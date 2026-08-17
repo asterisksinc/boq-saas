@@ -1,18 +1,18 @@
 import type { Metadata } from "next";
-import { Manrope } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 
-const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope" });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "Quantix — BOQ Management",
-  description: "Build, track, and deliver accurate Bills of Quantities.",
+  title: "DataCircles | BOQ + CRM",
+  description: "From scope to BOQ to purchase order—built for commercial clarity.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={manrope.variable}>{children}</body>
+      <body className={inter.variable}>{children}</body>
     </html>
   );
 }

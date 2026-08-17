@@ -1,155 +1,21 @@
-"use client";
-
-import {
-  Bell, Building2, ChevronDown, ChevronRight, CircleHelp, Clock3, Copy,
-  Download, FileText, FolderKanban, Gauge, LayoutDashboard, Menu, MoreHorizontal,
-  Plus, Search, Settings, Sparkles, TrendingUp, Users, X,
-} from "lucide-react";
-import { useMemo, useState } from "react";
-
-type Project = {
-  id: number;
-  name: string;
-  client: string;
-  code: string;
-  status: "In progress" | "Review" | "Draft";
-  value: number;
-  items: number;
-  updated: string;
-  progress: number;
-  color: string;
-};
-
-const initialProjects: Project[] = [
-  { id: 1, name: "Marina Heights", client: "Shoreline Developments", code: "QX-2401", status: "In progress", value: 2845000, items: 428, updated: "12 min ago", progress: 72, color: "#5a6cf0" },
-  { id: 2, name: "The Grove Residences", client: "Hearthstone Group", code: "QX-2398", status: "Review", value: 1672000, items: 316, updated: "Yesterday", progress: 91, color: "#ee8c5b" },
-  { id: 3, name: "Northstar Offices", client: "Axis Commercial", code: "QX-2387", status: "In progress", value: 4218000, items: 592, updated: "2 days ago", progress: 48, color: "#32a580" },
-  { id: 4, name: "Willow Health Centre", client: "Civic Health Trust", code: "QX-2374", status: "Draft", value: 986400, items: 184, updated: "4 days ago", progress: 24, color: "#9a72e8" },
-];
-
-const money = (value: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(value);
-
-export default function Dashboard() {
-  const [projects, setProjects] = useState(initialProjects);
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState("All projects");
-  const [modal, setModal] = useState(false);
-  const [sidebar, setSidebar] = useState(false);
-
-  const filtered = useMemo(() => projects.filter((project) => {
-    const matchesQuery = `${project.name} ${project.client} ${project.code}`.toLowerCase().includes(query.toLowerCase());
-    const matchesFilter = filter === "All projects" || project.status === filter;
-    return matchesQuery && matchesFilter;
-  }), [projects, query, filter]);
-
-  function addProject(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    const name = String(data.get("name") || "Untitled project");
-    const client = String(data.get("client") || "New client");
-    setProjects((current) => [{
-      id: Date.now(), name, client, code: `QX-${2400 + current.length + 1}`,
-      status: "Draft", value: 0, items: 0, updated: "Just now", progress: 8, color: "#5a6cf0",
-    }, ...current]);
-    setModal(false);
-  }
-
-  return (
-    <div className="app-shell">
-      {sidebar && <button className="scrim" aria-label="Close navigation" onClick={() => setSidebar(false)} />}
-      <aside className={`sidebar ${sidebar ? "sidebar-open" : ""}`}>
-        <div className="brand"><span className="brand-mark"><span /></span><strong>quantix</strong></div>
-        <button className="workspace"><span className="workspace-avatar">AC</span><span><small>Workspace</small><b>Atelier Costing</b></span><ChevronDown size={15} /></button>
-        <nav>
-          <NavItem icon={<LayoutDashboard />} label="Overview" active />
-          <NavItem icon={<FolderKanban />} label="Projects" count="12" />
-          <NavItem icon={<FileText />} label="Templates" />
-          <NavItem icon={<Building2 />} label="Cost library" />
-          <p className="nav-label">MANAGE</p>
-          <NavItem icon={<Users />} label="Team" />
-          <NavItem icon={<Gauge />} label="Reports" />
-        </nav>
-        <div className="sidebar-bottom">
-          <div className="trial-card"><span><Sparkles size={16} /> Pro trial</span><b>9 days left</b><div><i /></div><button>View plans</button></div>
-          <NavItem icon={<CircleHelp />} label="Help centre" />
-          <NavItem icon={<Settings />} label="Settings" />
-          <div className="profile"><span className="avatar">DK</span><span><b>Daniel Kim</b><small>Cost Consultant</small></span><MoreHorizontal size={18} /></div>
-        </div>
-      </aside>
-
-      <main>
-        <header className="topbar">
-          <button className="mobile-menu" onClick={() => setSidebar(true)}><Menu /></button>
-          <div className="breadcrumbs"><span>Atelier Costing</span><ChevronRight size={15} /><b>Overview</b></div>
-          <div className="top-actions"><button className="icon-btn"><Search size={19} /></button><button className="icon-btn notice"><Bell size={19} /><i /></button><button className="help-btn"><CircleHelp size={17} /> Help</button></div>
-        </header>
-
-        <section className="content">
-          <div className="welcome-row">
-            <div><p className="eyebrow">MONDAY, 17 AUGUST</p><h1>Good morning, Daniel.</h1><p>Here’s what’s happening across your estimates.</p></div>
-            <button className="primary-btn" onClick={() => setModal(true)}><Plus size={18} /> New project</button>
-          </div>
-
-          <div className="stat-grid">
-            <StatCard label="ACTIVE PROJECTS" value="12" note="2 added this month" icon={<FolderKanban />} trend />
-            <StatCard label="TOTAL ESTIMATED VALUE" value="£12.8m" note="Across active projects" icon={<TrendingUp />} />
-            <StatCard label="ITEMS PRICED" value="1,520" note="86% of total items" icon={<FileText />} ring />
-            <StatCard label="AWAITING REVIEW" value="3" note="Requires your attention" icon={<Clock3 />} alert />
-          </div>
-
-          <section className="panel projects-panel">
-            <div className="panel-head">
-              <div><h2>Recent projects</h2><p>Your latest Bills of Quantities</p></div>
-              <button className="text-btn">View all projects <ChevronRight size={16} /></button>
-            </div>
-            <div className="toolbar">
-              <label className="search-box"><Search size={17} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search projects..." /></label>
-              <div className="filter-tabs">{["All projects", "In progress", "Review", "Draft"].map((item) => <button key={item} onClick={() => setFilter(item)} className={filter === item ? "selected" : ""}>{item}</button>)}</div>
-            </div>
-            <div className="table-wrap">
-              <table>
-                <thead><tr><th>PROJECT</th><th>STATUS</th><th>ESTIMATED VALUE</th><th>PROGRESS</th><th>LAST UPDATED</th><th /></tr></thead>
-                <tbody>{filtered.map((project) => <tr key={project.id}>
-                  <td><div className="project-cell"><span className="project-icon" style={{ background: `${project.color}14`, color: project.color }}><Building2 size={20} /></span><span><b>{project.name}</b><small>{project.code} · {project.client}</small></span></div></td>
-                  <td><span className={`status ${project.status.toLowerCase().replace(" ", "-")}`}><i />{project.status}</span></td>
-                  <td><b>{money(project.value)}</b><small className="block">{project.items} line items</small></td>
-                  <td><div className="progress-cell"><div><i style={{ width: `${project.progress}%`, background: project.color }} /></div><span>{project.progress}%</span></div></td>
-                  <td><span className="muted">{project.updated}</span></td>
-                  <td><button className="row-action"><MoreHorizontal size={19} /></button></td>
-                </tr>)}</tbody>
-              </table>
-              {!filtered.length && <div className="empty-state">No projects match your search.</div>}
-            </div>
-          </section>
-
-          <div className="lower-grid">
-            <section className="panel activity-panel"><div className="panel-head"><div><h2>Recent activity</h2><p>Updates from your team</p></div><button className="row-action"><MoreHorizontal /></button></div>
-              <Activity initials="SM" color="#e8865f" text={<><b>Sarah Mitchell</b> updated pricing in <strong>Marina Heights</strong></>} time="18 min ago" />
-              <Activity initials="JL" color="#4c9a80" text={<><b>James Lee</b> submitted <strong>The Grove Residences</strong> for review</>} time="2 hours ago" />
-              <Activity initials="DK" color="#6372dc" text={<><b>You</b> imported 84 items to <strong>Northstar Offices</strong></>} time="Yesterday" />
-            </section>
-            <section className="panel quick-panel"><div className="panel-head"><div><h2>Quick actions</h2><p>Shortcuts to keep work moving</p></div></div>
-              <button onClick={() => setModal(true)}><span><Plus /></span><div><b>Create a new project</b><small>Start a BOQ from scratch</small></div><ChevronRight /></button>
-              <button><span><Copy /></span><div><b>Use a template</b><small>Build from your saved formats</small></div><ChevronRight /></button>
-              <button><span><Download /></span><div><b>Import a spreadsheet</b><small>Upload XLSX or CSV</small></div><ChevronRight /></button>
-            </section>
-          </div>
-        </section>
-      </main>
-
-      {modal && <div className="modal-backdrop" onMouseDown={() => setModal(false)}><div className="modal" onMouseDown={(e) => e.stopPropagation()}><div className="modal-head"><div><h2>Create project</h2><p>Set up a new Bill of Quantities.</p></div><button onClick={() => setModal(false)}><X /></button></div><form onSubmit={addProject}><label>Project name<input name="name" required autoFocus placeholder="e.g. Riverside Apartments" /></label><label>Client<input name="client" required placeholder="e.g. North & Co." /></label><div className="modal-actions"><button type="button" onClick={() => setModal(false)}>Cancel</button><button className="primary-btn" type="submit">Create project</button></div></form></div></div>}
-    </div>
-  );
-}
-
-function NavItem({ icon, label, active, count }: { icon: React.ReactNode; label: string; active?: boolean; count?: string }) {
-  return <button className={`nav-item ${active ? "active" : ""}`}><span>{icon}</span>{label}{count && <small>{count}</small>}</button>;
-}
-
-function StatCard({ label, value, note, icon, trend, ring, alert }: { label: string; value: string; note: string; icon: React.ReactNode; trend?: boolean; ring?: boolean; alert?: boolean }) {
-  return <div className="stat-card"><div className={`stat-icon ${alert ? "alert" : ""}`}>{icon}</div><p>{label}</p><div className="stat-value"><b>{value}</b>{ring && <span className="mini-ring">86%</span>}</div><small className={trend ? "positive" : ""}>{trend && <span>↗ 8.4%</span>} {note}</small></div>;
-}
-
-function Activity({ initials, color, text, time }: { initials: string; color: string; text: React.ReactNode; time: string }) {
-  return <div className="activity"><span className="activity-avatar" style={{ background: `${color}1c`, color }}>{initials}</span><div><p>{text}</p><small>{time}</small></div></div>;
-}
+import { ArrowRight, BarChart3, BriefcaseBusiness, Code2, FileSpreadsheet, FileText, Globe2, Mail, Menu, PackageCheck, PieChart } from "lucide-react";
+const a="/figma/", partners=["openai","amazon","nvidia","ford","coinbase","google","shopify","mindbody","mindbody","mindbody","mindbody"];
+const products=["Pricing","Atlas","Authorization Boost","Billing","Capital","Capital for platforms","Checkout","Climate","Connect","Crypto","Crypto Onramp","Data Pipeline","Elements","Financial Connections","Global Payouts","Identity","Invoicing","Issuing","Link","Managed Payments","Payment links","Payment methods","Payments","Radar","Revenue Recognition","Stripe Sigma","Subscriptions","Tax","Terminal","Treasury","Treasury for platforms","Usage-based billing"];
+const solutions=["Enterprises","Startups","Agentic commerce","Cryptocurrency","E-commerce","Embedded finance","Finance automation","Global businesses","In-app payments","Marketplaces","Money management","Platforms","SaaS","AI companies","Creator economy","Gaming","Hospitality, travel and leisure","Insurance","Media and entertainment","Non-profits","Professional services","Public sector","Retail"];
+export default function Home(){return <main className="site">
+<header className="nav-shell"><div className="nav-rail"><span className="brand-crop"><img className="brand-logo" src={`${a}logo.png`} alt="DataCircles"/></span><nav>{["Home","Product","Features","Pricing","Solutions","Insights","Company"].map(x=><a href={`#${x.toLowerCase()}`} key={x}>{x}</a>)}</nav><a className="button blue nav-cta" href="#demo">Request Demo</a><button className="mobile-menu" aria-label="Open navigation"><Menu/></button></div></header>
+<section className="hero-copy"><div><h1>From Scope to BOQ to Purchase Order<br/>Run Interior Project Commercials Without Excel Chaos.</h1><p>Create structured BOQs, standardize material pricing, compare vendor quotes, manage revisions, send<br className="desktop-only"/> client approvals, and convert approved cost plans into procurement-ready workflows all from one system built for interior design businesses.</p><span className="hero-actions"><a className="button blue" href="#pricing">Start Free</a><a className="button soft" href="#demo">Book a Demo</a></span><small>7-Day free trial · No card required · GST-Ready</small></div></section>
+<section className="partners"><div>{partners.map((x,i)=><span key={i}><img src={`${a}logo-${x}.svg`} alt={x}/></span>)}</div></section>
+<section className="hero-visual"><img className="hero-pattern" src={`${a}hero-pattern.svg`} alt=""/><div className="dashboard-wrap"><img className="dashboard" src={`${a}hero-dashboard.png`} alt="BOQ SaaS dashboard"/><img className="project-card" src={`${a}hero-card.png`} alt="Project summary"/></div></section>
+<section className="mission rail"><img src={`${a}contours.png`} alt=""/><Tag>Platform Mission</Tag><h2>Built for commercial clarity across design, estimation,<br/> procurement, and approvals.</h2></section>
+<section className="bento rail" id="product"><div className="bento-grid"><Card c="main"><h3>Accept and optimise payments<br/>globally – online and in person</h3><img src={`${a}bento-color.png`} alt="Abstract colorful wave"/></Card><Card c="billing"><h3>Enable any billing model</h3><i/></Card><Card c="agentic"><h3>Monetise through<br/>agentic commerce</h3></Card><Card c="borderless"><h3>Access borderless<br/>money movement with<br/>stablecoins and crypto</h3></Card><Card c="embed"><h3>Embed payments<br/>in your platform</h3><img src={`${a}bento-lines.png`} alt="Abstract line waves"/></Card></div></section>
+<section className="workflow rail" id="features"><Heading tag="CRM Connected">Interior BOQ workflows break down<br/>long before procurement begins.</Heading><div className="tabs">{[[FileSpreadsheet,"Excel Dosslved"],[FileText,"PDF Management"],[Mail,"WhatsApp Automation"],[Mail,"Email Management"],[BarChart3,"Manual edits"],[BarChart3,"Approval confusion."]].map(([I,t],n)=>{const Icon=I as typeof FileText;return <span className={n===0?"active":""} key={t as string}><Icon/>{t as string}</span>})}</div><div className="workflow-panel"><div className="workflow-copy"><div><h3>Excel-based BOQs become inconsistent across projects.</h3><p>Create a complete business profile for every company you work with. Centralize contacts, deals, invoices, notes, tasks, meetings, and activity history so your team always has the full context before making the next move.</p></div><blockquote>“We wanted businesses to stop searching across five different places just to understand what’s happening with one customer. DataCircles brings that entire relationship together.”<small>— Yash Mishra, CEO &amp; Founder</small></blockquote></div><div className="placeholder"/></div></section>
+<section className="solutions rail" id="solutions"><div className="solutions-head"><div><Tag>Invoicing Solutions</Tag><h2>Unified Solutions for Businesses,<br/>Workforces, and Customers</h2></div><p>Reduce manual work, close faster,<br/>and keep revenue operations running<br/>around the clock.</p></div><div className="solution-grid"><div className="builder"><div className="placeholder"/><div><h3>Build structured BOQs faster than spreadsheets can scale.</h3><p>Create category-wise BOQs with line items, quantities, units, rates, tax, labor, transport, markup, notes, and attachments. Use templates, duplicate previous BOQs, import Excel files, and maintain revision history without losing control.</p><a className="button blue" href="#demo">BOQ Builder</a></div></div><div className="feature-list"><Feature icon={<FileText/>} title="Smart Cost Library">Centralize material rates, vendor-linked pricing, GST logic, lead times, alternatives, and brand-level references so estimators and designers stop rebuilding price assumptions on every project.</Feature><Feature icon={<PieChart/>} title="Client Approvals">Share structured BOQs with clients, collect comments, manage rejections and revisions, capture digital approvals, and keep every decision tied to the commercial document version that was reviewed.</Feature></div></div><div className="video placeholder"><h2>Building the economic<br/>infrastructure for CRM + Invoicing</h2><a href="#demo">Watch now <ArrowRight/></a></div></section>
+<section className="integrations"><div className="integration-rail"><Heading dark tag="Oberion Integration">See how an interior BOQ moves from<br/>estimation to approval to procurement.</Heading><p className="int-sub">Connect your workflows with integrations that actually work. Use our off-the-shelf<br/>integrations, or build a custom integration with our REST API.</p><div className="int-logos">{Array.from({length:10},(_,i)=><span key={i}><img src={`${a}int-${i+1}.png`} alt={`Integration ${i+1}`}/></span>)}</div><div className="steps"><Step icon={<Code2/>} title="Create project">Developer-friendly APIs that let you extend, connect systems, and embed billing into your product.</Step>{["Build BOQ","Add materials and rates","Compare vendors","Send for approval","Convert into procurement actions"].map(x=><Step icon={<BriefcaseBusiness/>} title={x} key={x}>Enterprise-grade security with SOC 2 compliance, encryption, and audit-ready controls.</Step>)}</div></div></section>
+<section className="pricing rail" id="pricing"><Price title="Studio" price="₹200" desc="For companies getting their revenue operations off the ground." items={["Contact & Company Management","10,000 Records limit","3 Email Templates","1 Sales Pipeline","10 Custom Fields","10 Record Tags","+4 more features"]}/><Price popular title="Growth" price="₹400" desc="For companies ready to operationalize revenue and reporting." items={["All Starter features","25,000 Records limit","5 Email Templates","3 Sales Pipelines","25 Custom Fields","25 Record Tags","+4 more features"]}/></section>
+<section className="switcher rail placeholder"><div><h2>Stop switching between apps.</h2><p>Try BOQ SaaS free for 7 days at full limits and see your leads, invoices and payments in one place.<br/>No credit card needed.</p></div><a href="#demo"><ArrowRight/>Book a Free Demo</a></section>
+<section className="demo rail" id="demo"><img src={`${a}cta-contours.png`} alt=""/><Tag>Get Started</Tag><h2>See What BOQ Can Do for Your Business.</h2><p>Leave your email and we'll show you how BOQ can bring your customers, sales, invoicing, and<br/>operations together in one connected platform.</p><form><input type="email" placeholder="Email address"/><button>Book my Demo</button></form></section>
+<section className="ready rail"><div><h2>Ready to get started?</h2><p>Create an account instantly, or contact us to design a<br/>custom package for your business.</p><a className="button blue" href="#demo">Contact sales <ArrowRight/></a></div><Ready icon={<PackageCheck/>} title="See what you'll pay" link="Pricing details">Integrated per-transaction pricing<br/>with no hidden fees.</Ready><Ready icon={<Code2/>} title="Start building" link="Integration options">Get up and running with Stripe in as<br/>little as 10 minutes.</Ready></section>
+<footer className="footer rail"><div className="footer-cols"><Column title="Products and pricing" items={products}/><div><Column title="Solutions" items={solutions}/><Column sub title="Developers" items={["Documentation","API reference","API status","API changelog","Libraries and SDKs","Stripe Projects","Developer blog"]}/></div><div><Column title="Integrations and custom solutions" items={["Stripe App Marketplace","Stripe Partner ecosystem","Professional services"]}/><Column sub title="Resources" items={["Product roadmap","Guides","Customer stories","Blog","Community","Sessions annual conference","Privacy and terms","Prohibited and restricted businesses","Licences","Sitemap","Cookie settings","More resources"]}/></div><div><Column title="Company" items={["Careers","Newsroom","Stripe Press","Contact sales"]}/><Column sub title="Support" items={["Get support","Managed support plans"]}/><a className="signin">Sign in ›</a></div></div><div className="footer-bottom"><div><a><Globe2/> India (English)</a><p>© 2026 Stripe, LLC.</p></div><i/></div></footer>
+</main>}
+function Tag({children}:{children:React.ReactNode}){return <span className="tag"><i/>{children}</span>};function Heading({tag,children,dark=false}:{tag:string,children:React.ReactNode,dark?:boolean}){return <div className={`heading ${dark?'dark':''}`}><Tag>{tag}</Tag><h2>{children}</h2></div>};function Card({c,children}:{c:string,children:React.ReactNode}){return <article className={`bento-card ${c}`}>{children}</article>};function Feature({icon,title,children}:{icon:React.ReactNode,title:string,children:React.ReactNode}){return <article className="feature"><span>{icon}</span><div><h3>{title}</h3><p>{children}</p></div></article>};function Step({icon,title,children}:{icon:React.ReactNode,title:string,children:React.ReactNode}){return <article className="step"><span>{icon}</span><div><h3>{title}</h3><p>{children}</p></div></article>};function Price({title,price,desc,items,popular=false}:{title:string,price:string,desc:string,items:string[],popular?:boolean}){return <article className={`price ${popular?'popular':''}`}>{popular&&<b className="popular-label">● Most Popular Plan</b>}<h3>{popular?'✣':'◐'} {title}</h3><p>{desc}</p><div><strong>{price}</strong> <small>per user / month</small></div><ul>{items.map(x=><li key={x}>{x}</li>)}</ul><a>{popular?'Get Started':'Start free trial'}</a></article>};function Ready({icon,title,link,children}:{icon:React.ReactNode,title:string,link:string,children:React.ReactNode}){return <article className="ready-card"><span>{icon}</span><h3>{title}</h3><p>{children}</p><a>{link} <ArrowRight/></a></article>};function Column({title,items,sub=false}:{title:string,items:string[],sub?:boolean}){return <div className={`column ${sub?'sub':''}`}><h3>{title}</h3>{items.map(x=><a key={x}>{x}</a>)}</div>};
