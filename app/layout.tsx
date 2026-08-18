@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "DataCircles | BOQ + CRM",
+  title: "BOQ-SAAS",
   description: "From scope to BOQ to purchase order—built for commercial clarity.",
 };
 
