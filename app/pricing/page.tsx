@@ -48,7 +48,7 @@ function Tag({ children }: { children: React.ReactNode }) {
 
 function Header() {
   const links = ["Home", "Product", "Features", "Pricing", "Solutions", "Insights", "Company"];
-  return <header className="nav-shell"><div className="nav-rail"><a className="brand-placeholder" href="/" aria-label="BOQ-SAAS home"><span aria-hidden="true">B</span><strong>BOQ-SAAS</strong></a><nav>{links.map(x => <a href={x === "Pricing" ? "/pricing" : `/#${x.toLowerCase()}`} key={x}>{x}</a>)}</nav><a className="button blue nav-cta" href="#pricing-demo">Request Demo</a><button className="mobile-menu" aria-label="Open navigation"><Menu /></button></div></header>;
+  return <header className="nav-shell"><div className={`nav-rail ${styles.pricingNav}`}><a className="brand-placeholder" href="/" aria-label="BOQ-SAAS home"><span aria-hidden="true">B</span><strong>BOQ-SAAS</strong></a><nav>{links.map(x => <a className={x === "Pricing" ? "active-nav" : undefined} aria-current={x === "Pricing" ? "page" : undefined} href={x === "Pricing" ? "/pricing" : `/#${x.toLowerCase()}`} key={x}>{x}</a>)}</nav><a className="button blue nav-cta" href="#pricing-demo">Request Demo</a><button className="mobile-menu" aria-label="Open navigation"><Menu /></button></div></header>;
 }
 
 export default function PricingPage() {

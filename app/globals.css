@@ -7,3 +7,8 @@
 
 @media(min-width:1600px){.rail{width:auto;margin-left:309.5px;margin-right:309.5px}.hero-copy>div{width:auto;max-width:none;margin-left:302.5px;margin-right:302.5px}}
 @media(max-width:480px){.hero-copy h1{font-size:32px;line-height:36px}.hero-actions a{width:auto}.hero-visual{height:460px}.dashboard-wrap{transform:scale(.38)}.bento-card{height:350px}.solutions-head{display:block}.feature-list{grid-template-columns:1fr}.int-logos{grid-template-columns:repeat(2,1fr)}.switcher{align-items:flex-start;flex-direction:column;justify-content:flex-end}.demo form{height:auto;flex-direction:column;background:none;gap:8px}.demo input,.demo button{width:100%;height:50px;background:#f7f5f3}.demo button{background:#0085ff}.footer-cols{grid-template-columns:1fr}}
+
+/* Keep every home-page rail aligned to 300px gutters at 1920px. */
+@media(min-width:1101px){.rail,.nav-rail,.integration-rail{width:min(1320px,calc(100% - 80px));margin-left:auto;margin-right:auto}.hero-copy>div{width:min(1320px,calc(100% - 80px));max-width:none;margin-left:auto;margin-right:auto}}
+
+.nav-rail nav a{position:relative;transition:color .2s ease}.nav-rail nav a:hover,.nav-rail nav a.active-nav{color:var(--blue)}.nav-rail nav a.active-nav::after{content:"";position:absolute;left:0;right:0;bottom:-17px;height:2px;border-radius:2px;background:var(--blue)}
