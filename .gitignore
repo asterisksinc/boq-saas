@@ -1,9 +1,1 @@
-.next/
-node_modules/
-node_modules.partial/
-*.tsbuildinfo
-.chrome-qa/
-.chrome-qa-2/
-final-page.png
-final-qa.png
-margin-qa.png
+node_modules
