@@ -1,0 +1,229 @@
+{
+  "info": {
+    "_postman_id": "c6641a60-321f-4543-a85c-c38fbc541495",
+    "name": "BOQ Design Arena — Auth Only",
+    "description": "Authentication-only collection for BOQ Design Arena. Import the BOQ Design Arena — Local environment and keep Postman's cookie jar enabled. Supabase SSR session cookies are stored automatically; never manually store access or refresh tokens.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "let json;",
+          "try { json = pm.response.json(); } catch (_) {}",
+          "const requestId = json?.requestId || json?.error?.requestId || pm.response.headers.get('x-request-id');",
+          "if (requestId) pm.environment.set('lastRequestId', requestId);",
+          "pm.test('No stack trace is exposed', () => pm.expect(pm.response.text().toLowerCase()).not.to.include('stack trace'));"
+        ]
+      }
+    }
+  ],
+  "variable": [{ "key": "baseUrl", "value": "http://localhost:3000" }],
+  "item": [
+    {
+      "name": "01 — Registration and Verification",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"displayName\": \"{{displayName}}\",\n  \"companyName\": \"{{companyName}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/register",
+            "description": "Creates the Auth user plus default workspace, owner membership, profile, preferences, onboarding state, and audit record."
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Registration is accepted or duplicate is reported', () => pm.expect([201, 409]).to.include(pm.response.code));",
+                "if (pm.response.code === 201) pm.test('Verification state returned', () => pm.expect(pm.response.json().data).to.have.property('emailVerificationRequired'));"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Verify Email — PKCE Code",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/verify-email?code={{verificationCode}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "verify-email"],
+              "query": [{ "key": "code", "value": "{{verificationCode}}" }]
+            },
+            "description": "Copy the code query parameter from the Supabase email redirect into verificationCode. A successful exchange also establishes the cookie session."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Email verified', () => pm.response.to.have.status(200));"] } }]
+        },
+        {
+          "name": "Verify Email — Token Hash",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tokenHash\": \"{{verificationTokenHash}}\",\n  \"type\": \"{{verificationType}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/verify-email",
+            "description": "Alternative for custom Supabase templates that expose token_hash. verificationType is normally signup."
+          }
+        },
+        {
+          "name": "Resend Verification",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\"\n}" },
+            "url": "{{baseUrl}}/api/v1/auth/resend-verification",
+            "description": "Returns a generic response and is rate limited to avoid account enumeration and abuse."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Generic resend response', () => pm.response.to.have.status(200));"] } }]
+        }
+      ]
+    },
+    {
+      "name": "02 — Session",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}" },
+            "url": "{{baseUrl}}/api/v1/auth/login",
+            "description": "Authenticates the user and writes Supabase SSR cookies to Postman's cookie jar."
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Login succeeds', () => pm.response.to.have.status(200));",
+                "const data = pm.response.json().data;",
+                "pm.test('Identity and workspace context returned', () => { pm.expect(data.user.id).to.be.a('string'); pm.expect(data.context.workspace.id).to.be.a('string'); });"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Current Auth Identity",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/auth/me",
+            "description": "Returns identity, workspace, membership, permissions, preferences, and onboarding state from the active cookie session."
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Authenticated context returned', () => pm.response.to.have.status(200));",
+                "const data = pm.response.json().data;",
+                "pm.test('Permissions are server computed', () => pm.expect(data.permissions).to.have.property('canViewFinancials'));"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Refresh Session",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/auth/refresh",
+            "description": "Refreshes and rotates the current Supabase session using the refresh cookie in Postman's cookie jar."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Session refreshed', () => pm.response.to.have.status(200));", "pm.test('Expiry returned', () => pm.expect(pm.response.json().data.expiresAt).to.be.a('number'));"] } }]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/auth/logout",
+            "description": "Revokes the local refresh session and clears the application session cookies."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Logout accepted', () => pm.response.to.have.status(200));", "pm.test('Logged-out flag returned', () => pm.expect(pm.response.json().data.loggedOut).to.eql(true));"] } }]
+        }
+      ]
+    },
+    {
+      "name": "03 — Password Recovery",
+      "item": [
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\"\n}" },
+            "url": "{{baseUrl}}/api/v1/auth/forgot-password",
+            "description": "Always returns the same success-style response. Open the recovery link using the same browser/cookie context, then copy its code into resetCode."
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Recovery request accepted', () => pm.response.to.have.status(200));",
+                "pm.test('Response does not expose account existence', () => pm.expect(pm.response.json().data.message).to.include('If an account exists'));"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"code\": \"{{resetCode}}\",\n  \"password\": \"{{newPassword}}\"\n}" },
+            "url": "{{baseUrl}}/api/v1/auth/reset-password",
+            "description": "Exchanges the one-time recovery code, updates the password, and revokes other sessions."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Password reset succeeds', () => pm.response.to.have.status(200));"] } }]
+        }
+      ]
+    },
+    {
+      "name": "04 — Negative Auth Checks",
+      "item": [
+        {
+          "name": "Invalid Credentials",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"definitely-wrong-password\"\n}" },
+            "url": "{{baseUrl}}/api/v1/auth/login"
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Generic authentication failure', () => pm.response.to.have.status(401));",
+                "pm.test('No credential detail leaked', () => pm.expect(pm.response.json().error.message).to.eql('Invalid email or password.'));"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Unauthenticated Auth Me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/auth/me",
+            "description": "Clear localhost cookies in Postman's Cookies manager before running. Expected result: 401 UNAUTHENTICATED."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Authentication is required', () => pm.response.to.have.status(401));", "pm.test('Correct error code', () => pm.expect(pm.response.json().error.code).to.eql('UNAUTHENTICATED'));"] } }]
+        }
+      ]
+    }
+  ]
+}

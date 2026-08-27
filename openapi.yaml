@@ -1,0 +1,144 @@
+openapi: 3.1.0
+info:
+  title: BOQ Design Arena Phase 1 API
+  version: 1.0.0
+servers:
+  - url: /api/v1
+security:
+  - supabaseCookie: []
+paths:
+  /auth/register:
+    post:
+      security: []
+      summary: Register an account and default workspace
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Register' } } } }
+      responses: { '201': { description: Registered }, '409': { $ref: '#/components/responses/Error' }, '429': { $ref: '#/components/responses/Error' } }
+  /auth/login:
+    post:
+      security: []
+      summary: Sign in and set the Supabase SSR session cookies
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Login' } } } }
+      responses: { '200': { description: Signed in }, '401': { $ref: '#/components/responses/Error' }, '429': { $ref: '#/components/responses/Error' } }
+  /auth/refresh:
+    post:
+      summary: Rotate and refresh the current Supabase session
+      responses: { '200': { description: Refreshed }, '401': { $ref: '#/components/responses/Error' } }
+  /auth/logout:
+    post:
+      summary: Revoke the local refresh session and clear cookies
+      responses: { '200': { description: Logged out } }
+  /auth/me:
+    get:
+      summary: Auth identity, active workspace, membership, permissions, and onboarding
+      responses: { '200': { description: Current context }, '401': { $ref: '#/components/responses/Error' } }
+  /auth/forgot-password:
+    post:
+      security: []
+      summary: Send a non-enumerating Supabase recovery email
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Email' } } } }
+      responses: { '200': { description: Generic accepted response }, '429': { $ref: '#/components/responses/Error' } }
+  /auth/reset-password:
+    post:
+      security: []
+      summary: Exchange a one-time PKCE recovery code and set a new password
+      requestBody: { required: true, content: { application/json: { schema: { type: object, additionalProperties: false, required: [code, password], properties: { code: { type: string }, password: { type: string, minLength: 10, maxLength: 128 } } } } } }
+      responses: { '200': { description: Password reset }, '400': { $ref: '#/components/responses/Error' } }
+  /auth/verify-email:
+    get:
+      security: []
+      summary: Verify a Supabase PKCE code or email-link token hash
+      parameters:
+        - { in: query, name: code, required: false, description: PKCE code returned to the configured verification redirect, schema: { type: string } }
+        - { in: query, name: token_hash, required: false, description: Token hash used by a custom email template, schema: { type: string } }
+        - { in: query, name: type, required: false, schema: { type: string, enum: [email, signup, email_change] } }
+      responses: { '200': { description: Verified }, '400': { $ref: '#/components/responses/Error' } }
+    post:
+      security: []
+      summary: Verify a Supabase email token from JSON
+      responses: { '200': { description: Verified }, '400': { $ref: '#/components/responses/Error' } }
+  /auth/resend-verification:
+    post:
+      security: []
+      summary: Resend signup verification without account enumeration
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Email' } } } }
+      responses: { '200': { description: Generic accepted response } }
+  /users/me:
+    get:
+      summary: Get the current user and workspace context
+      responses: { '200': { description: Current user } }
+    patch:
+      summary: Update allowlisted user profile fields
+      requestBody: { required: true, content: { application/json: { schema: { type: object, additionalProperties: false, properties: { displayName: { type: [string, 'null'], maxLength: 120 } } } } } }
+      responses: { '200': { description: Updated }, '400': { $ref: '#/components/responses/Error' } }
+  /users/me/password:
+    patch:
+      summary: Change password after verifying the current password
+      responses: { '200': { description: Changed }, '401': { $ref: '#/components/responses/Error' } }
+  /users/me/preferences:
+    get:
+      summary: Read timezone and locale preferences
+      responses: { '200': { description: Preferences } }
+    patch:
+      summary: Update allowlisted timezone and locale preferences
+      responses: { '200': { description: Updated }, '400': { $ref: '#/components/responses/Error' } }
+  /onboarding/me:
+    get:
+      summary: Read resumable onboarding state
+      responses: { '200': { description: Onboarding state } }
+    patch:
+      summary: Atomically update progress and supported company settings
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/OnboardingPatch' } } } }
+      responses: { '200': { description: Updated }, '403': { $ref: '#/components/responses/Error' } }
+  /dashboard/overview:
+    get:
+      summary: Permission-aware workspace dashboard overview
+      responses:
+        '200': { description: Overview, including safe empty states for deferred domains, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+        '401': { $ref: '#/components/responses/Error' }
+  /dashboard/recent-projects: { get: { summary: Paginated recent projects (typed empty until Phase 4), responses: { '200': { $ref: '#/components/responses/Page' } } } }
+  /dashboard/recent-boqs: { get: { summary: Paginated recent BOQs (typed empty until Phase 5), responses: { '200': { $ref: '#/components/responses/Page' } } } }
+  /dashboard/pending-actions: { get: { summary: Paginated pending actions (typed empty until workflow phase), responses: { '200': { $ref: '#/components/responses/Page' } } } }
+  /dashboard/upcoming-deliverables: { get: { summary: Paginated deliverables (typed empty until project phase), responses: { '200': { $ref: '#/components/responses/Page' } } } }
+  /dashboard/notifications: { get: { summary: Paginated user notifications, responses: { '200': { $ref: '#/components/responses/Page' } } } }
+components:
+  securitySchemes:
+    supabaseCookie: { type: apiKey, in: cookie, name: sb-access-token }
+  schemas:
+    Email: { type: object, additionalProperties: false, required: [email], properties: { email: { type: string, format: email } } }
+    Login: { type: object, additionalProperties: false, required: [email, password], properties: { email: { type: string, format: email }, password: { type: string } } }
+    Register:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 10, maxLength: 128 }
+        displayName: { type: string, maxLength: 120 }
+        companyName: { type: string, maxLength: 160 }
+    OnboardingPatch:
+      type: object
+      additionalProperties: false
+      properties:
+        currentStep: { type: string }
+        completedSteps: { type: array, items: { type: string } }
+        skippedSteps: { type: array, items: { type: string } }
+        company:
+          type: object
+          additionalProperties: false
+          properties:
+            name: { type: string }
+            logoUrl: { type: [string, 'null'], format: uri }
+            website: { type: [string, 'null'], format: uri }
+            businessEmail: { type: [string, 'null'], format: email }
+            phone: { type: [string, 'null'] }
+            address: { type: [string, 'null'] }
+            country: { type: [string, 'null'] }
+            currency: { type: string, pattern: '^[A-Z]{3}$' }
+            taxId: { type: [string, 'null'] }
+            timezone: { type: string }
+    Envelope: { type: object, required: [data, requestId], properties: { data: {}, requestId: { type: string, format: uuid } } }
+    Error: { type: object, required: [error], properties: { error: { type: object, required: [code, message, requestId], properties: { code: { type: string }, message: { type: string }, fields: { type: object }, requestId: { type: string } } } } }
+    Page: { type: object, properties: { items: { type: array, items: {} }, page: { type: integer }, pageSize: { type: integer }, total: { type: integer }, hasMore: { type: boolean } } }
+  responses:
+    Error: { description: Error envelope, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Page: { description: Paginated response, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
