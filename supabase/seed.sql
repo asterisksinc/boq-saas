@@ -3,11 +3,10 @@
 -- DEV / TEST ONLY. Never apply this file to production.
 -- Supabase runs this file after migrations during `supabase db reset`.
 --
--- The auth.users rows below are deterministic placeholder identities so public
--- tables can be seeded with realistic ownership and tenant relationships. They
--- intentionally have no password and cannot sign in. Create login-capable test
--- users through POST /api/v1/auth/register, Supabase Studio, or the Auth Admin
--- API so Supabase owns password hashing and identity creation.
+-- Most auth.users rows below are deterministic placeholder identities so public
+-- tables can be seeded with realistic ownership and tenant relationships. The
+-- diptishgohane04@gmail.com fixture also receives an auth.identities row and is
+-- intended for email-OTP login testing; no seed password is stored.
 
 begin;
 
@@ -15,37 +14,116 @@ begin;
 -- 1. Placeholder Auth users
 -- ---------------------------------------------------------------------------
 
-insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data)
+insert into auth.users (
+  instance_id,
+  id,
+  aud,
+  role,
+  email,
+  email_confirmed_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at
+)
 values
   (
+    '00000000-0000-0000-0000-000000000000',
     '11111111-1111-4111-8111-111111111111',
+    'authenticated',
+    'authenticated',
     'fixture-owner-a@seed.invalid',
     now(),
-    '{"display_name":"Aarav Owner","company_name":"Arena Design Studio"}'::jsonb
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{"display_name":"Aarav Owner","company_name":"Arena Design Studio"}'::jsonb,
+    now(),
+    now()
   ),
   (
+    '00000000-0000-0000-0000-000000000000',
     '22222222-2222-4222-8222-222222222222',
+    'authenticated',
+    'authenticated',
     'fixture-member-a@seed.invalid',
     now(),
-    '{"display_name":"Meera Member","company_name":"Temporary Member Workspace"}'::jsonb
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{"display_name":"Meera Member","company_name":"Temporary Member Workspace"}'::jsonb,
+    now(),
+    now()
   ),
   (
+    '00000000-0000-0000-0000-000000000000',
     '33333333-3333-4333-8333-333333333333',
+    'authenticated',
+    'authenticated',
     'fixture-viewer-a@seed.invalid',
     now(),
-    '{"display_name":"Vihaan Viewer","company_name":"Temporary Viewer Workspace"}'::jsonb
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{"display_name":"Vihaan Viewer","company_name":"Temporary Viewer Workspace"}'::jsonb,
+    now(),
+    now()
   ),
   (
+    '00000000-0000-0000-0000-000000000000',
     '44444444-4444-4444-8444-444444444444',
+    'authenticated',
+    'authenticated',
     'fixture-owner-b@seed.invalid',
     now(),
-    '{"display_name":"Isha Owner","company_name":"Second Tenant Studio"}'::jsonb
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{"display_name":"Isha Owner","company_name":"Second Tenant Studio"}'::jsonb,
+    now(),
+    now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000000',
+    '55555555-5555-4555-8555-555555555555',
+    'authenticated',
+    'authenticated',
+    'diptishgohane04@gmail.com',
+    now(),
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{"display_name":"Diptish Gohane","company_name":"Arena Design Studio"}'::jsonb,
+    now(),
+    now()
   )
 on conflict (id) do update
 set
+  instance_id = excluded.instance_id,
+  aud = excluded.aud,
+  role = excluded.role,
   email = excluded.email,
   email_confirmed_at = excluded.email_confirmed_at,
+  raw_app_meta_data = excluded.raw_app_meta_data,
   raw_user_meta_data = excluded.raw_user_meta_data;
+
+-- A proper email identity lets GoTrue locate this confirmed user when
+-- signInWithOtp is called with shouldCreateUser=false.
+insert into auth.identities (
+  id,
+  provider_id,
+  user_id,
+  identity_data,
+  provider,
+  last_sign_in_at,
+  created_at,
+  updated_at
+)
+values (
+  '55555555-5555-4555-8555-555555555555',
+  '55555555-5555-4555-8555-555555555555',
+  '55555555-5555-4555-8555-555555555555',
+  '{"sub":"55555555-5555-4555-8555-555555555555","email":"diptishgohane04@gmail.com","email_verified":true}'::jsonb,
+  'email',
+  now(),
+  now(),
+  now()
+)
+on conflict (provider_id, provider) do update
+set
+  user_id = excluded.user_id,
+  identity_data = excluded.identity_data,
+  updated_at = excluded.updated_at;
 
 -- The signup trigger creates a temporary default workspace for every newly
 -- inserted user. The deterministic workspaces below make repeated seeds stable.
@@ -113,6 +191,14 @@ values
     'owner',
     'active',
     now() - interval '45 days'
+  ),
+  (
+    'a5555555-5555-4555-8555-555555555555',
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    '55555555-5555-4555-8555-555555555555',
+    'owner',
+    'active',
+    now()
   )
 on conflict (workspace_id, user_id) do update
 set
@@ -135,7 +221,8 @@ and exists (
       '11111111-1111-4111-8111-111111111111',
       '22222222-2222-4222-8222-222222222222',
       '33333333-3333-4333-8333-333333333333',
-      '44444444-4444-4444-8444-444444444444'
+      '44444444-4444-4444-8444-444444444444',
+      '55555555-5555-4555-8555-555555555555'
     )
 );
 
@@ -148,7 +235,8 @@ values
   ('11111111-1111-4111-8111-111111111111', 'Aarav Owner', null),
   ('22222222-2222-4222-8222-222222222222', 'Meera Member', null),
   ('33333333-3333-4333-8333-333333333333', 'Vihaan Viewer', null),
-  ('44444444-4444-4444-8444-444444444444', 'Isha Owner', null)
+  ('44444444-4444-4444-8444-444444444444', 'Isha Owner', null),
+  ('55555555-5555-4555-8555-555555555555', 'Diptish Gohane', null)
 on conflict (user_id) do update
 set
   display_name = excluded.display_name,
@@ -159,7 +247,8 @@ values
   ('11111111-1111-4111-8111-111111111111', 'Asia/Kolkata', 'en-IN'),
   ('22222222-2222-4222-8222-222222222222', 'Asia/Kolkata', 'en-IN'),
   ('33333333-3333-4333-8333-333333333333', 'Asia/Kolkata', 'en-IN'),
-  ('44444444-4444-4444-8444-444444444444', 'America/New_York', 'en-US')
+  ('44444444-4444-4444-8444-444444444444', 'America/New_York', 'en-US'),
+  ('55555555-5555-4555-8555-555555555555', 'Asia/Kolkata', 'en-IN')
 on conflict (user_id) do update
 set
   timezone = excluded.timezone,
@@ -246,6 +335,14 @@ values
   (
     'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
     '44444444-4444-4444-8444-444444444444',
+    'company_setup',
+    array['account_created'],
+    array[]::text[],
+    'in_progress'
+  ),
+  (
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    '55555555-5555-4555-8555-555555555555',
     'company_setup',
     array['account_created'],
     array[]::text[],
@@ -399,8 +496,10 @@ where not exists (
 commit;
 
 -- Seed summary:
---   Workspace A: owner + member + viewer, INR / Asia-Kolkata
+--   Workspace A: owners (including diptishgohane04@gmail.com) + member + viewer,
+--                INR / Asia-Kolkata
 --   Workspace B: separate owner, USD / America-New_York
+--   OTP login fixture: diptishgohane04@gmail.com (confirmed email identity)
 --   Notifications: unread/read, multiple priorities, both tenants
 --   Onboarding: completed and resumable examples
 --   Projects/BOQs/Costs/Approvals: not seeded because those tables are deferred

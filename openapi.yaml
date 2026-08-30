@@ -16,7 +16,7 @@ paths:
   /auth/login:
     post:
       security: []
-      summary: Request an email OTP, verify it, or use the legacy password login
+      summary: Request an email OTP (creating a first-time user), verify it, or use the legacy password login
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Login' } } } }
       responses: { '200': { description: Signed in }, '401': { $ref: '#/components/responses/Error' }, '429': { $ref: '#/components/responses/Error' } }
   /auth/refresh:

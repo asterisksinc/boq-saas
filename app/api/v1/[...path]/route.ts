@@ -1,6 +1,8 @@
 import { type SupabaseClient } from "@supabase/supabase-js";
 import { type NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { EmailOtpError, issueEmailOtp, verifyEmailOtp } from "@/lib/auth/email-otp";
 import { emptyPage, pagination } from "@/lib/domain/dashboard";
 import { consumeRateLimit, rateLimitKey } from "@/lib/api/rate-limit";
 import { fail, methodNotAllowed, ok, requestId } from "@/lib/api/response";
@@ -59,27 +61,44 @@ async function audit(supabase: SupabaseClient, action: string, id: string) {
   if (error) console.error(JSON.stringify({ requestId: id, event: "audit_write_failed", code: error.code }));
 }
 
+function emailOtpFailure(error: unknown, id: string) {
+  if (error instanceof EmailOtpError && error.code === "RATE_LIMITED") {
+    return fail("RATE_LIMITED", error.message, 429, id);
+  }
+  if (error instanceof EmailOtpError && error.code === "INVALID_OTP") {
+    return fail("UNAUTHENTICATED", "Invalid or expired OTP.", 401, id);
+  }
+  console.error(JSON.stringify({
+    requestId: id,
+    event: "custom_email_otp_failed",
+    reason: error instanceof Error ? error.message : "unknown",
+  }));
+  return fail("OTP_SEND_FAILED", "Gmail could not send the OTP. Check the SMTP configuration.", 500, id);
+}
+
 async function register(request: Request, supabase: SupabaseClient, id: string) {
   const blocked = limited(request, "register", id, 8); if (blocked) return blocked;
   const input = await parsed(request, registerSchema, id); if (input.response) return input.response;
-  const redirectTo = process.env.EMAIL_VERIFICATION_REDIRECT_URL ?? `${process.env.APP_URL ?? new URL(request.url).origin}/onboarding`;
-  const { data, error } = await supabase.auth.signUp({
+  let admin;
+  try { admin = createSupabaseAdminClient(); }
+  catch (error) { return emailOtpFailure(error, id); }
+  const { data, error } = await admin.auth.admin.createUser({
     email: input.data.email,
     password: input.data.password,
-    options: { emailRedirectTo: redirectTo, data: { display_name: input.data.displayName, company_name: input.data.companyName } },
+    email_confirm: false,
+    user_metadata: { display_name: input.data.displayName, company_name: input.data.companyName },
   });
   if (error) {
     const duplicate = /already|registered|exists/i.test(error.message);
     return fail(duplicate ? "CONFLICT" : "VALIDATION_ERROR", duplicate ? "An account with this email already exists." : "Registration could not be completed.", duplicate ? 409 : 400, id);
   }
-  const emailVerificationRequired = !data.session;
+  try { await issueEmailOtp(input.data.email, data.user.id); }
+  catch (otpError) { return emailOtpFailure(otpError, id); }
   return ok({
-    user: { id: data.user?.id, email: data.user?.email },
-    emailVerificationRequired,
-    otpSent: emailVerificationRequired,
-    message: emailVerificationRequired
-      ? "A 6-digit verification code has been sent to your email."
-      : "Registration completed.",
+    user: { id: data.user.id, email: data.user.email },
+    emailVerificationRequired: true,
+    otpSent: true,
+    message: "A 6-digit verification code has been sent through Gmail.",
   }, 201, id);
 }
 
@@ -88,20 +107,26 @@ async function login(request: Request, supabase: SupabaseClient, id: string) {
   const input = await parsed(request, loginSchema, id); if (input.response) return input.response;
 
   if (!("password" in input.data) && !("otp" in input.data)) {
-    const { error } = await supabase.auth.signInWithOtp({
-      email: input.data.email,
-      options: { shouldCreateUser: false },
-    });
-    if (error) {
-      console.error(JSON.stringify({ requestId: id, event: "login_otp_send_failed", code: error.code }));
-      return fail("OTP_SEND_FAILED", "OTP could not be sent. Please try again.", 400, id);
-    }
-    return ok({ otpSent: true, message: "A 6-digit login code has been sent to your email." }, 200, id);
+    try { await issueEmailOtp(input.data.email); }
+    catch (error) { return emailOtpFailure(error, id); }
+    return ok({ otpSent: true, message: "A 6-digit login code has been sent through Gmail." }, 200, id);
   }
 
-  const result = "otp" in input.data
-    ? await supabase.auth.verifyOtp({ email: input.data.email, token: input.data.otp, type: "email" })
-    : await supabase.auth.signInWithPassword(input.data);
+  let result;
+  if ("otp" in input.data) {
+    let userId: string;
+    try { userId = await verifyEmailOtp(input.data.email, input.data.otp); }
+    catch (error) { return emailOtpFailure(error, id); }
+    const admin = createSupabaseAdminClient();
+    const confirmed = await admin.auth.admin.updateUserById(userId, { email_confirm: true });
+    if (confirmed.error) return fail("INTERNAL_ERROR", "Account verification could not be completed.", 500, id);
+    const link = await admin.auth.admin.generateLink({ type: "magiclink", email: input.data.email });
+    const tokenHash = link.data?.properties?.hashed_token;
+    if (link.error || !tokenHash) return fail("INTERNAL_ERROR", "Login session could not be created.", 500, id);
+    result = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "magiclink" });
+  } else {
+    result = await supabase.auth.signInWithPassword(input.data);
+  }
   const { data, error } = result;
   if (error || !data.user) {
     return fail("UNAUTHENTICATED", "otp" in input.data ? "Invalid or expired OTP." : "Invalid email or password.", 401, id);
@@ -166,12 +191,9 @@ async function verifyEmail(request: NextRequest, supabase: SupabaseClient, id: s
 async function resendVerification(request: Request, supabase: SupabaseClient, id: string) {
   const blocked = limited(request, "resend-verification", id, 4); if (blocked) return blocked;
   const input = await parsed(request, resendVerificationSchema, id); if (input.response) return input.response;
-  await supabase.auth.resend({
-    type: "signup",
-    email: input.data.email,
-    options: { emailRedirectTo: process.env.EMAIL_VERIFICATION_REDIRECT_URL ?? `${process.env.APP_URL ?? new URL(request.url).origin}/onboarding` },
-  });
-  return ok({ message: "If verification is pending, a new email has been sent." }, 200, id);
+  try { await issueEmailOtp(input.data.email); }
+  catch (error) { return emailOtpFailure(error, id); }
+  return ok({ message: "If verification is pending, a new Gmail OTP has been sent." }, 200, id);
 }
 
 async function getMe(supabase: SupabaseClient, id: string) {

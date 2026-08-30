@@ -15,6 +15,13 @@ enable_confirmations = true
 otp_length = 6
 otp_expiry = 3600
 
+# Local development only. The hosted built-in email provider has its own low
+# project-wide quota; use custom SMTP before increasing hosted limits.
+[auth.rate_limit]
+email_sent = 50
+sign_in_sign_ups = 100
+token_verifications = 100
+
 [auth.email.template.confirmation]
 subject = "Your BOQ Design Arena verification code"
 content_path = "./supabase/templates/confirmation.html"

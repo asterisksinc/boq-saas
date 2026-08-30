@@ -49,6 +49,7 @@ describe("permissions and empty dashboard contracts", () => {
 
 describe("Supabase tenant controls", () => {
   const migration = readFileSync("supabase/migrations/20260827173000_phase1_auth_user_dashboard.sql", "utf8");
+  const seed = readFileSync("supabase/seed.sql", "utf8");
 
   it("enables RLS for every exposed Phase 1 table", () => {
     for (const table of ["workspaces", "workspace_memberships", "user_profiles", "user_preferences", "workspace_profiles", "onboarding_progress", "notifications", "audit_logs"]) {
@@ -61,9 +62,19 @@ describe("Supabase tenant controls", () => {
     expect(migration).toContain("'canViewFinancials', p_role in ('owner','admin')");
     expect(migration).toContain("case when s.role in ('owner','admin')");
   });
+
+  it("seeds the requested confirmed email identity for OTP login testing", () => {
+    expect(seed).toContain("diptishgohane04@gmail.com");
+    expect(seed).toContain("insert into auth.identities");
+    expect(seed).toContain('"email_verified":true');
+    expect(seed).toContain('"provider":"email","providers":["email"]');
+  });
 });
 
 describe("Supabase email OTP templates", () => {
+  const authRoute = readFileSync("app/api/v1/[...path]/route.ts", "utf8");
+  const customOtp = readFileSync("lib/auth/email-otp.ts", "utf8");
+  const otpMigration = readFileSync("supabase/migrations/20260830213500_custom_email_login_otps.sql", "utf8");
   const config = readFileSync("supabase/config.toml", "utf8");
   const confirmation = readFileSync("supabase/templates/confirmation.html", "utf8");
   const login = readFileSync("supabase/templates/magic-link.html", "utf8");
@@ -81,5 +92,19 @@ describe("Supabase email OTP templates", () => {
     expect(config).toContain("[auth.email.template.magic_link]");
     expect(config).toContain('content_path = "./supabase/templates/magic-link.html"');
     expect(config).toContain("otp_length = 6");
+  });
+
+  it("uses a custom Gmail OTP instead of Supabase email delivery", () => {
+    expect(customOtp).toContain("nodemailer.createTransport");
+    expect(customOtp).toContain("randomInt(100000, 1000000)");
+    expect(customOtp).toContain('service: "gmail"');
+    expect(authRoute).not.toContain("signInWithOtp");
+  });
+
+  it("stores only hashed, expiring OTPs behind service-role access", () => {
+    expect(customOtp).toContain('createHmac("sha256"');
+    expect(otpMigration).toContain("alter table public.email_login_otps enable row level security");
+    expect(otpMigration).toContain("revoke all on public.email_login_otps from anon, authenticated");
+    expect(otpMigration).toContain("expires_at timestamptz not null");
   });
 });

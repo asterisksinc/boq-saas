@@ -1,0 +1,215 @@
+{
+  "info": {
+    "_postman_id": "14bb9735-4d2c-4ca0-b253-f0ef23690c11",
+    "name": "BOQ Design Arena — Phase 1 Backend",
+    "description": "Import the matching Local environment first. Requests use the Next.js API and Supabase SSR cookies. Postman stores Set-Cookie values automatically; do not manually copy access or refresh tokens. Recommended run order: Register → Verify Email (when enabled) → Login → Auth Me → User/Onboarding/Dashboard → Logout.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "let json;",
+          "try { json = pm.response.json(); } catch (_) {}",
+          "const requestId = json?.requestId || json?.error?.requestId || pm.response.headers.get('x-request-id');",
+          "if (requestId) pm.environment.set('lastRequestId', requestId);",
+          "pm.test('Response never exposes a stack trace', function () {",
+          "  pm.expect(pm.response.text().toLowerCase()).not.to.include('stack trace');",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "page", "value": "1" },
+    { "key": "pageSize", "value": "20" }
+  ],
+  "item": [
+    {
+      "name": "01 — Authentication",
+      "description": "Supabase Auth is accessed only through the application API. Login and verification responses populate Postman's cookie jar.",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"displayName\": \"{{displayName}}\",\n  \"companyName\": \"{{companyName}}\"\n}" },
+            "url": "{{baseUrl}}/api/v1/auth/register",
+            "description": "Creates the Supabase Auth user and atomically provisions the default workspace, owner membership, profile, preferences, workspace profile, onboarding progress, and audit event."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Registered or duplicate is handled', () => pm.expect([201, 409]).to.include(pm.response.code));"] } }]
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}" },
+            "url": "{{baseUrl}}/api/v1/auth/login",
+            "description": "On success, Postman stores the Supabase SSR cookies automatically. Keep cookies enabled for baseUrl."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Login succeeds', () => pm.response.to.have.status(200));", "const json = pm.response.json();", "pm.test('Workspace context returned', () => pm.expect(json.data.context.workspace.id).to.be.a('string'));"] } }]
+        },
+        {
+          "name": "Refresh Session",
+          "request": { "method": "POST", "header": [], "url": "{{baseUrl}}/api/v1/auth/refresh", "description": "Rotates/refreshes the cookie session. Requires a valid refresh cookie in Postman's cookie jar." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Session refreshed', () => pm.response.to.have.status(200));"] } }]
+        },
+        {
+          "name": "Auth Me",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/v1/auth/me", "description": "Returns authenticated identity, active workspace, membership, permissions, preferences, and onboarding." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Current context is authenticated', () => pm.response.to.have.status(200));", "const data = pm.response.json().data;", "pm.test('Permissions are server computed', () => pm.expect(data.permissions).to.have.property('canViewFinancials'));"] } }]
+        },
+        {
+          "name": "Logout",
+          "request": { "method": "POST", "header": [], "url": "{{baseUrl}}/api/v1/auth/logout", "description": "Revokes the local refresh session and clears the application session cookies. Idempotent for an already logged-out caller." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Logout accepted', () => pm.response.to.have.status(200));"] } }]
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\"\n}" },
+            "url": "{{baseUrl}}/api/v1/auth/forgot-password",
+            "description": "Always returns a generic response. Open the recovery email, copy the code query parameter from its redirect URL, and set resetCode in the environment."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Non-enumerating response', () => pm.response.to.have.status(200));"] } }]
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"code\": \"{{resetCode}}\",\n  \"password\": \"{{newPassword}}\"\n}" },
+            "url": "{{baseUrl}}/api/v1/auth/reset-password",
+            "description": "Exchanges the one-time PKCE recovery code, changes the password, and signs out other sessions."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Password reset succeeds', () => pm.response.to.have.status(200));"] } }]
+        },
+        {
+          "name": "Verify Email — PKCE Code",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/verify-email?code={{verificationCode}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "verify-email"], "query": [{ "key": "code", "value": "{{verificationCode}}" }] },
+            "description": "Use when the verification redirect contains ?code=. The response also establishes the cookie session."
+          }
+        },
+        {
+          "name": "Verify Email — Token Hash",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"tokenHash\": \"{{verificationTokenHash}}\",\n  \"type\": \"{{verificationType}}\"\n}" },
+            "url": "{{baseUrl}}/api/v1/auth/verify-email",
+            "description": "Alternative for a custom Supabase email template that exposes token_hash. verificationType is normally signup."
+          }
+        },
+        {
+          "name": "Resend Verification",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\"\n}" },
+            "url": "{{baseUrl}}/api/v1/auth/resend-verification",
+            "description": "Returns a generic response and is rate limited."
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 — Current User",
+      "item": [
+        { "name": "Get Current User", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/v1/users/me", "description": "Same full user/workspace context as Auth Me." } },
+        {
+          "name": "Update Current User",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"displayName\": \"{{displayName}}\"\n}" },
+            "url": "{{baseUrl}}/api/v1/users/me",
+            "description": "Strict allowlist: only displayName is accepted. userId, workspaceId, role, and permissions are rejected."
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"currentPassword\": \"{{password}}\",\n  \"newPassword\": \"{{newPassword}}\"\n}" },
+            "url": "{{baseUrl}}/api/v1/users/me/password",
+            "description": "Verifies the current password, updates it, and revokes other sessions."
+          }
+        },
+        { "name": "Get Preferences", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/v1/users/me/preferences" } },
+        {
+          "name": "Update Preferences",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"timezone\": \"Asia/Kolkata\",\n  \"locale\": \"en-IN\"\n}" },
+            "url": "{{baseUrl}}/api/v1/users/me/preferences"
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 — Onboarding",
+      "item": [
+        { "name": "Get Onboarding", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/v1/onboarding/me", "description": "Resume the current user/workspace onboarding state after login." } },
+        {
+          "name": "Save Company Setup",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"currentStep\": \"company_setup\",\n  \"completedSteps\": [\"account_created\", \"company_setup\"],\n  \"skippedSteps\": [],\n  \"company\": {\n    \"name\": \"{{companyName}}\",\n    \"logoUrl\": null,\n    \"website\": \"https://example.com\",\n    \"businessEmail\": \"{{email}}\",\n    \"phone\": \"+91 98765 43210\",\n    \"address\": \"Nagpur, Maharashtra\",\n    \"country\": \"India\",\n    \"currency\": \"INR\",\n    \"taxId\": \"GSTIN-DEMO\",\n    \"timezone\": \"Asia/Kolkata\"\n  }\n}" },
+            "url": "{{baseUrl}}/api/v1/onboarding/me",
+            "description": "Company changes are permitted only for owner/admin membership. Workspace scope is derived from the cookie session, never from this body."
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 — Dashboard",
+      "item": [
+        {
+          "name": "Overview",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/v1/dashboard/overview", "description": "Returns workspace scope, KPI values, organization, safe empty/deferred widgets, notification preview, and server-computed permissions." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Overview succeeds', () => pm.response.to.have.status(200));", "const data = pm.response.json().data;", "pm.test('Workspace scope and permissions exist', () => { pm.expect(data.scope.workspaceId).to.be.a('string'); pm.expect(data.permissions).to.be.an('object'); });", "if (!data.permissions.canViewFinancials) pm.test('Financial values are hidden', () => pm.expect(data.kpis.totalEstimatedValue).to.eql(null));"] } }]
+        },
+        { "name": "Recent Projects", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/v1/dashboard/recent-projects?page={{page}}&pageSize={{pageSize}}", "description": "Typed empty page until the Projects phase is implemented." } },
+        { "name": "Recent BOQs", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/v1/dashboard/recent-boqs?page={{page}}&pageSize={{pageSize}}", "description": "Typed empty page until the BOQ phase is implemented." } },
+        { "name": "Pending Actions", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/v1/dashboard/pending-actions?page={{page}}&pageSize={{pageSize}}", "description": "Typed empty page until approval/workflow data exists." } },
+        { "name": "Upcoming Deliverables", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/v1/dashboard/upcoming-deliverables?page={{page}}&pageSize={{pageSize}}", "description": "Typed empty page until Project deliverables exist." } },
+        { "name": "Notifications", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/v1/dashboard/notifications?page={{page}}&pageSize={{pageSize}}", "description": "Real paginated notifications scoped to the authenticated user's server-selected workspace." } }
+      ]
+    },
+    {
+      "name": "05 — Negative Security Checks",
+      "description": "These requests should fail and demonstrate mass-assignment and authentication protection.",
+      "item": [
+        {
+          "name": "Reject User Mass Assignment",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"displayName\": \"Attacker\",\n  \"role\": \"owner\",\n  \"workspaceId\": \"00000000-0000-0000-0000-000000000000\"\n}" },
+            "url": "{{baseUrl}}/api/v1/users/me"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Mass assignment rejected', () => pm.response.to.have.status(400));", "pm.test('Validation error returned', () => pm.expect(pm.response.json().error.code).to.eql('VALIDATION_ERROR'));"] } }]
+        },
+        {
+          "name": "Unauthenticated Dashboard",
+          "request": { "method": "GET", "header": [{ "key": "Cookie", "value": "", "disabled": true }], "url": "{{baseUrl}}/api/v1/dashboard/overview", "description": "Clear cookies for baseUrl in Postman's Cookies manager before running. Expected status: 401." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Authentication required', () => pm.response.to.have.status(401));"] } }]
+        }
+      ]
+    }
+  ]
+}
+

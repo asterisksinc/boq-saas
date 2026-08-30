@@ -9,6 +9,7 @@
 - Tenancy/RBAC: none existed. Phase 1 adds `workspaces`, `workspace_memberships`, RLS policies, and server/database-computed permissions. Role labels (`owner`, `admin`, `member`, `viewer`) are an additive baseline because no repository role enum existed.
 - Validation/error/logging: none existed. Phase 1 adds strict Zod allowlists, a stable error envelope with request IDs, structured server error logging, and bounded in-memory abuse protection. Supabase Auth also provides auth-event logging and platform rate-limit configuration.
 - OpenAPI: none existed. `openapi.yaml` now documents every Phase 1 endpoint.
+- Integration assets: an import-ready 25-request Postman collection/environment and a frontend placement/auth/session/screen integration guide are provided under `postman/` and `docs/`.
 - Tests/test DB: none existed. Vitest was added for request contracts, permission behavior, pagination/empty states, rate limiting, and migration security invariants. Live Supabase integration tests require project credentials and a disposable Supabase project.
 
 ## Figma inspection
@@ -47,12 +48,14 @@
 
 - Exact Auth/Profile/Settings/Onboarding frame names and node IDs, visible labels, required markers, placeholders, helper/validation copy, select options, and dependent-field behavior could not be retrieved.
 - No Figma-only fields or enum choices were invented. `displayName` and `companyName` remain optional at registration; the PPRD-backed company fields are optional onboarding updates.
-- Email-link verification/recovery uses Supabase's token/code flow; no OTP UI flow was invented.
+- Registration confirmation and login use Supabase 6-digit email OTP templates. Password recovery keeps its separate PKCE link flow.
 
 ## Backend changes
 
 - Migration: `20260827173000_phase1_auth_user_dashboard.sql` creates tenant, membership, user profile/preferences, workspace profile, onboarding, notifications, and audit models; indexes; creation trigger; RLS; permission/context/onboarding/dashboard/audit RPCs.
+- Seed: `supabase/seed.sql` adds deterministic dev/test fixtures for two isolated tenants, owner/member/viewer permissions, onboarding, notifications, and audit events. `diptishgohane04@gmail.com` is a confirmed email identity for OTP login tests; no seed password is stored.
 - Auth: register, login, refresh, logout, current identity, forgot/reset password, email verification, and resend verification route handlers.
+- OTP email configuration: `supabase/config.toml` binds signup confirmation and login to templates that render `{{ .Token }}` and never `{{ .ConfirmationURL }}`.
 - User: current profile/context, allowlisted profile update, password change, preferences read/update.
 - Onboarding: resumable progress and atomic owner/admin company configuration update.
 - Dashboard: permission-aware Overview; real notifications preview/pagination; bounded typed empty-state supporting endpoints for domains not yet implemented.
@@ -63,8 +66,9 @@
 
 1. Create a Supabase project and copy `.env.example` to `.env.local` with its URL, publishable key, and the frontend-owned verification/recovery redirect URLs.
 2. Apply migrations with the Supabase CLI (`supabase db push`) or run the SQL migration in a controlled project.
-3. Configure the Supabase Auth site URL/redirect allowlist for `APP_URL` and configure production Auth rate limits in the Supabase dashboard. The in-process limiter is defense-in-depth only and is not shared across serverless instances.
-4. Use the generated API routes under `/api/v1`; authenticated sessions are maintained with Supabase SSR cookies.
+3. For a hosted Supabase project, open **Authentication > Email Templates**. Replace **Magic Link** with `supabase/templates/magic-link.html` and **Confirm signup** with `supabase/templates/confirmation.html`. Each template must contain `{{ .Token }}` and must not contain `{{ .ConfirmationURL }}`; otherwise Supabase sends a link instead of an OTP.
+4. Configure the Supabase Auth site URL/redirect allowlist for `APP_URL` and configure production Auth rate limits in the Supabase dashboard. The in-process limiter is defense-in-depth only and is not shared across serverless instances.
+5. Use the generated API routes under `/api/v1`; authenticated sessions are maintained with Supabase SSR cookies.
 
 ## Deferred
 
