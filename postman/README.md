@@ -6,6 +6,7 @@
 2. In Postman, select **Import** and import both files:
    - `BOQ-Design-Arena-Phase-1.postman_collection.json`
    - `BOQ-Design-Arena-Local.postman_environment.json`
+   - For authentication testing only, import `BOQ-Design-Arena-Auth-Only.postman_collection.json` instead of the full collection.
 3. Select **BOQ Design Arena — Local** from the environment selector.
 4. Replace `email`, `password`, `displayName`, and `companyName`. Use a unique email for registration.
 5. Confirm Postman's cookie jar is enabled. Do not create a Bearer token variable: this API uses Supabase SSR cookies.
@@ -36,4 +37,3 @@ For password recovery, run **Forgot Password**, open the email, copy the redirec
 ## Production environment
 
 Duplicate the local Postman environment and change only `baseUrl` to the deployed application origin, for example `https://app.example.com`. Never put a Supabase service-role key in Postman or frontend variables.
-

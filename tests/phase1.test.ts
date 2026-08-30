@@ -3,12 +3,18 @@ import { readFileSync } from "node:fs";
 import { emptyPage, pagination } from "../lib/domain/dashboard";
 import { permissionsFor } from "../lib/domain/permissions";
 import { consumeRateLimit } from "../lib/api/rate-limit";
-import { onboardingPatchSchema, registerSchema, userPatchSchema } from "../lib/api/validation";
+import { loginSchema, onboardingPatchSchema, registerSchema, userPatchSchema } from "../lib/api/validation";
 
 describe("Phase 1 request contracts", () => {
   it("normalizes registration email and rejects unknown fields", () => {
     expect(registerSchema.parse({ email: "  OWNER@Example.COM ", password: "a-secure-password" }).email).toBe("owner@example.com");
     expect(() => registerSchema.parse({ email: "a@b.com", password: "a-secure-password", role: "owner" })).toThrow();
+  });
+
+  it("accepts OTP request and verification login payloads", () => {
+    expect(loginSchema.parse({ email: " USER@Example.com " })).toEqual({ email: "user@example.com" });
+    expect(loginSchema.parse({ email: "user@example.com", otp: "123456" })).toEqual({ email: "user@example.com", otp: "123456" });
+    expect(() => loginSchema.parse({ email: "user@example.com", otp: "12345" })).toThrow();
   });
 
   it("rejects profile mass assignment", () => {
@@ -54,5 +60,26 @@ describe("Supabase tenant controls", () => {
     expect(migration).toContain("m.user_id = (select auth.uid())");
     expect(migration).toContain("'canViewFinancials', p_role in ('owner','admin')");
     expect(migration).toContain("case when s.role in ('owner','admin')");
+  });
+});
+
+describe("Supabase email OTP templates", () => {
+  const config = readFileSync("supabase/config.toml", "utf8");
+  const confirmation = readFileSync("supabase/templates/confirmation.html", "utf8");
+  const login = readFileSync("supabase/templates/magic-link.html", "utf8");
+
+  it("uses six-digit token templates instead of confirmation links", () => {
+    for (const template of [confirmation, login]) {
+      expect(template).toContain("{{ .Token }}");
+      expect(template).not.toContain("{{ .ConfirmationURL }}");
+    }
+  });
+
+  it("connects signup confirmation and login emails to their OTP templates", () => {
+    expect(config).toContain("[auth.email.template.confirmation]");
+    expect(config).toContain('content_path = "./supabase/templates/confirmation.html"');
+    expect(config).toContain("[auth.email.template.magic_link]");
+    expect(config).toContain('content_path = "./supabase/templates/magic-link.html"');
+    expect(config).toContain("otp_length = 6");
   });
 });

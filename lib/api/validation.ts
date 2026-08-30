@@ -10,7 +10,11 @@ export const registerSchema = z.object({
   companyName: z.string().trim().min(1).max(160).optional(),
 }).strict();
 
-export const loginSchema = z.object({ email, password: z.string().min(1).max(128) }).strict();
+export const loginSchema = z.union([
+  z.object({ email }).strict(),
+  z.object({ email, otp: z.string().trim().regex(/^\d{6}$/, "OTP must be a 6-digit code.") }).strict(),
+  z.object({ email, password: z.string().min(1).max(128) }).strict(),
+]);
 export const forgotPasswordSchema = z.object({ email }).strict();
 export const resetPasswordSchema = z.object({ code: z.string().min(1), password }).strict();
 export const verifyEmailSchema = z.object({

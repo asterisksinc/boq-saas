@@ -12,11 +12,11 @@ paths:
       security: []
       summary: Register an account and default workspace
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Register' } } } }
-      responses: { '201': { description: Registered }, '409': { $ref: '#/components/responses/Error' }, '429': { $ref: '#/components/responses/Error' } }
+      responses: { '201': { description: Registered; when email confirmation is required, a 6-digit signup OTP is sent }, '409': { $ref: '#/components/responses/Error' }, '429': { $ref: '#/components/responses/Error' } }
   /auth/login:
     post:
       security: []
-      summary: Sign in and set the Supabase SSR session cookies
+      summary: Request an email OTP, verify it, or use the legacy password login
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Login' } } } }
       responses: { '200': { description: Signed in }, '401': { $ref: '#/components/responses/Error' }, '429': { $ref: '#/components/responses/Error' } }
   /auth/refresh:
@@ -105,7 +105,11 @@ components:
     supabaseCookie: { type: apiKey, in: cookie, name: sb-access-token }
   schemas:
     Email: { type: object, additionalProperties: false, required: [email], properties: { email: { type: string, format: email } } }
-    Login: { type: object, additionalProperties: false, required: [email, password], properties: { email: { type: string, format: email }, password: { type: string } } }
+    Login:
+      oneOf:
+        - { type: object, additionalProperties: false, required: [email], properties: { email: { type: string, format: email } } }
+        - { type: object, additionalProperties: false, required: [email, otp], properties: { email: { type: string, format: email }, otp: { type: string, pattern: '^\\d{6}$' } } }
+        - { type: object, additionalProperties: false, required: [email, password], properties: { email: { type: string, format: email }, password: { type: string } } }
     Register:
       type: object
       additionalProperties: false

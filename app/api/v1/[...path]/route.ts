@@ -72,14 +72,40 @@ async function register(request: Request, supabase: SupabaseClient, id: string) 
     const duplicate = /already|registered|exists/i.test(error.message);
     return fail(duplicate ? "CONFLICT" : "VALIDATION_ERROR", duplicate ? "An account with this email already exists." : "Registration could not be completed.", duplicate ? 409 : 400, id);
   }
-  return ok({ user: { id: data.user?.id, email: data.user?.email }, emailVerificationRequired: !data.session }, 201, id);
+  const emailVerificationRequired = !data.session;
+  return ok({
+    user: { id: data.user?.id, email: data.user?.email },
+    emailVerificationRequired,
+    otpSent: emailVerificationRequired,
+    message: emailVerificationRequired
+      ? "A 6-digit verification code has been sent to your email."
+      : "Registration completed.",
+  }, 201, id);
 }
 
 async function login(request: Request, supabase: SupabaseClient, id: string) {
   const blocked = limited(request, "login", id, 10); if (blocked) return blocked;
   const input = await parsed(request, loginSchema, id); if (input.response) return input.response;
-  const { data, error } = await supabase.auth.signInWithPassword(input.data);
-  if (error || !data.user) return fail("UNAUTHENTICATED", "Invalid email or password.", 401, id);
+
+  if (!("password" in input.data) && !("otp" in input.data)) {
+    const { error } = await supabase.auth.signInWithOtp({
+      email: input.data.email,
+      options: { shouldCreateUser: false },
+    });
+    if (error) {
+      console.error(JSON.stringify({ requestId: id, event: "login_otp_send_failed", code: error.code }));
+      return fail("OTP_SEND_FAILED", "OTP could not be sent. Please try again.", 400, id);
+    }
+    return ok({ otpSent: true, message: "A 6-digit login code has been sent to your email." }, 200, id);
+  }
+
+  const result = "otp" in input.data
+    ? await supabase.auth.verifyOtp({ email: input.data.email, token: input.data.otp, type: "email" })
+    : await supabase.auth.signInWithPassword(input.data);
+  const { data, error } = result;
+  if (error || !data.user) {
+    return fail("UNAUTHENTICATED", "otp" in input.data ? "Invalid or expired OTP." : "Invalid email or password.", 401, id);
+  }
   const ctx = await context(supabase, id); if ("response" in ctx) return ctx.response;
   await audit(supabase, "auth.login.succeeded", id);
   return ok({ user: { id: data.user.id, email: data.user.email }, context: ctx.data }, 200, id);
