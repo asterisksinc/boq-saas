@@ -9,7 +9,9 @@ Browser UI
    │  fetch('/api/v1/...', { credentials: 'include' })
    ▼
 Next.js Route Handler
-   │  @supabase/ssr cookie session
+   ├  Gmail SMTP (custom six-digit OTP delivery)
+   ├  HMAC-hashed OTP store (expiry / attempt limits)
+   │  @supabase/ssr cookie session after OTP verification
    ▼
 Supabase Auth + Postgres RPC/RLS
 ```
@@ -28,6 +30,10 @@ Create `.env.local` from `.env.example`, then configure:
 ```dotenv
 NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY
+SUPABASE_SECRET_KEY=YOUR_SERVER_ONLY_SUPABASE_SECRET_KEY
+AUTH_OTP_SECRET=YOUR_RANDOM_64_CHARACTER_HEX_SECRET
+GMAIL_SMTP_USER=your-sender@gmail.com
+GMAIL_SMTP_APP_PASSWORD=YOUR_16_CHARACTER_GOOGLE_APP_PASSWORD
 APP_URL=http://localhost:3000
 PASSWORD_RESET_REDIRECT_URL=http://localhost:3000/reset-password
 EMAIL_VERIFICATION_REDIRECT_URL=http://localhost:3000/onboarding
@@ -35,13 +41,14 @@ EMAIL_VERIFICATION_REDIRECT_URL=http://localhost:3000/onboarding
 
 Then:
 
-1. Apply `supabase/migrations/20260827173000_phase1_auth_user_dashboard.sql` to the target Supabase project.
-2. In Supabase Auth URL Configuration, set the local Site URL to `http://localhost:3000`.
-3. Add `http://localhost:3000/onboarding` and `http://localhost:3000/reset-password` to the redirect allowlist.
-4. Configure the equivalent HTTPS production URLs before deployment.
-5. Start the application with `npm run dev` and validate the flow with the supplied Postman collection.
+1. Generate `AUTH_OTP_SECRET` once with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. Store the output only in the deployment secret manager and local `.env.local`.
+2. Create a Google App Password for the Gmail sender account (Google Account → Security → 2-Step Verification → App passwords). Put its 16-character value in `GMAIL_SMTP_APP_PASSWORD`.
+3. Copy the server-only Supabase secret key from Supabase Dashboard → Project Settings → API Keys into `SUPABASE_SECRET_KEY`.
+4. Apply both `supabase/migrations/20260827173000_phase1_auth_user_dashboard.sql` and `supabase/migrations/20260830213500_custom_email_login_otps.sql`.
+5. Configure the Supabase Auth Site URL and redirect allowlist for the local and production application URLs.
+6. Restart the application after changing secrets, then validate the request/verify flow with the supplied Postman collection.
 
-The publishable key is designed for browser/server-client initialization and is protected by RLS. Never expose the Supabase service-role key.
+The publishable key is safe for browser/server-client initialization and protected by RLS. `SUPABASE_SECRET_KEY`, `AUTH_OTP_SECRET`, and `GMAIL_SMTP_APP_PASSWORD` are server-only. Never put them in frontend code, Postman, logs, or `NEXT_PUBLIC_*` variables.
 
 ## 3. Recommended frontend file placement
 
@@ -235,7 +242,7 @@ Current-context database records use snake_case because they are returned from P
 | Logout button | `POST /auth/logout` | Clear in-memory user state and route to Login. |
 | Forgot-password form | `POST /auth/forgot-password` | Always show the same confirmation message. |
 | Reset-password page | `POST /auth/reset-password` | Read `code` from URL and submit it with the new password. |
-| Verification redirect | `GET /auth/verify-email?code=...` | Exchange the one-time code, then remove it from the browser URL. |
+| OTP verification form | `POST /auth/login` | Send `{ email, otp }`; success establishes the cookie session and returns workspace context. |
 | Resend verification | `POST /auth/resend-verification` | Show generic confirmation; disable/retry UI to respect rate limits. |
 | Profile page | `GET/PATCH /users/me` | Only `displayName` is currently writable. |
 | Change-password form | `PATCH /users/me/password` | Send current and new passwords; display 401 as incorrect current password. |
@@ -311,20 +318,18 @@ if (!result.context.user.emailVerified) {
 
 Do not authorize from these client-side checks. They improve navigation only; RLS and backend permission checks remain authoritative.
 
-## 9. Email-verification page
+## 9. Gmail OTP entry page
 
-The configured verification redirect is `/onboarding`. On that page, handle an optional `code` before loading onboarding:
+After registration or `requestLoginOtp`, keep the normalized email in component state and show a six-digit input. Do not put the OTP in a URL, local storage, analytics, or logs.
 
 ```ts
-const code = searchParams.get("code");
-
-if (code) {
-  await authApi.verifyEmail(code);
-  router.replace("/onboarding"); // removes the one-time code from URL/history
+async function submitOtp(email: string, otp: string) {
+  const result = await authApi.verifyLoginOtp(email, otp);
+  router.replace(result.context.onboarding?.status === "completed" ? "/dashboard" : "/onboarding");
 }
 ```
 
-Show an error state for an expired link and offer **Resend verification**. Never log or persist the code.
+Codes expire after 10 minutes, allow five invalid attempts, and can be resent after 60 seconds. Treat `401 UNAUTHENTICATED` as invalid/expired and `429 RATE_LIMITED` as resend cooldown. Registration and resend-verification use this same Gmail OTP screen.
 
 ## 10. Password-reset page
 

@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "14bb9735-4d2c-4ca0-b253-f0ef23690c11",
     "name": "BOQ Design Arena — Phase 1 Backend",
-    "description": "Import the matching Local environment first. Requests use the Next.js API and Supabase SSR cookies. Postman stores Set-Cookie values automatically; do not manually copy access or refresh tokens. Recommended run order: Register → Verify Email (when enabled) → Login → Auth Me → User/Onboarding/Dashboard → Logout.",
+    "description": "Import the matching Local environment first. Gmail SMTP delivers application-owned OTPs; Supabase is used only for the authenticated cookie session. Recommended run order: Register or Request Login OTP → set otp from Gmail → Verify Login OTP → Auth Me → User/Onboarding/Dashboard → Logout.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -44,15 +44,26 @@
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Registered or duplicate is handled', () => pm.expect([201, 409]).to.include(pm.response.code));"] } }]
         },
         {
-          "name": "Login",
+          "name": "Request Login OTP",
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\"\n}" },
             "url": "{{baseUrl}}/api/v1/auth/login",
-            "description": "On success, Postman stores the Supabase SSR cookies automatically. Keep cookies enabled for baseUrl."
+            "description": "Sends a six-digit application-owned code through Gmail SMTP. Copy it into the otp environment variable."
           },
-          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Login succeeds', () => pm.response.to.have.status(200));", "const json = pm.response.json();", "pm.test('Workspace context returned', () => pm.expect(json.data.context.workspace.id).to.be.a('string'));"] } }]
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('OTP request succeeds', () => pm.response.to.have.status(200));", "pm.test('OTP sent flag returned', () => pm.expect(pm.response.json().data.otpSent).to.eql(true));"] } }]
+        },
+        {
+          "name": "Verify Login OTP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"otp\": \"{{otp}}\"\n}" },
+            "url": "{{baseUrl}}/api/v1/auth/login",
+            "description": "Verifies the Gmail OTP and establishes the Supabase SSR cookie session."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('OTP verification succeeds', () => pm.response.to.have.status(200));", "const json = pm.response.json();", "pm.test('Workspace context returned', () => pm.expect(json.data.context.workspace.id).to.be.a('string'));"] } }]
         },
         {
           "name": "Refresh Session",
@@ -90,25 +101,6 @@
             "description": "Exchanges the one-time PKCE recovery code, changes the password, and signs out other sessions."
           },
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Password reset succeeds', () => pm.response.to.have.status(200));"] } }]
-        },
-        {
-          "name": "Verify Email — PKCE Code",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": { "raw": "{{baseUrl}}/api/v1/auth/verify-email?code={{verificationCode}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "verify-email"], "query": [{ "key": "code", "value": "{{verificationCode}}" }] },
-            "description": "Use when the verification redirect contains ?code=. The response also establishes the cookie session."
-          }
-        },
-        {
-          "name": "Verify Email — Token Hash",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"tokenHash\": \"{{verificationTokenHash}}\",\n  \"type\": \"{{verificationType}}\"\n}" },
-            "url": "{{baseUrl}}/api/v1/auth/verify-email",
-            "description": "Alternative for a custom Supabase email template that exposes token_hash. verificationType is normally signup."
-          }
         },
         {
           "name": "Resend Verification",
@@ -212,4 +204,3 @@
     }
   ]
 }
-
