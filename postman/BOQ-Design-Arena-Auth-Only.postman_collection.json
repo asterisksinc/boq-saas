@@ -55,11 +55,11 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"otp\": \"{{otp}}\"\n}" },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "raw": "{{baseUrl}}/api/v1/auth/verify-email",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "auth", "login"]
+              "path": ["api", "v1", "auth", "verify-email"]
             },
-            "description": "Set otp to the six-digit Gmail code. Successful verification establishes the Supabase SSR cookie session."
+            "description": "Set otp to the six-digit Gmail registration code. Successful verification confirms the account; use Request Login OTP and Verify Login OTP afterward to establish a session."
           },
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Email verified', () => pm.response.to.have.status(200));"] } }]
         },

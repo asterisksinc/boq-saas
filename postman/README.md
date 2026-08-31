@@ -13,13 +13,13 @@
 
 ## Recommended run order
 
-1. Run **Register** or **Request Login OTP**.
-2. Open the Gmail-delivered message and put its six-digit code in the `otp` environment variable.
-3. Run **Verify Registration OTP** or **Verify Login OTP**. Postman stores the returned Supabase cookies for `localhost`.
-4. **Auth Me** and **Get Current User**.
-5. **Save Company Setup**, then **Get Onboarding**.
-6. **Overview** and the five dashboard list requests.
-7. **Logout**.
+1. For a new account, run **Register**, copy the Gmail code into `otp`, then run **Verify Registration OTP**.
+2. Run **Request Login OTP**, replace `otp` with the new Gmail code, and run **Verify Login OTP**. Existing accounts can start here.
+3. Postman stores the login response's Supabase cookies for `localhost`.
+4. Run **Auth Me** and **Get Current User**.
+5. Run **Save Company Setup**, then **Get Onboarding**.
+6. Run **Overview** and the five dashboard list requests.
+7. Run **Logout**.
 
 For password recovery, run **Forgot Password**, open the email, copy the redirect's `code` into `resetCode`, and run **Reset Password**.
 
