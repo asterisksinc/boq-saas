@@ -1,18 +1,18 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
-
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
   title: "BOQ-SAAS",
   description: "From scope to BOQ to purchase order—built for commercial clarity.",
+  icons: {
+    icon: "/assets/boq-logo-small.svg",
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={inter.variable}>{children}</body>
+      <body>{children}</body>
     </html>
   );
 }
