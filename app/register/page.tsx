@@ -51,7 +51,7 @@ export default function RegisterPage() {
         try {
             const response = await register({ email: normalizedEmail, password, displayName: normalizedDisplayName });
             if (response.emailVerificationRequired) {
-                setSuccess("Account created. Please check your email to verify before continuing.");
+                router.push(`/verify-email?flow=signup&email=${encodeURIComponent(normalizedEmail)}`);
                 return;
             }
             router.push("/onboarding");

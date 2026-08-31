@@ -18,6 +18,7 @@ import {
   resetPasswordSchema,
   userPatchSchema,
   verifyEmailSchema,
+  verifyEmailOtpSchema,
 } from "@/lib/api/validation";
 import { z } from "zod";
 
@@ -180,6 +181,21 @@ async function verifyEmail(request: NextRequest, supabase: SupabaseClient, id: s
   const tokenHash = request.nextUrl.searchParams.get("token_hash");
   const type = request.nextUrl.searchParams.get("type");
   const source = request.method === "GET" ? { tokenHash, type } : await body(request);
+  const otpInput = verifyEmailOtpSchema.safeParse(source);
+  if (otpInput.success) {
+    let userId: string;
+    try { userId = await verifyEmailOtp(otpInput.data.email, otpInput.data.otp); }
+    catch (error) {
+      if (error instanceof EmailOtpError && error.code === "INVALID_OTP") {
+        return fail("VALIDATION_ERROR", "Verification code is invalid or expired.", 400, id);
+      }
+      return emailOtpFailure(error, id);
+    }
+    const admin = createSupabaseAdminClient();
+    const { error } = await admin.auth.admin.updateUserById(userId, { email_confirm: true });
+    if (error) return fail("INTERNAL_ERROR", "Account verification could not be completed.", 500, id);
+    return ok({ verified: true }, 200, id);
+  }
   const input = verifyEmailSchema.safeParse(source);
   if (!input.success) return fail("VALIDATION_ERROR", "Verification link is invalid.", 400, id, fieldErrors(input.error));
   const { error } = await supabase.auth.verifyOtp({ token_hash: input.data.tokenHash, type: input.data.type });

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { emptyPage, pagination } from "../lib/domain/dashboard";
 import { permissionsFor } from "../lib/domain/permissions";
 import { consumeRateLimit } from "../lib/api/rate-limit";
-import { loginSchema, onboardingPatchSchema, registerSchema, userPatchSchema } from "../lib/api/validation";
+import { loginSchema, onboardingPatchSchema, registerSchema, userPatchSchema, verifyEmailOtpSchema } from "../lib/api/validation";
 
 describe("Phase 1 request contracts", () => {
   it("normalizes registration email and rejects unknown fields", () => {
@@ -15,6 +15,12 @@ describe("Phase 1 request contracts", () => {
     expect(loginSchema.parse({ email: " USER@Example.com " })).toEqual({ email: "user@example.com" });
     expect(loginSchema.parse({ email: "user@example.com", otp: "123456" })).toEqual({ email: "user@example.com", otp: "123456" });
     expect(() => loginSchema.parse({ email: "user@example.com", otp: "12345" })).toThrow();
+  });
+
+  it("requires the email alongside a six-digit signup verification OTP", () => {
+    expect(verifyEmailOtpSchema.parse({ email: " USER@Example.com ", otp: "123456" })).toEqual({ email: "user@example.com", otp: "123456" });
+    expect(() => verifyEmailOtpSchema.parse({ otp: "123456" })).toThrow();
+    expect(() => verifyEmailOtpSchema.parse({ email: "user@example.com", otp: "12345" })).toThrow();
   });
 
   it("rejects profile mass assignment", () => {

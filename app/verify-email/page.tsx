@@ -19,9 +19,10 @@ function VerifyEmailContent() {
     const code = useMemo(() => searchParams.get("code") ?? "", [searchParams]);
     const tokenHash = useMemo(() => searchParams.get("token_hash") ?? "", [searchParams]);
     const type = useMemo(() => searchParams.get("type") ?? "email", [searchParams]);
+    const emailFromUrl = useMemo(() => searchParams.get("email") ?? "", [searchParams]);
     const [status, setStatus] = useState<"idle" | "verifying" | "success" | "error">("idle");
     const [message, setMessage] = useState("");
-    const [email, setEmail] = useState("");
+    const [email, setEmail] = useState(emailFromUrl);
     const [otp, setOtp] = useState<string[]>(Array(6).fill(""));
 
     useEffect(() => {
@@ -31,7 +32,7 @@ function VerifyEmailContent() {
             setStatus("verifying");
             try {
                 if (code) {
-                    await verifyEmailCode(code);
+                    await verifyEmailCode(code, emailFromUrl || undefined);
                 } else {
                     await verifyEmail({ tokenHash, type: type as "email" | "signup" | "email_change" });
                 }
@@ -45,7 +46,7 @@ function VerifyEmailContent() {
         };
 
         void run();
-    }, [code, tokenHash, type]);
+    }, [code, emailFromUrl, tokenHash, type]);
 
     const onOtpChange = (index: number, value: string) => {
         const next = [...otp];
@@ -67,7 +68,12 @@ function VerifyEmailContent() {
 
         setStatus("verifying");
         try {
-            await verifyEmailCode(code);
+            if (!email) {
+                setStatus("error");
+                setMessage("Open the verification page from signup, or enter your email before verifying.");
+                return;
+            }
+            await verifyEmailCode(code, email);
             setStatus("success");
             setMessage("Your email has been verified.");
         } catch (requestError) {

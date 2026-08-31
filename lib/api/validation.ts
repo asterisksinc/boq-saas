@@ -21,6 +21,10 @@ export const verifyEmailSchema = z.object({
   tokenHash: z.string().min(1),
   type: z.enum(["email", "signup", "email_change"]),
 }).strict();
+export const verifyEmailOtpSchema = z.object({
+  email,
+  otp: z.string().trim().regex(/^\d{6}$/, "OTP must be a 6-digit code."),
+}).strict();
 export const resendVerificationSchema = z.object({ email }).strict();
 export const changePasswordSchema = z.object({ currentPassword: z.string().min(1), newPassword: password }).strict();
 export const userPatchSchema = z.object({ displayName: z.string().trim().min(1).max(120).nullable().optional() }).strict();

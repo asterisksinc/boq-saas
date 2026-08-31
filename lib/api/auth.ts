@@ -105,7 +105,14 @@ export async function verifyEmail(input: { tokenHash: string; type: "email" | "s
     });
 }
 
-export async function verifyEmailCode(code: string) {
+export async function verifyEmailCode(code: string, email?: string) {
+    if (email) {
+        return request<{ verified: boolean }>("/api/v1/auth/verify-email", {
+            method: "POST",
+            body: JSON.stringify({ email, otp: code }),
+        });
+    }
+
     const url = new URL("/api/v1/auth/verify-email", window.location.origin);
     url.searchParams.set("code", code);
 

@@ -54,7 +54,15 @@ paths:
       responses: { '200': { description: Verified }, '400': { $ref: '#/components/responses/Error' } }
     post:
       security: []
-      summary: Verify a Supabase email token from JSON
+      summary: Verify a custom email OTP or Supabase email token from JSON
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - { type: object, additionalProperties: false, required: [email, otp], properties: { email: { type: string, format: email }, otp: { type: string, pattern: '^\\d{6}$' } } }
+                - { type: object, additionalProperties: false, required: [tokenHash, type], properties: { tokenHash: { type: string }, type: { type: string, enum: [email, signup, email_change] } } }
       responses: { '200': { description: Verified }, '400': { $ref: '#/components/responses/Error' } }
   /auth/resend-verification:
     post:
