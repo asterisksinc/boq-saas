@@ -280,7 +280,8 @@ export const authApi = {
   logout: () => api.post<{ loggedOut: boolean }>("/auth/logout"),
   forgotPassword: (email: string) => api.post<{ message: string }>("/auth/forgot-password", { email }),
   resetPassword: (code: string, password: string) => api.post<{ passwordReset: boolean }>("/auth/reset-password", { code, password }),
-  verifyEmail: (code: string) => api.get<{ verified: boolean }>(`/auth/verify-email?code=${encodeURIComponent(code)}`),
+  verifyEmailOtp: (email: string, otp: string) =>
+    api.post<{ verified: boolean }>("/auth/verify-email", { email, otp }),
   resendVerification: (email: string) => api.post<{ message: string }>("/auth/resend-verification", { email }),
 };
 ```
@@ -324,10 +325,14 @@ After registration or `requestLoginOtp`, keep the normalized email in component 
 
 ```ts
 async function submitOtp(email: string, otp: string) {
-  const result = await authApi.verifyLoginOtp(email, otp);
-  router.replace(result.context.onboarding?.status === "completed" ? "/dashboard" : "/onboarding");
+  await authApi.verifyEmailOtp(email, otp);
+  router.replace("/login");
 }
 ```
+
+The `GET /auth/verify-email?code=...` form is reserved for Supabase PKCE
+authorization codes. A six-digit Gmail OTP must be sent in the JSON body with
+its normalized email address.
 
 Codes expire after 10 minutes, allow five invalid attempts, and can be resent after 60 seconds. Treat `401 UNAUTHENTICATED` as invalid/expired and `429 RATE_LIMITED` as resend cooldown. Registration and resend-verification use this same Gmail OTP screen.
 
