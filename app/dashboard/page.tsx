@@ -65,9 +65,22 @@ export default function DashboardPage() {
 }
 
 function DashboardRail() {
+    const router = useRouter();
+    const menuRoutes = ["/dashboard", "/projects", "/boqs", "/costs", "/workspace", "/proposals", "/invoices", "/analytics", "/documents", "/integrations", "/billing"];
+
     return <aside className="fig-dashboard-rail" aria-label="Dashboard navigation">
         <div className="fig-dashboard-logo"><span><img src="/assets/boq-logo-small.svg" alt="BOQ" /></span></div>
-        <nav className="fig-dashboard-menu">{menuIcons.map((icon, index) => <button key={icon} className={index === 0 ? "is-current" : ""} type="button" aria-label={`Navigation item ${index + 1}`}><img src={`/assets/dashboard/${icon}.svg`} alt="" /></button>)}</nav>
+        <nav className="fig-dashboard-menu">{menuIcons.map((icon, index) => (
+            <button
+                key={icon}
+                className={index === 0 ? "is-current" : ""}
+                type="button"
+                aria-label={`Navigation item ${index + 1}`}
+                onClick={() => router.push(menuRoutes[index] || "/dashboard")}
+            >
+                <img src={`/assets/dashboard/${icon}.svg`} alt="" />
+            </button>
+        ))}</nav>
         <div className="fig-dashboard-tools"><button type="button" aria-label="Help"><img src="/assets/dashboard/dashboard-help.svg" alt="" /></button><button type="button" aria-label="Settings"><img src="/assets/dashboard/dashboard-settings.svg" alt="" /></button></div>
     </aside>;
 }
@@ -88,8 +101,25 @@ function Analytics({ overview, hasContent, money }: { overview: DashboardOvervie
     </section>;
 }
 
-function Metric({ value, label, trend }: { value: string; label: string; trend: "up" | "down" }) { return <div className="fig-metric"><strong>{value}</strong><small className={trend}>▲ {trend === "up" ? "1.2%" : "3.2%"}</small><span>{label}</span></div>; }
-function EmptyAnalytics() { return <div className="fig-empty-analytics"><div className="fig-chart-placeholder"><div className="fig-placeholder-chart"><FilePlus2 size={17} /></div><strong>No analytics data yet</strong><p>Once you create projects, your analytics and insights will appear here.</p></div><em>No data to display yet</em><div className="fig-chart-control"><span>Week</span><strong>Month</strong><span>Quarter</span></div></div>; }
+function Metric({ value, label, trend }: { value: string; label: string; trend: "up" | "down" }) {
+    const isNoData = value === "—" || value === "0";
+    return <div className="fig-metric">
+        <strong>{value === "Private" && <img className="fig-private-icon" src="/assets/dashboard/dashboard-visibility-off.svg" alt="" />}{value}</strong>
+        {!isNoData && <small className={trend}>▲ {trend === "up" ? "1.2%" : "3.2%"}</small>}
+        <span>{label}</span>
+    </div>;
+}
+function EmptyAnalytics() {
+    return <div className="fig-empty-analytics">
+        <div className="fig-chart-placeholder">
+            <div className="fig-placeholder-chart"><FilePlus2 size={17} /></div>
+            <strong>No analytics data yet</strong>
+            <p>Once you create projects, your analytics and insights will appear here.</p>
+        </div>
+        <em>No data to display yet</em>
+        <div className="fig-chart-control"><span>Week</span><strong>Month</strong><span>Quarter</span></div>
+    </div>;
+}
 
 function AnalyticsChart() { return <div className="fig-chart"><div className="fig-chart-grid"><span>₹ 100L</span><span>₹ 75L</span><span>₹ 50L</span><span>₹ 25L</span><span>₹ 0</span></div><svg viewBox="0 0 940 220" preserveAspectRatio="none" aria-label="Monthly estimated and actual values"><defs><linearGradient id="actualFill" x1="0" y1="0" x2="0" y2="1"><stop stopColor="#2563eb" stopOpacity=".28" /><stop offset="1" stopColor="#2563eb" stopOpacity=".02" /></linearGradient></defs><path className="fig-estimated-line" d="M0 148 C120 105 220 69 360 70 C480 72 535 171 665 132 C775 100 850 72 940 35" /><path className="fig-actual-fill" d="M0 148 C140 120 260 98 390 100 C510 102 530 150 650 135 C760 120 850 82 940 55 L940 220 L0 220Z" /><path className="fig-actual-line" d="M0 148 C140 120 260 98 390 100 C510 102 530 150 650 135 C760 120 850 82 940 55" /></svg><div className="fig-chart-months"><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span><span>Aug</span></div></div>; }
 

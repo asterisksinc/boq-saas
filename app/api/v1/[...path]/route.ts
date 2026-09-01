@@ -6,7 +6,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { EmailOtpError, issueEmailOtp, verifyEmailOtp } from "@/lib/auth/email-otp";
 import { pagination } from "@/lib/domain/dashboard";
-import { dashboardPeriod, demoDashboard, demoPendingActions, demoRecentBoqs, demoRecentProjects, demoUpcomingDeliverables } from "@/lib/domain/dashboard-demo";
+import { demoPendingActions, demoRecentBoqs, demoRecentProjects, demoUpcomingDeliverables } from "@/lib/domain/dashboard-demo";
 import { consumeRateLimit, rateLimitKey } from "@/lib/api/rate-limit";
 import { fail, methodNotAllowed, ok, requestId } from "@/lib/api/response";
 import {
@@ -309,12 +309,8 @@ async function dashboardOverview(request: NextRequest, supabase: SupabaseClient,
     return fail("INTERNAL_ERROR", "Dashboard overview is temporarily unavailable.", 500, id);
   }
   const base = (data ?? {}) as Record<string, unknown>;
-  const scope = (base.scope ?? {}) as { currency?: string };
-  const permissions = (base.permissions ?? {}) as { canViewFinancials?: boolean };
-  const demo = demoDashboard(dashboardPeriod(request.nextUrl.searchParams.get("period")), scope.currency ?? "INR", permissions.canViewFinancials === true);
-  // TODO(PROJECT_BOQ_BACKEND): Remove this merge once get_dashboard_overview
-  // returns real Project/BOQ/Costing/Workflow aggregates.
-  return ok({ ...base, ...demo, scope: base.scope, organization: base.organization, permissions: base.permissions, notifications: base.notifications }, 200, id);
+  // TODO(PROJECT_BOQ_BACKEND): Keep this endpoint aligned with real domain aggregates.
+  return ok(base, 200, id);
 }
 
 const projectSelect = "id,project_code,name,client_name,client_contact,client_email,project_type,status,location,description,area_sqft,project_value,approved_budget,start_date,target_completion_date,assigned_designer_id,tags,progress,created_by,created_at,updated_at";
@@ -693,6 +689,7 @@ async function dashboardList(request: NextRequest, supabase: SupabaseClient, id:
   if (!workspaceId) return fail("FORBIDDEN", "Active workspace membership required.", 403, id);
   const { page, pageSize, from, to } = pagination(request.nextUrl.searchParams);
   if (name !== "notifications") {
+    // TODO(PROJECT_BOQ_BACKEND): Replace these demo pages with tenant-scoped domain queries.
     // TODO(PROJECT_BOQ_BACKEND): Replace these demo pages with tenant-scoped
     // Project/BOQ/Workflow/Deliverable queries when those tables are available.
     const demoItems: Record<string, unknown[]> = {
@@ -751,7 +748,7 @@ async function listProposals(request: NextRequest, supabase: SupabaseClient, id:
   const search = request.nextUrl.searchParams.get("search")?.trim().slice(0, 120);
   let query = supabase.from("proposals").select(proposalSelect, { count: "exact" })
     .eq("workspace_id", scoped.access.workspaceId).is("archived_at", null).order("updated_at", { ascending: false }).range(from, to);
-  if (status && ["draft","sent","approved","revisions","won","lost"].includes(status)) query = query.eq("status", status);
+  if (status && ["draft", "sent", "approved", "revisions", "won", "lost"].includes(status)) query = query.eq("status", status);
   if (search) {
     const safe = search.replace(/[%_,()]/g, " ");
     query = query.or(`proposal_code.ilike.%${safe}%,project_name.ilike.%${safe}%,client_name.ilike.%${safe}%`);
@@ -769,13 +766,16 @@ async function proposalSummary(supabase: SupabaseClient, id: string) {
   if (error) return fail("INTERNAL_ERROR", "Proposal summary could not be loaded.", 500, id);
   const rows = data ?? [];
   const sent = rows.filter((row) => row.status === "sent");
-  const responded = rows.filter((row) => ["approved","revisions","won","lost"].includes(row.status));
+  const responded = rows.filter((row) => ["approved", "revisions", "won", "lost"].includes(row.status));
+  const expiringSoon = rows.filter((row) => row.status === "sent" && row.expiry_date && row.expiry_date >= new Date().toISOString().slice(0, 10) && row.expiry_date <= new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10));
   return ok({
     total: rows.length,
     totalSent: sent.length,
     winRate: responded.length ? Math.round((rows.filter((row) => row.status === "won").length / responded.length) * 10000) / 100 : 0,
     averageValue: rows.length ? rows.reduce((sum, row) => sum + Number(row.proposed_value), 0) / rows.length : 0,
     pendingResponse: sent.length,
+    decidedCount: responded.length,
+    expiringSoon: expiringSoon.length,
     currency: scoped.access.currency,
   }, 200, id);
 }
@@ -897,8 +897,10 @@ function folderDto(row: Record<string, unknown>, itemCount = 0, sizeBytes = 0) {
 }
 
 function documentDto(row: Record<string, unknown>) {
-  return { id: row.id, folderId: row.folder_id, proposalId: row.proposal_id, projectId: row.project_id, projectName: row.project_name,
-    name: row.name, mimeType: row.mime_type, sizeBytes: Number(row.size_bytes), createdAt: row.created_at, updatedAt: row.updated_at };
+  return {
+    id: row.id, folderId: row.folder_id, proposalId: row.proposal_id, projectId: row.project_id, projectName: row.project_name,
+    name: row.name, mimeType: row.mime_type, sizeBytes: Number(row.size_bytes), createdAt: row.created_at, updatedAt: row.updated_at
+  };
 }
 
 async function listFolders(request: NextRequest, supabase: SupabaseClient, id: string) {
@@ -911,10 +913,12 @@ async function listFolders(request: NextRequest, supabase: SupabaseClient, id: s
   const ids = (folders.data ?? []).map((folder) => folder.id);
   const docs = ids.length ? await supabase.from("documents").select("folder_id,size_bytes").eq("workspace_id", scoped.access.workspaceId).in("folder_id", ids) : { data: [], error: null };
   if (docs.error) return fail("INTERNAL_ERROR", "Folder totals could not be loaded.", 500, id);
-  return ok({ items: (folders.data ?? []).map((folder) => {
-    const children = (docs.data ?? []).filter((doc) => doc.folder_id === folder.id);
-    return folderDto(folder as Record<string, unknown>, children.length, children.reduce((sum, doc) => sum + Number(doc.size_bytes), 0));
-  }) }, 200, id);
+  return ok({
+    items: (folders.data ?? []).map((folder) => {
+      const children = (docs.data ?? []).filter((doc) => doc.folder_id === folder.id);
+      return folderDto(folder as Record<string, unknown>, children.length, children.reduce((sum, doc) => sum + Number(doc.size_bytes), 0));
+    })
+  }, 200, id);
 }
 
 async function createFolder(request: Request, supabase: SupabaseClient, id: string) {
@@ -924,8 +928,10 @@ async function createFolder(request: Request, supabase: SupabaseClient, id: stri
     const parent = await supabase.from("document_folders").select("id").eq("workspace_id", scoped.access.workspaceId).eq("id", input.data.parentId).single();
     if (parent.error) return fail("NOT_FOUND", "Parent folder was not found.", 404, id);
   }
-  const { data, error } = await supabase.from("document_folders").insert({ workspace_id: scoped.access.workspaceId, parent_id: input.data.parentId ?? null,
-    name: input.data.name, created_by: scoped.access.userId, updated_by: scoped.access.userId }).select("id,parent_id,name,created_at,updated_at").single();
+  const { data, error } = await supabase.from("document_folders").insert({
+    workspace_id: scoped.access.workspaceId, parent_id: input.data.parentId ?? null,
+    name: input.data.name, created_by: scoped.access.userId, updated_by: scoped.access.userId
+  }).select("id,parent_id,name,created_at,updated_at").single();
   if (error) return fail(error.code === "23505" ? "CONFLICT" : "VALIDATION_ERROR", error.code === "23505" ? "A folder with this name already exists here." : "Folder could not be created.", error.code === "23505" ? 409 : 400, id);
   await audit(supabase, "document_folder.created", id);
   return ok(folderDto(data as Record<string, unknown>), 201, id);
@@ -1000,7 +1006,7 @@ async function listDocuments(request: NextRequest, supabase: SupabaseClient, id:
   return ok({ items: (result.data ?? []).map((row) => documentDto(row as Record<string, unknown>)), page, pageSize, total, hasMore: to + 1 < total }, 200, id);
 }
 
-const allowedDocumentExtensions = new Set(["pdf","png","jpg","jpeg","webp","doc","docx","xls","xlsx","csv","dwg","dxf","txt","zip"]);
+const allowedDocumentExtensions = new Set(["pdf", "png", "jpg", "jpeg", "webp", "doc", "docx", "xls", "xlsx", "csv", "dwg", "dxf", "txt", "zip"]);
 
 async function uploadDocument(request: Request, supabase: SupabaseClient, id: string) {
   const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
@@ -1026,10 +1032,12 @@ async function uploadDocument(request: Request, supabase: SupabaseClient, id: st
     await storage.remove([storagePath]);
     return fail("VALIDATION_ERROR", "projectId and proposalId must be UUIDs.", 400, id);
   }
-  const inserted = await supabase.from("documents").insert({ workspace_id: scoped.access.workspaceId, folder_id: folderId, proposal_id: proposalId,
+  const inserted = await supabase.from("documents").insert({
+    workspace_id: scoped.access.workspaceId, folder_id: folderId, proposal_id: proposalId,
     project_id: projectId, project_name: form.get("projectName") ? String(form.get("projectName")).trim().slice(0, 200) : null,
     name: safeName, storage_path: storagePath, mime_type: file.type || "application/octet-stream", size_bytes: file.size,
-    checksum_sha256: createHash("sha256").update(bytes).digest("hex"), uploaded_by: scoped.access.userId })
+    checksum_sha256: createHash("sha256").update(bytes).digest("hex"), uploaded_by: scoped.access.userId
+  })
     .select("id,folder_id,proposal_id,project_id,project_name,name,mime_type,size_bytes,created_at,updated_at").single();
   if (inserted.error) { await storage.remove([storagePath]); return fail("VALIDATION_ERROR", "Document metadata could not be saved.", 400, id); }
   await audit(supabase, "document.uploaded", id);
@@ -1043,8 +1051,10 @@ async function updateDocument(request: Request, supabase: SupabaseClient, id: st
     const folder = await supabase.from("document_folders").select("id").eq("workspace_id", scoped.access.workspaceId).eq("id", input.data.folderId).single();
     if (folder.error) return fail("NOT_FOUND", "Destination folder was not found.", 404, id);
   }
-  const values = { ...(input.data.name !== undefined ? { name: input.data.name } : {}), ...(input.data.folderId !== undefined ? { folder_id: input.data.folderId } : {}),
-    ...(input.data.projectId !== undefined ? { project_id: input.data.projectId } : {}), ...(input.data.projectName !== undefined ? { project_name: input.data.projectName } : {}) };
+  const values = {
+    ...(input.data.name !== undefined ? { name: input.data.name } : {}), ...(input.data.folderId !== undefined ? { folder_id: input.data.folderId } : {}),
+    ...(input.data.projectId !== undefined ? { project_id: input.data.projectId } : {}), ...(input.data.projectName !== undefined ? { project_name: input.data.projectName } : {})
+  };
   const result = await supabase.from("documents").update(values).eq("workspace_id", scoped.access.workspaceId).eq("id", documentId)
     .select("id,folder_id,proposal_id,project_id,project_name,name,mime_type,size_bytes,created_at,updated_at").single();
   if (result.error) return fail("NOT_FOUND", "Document was not found.", 404, id);
@@ -1101,9 +1111,9 @@ async function listInvoices(request: NextRequest, supabase: SupabaseClient, id: 
   const search = request.nextUrl.searchParams.get("search")?.trim().slice(0, 120);
   let query = supabase.from("invoices").select(invoiceSelect, { count: "exact" }).eq("workspace_id", scoped.access.workspaceId)
     .is("archived_at", null).order("updated_at", { ascending: false }).range(from, to);
-  if (type && ["invoice","pro_forma","quote"].includes(type)) query = query.eq("document_type", type);
-  if (status === "overdue") query = query.in("status", ["pending","sent","partial"]).lt("due_date", new Date().toISOString().slice(0, 10));
-  else if (status && ["draft","pending","sent","accepted","partial","paid","void"].includes(status)) query = query.eq("status", status);
+  if (type && ["invoice", "pro_forma", "quote"].includes(type)) query = query.eq("document_type", type);
+  if (status === "overdue") query = query.in("status", ["pending", "sent", "partial"]).lt("due_date", new Date().toISOString().slice(0, 10));
+  else if (status && ["draft", "pending", "sent", "accepted", "partial", "paid", "void"].includes(status)) query = query.eq("status", status);
   if (search) {
     const safe = search.replace(/[%_,()]/g, " ");
     query = query.or(`invoice_code.ilike.%${safe}%,manual_number.ilike.%${safe}%,project_name.ilike.%${safe}%,client_name.ilike.%${safe}%`);
@@ -1124,8 +1134,10 @@ async function invoiceSummary(supabase: SupabaseClient, id: string) {
   const overdue = rows.filter((row) => row.due_date < today && Number(row.total_paid) < Number(row.total_amount) && row.status !== "draft");
   const totalInvoiced = rows.reduce((sum, row) => sum + Number(row.total_amount), 0);
   const collected = rows.reduce((sum, row) => sum + Number(row.total_paid), 0);
-  return ok({ totalInvoices: rows.length, totalInvoiced, collected, outstanding: totalInvoiced - collected,
-    overdue: overdue.reduce((sum, row) => sum + Number(row.total_amount) - Number(row.total_paid), 0), overdueCount: overdue.length, currency: scoped.access.currency }, 200, id);
+  return ok({
+    totalInvoices: rows.length, totalInvoiced, collected, outstanding: totalInvoiced - collected,
+    overdue: overdue.reduce((sum, row) => sum + Number(row.total_amount) - Number(row.total_paid), 0), overdueCount: overdue.length, currency: scoped.access.currency
+  }, 200, id);
 }
 
 async function loadInvoice(supabase: SupabaseClient, workspaceId: string, invoiceId: string) {
@@ -1161,7 +1173,7 @@ async function updateInvoice(request: Request, supabase: SupabaseClient, id: str
   const input = await parsed(request, invoicePatchSchema, id); if (input.response) return input.response;
   const current = await loadInvoice(supabase, scoped.access.workspaceId, invoiceId);
   if (!current) return fail("NOT_FOUND", "Invoice was not found.", 404, id);
-  if (["paid","void"].includes(String(current.storedStatus))) return fail("CONFLICT", "Paid or void invoices cannot be edited.", 409, id);
+  if (["paid", "void"].includes(String(current.storedStatus))) return fail("CONFLICT", "Paid or void invoices cannot be edited.", 409, id);
   const patch = input.data;
   const merged = {
     type: patch.type ?? current.type, clientId: patch.clientId !== undefined ? patch.clientId : current.clientId,
@@ -1218,7 +1230,7 @@ function basicInvoicePdf(invoice: Awaited<ReturnType<typeof loadInvoice>> & Reco
   const lines = [
     `${invoice.invoiceNumber} - ${String(invoice.type).replace("_", " ").toUpperCase()}`,
     `Billed to: ${invoice.clientName}`,
-    `Address: ${[address?.line1,address?.line2,address?.city,address?.state,address?.pincode].filter(Boolean).join(", ")}`,
+    `Address: ${[address?.line1, address?.line2, address?.city, address?.state, address?.pincode].filter(Boolean).join(", ")}`,
     `Project: ${invoice.projectName}`, `Issue date: ${invoice.issueDate}`, `Due date: ${invoice.dueDate}`, `Milestone: ${invoice.milestone}`, "",
     "Description | Qty x Rate | Amount", ...itemLines, "", `Subtotal: ${invoice.currency} ${Number(invoice.subtotal).toFixed(2)}`,
     `Tax (${invoice.taxRate}%): ${invoice.currency} ${Number(invoice.taxAmount).toFixed(2)}`, `Total: ${invoice.currency} ${Number(invoice.totalAmount).toFixed(2)}`,
@@ -1240,10 +1252,12 @@ async function invoicePdf(supabase: SupabaseClient, id: string, invoiceId: strin
   const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
   const invoice = await loadInvoice(supabase, scoped.access.workspaceId, invoiceId);
   if (!invoice) return fail("NOT_FOUND", "Invoice was not found.", 404, id);
-  return new Response(basicInvoicePdf(invoice as typeof invoice & Record<string, unknown>), { status: 200, headers: {
-    "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename=\"${pdfEscape(invoice.invoiceNumber)}.pdf\"`,
-    "Cache-Control": "private, no-store", "X-Request-Id": id,
-  } });
+  return new Response(basicInvoicePdf(invoice as typeof invoice & Record<string, unknown>), {
+    status: 200, headers: {
+      "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename=\"${pdfEscape(invoice.invoiceNumber)}.pdf\"`,
+      "Cache-Control": "private, no-store", "X-Request-Id": id,
+    }
+  });
 }
 
 async function dispatch(request: NextRequest, path: string[]) {
