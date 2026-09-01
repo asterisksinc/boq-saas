@@ -49,6 +49,13 @@ describe("Project tenant and import implementation", () => {
     expect(migration).toContain("current_workspace_role(workspace_id) in ('owner','admin')");
   });
 
+  it("is safe to rerun after a partially committed SQL Editor execution", () => {
+    expect(migration).toContain("drop constraint if exists projects_area_check");
+    expect(migration).toContain("create table if not exists public.project_rooms");
+    expect(migration).toContain("drop trigger if exists project_rooms_touch");
+    expect(migration).toContain("drop policy if exists projects_update_writer");
+  });
+
   it("parses both Project and BOQ workbooks on the backend with bounded uploads", () => {
     expect(route).toContain("XLSX.read");
     expect(route).toContain("request.formData()");

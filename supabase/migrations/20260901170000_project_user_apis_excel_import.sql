@@ -29,9 +29,16 @@ create table if not exists public.boq_imports (
   created_at timestamptz not null default now()
 );
 
+alter table public.boq_imports add column if not exists rows jsonb not null default '[]'::jsonb;
+
 create sequence if not exists public.project_code_seq;
 
 alter table public.projects drop constraint if exists projects_status_check;
+alter table public.projects drop constraint if exists projects_area_check;
+alter table public.projects drop constraint if exists projects_value_check;
+alter table public.projects drop constraint if exists projects_budget_check;
+alter table public.projects drop constraint if exists projects_progress_check;
+alter table public.projects drop constraint if exists projects_dates_check;
 alter table public.projects
   add column if not exists project_code text not null default ('PRJ-' || lpad(nextval('public.project_code_seq')::text, 6, '0')),
   add column if not exists client_contact text,
@@ -58,7 +65,7 @@ create index if not exists projects_workspace_status_idx on public.projects(work
 create index if not exists projects_workspace_name_idx on public.projects(workspace_id, lower(name)) where archived_at is null;
 create index if not exists boq_imports_workspace_created_idx on public.boq_imports(workspace_id, created_at desc);
 
-create table public.project_rooms (
+create table if not exists public.project_rooms (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
   project_id uuid not null references public.projects(id) on delete cascade,
@@ -76,7 +83,7 @@ create table public.project_rooms (
   unique(project_id, name)
 );
 
-create table public.project_imports (
+create table if not exists public.project_imports (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
   file_name text not null check (char_length(file_name) between 1 and 255),
@@ -90,10 +97,11 @@ create table public.project_imports (
   created_at timestamptz not null default now()
 );
 
-create index project_rooms_project_sort_idx on public.project_rooms(project_id, sort_order, created_at);
-create index project_imports_workspace_created_idx on public.project_imports(workspace_id, created_at desc);
+create index if not exists project_rooms_project_sort_idx on public.project_rooms(project_id, sort_order, created_at);
+create index if not exists project_imports_workspace_created_idx on public.project_imports(workspace_id, created_at desc);
 drop trigger if exists projects_touch on public.projects;
 create trigger projects_touch before update on public.projects for each row execute function public.touch_updated_at();
+drop trigger if exists project_rooms_touch on public.project_rooms;
 create trigger project_rooms_touch before update on public.project_rooms for each row execute function public.touch_updated_at();
 
 alter table public.projects enable row level security;
@@ -104,28 +112,38 @@ alter table public.project_imports enable row level security;
 drop policy if exists projects_select_member on public.projects;
 create policy projects_select_member on public.projects for select to authenticated using (public.is_workspace_member(workspace_id));
 drop policy if exists projects_insert_member on public.projects;
+drop policy if exists projects_insert_writer on public.projects;
 create policy projects_insert_writer on public.projects for insert to authenticated
   with check (public.current_workspace_role(workspace_id) in ('owner','admin','member') and created_by = (select auth.uid()));
+drop policy if exists projects_update_writer on public.projects;
 create policy projects_update_writer on public.projects for update to authenticated
   using (public.current_workspace_role(workspace_id) in ('owner','admin','member'))
   with check (public.current_workspace_role(workspace_id) in ('owner','admin','member'));
+drop policy if exists projects_delete_admin on public.projects;
 create policy projects_delete_admin on public.projects for delete to authenticated
   using (public.current_workspace_role(workspace_id) in ('owner','admin'));
 
+drop policy if exists project_rooms_select_member on public.project_rooms;
 create policy project_rooms_select_member on public.project_rooms for select to authenticated using (public.is_workspace_member(workspace_id));
+drop policy if exists project_rooms_insert_writer on public.project_rooms;
 create policy project_rooms_insert_writer on public.project_rooms for insert to authenticated
   with check (public.current_workspace_role(workspace_id) in ('owner','admin','member') and created_by = (select auth.uid()));
+drop policy if exists project_rooms_update_writer on public.project_rooms;
 create policy project_rooms_update_writer on public.project_rooms for update to authenticated
   using (public.current_workspace_role(workspace_id) in ('owner','admin','member'))
   with check (public.current_workspace_role(workspace_id) in ('owner','admin','member'));
+drop policy if exists project_rooms_delete_writer on public.project_rooms;
 create policy project_rooms_delete_writer on public.project_rooms for delete to authenticated
   using (public.current_workspace_role(workspace_id) in ('owner','admin','member'));
 
+drop policy if exists project_imports_select_member on public.project_imports;
 create policy project_imports_select_member on public.project_imports for select to authenticated using (public.is_workspace_member(workspace_id));
+drop policy if exists project_imports_insert_writer on public.project_imports;
 create policy project_imports_insert_writer on public.project_imports for insert to authenticated
   with check (public.current_workspace_role(workspace_id) in ('owner','admin','member') and created_by = (select auth.uid()));
 
 drop policy if exists boq_imports_insert_member on public.boq_imports;
+drop policy if exists boq_imports_insert_writer on public.boq_imports;
 create policy boq_imports_insert_writer on public.boq_imports for insert to authenticated
   with check (public.current_workspace_role(workspace_id) in ('owner','admin','member') and created_by = (select auth.uid()));
 drop policy if exists boq_imports_select_member on public.boq_imports;

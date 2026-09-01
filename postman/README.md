@@ -28,6 +28,7 @@ Run the collection folders in numeric order:
 8. Documents
 9. Proposal & Document Negative Checks
 10. Invoices
+11. Projects & Excel Import
 
 For OTP requests, copy the six-digit Gmail code into the environment `otp`
 value before running the corresponding verification request. For document
