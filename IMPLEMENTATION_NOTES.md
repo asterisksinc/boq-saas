@@ -74,10 +74,27 @@
 - Proposal `sent` currently records lifecycle state and `sentAt`; recipient contact records and outbound email delivery remain dependent on the Client/communications modules. The included PDF is a stable one-page commercial summary; branded/multi-page rendering remains dependent on finalized company branding and templates.
 - API, strict validation, OpenAPI, frontend integration guidance, tests, and a dedicated Postman collection were updated together.
 
+## Invoices increment (2026-09-01)
+
+- Authentication was not changed. The existing internal workspace roles remain owner/admin/member/viewer; they are authorization roles for the current User persona, not the future product personas Admin/User/Client.
+- Migration: `20260901150000_invoices.sql` adds invoice/pro-forma/quote headers, immutable client/project snapshots, line items, payment history, indexes, RLS, permission flags, and transactional RPCs.
+- Server-owned commercial calculations use fixed-precision numerics for line amounts, subtotal, tax, total, paid, and outstanding. Client-supplied totals/currency/workspace/user fields are rejected.
+- Workflow: empty/populated list, search/type/status filters, summary cards, create/save draft, detail/preview, edit with atomic item replacement, pending/sent/accepted/void lifecycle, effective overdue state, partial/full payment recording, PDF download, and protected archive.
+- Payment controls reject overpayment, update `partial`/`paid` atomically, lock paid/void invoices from editing, and prevent invoices with payment history from being archived.
+- `client_id` and `project_id` remain soft UUID references while Client/Project tables are deferred; snapshot names and billing address preserve the issued document. A future Client identity must link separately and receive invoice-scoped RLS/API access rather than becoming an internal workspace role.
+- “Send to Client” currently records `sent` and `sentAt`; outbound delivery needs the future Client contact and communications modules. Spreadsheet import is deferred until its file template and conflict policy are approved.
+
+## Temporary populated Dashboard responses (2026-09-01)
+
+- `GET /dashboard/overview` now accepts `period=week|month|quarter` and overlays explicitly marked hardcoded data for Project/BOQ KPIs, analytics series, Projects & BOQ breakdown, highlighted overdue BOQ, activity, recent records, actions, and deliverables.
+- Dashboard drill-down endpoints return paginated hardcoded demo records. Each response includes `dataSource: "hardcoded_demo"` and `demoData: true`; the overview additionally publishes `demoSections`.
+- Real authentication, active workspace scope, organization, permissions, financial masking, and notifications continue to come from Supabase. Demo record IDs must never be used for mutations.
+- Code comments use `TODO(PROJECT_BOQ_BACKEND)` as the replacement marker. Replace `lib/domain/dashboard-demo.ts` and the two marked route merge branches once Projects, BOQs, Costing, Approvals, and Deliverables exist.
+
 ## Operational setup
 
 1. Create a Supabase project and copy `.env.example` to `.env.local` with its URL, publishable key, and the frontend-owned verification/recovery redirect URLs.
-2. Apply migrations in timestamp order with the Supabase CLI (`supabase db push`) or run the SQL migrations in a controlled project. Confirm the `workspace-documents` bucket remains private.
+2. Apply migrations in timestamp order with the Supabase CLI (`supabase db push`) or run the SQL migrations in a controlled project, including `20260901150000_invoices.sql`. Confirm the `workspace-documents` bucket remains private.
 3. For a hosted Supabase project, open **Authentication > Email Templates**. Replace **Magic Link** with `supabase/templates/magic-link.html` and **Confirm signup** with `supabase/templates/confirmation.html`. Each template must contain `{{ .Token }}` and must not contain `{{ .ConfirmationURL }}`; otherwise Supabase sends a link instead of an OTP.
 4. Configure the Supabase Auth site URL/redirect allowlist for `APP_URL` and configure production Auth rate limits in the Supabase dashboard. The in-process limiter is defense-in-depth only and is not shared across serverless instances.
 5. Use the generated API routes under `/api/v1`; authenticated sessions are maintained with Supabase SSR cookies.
@@ -85,7 +102,9 @@
 ## Deferred
 
 - Client and Super Admin.
-- Full Project/Room, BOQ, costing, approvals, deliverables, invoices, integrations, billing, and support modules.
+- Full Project/Room, BOQ, costing, approvals, deliverables, integrations, billing, and support modules.
+- Admin persona APIs, Client CRUD/portal identity, client-scoped invoice viewing/payment, and outbound invoice delivery.
+- Invoice spreadsheet import until the product defines its CSV/XLSX template and duplicate/update rules.
 - Branded/multi-page proposal rendering and outbound client delivery; these depend on finalized company branding, client contacts, and an approved mail/rendering pipeline.
 - Upload malware scanning/quarantine service.
 - Populated dashboard queries for deferred domain tables. The Overview contract is stable and explicitly reports those sources as deferred.

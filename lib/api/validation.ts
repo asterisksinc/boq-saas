@@ -112,7 +112,7 @@ const invoiceItemSchema = z.object({
   rate: z.coerce.number().finite().min(0).max(999999999999),
 }).strict();
 
-export const invoiceCreateSchema = z.object({
+const invoiceBaseSchema = z.object({
   type: z.enum(["invoice", "pro_forma", "quote"]),
   clientId: optionalNullableUuid,
   clientName: z.string().trim().min(1).max(200),
@@ -125,19 +125,31 @@ export const invoiceCreateSchema = z.object({
   }).strict(),
   projectId: optionalNullableUuid,
   projectName: z.string().trim().min(1).max(200),
+  invoiceNumber: z.string().trim().min(1).max(80).optional(),
   issueDate: isoDate,
   dueDate: isoDate,
   milestone: z.string().trim().min(1).max(200),
   reference: z.string().trim().max(200).nullable().optional(),
   taxRate: z.coerce.number().finite().min(0).max(100).default(18),
   additionalNotes: z.string().trim().max(5000).nullable().optional(),
+  bankDetails: z.object({
+    bankName: z.string().trim().min(1).max(160),
+    accountHolder: z.string().trim().min(1).max(160),
+    accountNumber: z.string().trim().min(4).max(40),
+    ifscCode: z.string().trim().min(4).max(20),
+    branch: z.string().trim().max(160).nullable().optional(),
+    branchAddress: z.string().trim().max(300).nullable().optional(),
+  }).strict().nullable().optional(),
   status: z.enum(["draft", "pending"]).default("draft"),
   items: z.array(invoiceItemSchema).min(1).max(200),
-}).strict().superRefine((value, ctx) => {
+}).strict();
+
+export const invoiceCreateSchema = invoiceBaseSchema.superRefine((value, ctx) => {
   if (value.dueDate < value.issueDate) ctx.addIssue({ code: "custom", path: ["dueDate"], message: "Due date cannot be before issue date." });
 });
 
-export const invoicePatchSchema = invoiceCreateSchema.partial().strict().superRefine((value, ctx) => {
+export const invoicePatchSchema = invoiceBaseSchema.partial().strict().superRefine((value, ctx) => {
+  if (Object.keys(value).length === 0) ctx.addIssue({ code: "custom", path: [], message: "At least one field is required." });
   if (value.issueDate && value.dueDate && value.dueDate < value.issueDate) ctx.addIssue({ code: "custom", path: ["dueDate"], message: "Due date cannot be before issue date." });
 });
 
