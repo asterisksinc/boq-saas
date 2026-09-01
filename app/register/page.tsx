@@ -51,7 +51,12 @@ export default function RegisterPage() {
         try {
             const response = await register({ email: normalizedEmail, password, displayName: normalizedDisplayName });
             if (response.emailVerificationRequired) {
-                router.push(`/verify-email?flow=signup&email=${encodeURIComponent(normalizedEmail)}`);
+                // Redirect to OTP verification for new accounts
+                const params = new URLSearchParams({
+                    flow: "signup",
+                    email: normalizedEmail,
+                });
+                router.push(`/verify-email?${params.toString()}`);
                 return;
             }
             router.push("/onboarding");
