@@ -98,7 +98,7 @@
 - Workspace/user/code/progress fields are server-owned and derived from the cookie session. Every query is active-workspace scoped, with RLS as a second enforcement layer.
 - Project spreadsheet preview/import accepts CSV/XLS/XLSX and parses on the backend. Strict imports are all-or-nothing when validation errors are present; `skipInvalid=true` is an explicit partial-import option.
 - BOQ spreadsheet preview/upload now also parses and persists the original spreadsheet server-side. The older pre-parsed JSON endpoint remains for compatibility.
-- OpenAPI, a dedicated Projects Postman collection, frontend integration guidance, and contract/migration tests were updated. Frontend source files remain unchanged.
+- OpenAPI, the single Complete Postman collection (folder 11), frontend integration guidance, and contract/migration tests were updated. Frontend source files remain unchanged.
 
 ## Operational setup
 
