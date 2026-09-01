@@ -76,8 +76,9 @@ describe("proposal/document tenant and API controls", () => {
   });
 
   it("ships a parseable Postman collection", () => {
-    const collection = JSON.parse(readFileSync("postman/BOQ-Design-Arena-Proposals-Documents.postman_collection.json", "utf8"));
-    expect(collection.item).toHaveLength(4);
-    expect(collection.info.name).toContain("Proposals & Documents");
+    const collection = JSON.parse(readFileSync("postman/BOQ-Design-Arena-Complete.postman_collection.json", "utf8"));
+    expect(collection.info.name).toContain("Complete API");
+    expect(collection.item.some((group: { name: string }) => group.name === "06 — Proposals")).toBe(true);
+    expect(collection.item.some((group: { name: string }) => group.name === "08 — Documents")).toBe(true);
   });
 });

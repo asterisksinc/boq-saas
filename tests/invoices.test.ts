@@ -66,8 +66,8 @@ describe("invoice persistence and authorization", () => {
   });
 
   it("ships a parseable invoice Postman collection", () => {
-    const collection = JSON.parse(readFileSync("postman/BOQ-Design-Arena-Invoices.postman_collection.json", "utf8"));
-    expect(collection.info.name).toContain("Invoices");
-    expect(collection.item).toHaveLength(3);
+    const collection = JSON.parse(readFileSync("postman/BOQ-Design-Arena-Complete.postman_collection.json", "utf8"));
+    expect(collection.info.name).toContain("Complete API");
+    expect(collection.item.some((group: { name: string }) => group.name === "10 — Invoices")).toBe(true);
   });
 });
