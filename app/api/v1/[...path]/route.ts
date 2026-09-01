@@ -292,7 +292,8 @@ async function dashboardOverview(request: NextRequest, supabase: SupabaseClient,
 
 async function dashboardList(request: NextRequest, supabase: SupabaseClient, id: string, name: string) {
   const ctx = await context(supabase, id); if ("response" in ctx) return ctx.response;
-  const workspaceId = (ctx.data as { workspace?: { id?: string } } | null)?.workspace?.id;
+  const dashboardContext = ctx.data as { workspace?: { id?: string }; permissions?: { canViewFinancials?: boolean } } | null;
+  const workspaceId = dashboardContext?.workspace?.id;
   if (!workspaceId) return fail("FORBIDDEN", "Active workspace membership required.", 403, id);
   const { page, pageSize, from, to } = pagination(request.nextUrl.searchParams);
   if (name !== "notifications") {
@@ -304,7 +305,9 @@ async function dashboardList(request: NextRequest, supabase: SupabaseClient, id:
       "pending-actions": demoPendingActions,
       "upcoming-deliverables": demoUpcomingDeliverables,
     };
-    const all = demoItems[name] ?? [];
+    const all = name === "recent-boqs" && dashboardContext?.permissions?.canViewFinancials !== true
+      ? (demoItems[name] ?? []).map((item) => ({ ...(item as Record<string, unknown>), value: null }))
+      : demoItems[name] ?? [];
     return ok({ items: all.slice(from, to + 1), page, pageSize, total: all.length, hasMore: to + 1 < all.length, dataSource: "hardcoded_demo", demoData: true }, 200, id);
   }
   const countQuery = supabase.from("notifications").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId);
