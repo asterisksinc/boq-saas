@@ -1,4 +1,4 @@
-# Phase 1 implementation notes
+# Backend implementation notes
 
 ## Current backend audit
 
@@ -62,10 +62,22 @@
 - Security: workspace scope comes only from `auth.uid()` membership; no workspace/user/role body parameter is accepted. RLS provides a second enforcement layer. Financial values are `null` and cost overview is omitted for non-financial roles.
 - Failure isolation: deferred domains are independent typed empty sections with `unavailableSections`; internal RPC failures are correlated and do not expose stack traces.
 
+## Proposals and Documents increment (2026-09-01)
+
+- Source contract: the checked-in PPRD places both modules in Phase 6; the supplied UI screenshots define proposal start modes/lifecycle actions and folder/file operations.
+- Migration: `20260901120000_proposals_documents.sql` adds proposals, nested document folders, document metadata, indexes, touch triggers, RLS/grants, and a private 25 MB `workspace-documents` Supabase Storage bucket.
+- Proposal create modes: `scratch`, `boq`, `duplicate`, and `template`. Because Project/BOQ/Template tables are deferred, their UUIDs are soft references and visible labels are stored as immutable snapshots. Add foreign keys in the respective future migrations without changing the current API fields.
+- Proposal workflow: list/search/filter, dashboard summary, create, preview/detail, dependency-free PDF download, atomic authenticated view count, update, status transitions (`draft`, `sent`, `approved`, `revisions`, `won`, `lost`), duplicate-through-create, and owner/admin archive.
+- Documents workflow: root/child folder listing, create/rename/move, confirmed recursive deletion, paginated file listing, multipart upload, metadata update/move, private signed download, and permanent owner/admin deletion.
+- Permissions: viewer read-only; member create/update; owner/admin additionally archive/delete. Workspace/user/currency/storage paths are always derived server-side.
+- Upload security: extension allowlist, 25 MB bound, SHA-256 checksum, private storage, and short-lived downloads. Production deployments should add malware scanning/quarantine before treating untrusted uploads as safe.
+- Proposal `sent` currently records lifecycle state and `sentAt`; recipient contact records and outbound email delivery remain dependent on the Client/communications modules. The included PDF is a stable one-page commercial summary; branded/multi-page rendering remains dependent on finalized company branding and templates.
+- API, strict validation, OpenAPI, frontend integration guidance, tests, and a dedicated Postman collection were updated together.
+
 ## Operational setup
 
 1. Create a Supabase project and copy `.env.example` to `.env.local` with its URL, publishable key, and the frontend-owned verification/recovery redirect URLs.
-2. Apply migrations with the Supabase CLI (`supabase db push`) or run the SQL migration in a controlled project.
+2. Apply migrations in timestamp order with the Supabase CLI (`supabase db push`) or run the SQL migrations in a controlled project. Confirm the `workspace-documents` bucket remains private.
 3. For a hosted Supabase project, open **Authentication > Email Templates**. Replace **Magic Link** with `supabase/templates/magic-link.html` and **Confirm signup** with `supabase/templates/confirmation.html`. Each template must contain `{{ .Token }}` and must not contain `{{ .ConfirmationURL }}`; otherwise Supabase sends a link instead of an OTP.
 4. Configure the Supabase Auth site URL/redirect allowlist for `APP_URL` and configure production Auth rate limits in the Supabase dashboard. The in-process limiter is defense-in-depth only and is not shared across serverless instances.
 5. Use the generated API routes under `/api/v1`; authenticated sessions are maintained with Supabase SSR cookies.
@@ -73,7 +85,9 @@
 ## Deferred
 
 - Client and Super Admin.
-- Full Project/Room, BOQ, costing, approvals, deliverables, documents, proposals, invoices, integrations, billing, and support modules.
+- Full Project/Room, BOQ, costing, approvals, deliverables, invoices, integrations, billing, and support modules.
+- Branded/multi-page proposal rendering and outbound client delivery; these depend on finalized company branding, client contacts, and an approved mail/rendering pipeline.
+- Upload malware scanning/quarantine service.
 - Populated dashboard queries for deferred domain tables. The Overview contract is stable and explicitly reports those sources as deferred.
 - Live migration/auth/tenant integration tests until a disposable Supabase project and credentials are available.
 - Final Figma field reconciliation until the connected account has access/quota.
