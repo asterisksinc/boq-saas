@@ -23,6 +23,36 @@ export type AuthContext = {
     [key: string]: unknown;
 };
 
+export type DashboardNotification = {
+    id: string;
+    type: string;
+    title: string;
+    priority: string | null;
+    createdAt: string;
+    readAt: string | null;
+};
+
+export type DashboardOverview = {
+    scope: { workspaceId: string; currency: string; timezone: string; generatedAt: string };
+    kpis: {
+        totalProjects: number;
+        activeProjects: number;
+        draftBoqs: number;
+        pendingApprovals: number;
+        totalEstimatedValue: number | null;
+        actualCost: number | null;
+        grossMargin: number | null;
+    };
+    organization: { id: string; name: string; status: string; country: string | null };
+    recentProjects: unknown[];
+    recentBoqs: unknown[];
+    pendingActions: unknown[];
+    upcomingDeliverables: unknown[];
+    notifications: { unreadCount: number; items: DashboardNotification[] };
+    permissions: { canViewFinancials?: boolean; [key: string]: boolean | undefined };
+    unavailableSections: Array<{ section: string; reason: "DOMAIN_DEFERRED" }>;
+};
+
 export function parseApiResponse<T>(payload: unknown): T & { requestId?: string } {
     const response = payload as ApiEnvelope<T>;
     if (response && typeof response === "object" && "data" in response) {
@@ -32,6 +62,10 @@ export function parseApiResponse<T>(payload: unknown): T & { requestId?: string 
 }
 
 export function getApiErrorMessage(payload: unknown): string {
+    if (payload instanceof Error && payload.message) {
+        return payload.message;
+    }
+
     if (payload && typeof payload === "object") {
         const response = payload as ApiEnvelope<unknown> & { message?: string };
         if (response.error?.message) return response.error.message;
@@ -82,6 +116,18 @@ export async function logout() {
 
 export async function getCurrentUser() {
     return request<{ user: AuthUser; context?: AuthContext }>("/api/v1/auth/me");
+}
+
+export async function getDashboardOverview() {
+    return request<DashboardOverview>("/api/v1/dashboard/overview");
+}
+
+export async function createProject(input: { name: string; clientName: string; projectType: string; status: "active" | "on_hold" | "planning"; location?: string }) {
+    return request<{ id: string }>("/api/v1/projects", { method: "POST", body: JSON.stringify(input) });
+}
+
+export async function createBoqImport(input: { fileName: string; fileType: "csv" | "xlsx" | "xls"; rowCount: number; columns: string[]; rows: Array<Array<string | number | boolean | null>> }) {
+    return request<{ id: string }>("/api/v1/boq-imports", { method: "POST", body: JSON.stringify(input) });
 }
 
 export async function forgotPassword(input: { email: string }) {

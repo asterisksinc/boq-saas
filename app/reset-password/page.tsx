@@ -20,6 +20,8 @@ function ResetPasswordContent() {
     const code = useMemo(() => searchParams.get("code") ?? "", [searchParams]);
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -85,12 +87,22 @@ function ResetPasswordContent() {
 
                     <label className="field">
                         <span>Password <em>*</em></span>
-                        <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 10 characters" required autoComplete="new-password" />
+                        <div className="auth-password-control">
+                            <input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 10 characters" required autoComplete="new-password" />
+                            <button type="button" className="password-toggle" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Hide password" : "Show password"}>
+                                <img src="/assets/password-visibility.svg" alt="" aria-hidden="true" />
+                            </button>
+                        </div>
                     </label>
 
                     <label className="field">
                         <span>Confirm Password <em>*</em></span>
-                        <input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="Re-enter your password" required autoComplete="new-password" />
+                        <div className="auth-password-control">
+                            <input type={showConfirmPassword ? "text" : "password"} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="Re-enter your password" required autoComplete="new-password" />
+                            <button type="button" className="password-toggle" onClick={() => setShowConfirmPassword((value) => !value)} aria-label={showConfirmPassword ? "Hide password" : "Show password"}>
+                                <img src="/assets/password-visibility.svg" alt="" aria-hidden="true" />
+                            </button>
+                        </div>
                     </label>
 
                     <button className="primary-button" type="submit" disabled={isSubmitting || !password || !confirmPassword}>

@@ -21,6 +21,12 @@ import {
   userPatchSchema,
   verifyEmailSchema,
   verifyEmailOtpSchema,
+
+  // my changes
+  projectCreateSchema,
+  boqImportSchema,
+
+  // Friend's changes
   documentPatchSchema,
   folderCreateSchema,
   folderDeleteSchema,
@@ -145,6 +151,12 @@ async function login(request: Request, supabase: SupabaseClient, id: string) {
   if (error || !data.user) {
     return fail("UNAUTHENTICATED", "otp" in input.data ? "Invalid or expired OTP." : "Invalid email or password.", 401, id);
   }
+  if (!("otp" in input.data)) {
+    try { await issueEmailOtp(input.data.email, data.user.id); }
+    catch (otpError) { return emailOtpFailure(otpError, id); }
+    await supabase.auth.signOut({ scope: "local" });
+    return ok({ otpSent: true, message: "A 6-digit login code has been sent through Gmail." }, 200, id);
+  }
   const ctx = await context(supabase, id); if ("response" in ctx) return ctx.response;
   await audit(supabase, "auth.login.succeeded", id);
   return ok({ user: { id: data.user.id, email: data.user.email }, context: ctx.data }, 200, id);
@@ -207,7 +219,17 @@ async function verifyEmail(request: NextRequest, supabase: SupabaseClient, id: s
     const admin = createSupabaseAdminClient();
     const { error } = await admin.auth.admin.updateUserById(userId, { email_confirm: true });
     if (error) return fail("INTERNAL_ERROR", "Account verification could not be completed.", 500, id);
-    return ok({ verified: true }, 200, id);
+
+    // Registration uses an admin-created user, so confirming the email alone does
+    // not create a session in this browser. Mint a one-time magic-link token and
+    // consume it through the SSR client to persist the auth cookies.
+    const link = await admin.auth.admin.generateLink({ type: "magiclink", email: otpInput.data.email });
+    const tokenHash = link.data?.properties?.hashed_token;
+    if (link.error || !tokenHash) return fail("INTERNAL_ERROR", "A session could not be created after verification.", 500, id);
+    const session = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "magiclink" });
+    if (session.error || !session.data.user) return fail("INTERNAL_ERROR", "A session could not be created after verification.", 500, id);
+    await audit(supabase, "auth.email.verified", id);
+    return ok({ verified: true, user: { id: session.data.user.id, email: session.data.user.email } }, 200, id);
   }
   const input = verifyEmailSchema.safeParse(source);
   if (!input.success) return fail("VALIDATION_ERROR", "Verification link is invalid.", 400, id, fieldErrors(input.error));
@@ -288,6 +310,44 @@ async function dashboardOverview(request: NextRequest, supabase: SupabaseClient,
   // TODO(PROJECT_BOQ_BACKEND): Remove this merge once get_dashboard_overview
   // returns real Project/BOQ/Costing/Workflow aggregates.
   return ok({ ...base, ...demo, scope: base.scope, organization: base.organization, permissions: base.permissions, notifications: base.notifications }, 200, id);
+}
+
+async function createProject(request: Request, supabase: SupabaseClient, id: string) {
+  const ctx = await context(supabase, id); if ("response" in ctx) return ctx.response;
+  const workspaceId = (ctx.data as { workspace?: { id?: string } } | null)?.workspace?.id;
+  if (!workspaceId) return fail("FORBIDDEN", "Active workspace membership required.", 403, id);
+  const input = await parsed(request, projectCreateSchema, id); if (input.response) return input.response;
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin.from("projects").insert({
+    workspace_id: workspaceId, name: input.data.name, client_name: input.data.clientName,
+    project_type: input.data.projectType, status: input.data.status, location: input.data.location || null,
+    created_by: ctx.user.id,
+  }).select("id,name,client_name,project_type,status,location,created_at").single();
+  if (error) {
+    console.error(JSON.stringify({ requestId: id, event: "project_create_failed", code: error.code, message: error.message }));
+    return fail("VALIDATION_ERROR", "Project could not be created. Please verify the database migration is applied.", 400, id);
+  }
+  await audit(supabase, "project.created", id);
+  return ok(data, 201, id);
+}
+
+async function createBoqImport(request: Request, supabase: SupabaseClient, id: string) {
+  const ctx = await context(supabase, id); if ("response" in ctx) return ctx.response;
+  const workspaceId = (ctx.data as { workspace?: { id?: string } } | null)?.workspace?.id;
+  if (!workspaceId) return fail("FORBIDDEN", "Active workspace membership required.", 403, id);
+  const input = await parsed(request, boqImportSchema, id); if (input.response) return input.response;
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin.from("boq_imports").insert({
+    workspace_id: workspaceId, project_id: input.data.projectId || null, file_name: input.data.fileName,
+    file_type: input.data.fileType, row_count: input.data.rowCount, columns: input.data.columns,
+    created_by: ctx.user.id, rows: input.data.rows ?? [],
+  }).select("id,file_name,file_type,row_count,columns,created_at").single();
+  if (error) {
+    console.error(JSON.stringify({ requestId: id, event: "boq_import_create_failed", code: error.code, message: error.message }));
+    return fail("VALIDATION_ERROR", "BOQ import could not be saved. Please verify the database migration is applied.", 400, id);
+  }
+  await audit(supabase, "boq.imported", id);
+  return ok(data, 201, id);
 }
 
 async function dashboardList(request: NextRequest, supabase: SupabaseClient, id: string, name: string) {
@@ -871,7 +931,9 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (request.method === "PATCH" && route === "users/me/password") return changePassword(request, supabase, id);
   if ((request.method === "GET" || request.method === "PATCH") && route === "users/me/preferences") return preferences(request, supabase, id);
   if ((request.method === "GET" || request.method === "PATCH") && route === "onboarding/me") return onboarding(request, supabase, id);
-  if (request.method === "GET" && route === "dashboard/overview") return dashboardOverview(request, supabase, id);
+  if (request.method === "GET" && route === "dashboard/overview") return dashboardOverview(supabase, id);
+  if (request.method === "POST" && route === "projects") return createProject(request, supabase, id);
+  if (request.method === "POST" && route === "boq-imports") return createBoqImport(request, supabase, id);
   const list = route.match(/^dashboard\/(recent-projects|recent-boqs|pending-actions|upcoming-deliverables|notifications)$/)?.[1];
   if (request.method === "GET" && list) return dashboardList(request, supabase, id, list);
   if (request.method === "GET" && route === "proposals") return listProposals(request, supabase, id);

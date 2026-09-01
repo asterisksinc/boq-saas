@@ -19,12 +19,17 @@ function VerifyEmailContent() {
     const code = useMemo(() => searchParams.get("code") ?? "", [searchParams]);
     const tokenHash = useMemo(() => searchParams.get("token_hash") ?? "", [searchParams]);
     const type = useMemo(() => searchParams.get("type") ?? "email", [searchParams]);
-    const emailFromUrl = useMemo(() => searchParams.get("email") ?? "", [searchParams]);
+    const flow = useMemo(() => searchParams.get("flow") ?? "link", [searchParams]);
+    const emailParam = useMemo(() => searchParams.get("email") ?? "", [searchParams]);
+
     const [status, setStatus] = useState<"idle" | "verifying" | "success" | "error">("idle");
     const [message, setMessage] = useState("");
-    const [email, setEmail] = useState(emailFromUrl);
+    const [email, setEmail] = useState(emailParam);
     const [otp, setOtp] = useState<string[]>(Array(6).fill(""));
+    const [resendTimer, setResendTimer] = useState(0);
+    const [canResend, setCanResend] = useState(true);
 
+    // Auto-verify if code or tokenHash is present (email link flow)
     useEffect(() => {
         const run = async () => {
             if (!code && !tokenHash) return;
@@ -32,7 +37,7 @@ function VerifyEmailContent() {
             setStatus("verifying");
             try {
                 if (code) {
-                    await verifyEmailCode(code, emailFromUrl || undefined);
+                    await verifyEmailCode(code);
                 } else {
                     await verifyEmail({ tokenHash, type: type as "email" | "signup" | "email_change" });
                 }
@@ -46,7 +51,21 @@ function VerifyEmailContent() {
         };
 
         void run();
-    }, [code, emailFromUrl, tokenHash, type]);
+    }, [code, tokenHash, type]);
+
+    // Countdown timer for resend
+    useEffect(() => {
+        if (resendTimer <= 0) {
+            setCanResend(true);
+            return;
+        }
+
+        const timer = setInterval(() => {
+            setResendTimer((prev) => prev - 1);
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [resendTimer]);
 
     const onOtpChange = (index: number, value: string) => {
         const next = [...otp];
@@ -60,22 +79,28 @@ function VerifyEmailContent() {
     };
 
     const onVerify = async () => {
-        const code = otp.join("");
-        if (code.length !== 6) {
+        const otpCode = otp.join("");
+        if (otpCode.length !== 6) {
             setMessage("Enter the full 6-digit verification code.");
             return;
         }
 
         setStatus("verifying");
         try {
-            if (!email) {
-                setStatus("error");
-                setMessage("Open the verification page from signup, or enter your email before verifying.");
-                return;
-            }
-            await verifyEmailCode(code, email);
+            await verifyEmailCode(otpCode, email);
             setStatus("success");
             setMessage("Your email has been verified.");
+
+            // Redirect based on flow
+            setTimeout(() => {
+                if (flow === "signup") {
+                    router.push("/onboarding");
+                } else if (flow === "login") {
+                    router.push("/dashboard");
+                } else {
+                    router.push("/login");
+                }
+            }, 1500);
         } catch (requestError) {
             setStatus("error");
             setMessage(getApiErrorMessage(requestError));
@@ -88,18 +113,35 @@ function VerifyEmailContent() {
             return;
         }
 
+        if (!canResend) {
+            return;
+        }
+
+        setCanResend(false);
+        setResendTimer(60); // 60 second cooldown
+
         try {
             const response = await resendVerification({ email });
-            setMessage(response.message || "Verification email sent.");
+            setMessage(response.message || "Verification code sent.");
         } catch (requestError) {
             setMessage(getApiErrorMessage(requestError));
+            setCanResend(true);
+            setResendTimer(0);
         }
+    };
+
+    const formatTime = (seconds: number) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
     };
 
     return (
         <AuthLayout
-            title={status === "success" ? "Email verified" : status === "error" ? "Verification issue" : "Check your Email"}
-            subtitle={status === "success" ? "Your account is ready to continue." : email ? `Enter the unique code we sent to ${email} below` : "Enter the unique code we sent to your email below"}
+            title={status === "success" ? "Verified" : status === "error" ? "Verification issue" : "Check your Email"}
+            subtitle={status === "success" ? "Your account is verified. Redirecting..." : email ? `Enter the unique code we sent to ${email} below` : "Enter the unique code we sent to your email below"}
+            iconSrc="/assets/check-email.svg"
+            iconAlt="Email verification"
             footer={
                 <div className="auth-footer-inline">
                     <span>2026 BOQ. All Rights Reserved.</span>
@@ -113,8 +155,7 @@ function VerifyEmailContent() {
                     <div className="auth-success-box compact-box">
                         <div className="auth-success-icon" aria-hidden="true">✓</div>
                         <h3>Email verified</h3>
-                        <p>Your email has been verified. You can continue to the app.</p>
-                        <button type="button" className="primary-button" onClick={() => router.push("/login")}>Continue</button>
+                        <p>Your account is ready. Redirecting...</p>
                     </div>
                 ) : (
                     <>
@@ -134,16 +175,25 @@ function VerifyEmailContent() {
                             ))}
                         </div>
 
-                        <button type="button" className="auth-link-button" onClick={() => onResend()}>
-                            Didn&apos;t receive it? Send Again
-                        </button>
+                        <div className="otp-actions">
+                            <button
+                                type="button"
+                                className="auth-link-button"
+                                disabled={!canResend}
+                                onClick={() => onResend()}
+                            >
+                                Didn&apos;t receive it? Send Again
+                            </button>
 
-                        <p className="auth-inline-note">Resend 00:39s</p>
+                            {!canResend && (
+                                <p className="auth-inline-note">Resend {formatTime(resendTimer)}</p>
+                            )}
+                        </div>
 
                         {message ? <p className={status === "error" ? "error-banner" : "success-banner"} role="status">{message}</p> : null}
 
-                        <button type="button" className="primary-button" onClick={onVerify}>
-                            Verify Code
+                        <button type="button" className="primary-button" onClick={onVerify} disabled={status === "verifying"}>
+                            {status === "verifying" ? "Verifying..." : "Verify Code"}
                         </button>
                     </>
                 )}

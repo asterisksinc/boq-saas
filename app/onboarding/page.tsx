@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChangeEvent, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { getApiErrorMessage, getOnboardingState, saveOnboardingState, verifyEmailCode } from "@/lib/api/auth";
+import * as XLSX from "xlsx";
+import { createBoqImport, createProject, getApiErrorMessage, getOnboardingState, saveOnboardingState, verifyEmailCode } from "@/lib/api/auth";
 
 const stepMeta = [
     {
@@ -80,14 +81,18 @@ function OnboardingContent() {
     const [measurementSystem, setMeasurementSystem] = useState("Metric (m, sq.m, cu.m)");
     const [taxType, setTaxType] = useState("GST (India)");
     const [defaultMarkup, setDefaultMarkup] = useState("0");
-    const [projectName, setProjectName] = useState("ex. Sharma Residence");
-    const [clientName, setClientName] = useState("ex. John Doe");
+    const [projectName, setProjectName] = useState("");
+    const [clientName, setClientName] = useState("");
     const [projectType, setProjectType] = useState("");
     const [projectStatus, setProjectStatus] = useState("Active");
-    const [projectLocation, setProjectLocation] = useState("ex. Mumbai, Maharashtra");
+    const [projectLocation, setProjectLocation] = useState("");
     const [pathSelection, setPathSelection] = useState<"scratch" | "import" | null>("scratch");
     const [isUploadReady, setIsUploadReady] = useState(false);
     const [selectedFileName, setSelectedFileName] = useState("");
+    const [importColumns, setImportColumns] = useState<string[]>([]);
+    const [importRowCount, setImportRowCount] = useState(0);
+    const [importRows, setImportRows] = useState<Array<Array<string | number | boolean | null>>>([]);
+    const [completion, setCompletion] = useState<"project" | "import" | null>(null);
     const [language, setLanguage] = useState("ENG");
     const [showLangDropdown, setShowLangDropdown] = useState(false);
 
@@ -155,11 +160,58 @@ function OnboardingContent() {
         }
     };
 
-    const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
+        if (file.size > 25 * 1024 * 1024) {
+            setError("The selected file is larger than the 25 MB upload limit.");
+            return;
+        }
         setSelectedFileName(file.name);
+        const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1, defval: "" });
+        const headers = (rows[0] ?? []).map((value) => String(value).trim()).filter(Boolean);
+        setImportColumns(headers.slice(0, 12));
+        setImportRowCount(Math.max(0, rows.length - 1));
+        setImportRows(rows.slice(1, 10_001).map((row) => row.map((value) => {
+            if (typeof value === "string" || typeof value === "number" || typeof value === "boolean" || value === null) return value;
+            return String(value);
+        })));
         setIsUploadReady(true);
+    };
+
+    const finish = async (kind: "project" | "import") => {
+        await saveOnboardingState({ currentStep: "dashboard", completedSteps: ["workspace", "workflow", "project", kind === "project" ? "first-project" : "import-boq"], company: { name: workspaceName, currency: currency === "Indian Rupee (â‚¹)" ? "INR" : undefined } });
+        setCompletion(kind);
+    };
+
+    const submitProject = async () => {
+        if (!projectName.trim() || !clientName.trim() || !projectType) { setError("Project name, client name, and project type are required."); return; }
+        setLoading(true); setError("");
+        try {
+            await createProject({ name: projectName.trim(), clientName: clientName.trim(), projectType, status: projectStatus === "On Hold" ? "on_hold" : projectStatus.toLowerCase() as "active" | "planning", location: projectLocation.trim() || undefined });
+            await finish("project");
+        } catch (requestError) { setError(getApiErrorMessage(requestError)); } finally { setLoading(false); }
+    };
+
+    const submitImport = async () => {
+        if (!isUploadReady) { setError("Choose an Excel or CSV file before importing."); return; }
+        const fileType = selectedFileName.split(".").pop()?.toLowerCase();
+        if (fileType !== "csv" && fileType !== "xlsx" && fileType !== "xls") { setError("Choose a CSV, XLS, or XLSX file."); return; }
+        setLoading(true); setError("");
+        try {
+            await createBoqImport({ fileName: selectedFileName, fileType, rowCount: importRowCount, columns: importColumns, rows: importRows });
+            await finish("import");
+        } catch (requestError) { setError(getApiErrorMessage(requestError)); } finally { setLoading(false); }
+    };
+
+    const skipToDashboard = async () => {
+        setLoading(true); setError("");
+        try {
+            await saveOnboardingState({ currentStep: "dashboard", completedSteps: ["workspace", "workflow", "project"], skippedSteps: ["first-project", "import-boq"], company: { name: workspaceName, currency: currency === "Indian Rupee (â‚¹)" ? "INR" : undefined } });
+            router.push("/dashboard");
+        } catch (requestError) { setError(getApiErrorMessage(requestError)); } finally { setLoading(false); }
     };
 
     const goNext = async () => {
@@ -285,6 +337,21 @@ function OnboardingContent() {
                 <section className="onboarding-main">
                     <div className="onboarding-card">
                         {error ? <p className="error-banner" role="alert">{error}</p> : null}
+                        {completion ? (
+                            <section className="onboarding-completion">
+                                <img src="/assets/onboarding-complete.svg" alt="" />
+                                <h1>{completion === "project" ? "Create Your First Project" : "Import Your Existing BOQ"}</h1>
+                                <p>{completion === "project" ? "Your first project has been created and your workspace is ready." : "Your BOQ has been saved and is ready for the next steps."}</p>
+                                <div className="onboarding-summary">
+                                    <p><span>✓ Workspace</span><strong>{workspaceName || "Your workspace"}</strong></p>
+                                    <p><span>✓ {completion === "project" ? "Project" : "BOQ import"}</span><strong>{completion === "project" ? projectName : selectedFileName}</strong></p>
+                                    <p><span>✓ Currency</span><strong>{currency}</strong></p>
+                                    <p><span>✓ Measurement</span><strong>{measurementSystem}</strong></p>
+                                </div>
+                                <div className="footer-row"><button type="button" className="secondary-btn">Explore Templates</button><button type="button" className="primary-btn" onClick={() => router.push("/dashboard")}>Go to Dashboard</button></div>
+                            </section>
+                        ) : (
+                        <>
 
                         {isWorkspaceStep ? (
                             <>
@@ -392,7 +459,7 @@ function OnboardingContent() {
                                     <button
                                         type="button"
                                         className={`choice-card ${pathSelection === "scratch" ? "selected" : ""}`}
-                                        onClick={() => setPathSelection("scratch")}
+                                        onClick={() => { setPathSelection("scratch"); setStep(3); }}
                                     >
                                         <div className="choice-icon">＋</div>
                                         <h3>Start From Scratch</h3>
@@ -403,10 +470,7 @@ function OnboardingContent() {
                                     <button
                                         type="button"
                                         className={`choice-card ${pathSelection === "import" ? "selected" : ""}`}
-                                        onClick={() => {
-                                            setPathSelection("import");
-                                            setStep(4);
-                                        }}
+                                        onClick={() => { setPathSelection("import"); setStep(4); }}
                                     >
                                         <div className="choice-icon">＋</div>
                                         <h3>Import an existing BOQ</h3>
@@ -417,9 +481,7 @@ function OnboardingContent() {
 
                                 <div className="choice-footer">
                                     <button type="button" className="secondary-btn" onClick={goBack}>Back</button>
-                                    <button type="button" className="primary-btn" onClick={() => pathSelection === "scratch" ? setStep(3) : setStep(4)}>
-                                        Continue
-                                    </button>
+                                    <p className="onboarding-dashboard-link">Not ready yet? <button type="button" disabled={loading} onClick={() => void skipToDashboard()}>Go to Dashboard</button></p>
                                 </div>
                             </>
                         ) : null}
@@ -433,12 +495,12 @@ function OnboardingContent() {
                                     <div className="split-row">
                                         <label className="onboarding-field">
                                             <span>Project Name <em>*</em></span>
-                                            <input value={projectName} onChange={(event) => setProjectName(event.target.value)} />
+                                            <input value={projectName} placeholder="ex. Sharma Residence" onChange={(event) => setProjectName(event.target.value)} />
                                         </label>
 
                                         <label className="onboarding-field">
                                             <span>Client Name <em>*</em></span>
-                                            <input value={clientName} onChange={(event) => setClientName(event.target.value)} />
+                                            <input value={clientName} placeholder="ex. John Doe" onChange={(event) => setClientName(event.target.value)} />
                                         </label>
                                     </div>
 
@@ -471,7 +533,7 @@ function OnboardingContent() {
 
                                     <label className="onboarding-field">
                                         <span>Project Location</span>
-                                        <input value={projectLocation} onChange={(event) => setProjectLocation(event.target.value)} />
+                                        <input value={projectLocation} placeholder="ex. Mumbai, Maharashtra" onChange={(event) => setProjectLocation(event.target.value)} />
                                     </label>
                                 </div>
                             </>
@@ -482,27 +544,33 @@ function OnboardingContent() {
                                 <h1>{currentTitle}</h1>
                                 <p className="onboarding-subtitle">{currentSubtitle}</p>
 
-                                <div className="upload-box">
+                                {!isUploadReady ? <div className="upload-box">
                                     <label htmlFor="boq-upload" className="upload-label">
-                                        <span className="upload-icon">⇪</span>
+                                        <img className="upload-icon" src="/assets/onboarding-upload.svg" alt="" />
                                         <span className="upload-title">Drag &amp; Drop Your File Here</span>
                                         <span className="upload-or">or</span>
                                         <span className="upload-button">Explore Templates</span>
                                         <input id="boq-upload" type="file" accept=".xlsx,.xls,.csv" onChange={handleFileChange} />
                                     </label>
                                     <p className="upload-meta">Supported: .xlsx, .xls, .csv • Maximum file size: 25 MB</p>
-                                </div>
+                                </div> : <div className="import-mapping">
+                                    <div className="import-file-ready"><strong>✓ {selectedFileName} {importRowCount ? `— ${importRowCount} rows detected` : ""}</strong><button type="button" onClick={() => setIsUploadReady(false)}>Change File</button></div>
+                                    <div className="import-table"><header><span>Spreadsheet column</span><span>BOQ field</span><span>Rows</span></header>{importColumns.map((column) => <div key={column}><span>{column}</span><b>→</b><select defaultValue="Item Name"><option>Item Name</option><option>Description</option><option>Quantity</option><option>Rate</option><option>Amount</option></select><i>{importRowCount || "—"}</i></div>)}</div>
+                                    <div className="import-warning">⚠ <span><strong>Review your file before importing</strong><br />You can adjust these mappings after import.</span></div>
+                                </div>}
                             </>
                         ) : null}
 
-                        {!isChoiceStep && !isImportStep ? (
+                        {!isChoiceStep ? (
                             <div className="footer-row">
                                 <button type="button" className="secondary-btn" onClick={goBack}>Back</button>
-                                <button type="button" className="primary-btn" onClick={goNext} disabled={loading}>
+                                <button type="button" className="primary-btn" onClick={isProjectStep ? submitProject : isImportStep ? submitImport : goNext} disabled={loading}>
                                     {step === 3 ? "Create a Project" : step === 4 ? "Import BOQ" : "Continue"}
                                 </button>
                             </div>
                         ) : null}
+                        </>
+                        )}
                     </div>
                 </section>
             </div>

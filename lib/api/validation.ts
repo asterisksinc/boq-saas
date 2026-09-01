@@ -49,6 +49,21 @@ export const onboardingPatchSchema = z.object({
     timezone: z.string().trim().min(1).max(80).optional(),
   }).strict().optional(),
 }).strict();
+export const projectCreateSchema = z.object({
+  name: z.string().trim().min(1).max(160),
+  clientName: z.string().trim().min(1).max(160),
+  projectType: z.string().trim().min(1).max(80),
+  status: z.enum(["active", "on_hold", "planning"]),
+  location: z.string().trim().max(240).optional(),
+}).strict();
+export const boqImportSchema = z.object({
+  fileName: z.string().trim().min(1).max(255),
+  fileType: z.enum(["csv", "xlsx", "xls"]),
+  rowCount: z.number().int().min(0).max(100_000),
+  columns: z.array(z.string().trim().min(1).max(120)).max(100),
+  rows: z.array(z.array(z.union([z.string(), z.number(), z.boolean(), z.null()]))).max(10_000).optional(),
+  projectId: z.string().uuid().optional(),
+}).strict();
 
 const uuid = z.string().uuid();
 const optionalNullableUuid = uuid.nullable().optional();

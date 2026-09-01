@@ -22,7 +22,8 @@ export default function LoginPage() {
 
         try {
             await login({ email: email.trim(), password });
-            router.replace("/dashboard");
+            const params = new URLSearchParams({ flow: "login", email: email.trim() });
+            router.push(`/verify-email?${params.toString()}`);
         } catch (requestError) {
             const message = getApiErrorMessage(requestError);
             setError(/invalid email or password/i.test(message) ? "Incorrect username or password. Please try again." : message);
@@ -34,7 +35,7 @@ export default function LoginPage() {
     return (
         <AuthLayout
             title="Welcome to BOQ"
-            subtitle="Lorem Imspi"
+            subtitle="Sign in to your account to continue"
             footer={
                 <div className="auth-footer-inline">
                     <span>2026 BOQ. All Rights Reserved.</span>
