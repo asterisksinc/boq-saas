@@ -1,6 +1,6 @@
 # BOQ Design Arena frontend integration guide
 
-This guide describes how the existing Next.js App Router frontend should integrate with the Phase 1 backend. It does not require the frontend to call Supabase directly.
+This guide describes how the existing Next.js App Router frontend should integrate with Auth/User/Dashboard plus the Proposals and Documents APIs. It does not require the frontend to call Supabase directly.
 
 ## 1. Integration architecture
 
@@ -44,7 +44,7 @@ Then:
 1. Generate `AUTH_OTP_SECRET` once with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. Store the output only in the deployment secret manager and local `.env.local`.
 2. Create a Google App Password for the Gmail sender account (Google Account → Security → 2-Step Verification → App passwords). Put its 16-character value in `GMAIL_SMTP_APP_PASSWORD`.
 3. Copy the server-only Supabase secret key from Supabase Dashboard → Project Settings → API Keys into `SUPABASE_SECRET_KEY`.
-4. Apply both `supabase/migrations/20260827173000_phase1_auth_user_dashboard.sql` and `supabase/migrations/20260830213500_custom_email_login_otps.sql`.
+4. Apply the migrations in timestamp order, including `supabase/migrations/20260901120000_proposals_documents.sql`. It creates the private `workspace-documents` Storage bucket and its RLS policies.
 5. Configure the Supabase Auth Site URL and redirect allowlist for the local and production application URLs.
 6. Restart the application after changing secrets, then validate the request/verify flow with the supplied Postman collection.
 
@@ -66,6 +66,8 @@ features/
   user/api.ts                 # profile, password, and preferences
   onboarding/api.ts           # resumable onboarding state
   dashboard/api.ts            # overview and paginated widgets
+  proposals/api.ts            # proposal list, summary, create/edit, lifecycle
+  documents/api.ts            # folders, multipart uploads, file operations
 app/
   (auth)/login/page.tsx
   (auth)/register/page.tsx
@@ -138,6 +140,8 @@ export const api = {
     send<T>(path, { method: "POST", body: value === undefined ? undefined : JSON.stringify(value) }),
   patch: <T>(path: string, value: unknown) =>
     send<T>(path, { method: "PATCH", body: JSON.stringify(value) }),
+  delete: <T>(path: string, value?: unknown) =>
+    send<T>(path, { method: "DELETE", body: value === undefined ? undefined : JSON.stringify(value) }),
 };
 ```
 
@@ -403,7 +407,86 @@ const estimatedValue = overview.permissions.canViewFinancials && overview.kpis.t
   : null;
 ```
 
-## 13. Error handling
+## 13. Proposals integration
+
+Load the screen header and table independently so filtering does not change the KPI cards:
+
+```ts
+const [summary, proposals] = await Promise.all([
+  api.get<ProposalSummary>("/proposals/summary"),
+  api.get<Page<Proposal>>("/proposals?page=1&pageSize=10&status=sent&search=Oberoi"),
+]);
+```
+
+Create flows use one endpoint and a `sourceType` discriminator. `sourceId` is required for `boq`, `duplicate`, and `template`. Until the Projects/BOQ/Templates modules are introduced, send the selected UUID plus the visible snapshot label. Do not invent IDs from labels.
+
+```ts
+await api.post<Proposal>("/proposals", {
+  projectId: selectedProject.id,
+  projectName: selectedProject.name,
+  clientName: values.clientName,
+  sourceType: "boq", // scratch | boq | duplicate | template
+  sourceId: selectedBoq.id,
+  sourceLabel: selectedBoq.label,
+  proposedValue: values.proposedValue,
+  expiryDate: values.expiryDate || null,
+  internalNotes: values.internalNotes || null,
+  scopeItems: values.scopeItems,
+});
+```
+
+- `GET /proposals/{id}` supplies both the edit form and preview modal.
+- Call `POST /proposals/{id}/view` once when an authenticated preview opens; use the returned atomic `viewCount`.
+- `GET /proposals/{id}/pdf` returns the proposal as an `application/pdf` attachment. Use a normal navigation/download or fetch it as a Blob; it is not a JSON envelope.
+- `PATCH /proposals/{id}` updates allowlisted commercial/snapshot fields.
+- `POST /proposals/{id}/status` with `{ status: "sent" }` implements Send to Client; the same endpoint supports `draft`, `approved`, `revisions`, `won`, and `lost`.
+- Duplicate by creating a new proposal with `sourceType: "duplicate"` and the original proposal ID. Existing scope items are copied when `scopeItems` is omitted.
+- `DELETE /proposals/{id}` archives rather than physically deleting and is owner/admin only.
+- Format `proposedValue` with the response `currency`; never submit a currency from browser state.
+
+## 14. Documents integration
+
+The API supports the list and card designs with the same data. View selection is client-only state.
+
+```ts
+const root = await api.get<{ items: DocumentFolder[] }>("/document-folders");
+const children = await api.get<{ items: DocumentFolder[] }>(`/document-folders?parentId=${folderId}`);
+const files = await api.get<Page<Document>>(`/documents?folderId=${folderId}&page=1&pageSize=20`);
+```
+
+Folder operations:
+
+- `POST /document-folders` with `{ name, parentId?: null }` creates a root or nested folder.
+- `PATCH /document-folders/{id}` renames and/or moves it.
+- `DELETE /document-folders/{id}` requires `{ confirmation: exactFolderName }`. It permanently removes descendants and stored files, and is owner/admin only. Use the confirmation checkbox/modal shown in the design.
+
+Upload with browser `FormData`; do not set `Content-Type` manually because the browser must add the multipart boundary:
+
+```ts
+const form = new FormData();
+form.append("folderId", folderId);
+form.append("file", file);
+if (project) {
+  form.append("projectId", project.id);
+  form.append("projectName", project.name);
+}
+
+const response = await fetch("/api/v1/documents/upload", {
+  method: "POST",
+  credentials: "include",
+  body: form,
+});
+```
+
+Uploads are restricted to 25 MB and the allowlisted PDF/image/Office/spreadsheet/CAD/text/ZIP extensions. Files are stored in a private Supabase bucket under a server-derived workspace path.
+
+- `PATCH /documents/{id}` renames, moves, or relinks file metadata.
+- `GET /documents/{id}/download` returns a signed URL valid for 60 seconds. Request it only when the user clicks View/Download; never persist it.
+- `DELETE /documents/{id}` permanently removes storage and metadata and is owner/admin only.
+
+Role behavior is consistent across both modules: viewer = read, member = read/create/update, owner/admin = all operations including destructive actions. Use `permissions.canCreateProposal`, `canManageDocuments`, `canArchiveProposal`, and `canDeleteDocuments` for button visibility. The backend remains authoritative even if buttons are hidden.
+
+## 15. Error handling
 
 | Status/code | UI behavior |
 |---|---|
@@ -416,7 +499,7 @@ const estimatedValue = overview.permissions.canViewFinancials && overview.kpis.t
 
 Never display raw stack traces or Supabase internals. Log the backend `requestId`, not passwords, tokens, or recovery codes.
 
-## 14. Session refresh strategy
+## 16. Session refresh strategy
 
 Normal API calls and Supabase SSR handle cookie refresh. If an active screen receives a single 401 because the session expired:
 
@@ -426,7 +509,7 @@ Normal API calls and Supabase SSR handle cookie refresh. If an active screen rec
 
 Do not retry login, registration, password, or mutation requests automatically. Do not create an infinite refresh loop.
 
-## 15. Production checklist
+## 17. Production checklist
 
 - Use HTTPS for the frontend/API origin.
 - Set `APP_URL`, `PASSWORD_RESET_REDIRECT_URL`, and `EMAIL_VERIFICATION_REDIRECT_URL` to production HTTPS URLs.
@@ -438,12 +521,15 @@ Do not retry login, registration, password, or mutation requests automatically. 
 - Test owner/admin versus member/viewer financial visibility.
 - Verify registration, confirmation, login, refresh, logout, forgot/reset password, profile, onboarding resume, and dashboard empty state.
 - Never expose or commit the Supabase service-role key.
+- Verify the `workspace-documents` bucket is private and test upload/download/delete with two separate workspaces.
+- Test proposal create modes, status changes, duplicate behavior, search/filter pagination, and archive authorization.
 
-## 16. Source files
+## 18. Source files
 
 - API implementation: `app/api/v1/[...path]/route.ts`
 - Validation contracts: `lib/api/validation.ts`
 - Supabase server client: `lib/supabase/server.ts`
 - Database/RLS migration: `supabase/migrations/20260827173000_phase1_auth_user_dashboard.sql`
+- Proposals/Documents migration: `supabase/migrations/20260901120000_proposals_documents.sql`
 - OpenAPI: `openapi.yaml`
 - Postman assets: `postman/`

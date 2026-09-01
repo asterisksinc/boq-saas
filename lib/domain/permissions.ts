@@ -9,5 +9,9 @@ export function permissionsFor(role: string) {
     canViewFinancials: elevated,
     canApprove: elevated,
     canExport: contributor,
+    canCreateProposal: contributor,
+    canManageDocuments: contributor,
+    canArchiveProposal: elevated,
+    canDeleteDocuments: elevated,
   };
 }

@@ -1,5 +1,6 @@
 import { type SupabaseClient } from "@supabase/supabase-js";
 import { type NextRequest } from "next/server";
+import { createHash, randomUUID } from "node:crypto";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { EmailOtpError, issueEmailOtp, verifyEmailOtp } from "@/lib/auth/email-otp";
@@ -19,8 +20,19 @@ import {
   userPatchSchema,
   verifyEmailSchema,
   verifyEmailOtpSchema,
+
+  // my changes
   projectCreateSchema,
   boqImportSchema,
+
+  // Friend's changes
+  documentPatchSchema,
+  folderCreateSchema,
+  folderDeleteSchema,
+  folderPatchSchema,
+  proposalCreateSchema,
+  proposalPatchSchema,
+  proposalStatusSchema,
 } from "@/lib/api/validation";
 import { z } from "zod";
 
@@ -341,6 +353,364 @@ async function dashboardList(request: NextRequest, supabase: SupabaseClient, id:
   return ok({ items: items.data ?? [], page, pageSize, total, hasMore: to + 1 < total }, 200, id);
 }
 
+type WorkspaceAccess = { userId: string; workspaceId: string; role: "owner" | "admin" | "member" | "viewer"; currency: string };
+
+async function workspaceAccess(supabase: SupabaseClient, id: string, write = false, admin = false) {
+  const ctx = await context(supabase, id);
+  if ("response" in ctx) return ctx;
+  const value = ctx.data as {
+    workspace?: { id?: string; currency?: string };
+    membership?: { role?: WorkspaceAccess["role"] };
+  } | null;
+  const workspaceId = value?.workspace?.id;
+  const role = value?.membership?.role;
+  if (!workspaceId || !role) return { response: fail("FORBIDDEN", "Active workspace membership required.", 403, id) };
+  if ((write && role === "viewer") || (admin && !["owner", "admin"].includes(role))) {
+    return { response: fail("FORBIDDEN", "Your workspace role cannot perform this action.", 403, id) };
+  }
+  return { access: { userId: ctx.user.id, workspaceId, role, currency: value?.workspace?.currency ?? "INR" } satisfies WorkspaceAccess };
+}
+
+function proposalDto(row: Record<string, unknown>) {
+  return {
+    id: row.id, proposalCode: row.proposal_code, projectId: row.project_id, projectName: row.project_name,
+    clientName: row.client_name, sourceType: row.source_type, sourceId: row.source_id, sourceLabel: row.source_label,
+    proposedValue: Number(row.proposed_value), currency: row.currency, expiryDate: row.expiry_date,
+    internalNotes: row.internal_notes, scopeItems: row.scope_items ?? [], status: row.status,
+    viewCount: row.view_count, sentAt: row.sent_at, createdAt: row.created_at, updatedAt: row.updated_at,
+  };
+}
+
+const proposalSelect = "id,proposal_code,project_id,project_name,client_name,source_type,source_id,source_label,proposed_value,currency,expiry_date,internal_notes,scope_items,status,view_count,sent_at,created_at,updated_at";
+
+async function listProposals(request: NextRequest, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const { page, pageSize, from, to } = pagination(request.nextUrl.searchParams);
+  const status = request.nextUrl.searchParams.get("status");
+  const search = request.nextUrl.searchParams.get("search")?.trim().slice(0, 120);
+  let query = supabase.from("proposals").select(proposalSelect, { count: "exact" })
+    .eq("workspace_id", scoped.access.workspaceId).is("archived_at", null).order("updated_at", { ascending: false }).range(from, to);
+  if (status && ["draft","sent","approved","revisions","won","lost"].includes(status)) query = query.eq("status", status);
+  if (search) {
+    const safe = search.replace(/[%_,()]/g, " ");
+    query = query.or(`proposal_code.ilike.%${safe}%,project_name.ilike.%${safe}%,client_name.ilike.%${safe}%`);
+  }
+  const result = await query;
+  if (result.error) return fail("INTERNAL_ERROR", "Proposals could not be loaded.", 500, id);
+  const total = result.count ?? 0;
+  return ok({ items: (result.data ?? []).map((row) => proposalDto(row as Record<string, unknown>)), page, pageSize, total, hasMore: to + 1 < total }, 200, id);
+}
+
+async function proposalSummary(supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const { data, error } = await supabase.from("proposals").select("status,proposed_value,sent_at,expiry_date")
+    .eq("workspace_id", scoped.access.workspaceId).is("archived_at", null);
+  if (error) return fail("INTERNAL_ERROR", "Proposal summary could not be loaded.", 500, id);
+  const rows = data ?? [];
+  const sent = rows.filter((row) => row.status === "sent");
+  const responded = rows.filter((row) => ["approved","revisions","won","lost"].includes(row.status));
+  return ok({
+    total: rows.length,
+    totalSent: sent.length,
+    winRate: responded.length ? Math.round((rows.filter((row) => row.status === "won").length / responded.length) * 10000) / 100 : 0,
+    averageValue: rows.length ? rows.reduce((sum, row) => sum + Number(row.proposed_value), 0) / rows.length : 0,
+    pendingResponse: sent.length,
+    currency: scoped.access.currency,
+  }, 200, id);
+}
+
+async function createProposal(request: Request, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const input = await parsed(request, proposalCreateSchema, id); if (input.response) return input.response;
+  let scopeItems = input.data.scopeItems ?? [];
+  if (input.data.sourceType === "duplicate" && input.data.sourceId && !input.data.scopeItems) {
+    const original = await supabase.from("proposals").select("scope_items").eq("workspace_id", scoped.access.workspaceId).eq("id", input.data.sourceId).is("archived_at", null).single();
+    if (original.error) return fail("NOT_FOUND", "Source proposal was not found.", 404, id);
+    scopeItems = original.data.scope_items ?? [];
+  }
+  const values = {
+    workspace_id: scoped.access.workspaceId, project_id: input.data.projectId ?? null, project_name: input.data.projectName,
+    client_name: input.data.clientName, source_type: input.data.sourceType, source_id: input.data.sourceId ?? null,
+    source_label: input.data.sourceLabel ?? null, proposed_value: input.data.proposedValue, currency: scoped.access.currency,
+    expiry_date: input.data.expiryDate ?? null, internal_notes: input.data.internalNotes ?? null, scope_items: scopeItems,
+    created_by: scoped.access.userId, updated_by: scoped.access.userId,
+  };
+  const { data, error } = await supabase.from("proposals").insert(values).select(proposalSelect).single();
+  if (error) return fail("VALIDATION_ERROR", "Proposal could not be created.", 400, id);
+  await audit(supabase, "proposal.created", id);
+  return ok(proposalDto(data as Record<string, unknown>), 201, id);
+}
+
+async function getProposal(supabase: SupabaseClient, id: string, proposalId: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const { data, error } = await supabase.from("proposals").select(proposalSelect).eq("workspace_id", scoped.access.workspaceId).eq("id", proposalId).is("archived_at", null).single();
+  return error ? fail("NOT_FOUND", "Proposal was not found.", 404, id) : ok(proposalDto(data as Record<string, unknown>), 200, id);
+}
+
+function pdfEscape(value: unknown) {
+  return String(value ?? "").normalize("NFKD").replace(/[^\x20-\x7e]/g, "").replace(/([\\()])/g, "\\$1");
+}
+
+function basicProposalPdf(proposal: ReturnType<typeof proposalDto>) {
+  const lines = [
+    `${proposal.proposalCode} - Proposal`,
+    `Project: ${proposal.projectName}`,
+    `Prepared for: ${proposal.clientName}`,
+    `Status: ${proposal.status}`,
+    `Proposed value: ${proposal.currency} ${Number(proposal.proposedValue).toFixed(2)}`,
+    `Expiry: ${proposal.expiryDate ?? "Not set"}`,
+    "",
+    "Scope includes",
+    ...((proposal.scopeItems as unknown[]) ?? []).slice(0, 20).map((item) => `- ${item}`),
+    "",
+    `Grand total: ${proposal.currency} ${Number(proposal.proposedValue).toFixed(2)}`,
+  ];
+  const commands = lines.map((line, index) => `BT /F1 ${index === 0 ? 18 : 11} Tf 50 ${770 - index * 24} Td (${pdfEscape(line).slice(0, 105)}) Tj ET`).join("\n");
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    `<< /Length ${Buffer.byteLength(commands, "ascii")} >>\nstream\n${commands}\nendstream`,
+  ];
+  let output = "%PDF-1.4\n";
+  const offsets = [0];
+  objects.forEach((object, index) => { offsets.push(Buffer.byteLength(output, "ascii")); output += `${index + 1} 0 obj\n${object}\nendobj\n`; });
+  const xref = Buffer.byteLength(output, "ascii");
+  output += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.slice(1).map((offset) => `${String(offset).padStart(10, "0")} 00000 n `).join("\n")}\n`;
+  output += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return new Uint8Array(Buffer.from(output, "ascii"));
+}
+
+async function proposalPdf(supabase: SupabaseClient, id: string, proposalId: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const { data, error } = await supabase.from("proposals").select(proposalSelect).eq("workspace_id", scoped.access.workspaceId).eq("id", proposalId).is("archived_at", null).single();
+  if (error) return fail("NOT_FOUND", "Proposal was not found.", 404, id);
+  const proposal = proposalDto(data as Record<string, unknown>);
+  return new Response(basicProposalPdf(proposal), { status: 200, headers: { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename=\"${pdfEscape(proposal.proposalCode)}.pdf\"`, "Cache-Control": "private, no-store", "X-Request-Id": id } });
+}
+
+async function recordProposalView(supabase: SupabaseClient, id: string, proposalId: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const { data, error } = await supabase.rpc("record_proposal_view", { p_proposal_id: proposalId });
+  return error ? fail("NOT_FOUND", "Proposal was not found.", 404, id) : ok({ viewCount: data }, 200, id);
+}
+
+async function updateProposal(request: Request, supabase: SupabaseClient, id: string, proposalId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const input = await parsed(request, proposalPatchSchema, id); if (input.response) return input.response;
+  const patch = input.data;
+  const values = {
+    ...(patch.projectId !== undefined ? { project_id: patch.projectId } : {}), ...(patch.projectName !== undefined ? { project_name: patch.projectName } : {}),
+    ...(patch.clientName !== undefined ? { client_name: patch.clientName } : {}), ...(patch.proposedValue !== undefined ? { proposed_value: patch.proposedValue } : {}),
+    ...(patch.expiryDate !== undefined ? { expiry_date: patch.expiryDate } : {}), ...(patch.internalNotes !== undefined ? { internal_notes: patch.internalNotes } : {}),
+    ...(patch.scopeItems !== undefined ? { scope_items: patch.scopeItems } : {}), updated_by: scoped.access.userId,
+  };
+  const { data, error } = await supabase.from("proposals").update(values).eq("workspace_id", scoped.access.workspaceId).eq("id", proposalId).is("archived_at", null).select(proposalSelect).single();
+  if (error) return fail("NOT_FOUND", "Proposal was not found or could not be updated.", 404, id);
+  await audit(supabase, "proposal.updated", id);
+  return ok(proposalDto(data as Record<string, unknown>), 200, id);
+}
+
+async function changeProposalStatus(request: Request, supabase: SupabaseClient, id: string, proposalId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const input = await parsed(request, proposalStatusSchema, id); if (input.response) return input.response;
+  const values = { status: input.data.status, updated_by: scoped.access.userId, ...(input.data.status === "sent" ? { sent_at: new Date().toISOString() } : {}) };
+  const { data, error } = await supabase.from("proposals").update(values).eq("workspace_id", scoped.access.workspaceId).eq("id", proposalId).is("archived_at", null).select(proposalSelect).single();
+  if (error) return fail("NOT_FOUND", "Proposal was not found.", 404, id);
+  await audit(supabase, `proposal.${input.data.status}`, id);
+  return ok(proposalDto(data as Record<string, unknown>), 200, id);
+}
+
+async function archiveProposal(supabase: SupabaseClient, id: string, proposalId: string) {
+  const scoped = await workspaceAccess(supabase, id, true, true); if ("response" in scoped) return scoped.response;
+  const { error } = await supabase.from("proposals").update({ archived_at: new Date().toISOString(), updated_by: scoped.access.userId })
+    .eq("workspace_id", scoped.access.workspaceId).eq("id", proposalId).is("archived_at", null).select("id").single();
+  if (error) return fail("NOT_FOUND", "Proposal was not found.", 404, id);
+  await audit(supabase, "proposal.archived", id);
+  return ok({ archived: true }, 200, id);
+}
+
+function folderDto(row: Record<string, unknown>, itemCount = 0, sizeBytes = 0) {
+  return { id: row.id, parentId: row.parent_id, name: row.name, itemCount, sizeBytes, createdAt: row.created_at, updatedAt: row.updated_at };
+}
+
+function documentDto(row: Record<string, unknown>) {
+  return { id: row.id, folderId: row.folder_id, proposalId: row.proposal_id, projectId: row.project_id, projectName: row.project_name,
+    name: row.name, mimeType: row.mime_type, sizeBytes: Number(row.size_bytes), createdAt: row.created_at, updatedAt: row.updated_at };
+}
+
+async function listFolders(request: NextRequest, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const parentId = request.nextUrl.searchParams.get("parentId");
+  let foldersQuery = supabase.from("document_folders").select("id,parent_id,name,created_at,updated_at").eq("workspace_id", scoped.access.workspaceId).order("updated_at", { ascending: false });
+  foldersQuery = parentId ? foldersQuery.eq("parent_id", parentId) : foldersQuery.is("parent_id", null);
+  const folders = await foldersQuery;
+  if (folders.error) return fail("INTERNAL_ERROR", "Folders could not be loaded.", 500, id);
+  const ids = (folders.data ?? []).map((folder) => folder.id);
+  const docs = ids.length ? await supabase.from("documents").select("folder_id,size_bytes").eq("workspace_id", scoped.access.workspaceId).in("folder_id", ids) : { data: [], error: null };
+  if (docs.error) return fail("INTERNAL_ERROR", "Folder totals could not be loaded.", 500, id);
+  return ok({ items: (folders.data ?? []).map((folder) => {
+    const children = (docs.data ?? []).filter((doc) => doc.folder_id === folder.id);
+    return folderDto(folder as Record<string, unknown>, children.length, children.reduce((sum, doc) => sum + Number(doc.size_bytes), 0));
+  }) }, 200, id);
+}
+
+async function createFolder(request: Request, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const input = await parsed(request, folderCreateSchema, id); if (input.response) return input.response;
+  if (input.data.parentId) {
+    const parent = await supabase.from("document_folders").select("id").eq("workspace_id", scoped.access.workspaceId).eq("id", input.data.parentId).single();
+    if (parent.error) return fail("NOT_FOUND", "Parent folder was not found.", 404, id);
+  }
+  const { data, error } = await supabase.from("document_folders").insert({ workspace_id: scoped.access.workspaceId, parent_id: input.data.parentId ?? null,
+    name: input.data.name, created_by: scoped.access.userId, updated_by: scoped.access.userId }).select("id,parent_id,name,created_at,updated_at").single();
+  if (error) return fail(error.code === "23505" ? "CONFLICT" : "VALIDATION_ERROR", error.code === "23505" ? "A folder with this name already exists here." : "Folder could not be created.", error.code === "23505" ? 409 : 400, id);
+  await audit(supabase, "document_folder.created", id);
+  return ok(folderDto(data as Record<string, unknown>), 201, id);
+}
+
+async function updateFolder(request: Request, supabase: SupabaseClient, id: string, folderId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const input = await parsed(request, folderPatchSchema, id); if (input.response) return input.response;
+  if (input.data.parentId === folderId) return fail("VALIDATION_ERROR", "A folder cannot be its own parent.", 400, id);
+  if (input.data.parentId) {
+    const parent = await supabase.from("document_folders").select("id,parent_id").eq("workspace_id", scoped.access.workspaceId).eq("id", input.data.parentId).single();
+    if (parent.error) return fail("NOT_FOUND", "Parent folder was not found.", 404, id);
+    try {
+      const descendants = await descendantFolderIds(supabase, scoped.access.workspaceId, folderId);
+      if (descendants.includes(input.data.parentId)) return fail("VALIDATION_ERROR", "A folder cannot be moved into its own descendant.", 400, id);
+    } catch { return fail("INTERNAL_ERROR", "Folder hierarchy could not be validated.", 500, id); }
+  }
+  const values = { ...(input.data.name !== undefined ? { name: input.data.name } : {}), ...(input.data.parentId !== undefined ? { parent_id: input.data.parentId } : {}), updated_by: scoped.access.userId };
+  const { data, error } = await supabase.from("document_folders").update(values).eq("workspace_id", scoped.access.workspaceId).eq("id", folderId).select("id,parent_id,name,created_at,updated_at").single();
+  if (error) return fail(error.code === "23505" ? "CONFLICT" : "NOT_FOUND", error.code === "23505" ? "A folder with this name already exists here." : "Folder was not found.", error.code === "23505" ? 409 : 404, id);
+  await audit(supabase, "document_folder.updated", id);
+  return ok(folderDto(data as Record<string, unknown>), 200, id);
+}
+
+async function descendantFolderIds(supabase: SupabaseClient, workspaceId: string, rootId: string) {
+  const ids = [rootId];
+  for (let cursor = 0; cursor < ids.length && ids.length <= 1000; cursor += 1) {
+    const result = await supabase.from("document_folders").select("id").eq("workspace_id", workspaceId).eq("parent_id", ids[cursor]);
+    if (result.error) throw result.error;
+    for (const row of result.data ?? []) if (!ids.includes(row.id)) ids.push(row.id);
+  }
+  return ids;
+}
+
+async function deleteFolder(request: Request, supabase: SupabaseClient, id: string, folderId: string) {
+  const scoped = await workspaceAccess(supabase, id, true, true); if ("response" in scoped) return scoped.response;
+  const input = await parsed(request, folderDeleteSchema, id); if (input.response) return input.response;
+  const folder = await supabase.from("document_folders").select("id,name").eq("workspace_id", scoped.access.workspaceId).eq("id", folderId).single();
+  if (folder.error) return fail("NOT_FOUND", "Folder was not found.", 404, id);
+  if (input.data.confirmation !== folder.data.name) return fail("VALIDATION_ERROR", "Folder name confirmation does not match.", 400, id);
+  let folderIds: string[];
+  try { folderIds = await descendantFolderIds(supabase, scoped.access.workspaceId, folderId); }
+  catch { return fail("INTERNAL_ERROR", "Folder contents could not be resolved.", 500, id); }
+  const files = await supabase.from("documents").select("storage_path").eq("workspace_id", scoped.access.workspaceId).in("folder_id", folderIds);
+  if (files.error) return fail("INTERNAL_ERROR", "Folder contents could not be loaded.", 500, id);
+  const paths = (files.data ?? []).map((file) => file.storage_path);
+  if (paths.length) {
+    const storage = createSupabaseAdminClient().storage.from("workspace-documents");
+    for (let offset = 0; offset < paths.length; offset += 100) {
+      const removed = await storage.remove(paths.slice(offset, offset + 100));
+      if (removed.error) return fail("INTERNAL_ERROR", "Stored files could not be deleted.", 500, id);
+    }
+  }
+  const deleted = await supabase.from("document_folders").delete().eq("workspace_id", scoped.access.workspaceId).eq("id", folderId);
+  if (deleted.error) return fail("INTERNAL_ERROR", "Folder could not be deleted.", 500, id);
+  await audit(supabase, "document_folder.deleted", id);
+  return ok({ deleted: true, filesDeleted: paths.length }, 200, id);
+}
+
+async function listDocuments(request: NextRequest, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const folderId = request.nextUrl.searchParams.get("folderId");
+  if (!folderId) return fail("VALIDATION_ERROR", "folderId is required.", 400, id);
+  const { page, pageSize, from, to } = pagination(request.nextUrl.searchParams);
+  const search = request.nextUrl.searchParams.get("search")?.trim().slice(0, 120);
+  let query = supabase.from("documents").select("id,folder_id,proposal_id,project_id,project_name,name,mime_type,size_bytes,created_at,updated_at", { count: "exact" })
+    .eq("workspace_id", scoped.access.workspaceId).eq("folder_id", folderId).order("updated_at", { ascending: false }).range(from, to);
+  if (search) query = query.ilike("name", `%${search.replace(/[%_]/g, " ")}%`);
+  const result = await query;
+  if (result.error) return fail("INTERNAL_ERROR", "Documents could not be loaded.", 500, id);
+  const total = result.count ?? 0;
+  return ok({ items: (result.data ?? []).map((row) => documentDto(row as Record<string, unknown>)), page, pageSize, total, hasMore: to + 1 < total }, 200, id);
+}
+
+const allowedDocumentExtensions = new Set(["pdf","png","jpg","jpeg","webp","doc","docx","xls","xlsx","csv","dwg","dxf","txt","zip"]);
+
+async function uploadDocument(request: Request, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  let form: FormData;
+  try { form = await request.formData(); } catch { return fail("VALIDATION_ERROR", "A multipart upload is required.", 400, id); }
+  const file = form.get("file");
+  const folderId = String(form.get("folderId") ?? "");
+  if (!(file instanceof File) || !z.string().uuid().safeParse(folderId).success) return fail("VALIDATION_ERROR", "file and a valid folderId are required.", 400, id);
+  if (file.size < 1 || file.size > 25 * 1024 * 1024) return fail("VALIDATION_ERROR", "File size must be between 1 byte and 25 MB.", 400, id);
+  const safeName = file.name.replace(/[\\/\u0000-\u001f]/g, "_").trim().slice(0, 255);
+  const extension = safeName.includes(".") ? safeName.split(".").pop()!.toLowerCase() : "";
+  if (!safeName || !allowedDocumentExtensions.has(extension)) return fail("VALIDATION_ERROR", "This file type is not supported.", 400, id);
+  const folder = await supabase.from("document_folders").select("id").eq("workspace_id", scoped.access.workspaceId).eq("id", folderId).single();
+  if (folder.error) return fail("NOT_FOUND", "Upload folder was not found.", 404, id);
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const storagePath = `${scoped.access.workspaceId}/${folderId}/${randomUUID()}-${safeName}`;
+  const storage = createSupabaseAdminClient().storage.from("workspace-documents");
+  const uploaded = await storage.upload(storagePath, bytes, { contentType: file.type || "application/octet-stream", upsert: false });
+  if (uploaded.error) return fail("INTERNAL_ERROR", "File could not be stored.", 500, id);
+  const projectId = form.get("projectId") ? String(form.get("projectId")) : null;
+  const proposalId = form.get("proposalId") ? String(form.get("proposalId")) : null;
+  if ((projectId && !z.string().uuid().safeParse(projectId).success) || (proposalId && !z.string().uuid().safeParse(proposalId).success)) {
+    await storage.remove([storagePath]);
+    return fail("VALIDATION_ERROR", "projectId and proposalId must be UUIDs.", 400, id);
+  }
+  const inserted = await supabase.from("documents").insert({ workspace_id: scoped.access.workspaceId, folder_id: folderId, proposal_id: proposalId,
+    project_id: projectId, project_name: form.get("projectName") ? String(form.get("projectName")).trim().slice(0, 200) : null,
+    name: safeName, storage_path: storagePath, mime_type: file.type || "application/octet-stream", size_bytes: file.size,
+    checksum_sha256: createHash("sha256").update(bytes).digest("hex"), uploaded_by: scoped.access.userId })
+    .select("id,folder_id,proposal_id,project_id,project_name,name,mime_type,size_bytes,created_at,updated_at").single();
+  if (inserted.error) { await storage.remove([storagePath]); return fail("VALIDATION_ERROR", "Document metadata could not be saved.", 400, id); }
+  await audit(supabase, "document.uploaded", id);
+  return ok(documentDto(inserted.data as Record<string, unknown>), 201, id);
+}
+
+async function updateDocument(request: Request, supabase: SupabaseClient, id: string, documentId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const input = await parsed(request, documentPatchSchema, id); if (input.response) return input.response;
+  if (input.data.folderId) {
+    const folder = await supabase.from("document_folders").select("id").eq("workspace_id", scoped.access.workspaceId).eq("id", input.data.folderId).single();
+    if (folder.error) return fail("NOT_FOUND", "Destination folder was not found.", 404, id);
+  }
+  const values = { ...(input.data.name !== undefined ? { name: input.data.name } : {}), ...(input.data.folderId !== undefined ? { folder_id: input.data.folderId } : {}),
+    ...(input.data.projectId !== undefined ? { project_id: input.data.projectId } : {}), ...(input.data.projectName !== undefined ? { project_name: input.data.projectName } : {}) };
+  const result = await supabase.from("documents").update(values).eq("workspace_id", scoped.access.workspaceId).eq("id", documentId)
+    .select("id,folder_id,proposal_id,project_id,project_name,name,mime_type,size_bytes,created_at,updated_at").single();
+  if (result.error) return fail("NOT_FOUND", "Document was not found.", 404, id);
+  await audit(supabase, "document.updated", id);
+  return ok(documentDto(result.data as Record<string, unknown>), 200, id);
+}
+
+async function downloadDocument(supabase: SupabaseClient, id: string, documentId: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const result = await supabase.from("documents").select("name,storage_path").eq("workspace_id", scoped.access.workspaceId).eq("id", documentId).single();
+  if (result.error) return fail("NOT_FOUND", "Document was not found.", 404, id);
+  const signed = await createSupabaseAdminClient().storage.from("workspace-documents").createSignedUrl(result.data.storage_path, 60, { download: result.data.name });
+  return signed.error ? fail("INTERNAL_ERROR", "Download link could not be created.", 500, id) : ok({ url: signed.data.signedUrl, expiresIn: 60, fileName: result.data.name }, 200, id);
+}
+
+async function deleteDocument(supabase: SupabaseClient, id: string, documentId: string) {
+  const scoped = await workspaceAccess(supabase, id, true, true); if ("response" in scoped) return scoped.response;
+  const result = await supabase.from("documents").select("storage_path").eq("workspace_id", scoped.access.workspaceId).eq("id", documentId).single();
+  if (result.error) return fail("NOT_FOUND", "Document was not found.", 404, id);
+  const removed = await createSupabaseAdminClient().storage.from("workspace-documents").remove([result.data.storage_path]);
+  if (removed.error) return fail("INTERNAL_ERROR", "Stored file could not be deleted.", 500, id);
+  const deleted = await supabase.from("documents").delete().eq("workspace_id", scoped.access.workspaceId).eq("id", documentId);
+  if (deleted.error) return fail("INTERNAL_ERROR", "Document metadata could not be deleted.", 500, id);
+  await audit(supabase, "document.deleted", id);
+  return ok({ deleted: true }, 200, id);
+}
+
 async function dispatch(request: NextRequest, path: string[]) {
   const id = requestId(request);
   const route = path.join("/");
@@ -367,9 +737,35 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (request.method === "POST" && route === "boq-imports") return createBoqImport(request, supabase, id);
   const list = route.match(/^dashboard\/(recent-projects|recent-boqs|pending-actions|upcoming-deliverables|notifications)$/)?.[1];
   if (request.method === "GET" && list) return dashboardList(request, supabase, id, list);
+  if (request.method === "GET" && route === "proposals") return listProposals(request, supabase, id);
+  if (request.method === "GET" && route === "proposals/summary") return proposalSummary(supabase, id);
+  if (request.method === "POST" && route === "proposals") return createProposal(request, supabase, id);
+  const proposalMatch = route.match(/^proposals\/([0-9a-f-]{36})$/i);
+  if (proposalMatch && request.method === "GET") return getProposal(supabase, id, proposalMatch[1]);
+  if (proposalMatch && request.method === "PATCH") return updateProposal(request, supabase, id, proposalMatch[1]);
+  if (proposalMatch && request.method === "DELETE") return archiveProposal(supabase, id, proposalMatch[1]);
+  const proposalStatusMatch = route.match(/^proposals\/([0-9a-f-]{36})\/status$/i);
+  if (proposalStatusMatch && request.method === "POST") return changeProposalStatus(request, supabase, id, proposalStatusMatch[1]);
+  const proposalPdfMatch = route.match(/^proposals\/([0-9a-f-]{36})\/pdf$/i);
+  if (proposalPdfMatch && request.method === "GET") return proposalPdf(supabase, id, proposalPdfMatch[1]);
+  const proposalViewMatch = route.match(/^proposals\/([0-9a-f-]{36})\/view$/i);
+  if (proposalViewMatch && request.method === "POST") return recordProposalView(supabase, id, proposalViewMatch[1]);
+  if (request.method === "GET" && route === "document-folders") return listFolders(request, supabase, id);
+  if (request.method === "POST" && route === "document-folders") return createFolder(request, supabase, id);
+  const folderMatch = route.match(/^document-folders\/([0-9a-f-]{36})$/i);
+  if (folderMatch && request.method === "PATCH") return updateFolder(request, supabase, id, folderMatch[1]);
+  if (folderMatch && request.method === "DELETE") return deleteFolder(request, supabase, id, folderMatch[1]);
+  if (request.method === "GET" && route === "documents") return listDocuments(request, supabase, id);
+  if (request.method === "POST" && route === "documents/upload") return uploadDocument(request, supabase, id);
+  const documentMatch = route.match(/^documents\/([0-9a-f-]{36})$/i);
+  if (documentMatch && request.method === "PATCH") return updateDocument(request, supabase, id, documentMatch[1]);
+  if (documentMatch && request.method === "DELETE") return deleteDocument(supabase, id, documentMatch[1]);
+  const downloadMatch = route.match(/^documents\/([0-9a-f-]{36})\/download$/i);
+  if (downloadMatch && request.method === "GET") return downloadDocument(supabase, id, downloadMatch[1]);
   return methodNotAllowed(id);
 }
 
 export async function GET(request: NextRequest, params: Params) { return dispatch(request, (await params.params).path); }
 export async function POST(request: NextRequest, params: Params) { return dispatch(request, (await params.params).path); }
 export async function PATCH(request: NextRequest, params: Params) { return dispatch(request, (await params.params).path); }
+export async function DELETE(request: NextRequest, params: Params) { return dispatch(request, (await params.params).path); }

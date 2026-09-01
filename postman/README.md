@@ -17,6 +17,15 @@
 2. Run **Request Login OTP**, replace `otp` with the new Gmail code, and run **Verify Login OTP**. Existing accounts can start here.
 3. Postman stores the login response's Supabase cookies for `localhost`.
 4. Run **Auth Me** and **Get Current User**.
+
+## Proposals and Documents
+
+Import `BOQ-Design-Arena-Proposals-Documents.postman_collection.json` after the
+Local environment. Authenticate with either existing collection first and keep
+Postman's cookie jar enabled. Run **Create Folder** before document requests,
+select a local allowlisted file in **Upload Document**, and run destructive
+requests last. The collection stores created proposal/folder/document UUIDs as
+collection variables automatically.
 5. Run **Save Company Setup**, then **Get Onboarding**.
 6. Run **Overview** and the five dashboard list requests.
 7. Run **Logout**.

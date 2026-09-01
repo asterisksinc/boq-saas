@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
-  title: BOQ Design Arena Phase 1 API
-  version: 1.0.0
+  title: BOQ Design Arena API
+  version: 1.1.0
 servers:
   - url: /api/v1
 security:
@@ -108,6 +108,120 @@ paths:
   /dashboard/pending-actions: { get: { summary: Paginated pending actions (typed empty until workflow phase), responses: { '200': { $ref: '#/components/responses/Page' } } } }
   /dashboard/upcoming-deliverables: { get: { summary: Paginated deliverables (typed empty until project phase), responses: { '200': { $ref: '#/components/responses/Page' } } } }
   /dashboard/notifications: { get: { summary: Paginated user notifications, responses: { '200': { $ref: '#/components/responses/Page' } } } }
+  /proposals:
+    get:
+      summary: List active workspace proposals
+      parameters:
+        - { in: query, name: page, schema: { type: integer, minimum: 1 } }
+        - { in: query, name: pageSize, schema: { type: integer, minimum: 1, maximum: 100 } }
+        - { in: query, name: status, schema: { $ref: '#/components/schemas/ProposalStatus' } }
+        - { in: query, name: search, schema: { type: string, maxLength: 120 } }
+      responses: { '200': { $ref: '#/components/responses/Page' }, '401': { $ref: '#/components/responses/Error' } }
+    post:
+      summary: Create a proposal from scratch, BOQ, duplicate, or template
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProposalCreate' } } } }
+      responses: { '201': { description: Proposal created }, '400': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } }
+  /proposals/summary:
+    get:
+      summary: Proposal dashboard totals, win rate, average value, and pending responses
+      responses: { '200': { description: Proposal summary } }
+  /proposals/{proposalId}:
+    parameters:
+      - { $ref: '#/components/parameters/ProposalId' }
+    get:
+      summary: Get proposal details/preview data
+      responses: { '200': { description: Proposal }, '404': { $ref: '#/components/responses/Error' } }
+    patch:
+      summary: Update editable proposal details
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProposalPatch' } } } }
+      responses: { '200': { description: Updated }, '400': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' } }
+    delete:
+      summary: Archive a proposal (owner/admin)
+      responses: { '200': { description: Archived }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' } }
+  /proposals/{proposalId}/status:
+    parameters:
+      - { $ref: '#/components/parameters/ProposalId' }
+    post:
+      summary: Send a proposal or mark it approved, in revision, won, lost, or draft
+      requestBody: { required: true, content: { application/json: { schema: { type: object, additionalProperties: false, required: [status], properties: { status: { $ref: '#/components/schemas/ProposalStatus' } } } } } }
+      responses: { '200': { description: Status changed }, '400': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' } }
+  /proposals/{proposalId}/pdf:
+    parameters:
+      - { $ref: '#/components/parameters/ProposalId' }
+    get:
+      summary: Download a generated one-page proposal PDF
+      responses:
+        '200': { description: Proposal PDF, content: { application/pdf: { schema: { type: string, format: binary } } } }
+        '404': { $ref: '#/components/responses/Error' }
+  /proposals/{proposalId}/view:
+    parameters:
+      - { $ref: '#/components/parameters/ProposalId' }
+    post:
+      summary: Atomically record an authenticated proposal preview/view
+      responses: { '200': { description: Updated view count }, '404': { $ref: '#/components/responses/Error' } }
+  /document-folders:
+    get:
+      summary: List root folders or direct children with item count and size
+      parameters:
+        - { in: query, name: parentId, schema: { type: string, format: uuid } }
+      responses: { '200': { description: Folder list } }
+    post:
+      summary: Create a folder
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/FolderCreate' } } } }
+      responses: { '201': { description: Folder created }, '409': { $ref: '#/components/responses/Error' } }
+  /document-folders/{folderId}:
+    parameters:
+      - { $ref: '#/components/parameters/FolderId' }
+    patch:
+      summary: Rename or move a folder
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/FolderPatch' } } } }
+      responses: { '200': { description: Folder updated }, '409': { $ref: '#/components/responses/Error' } }
+    delete:
+      summary: Permanently delete a folder tree and stored files (owner/admin)
+      requestBody: { required: true, content: { application/json: { schema: { type: object, additionalProperties: false, required: [confirmation], properties: { confirmation: { type: string, description: Exact folder name } } } } } }
+      responses: { '200': { description: Folder tree deleted }, '400': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } }
+  /documents:
+    get:
+      summary: List files in a folder
+      parameters:
+        - { in: query, name: folderId, required: true, schema: { type: string, format: uuid } }
+        - { in: query, name: search, schema: { type: string, maxLength: 120 } }
+        - { in: query, name: page, schema: { type: integer, minimum: 1 } }
+        - { in: query, name: pageSize, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses: { '200': { $ref: '#/components/responses/Page' } }
+  /documents/upload:
+    post:
+      summary: Upload a file (maximum 25 MB) to private workspace storage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [folderId, file]
+              properties:
+                folderId: { type: string, format: uuid }
+                projectId: { type: string, format: uuid }
+                projectName: { type: string, maxLength: 200 }
+                proposalId: { type: string, format: uuid }
+                file: { type: string, format: binary }
+      responses: { '201': { description: Uploaded }, '400': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } }
+  /documents/{documentId}:
+    parameters:
+      - { $ref: '#/components/parameters/DocumentId' }
+    patch:
+      summary: Rename, move, or relink a document
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/DocumentPatch' } } } }
+      responses: { '200': { description: Updated }, '404': { $ref: '#/components/responses/Error' } }
+    delete:
+      summary: Permanently delete a stored document (owner/admin)
+      responses: { '200': { description: Deleted }, '403': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' } }
+  /documents/{documentId}/download:
+    parameters:
+      - { $ref: '#/components/parameters/DocumentId' }
+    get:
+      summary: Create a private 60-second download URL
+      responses: { '200': { description: Signed download URL }, '404': { $ref: '#/components/responses/Error' } }
 components:
   securitySchemes:
     supabaseCookie: { type: apiKey, in: cookie, name: sb-access-token }
@@ -151,6 +265,58 @@ components:
     Envelope: { type: object, required: [data, requestId], properties: { data: {}, requestId: { type: string, format: uuid } } }
     Error: { type: object, required: [error], properties: { error: { type: object, required: [code, message, requestId], properties: { code: { type: string }, message: { type: string }, fields: { type: object }, requestId: { type: string } } } } }
     Page: { type: object, properties: { items: { type: array, items: {} }, page: { type: integer }, pageSize: { type: integer }, total: { type: integer }, hasMore: { type: boolean } } }
+    ProposalStatus: { type: string, enum: [draft, sent, approved, revisions, won, lost] }
+    ProposalCreate:
+      type: object
+      additionalProperties: false
+      required: [projectName, clientName, proposedValue]
+      properties:
+        projectId: { type: [string, 'null'], format: uuid }
+        projectName: { type: string, maxLength: 200 }
+        clientName: { type: string, maxLength: 200 }
+        sourceType: { type: string, enum: [scratch, boq, duplicate, template], default: scratch }
+        sourceId: { type: [string, 'null'], format: uuid, description: Required unless sourceType is scratch }
+        sourceLabel: { type: [string, 'null'], maxLength: 240 }
+        proposedValue: { type: number, minimum: 0 }
+        expiryDate: { type: [string, 'null'], format: date }
+        internalNotes: { type: [string, 'null'], maxLength: 5000 }
+        scopeItems: { type: array, maxItems: 100, items: { type: string, maxLength: 500 } }
+    ProposalPatch:
+      type: object
+      additionalProperties: false
+      properties:
+        projectId: { type: [string, 'null'], format: uuid }
+        projectName: { type: string, maxLength: 200 }
+        clientName: { type: string, maxLength: 200 }
+        proposedValue: { type: number, minimum: 0 }
+        expiryDate: { type: [string, 'null'], format: date }
+        internalNotes: { type: [string, 'null'], maxLength: 5000 }
+        scopeItems: { type: array, maxItems: 100, items: { type: string, maxLength: 500 } }
+    FolderCreate:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 160 }
+        parentId: { type: [string, 'null'], format: uuid }
+    FolderPatch:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, maxLength: 160 }
+        parentId: { type: [string, 'null'], format: uuid }
+    DocumentPatch:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, maxLength: 255 }
+        folderId: { type: string, format: uuid }
+        projectId: { type: [string, 'null'], format: uuid }
+        projectName: { type: [string, 'null'], maxLength: 200 }
+  parameters:
+    ProposalId: { in: path, name: proposalId, required: true, schema: { type: string, format: uuid } }
+    FolderId: { in: path, name: folderId, required: true, schema: { type: string, format: uuid } }
+    DocumentId: { in: path, name: documentId, required: true, schema: { type: string, format: uuid } }
   responses:
     Error: { description: Error envelope, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     Page: { description: Paginated response, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
