@@ -91,6 +91,15 @@
 - Real authentication, active workspace scope, organization, permissions, financial masking, and notifications continue to come from Supabase. Demo record IDs must never be used for mutations.
 - Code comments use `TODO(PROJECT_BOQ_BACKEND)` as the replacement marker. Replace `lib/domain/dashboard-demo.ts` and the two marked route merge branches once Projects, BOQs, Costing, Approvals, and Deliverables exist.
 
+## Projects and backend Excel import increment (2026-09-01)
+
+- Migration `20260901170000_project_user_apis_excel_import.sql` expands the project record, adds project rooms and import history, indexes, RLS, and writer/admin policies.
+- Authenticated users can list/search/filter, create, read, update, change lifecycle state, duplicate, and manage room setup. Owner/admin is required for permanent project deletion.
+- Workspace/user/code/progress fields are server-owned and derived from the cookie session. Every query is active-workspace scoped, with RLS as a second enforcement layer.
+- Project spreadsheet preview/import accepts CSV/XLS/XLSX and parses on the backend. Strict imports are all-or-nothing when validation errors are present; `skipInvalid=true` is an explicit partial-import option.
+- BOQ spreadsheet preview/upload now also parses and persists the original spreadsheet server-side. The older pre-parsed JSON endpoint remains for compatibility.
+- OpenAPI, a dedicated Projects Postman collection, frontend integration guidance, and contract/migration tests were updated. Frontend source files remain unchanged.
+
 ## Operational setup
 
 1. Create a Supabase project and copy `.env.example` to `.env.local` with its URL, publishable key, and the frontend-owned verification/recovery redirect URLs.
@@ -102,7 +111,7 @@
 ## Deferred
 
 - Client and Super Admin.
-- Full Project/Room, BOQ, costing, approvals, deliverables, integrations, billing, and support modules.
+- Project requirements/BOQ authoring, costing, approvals, deliverables, integrations, billing, and support modules.
 - Admin persona APIs, Client CRUD/portal identity, client-scoped invoice viewing/payment, and outbound invoice delivery.
 - Invoice spreadsheet import until the product defines its CSV/XLSX template and duplicate/update rules.
 - Branded/multi-page proposal rendering and outbound client delivery; these depend on finalized company branding, client contacts, and an approved mail/rendering pipeline.

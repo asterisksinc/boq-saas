@@ -6,6 +6,9 @@ export type ApiErrorCode =
   | "FORBIDDEN"
   | "NOT_FOUND"
   | "CONFLICT"
+  | "PAYLOAD_TOO_LARGE"
+  | "IMPORT_VALIDATION_FAILED"
+  | "IMPORT_FAILED"
   | "OTP_SEND_FAILED"
   | "RATE_LIMITED"
   | "INTERNAL_ERROR";

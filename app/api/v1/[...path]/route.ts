@@ -1,6 +1,7 @@
 import { type SupabaseClient } from "@supabase/supabase-js";
 import { type NextRequest } from "next/server";
 import { createHash, randomUUID } from "node:crypto";
+import * as XLSX from "xlsx";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { EmailOtpError, issueEmailOtp, verifyEmailOtp } from "@/lib/auth/email-otp";
@@ -24,6 +25,10 @@ import {
 
   // my changes
   projectCreateSchema,
+  projectPatchSchema,
+  projectRoomCreateSchema,
+  projectRoomPatchSchema,
+  projectStatusSchema,
   boqImportSchema,
 
   // Friend's changes
@@ -312,35 +317,315 @@ async function dashboardOverview(request: NextRequest, supabase: SupabaseClient,
   return ok({ ...base, ...demo, scope: base.scope, organization: base.organization, permissions: base.permissions, notifications: base.notifications }, 200, id);
 }
 
+const projectSelect = "id,project_code,name,client_name,client_contact,client_email,project_type,status,location,description,area_sqft,project_value,approved_budget,start_date,target_completion_date,assigned_designer_id,tags,progress,created_by,created_at,updated_at";
+
+function projectDto(row: Record<string, unknown>) {
+  return {
+    id: row.id, projectCode: row.project_code, name: row.name, clientName: row.client_name,
+    clientContact: row.client_contact, clientEmail: row.client_email, projectType: row.project_type,
+    status: row.status, location: row.location, description: row.description,
+    areaSqft: row.area_sqft == null ? null : Number(row.area_sqft),
+    projectValue: row.project_value == null ? null : Number(row.project_value),
+    approvedBudget: row.approved_budget == null ? null : Number(row.approved_budget),
+    startDate: row.start_date, targetCompletionDate: row.target_completion_date,
+    assignedDesignerId: row.assigned_designer_id, tags: row.tags ?? [], progress: Number(row.progress ?? 0),
+    createdBy: row.created_by, createdAt: row.created_at, updatedAt: row.updated_at,
+  };
+}
+
+function projectValues(input: Record<string, unknown>) {
+  const fieldMap: Record<string, string> = {
+    name: "name", clientName: "client_name", clientContact: "client_contact", clientEmail: "client_email",
+    projectType: "project_type", status: "status", location: "location", description: "description",
+    areaSqft: "area_sqft", projectValue: "project_value", approvedBudget: "approved_budget",
+    startDate: "start_date", targetCompletionDate: "target_completion_date",
+    assignedDesignerId: "assigned_designer_id", tags: "tags",
+  };
+  return Object.fromEntries(Object.entries(input).map(([key, value]) => [fieldMap[key], value === "" ? null : value]).filter(([key]) => key));
+}
+
+async function listProjects(request: NextRequest, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const { page, pageSize, from, to } = pagination(request.nextUrl.searchParams);
+  const status = request.nextUrl.searchParams.get("status");
+  const type = request.nextUrl.searchParams.get("type")?.trim().slice(0, 80);
+  const search = request.nextUrl.searchParams.get("search")?.trim().slice(0, 120);
+  let query = supabase.from("projects").select(projectSelect, { count: "exact" })
+    .eq("workspace_id", scoped.access.workspaceId).is("archived_at", null)
+    .order("updated_at", { ascending: false }).range(from, to);
+  if (status && ["active","planning","in_progress","on_hold","completed"].includes(status)) query = query.eq("status", status);
+  if (type) query = query.eq("project_type", type);
+  if (request.nextUrl.searchParams.get("assignedToMe") === "true") query = query.eq("assigned_designer_id", scoped.access.userId);
+  if (search) {
+    const safe = search.replace(/[%_,()]/g, " ");
+    query = query.or(`project_code.ilike.%${safe}%,name.ilike.%${safe}%,client_name.ilike.%${safe}%,location.ilike.%${safe}%`);
+  }
+  const result = await query;
+  if (result.error) return fail("INTERNAL_ERROR", "Projects could not be loaded.", 500, id);
+  const total = result.count ?? 0;
+  return ok({ items: (result.data ?? []).map((row) => projectDto(row as Record<string, unknown>)), page, pageSize, total, hasMore: to + 1 < total }, 200, id);
+}
+
 async function createProject(request: Request, supabase: SupabaseClient, id: string) {
-  const ctx = await context(supabase, id); if ("response" in ctx) return ctx.response;
-  const workspaceId = (ctx.data as { workspace?: { id?: string } } | null)?.workspace?.id;
-  if (!workspaceId) return fail("FORBIDDEN", "Active workspace membership required.", 403, id);
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
   const input = await parsed(request, projectCreateSchema, id); if (input.response) return input.response;
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin.from("projects").insert({
-    workspace_id: workspaceId, name: input.data.name, client_name: input.data.clientName,
-    project_type: input.data.projectType, status: input.data.status, location: input.data.location || null,
-    created_by: ctx.user.id,
-  }).select("id,name,client_name,project_type,status,location,created_at").single();
+  const { data, error } = await supabase.from("projects").insert({
+    workspace_id: scoped.access.workspaceId, created_by: scoped.access.userId, ...projectValues(input.data),
+  }).select(projectSelect).single();
   if (error) {
     console.error(JSON.stringify({ requestId: id, event: "project_create_failed", code: error.code, message: error.message }));
-    return fail("VALIDATION_ERROR", "Project could not be created. Please verify the database migration is applied.", 400, id);
+    return fail(error.code === "23505" ? "CONFLICT" : "VALIDATION_ERROR", error.code === "23505" ? "A project with these details already exists." : "Project could not be created.", error.code === "23505" ? 409 : 400, id);
   }
   await audit(supabase, "project.created", id);
-  return ok(data, 201, id);
+  return ok(projectDto(data as Record<string, unknown>), 201, id);
+}
+
+async function getProject(supabase: SupabaseClient, id: string, projectId: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const [project, rooms] = await Promise.all([
+    supabase.from("projects").select(projectSelect).eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).is("archived_at", null).maybeSingle(),
+    supabase.from("project_rooms").select("id,name,room_type,length,width,height,unit,notes,sort_order,created_at,updated_at").eq("workspace_id", scoped.access.workspaceId).eq("project_id", projectId).order("sort_order"),
+  ]);
+  if (project.error || rooms.error) return fail("INTERNAL_ERROR", "Project could not be loaded.", 500, id);
+  if (!project.data) return fail("NOT_FOUND", "Project was not found.", 404, id);
+  return ok({ ...projectDto(project.data as Record<string, unknown>), rooms: rooms.data ?? [] }, 200, id);
+}
+
+async function updateProject(request: Request, supabase: SupabaseClient, id: string, projectId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const input = await parsed(request, projectPatchSchema, id); if (input.response) return input.response;
+  const { data, error } = await supabase.from("projects").update(projectValues(input.data))
+    .eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).is("archived_at", null).select(projectSelect).maybeSingle();
+  if (error) return fail("VALIDATION_ERROR", "Project could not be updated.", 400, id);
+  if (!data) return fail("NOT_FOUND", "Project was not found.", 404, id);
+  await audit(supabase, "project.updated", id);
+  return ok(projectDto(data as Record<string, unknown>), 200, id);
+}
+
+async function changeProjectStatus(request: Request, supabase: SupabaseClient, id: string, projectId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const input = await parsed(request, projectStatusSchema, id); if (input.response) return input.response;
+  const progress = input.data.status === "completed" ? 100 : undefined;
+  const { data, error } = await supabase.from("projects").update({ status: input.data.status, ...(progress == null ? {} : { progress }) })
+    .eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).is("archived_at", null).select(projectSelect).maybeSingle();
+  if (error) return fail("VALIDATION_ERROR", "Project status could not be changed.", 400, id);
+  if (!data) return fail("NOT_FOUND", "Project was not found.", 404, id);
+  await audit(supabase, `project.status.${input.data.status}`, id);
+  return ok(projectDto(data as Record<string, unknown>), 200, id);
+}
+
+async function duplicateProject(supabase: SupabaseClient, id: string, projectId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const source = await supabase.from("projects").select(projectSelect).eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).is("archived_at", null).maybeSingle();
+  if (source.error) return fail("INTERNAL_ERROR", "Project could not be duplicated.", 500, id);
+  if (!source.data) return fail("NOT_FOUND", "Project was not found.", 404, id);
+  const row = source.data as Record<string, unknown>;
+  const created = await supabase.from("projects").insert({
+    workspace_id: scoped.access.workspaceId, created_by: scoped.access.userId, name: `${row.name} (Copy)`,
+    client_name: row.client_name, client_contact: row.client_contact, client_email: row.client_email,
+    project_type: row.project_type, status: "planning", location: row.location, description: row.description,
+    area_sqft: row.area_sqft, project_value: row.project_value, approved_budget: row.approved_budget,
+    start_date: row.start_date, target_completion_date: row.target_completion_date,
+    assigned_designer_id: row.assigned_designer_id, tags: row.tags,
+  }).select(projectSelect).single();
+  if (created.error) return fail("VALIDATION_ERROR", "Project could not be duplicated.", 400, id);
+  const sourceRooms = await supabase.from("project_rooms").select("name,room_type,length,width,height,unit,notes,sort_order").eq("project_id", projectId).eq("workspace_id", scoped.access.workspaceId);
+  if (!sourceRooms.error && sourceRooms.data?.length) await supabase.from("project_rooms").insert(sourceRooms.data.map((room) => ({ ...room, workspace_id: scoped.access.workspaceId, project_id: created.data.id, created_by: scoped.access.userId })));
+  await audit(supabase, "project.duplicated", id);
+  return ok(projectDto(created.data as Record<string, unknown>), 201, id);
+}
+
+async function deleteProject(supabase: SupabaseClient, id: string, projectId: string) {
+  const scoped = await workspaceAccess(supabase, id, false, true); if ("response" in scoped) return scoped.response;
+  const { data, error } = await supabase.from("projects").delete().eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).select("id").maybeSingle();
+  if (error) return fail("VALIDATION_ERROR", "Project could not be deleted because it has dependent records.", 400, id);
+  if (!data) return fail("NOT_FOUND", "Project was not found.", 404, id);
+  await audit(supabase, "project.deleted", id);
+  return ok({ deleted: true, id: projectId }, 200, id);
+}
+
+async function listProjectRooms(supabase: SupabaseClient, id: string, projectId: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const result = await supabase.from("project_rooms").select("id,name,room_type,length,width,height,unit,notes,sort_order,created_at,updated_at")
+    .eq("workspace_id", scoped.access.workspaceId).eq("project_id", projectId).order("sort_order").order("created_at");
+  return result.error ? fail("INTERNAL_ERROR", "Rooms could not be loaded.", 500, id) : ok({ items: result.data ?? [] }, 200, id);
+}
+
+async function createProjectRoom(request: Request, supabase: SupabaseClient, id: string, projectId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const input = await parsed(request, projectRoomCreateSchema, id); if (input.response) return input.response;
+  const project = await supabase.from("projects").select("id").eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).is("archived_at", null).maybeSingle();
+  if (!project.data) return fail("NOT_FOUND", "Project was not found.", 404, id);
+  const value = input.data;
+  const result = await supabase.from("project_rooms").insert({ workspace_id: scoped.access.workspaceId, project_id: projectId, created_by: scoped.access.userId,
+    name: value.name, room_type: value.roomType, length: value.length, width: value.width, height: value.height, unit: value.unit, notes: value.notes })
+    .select("id,name,room_type,length,width,height,unit,notes,sort_order,created_at,updated_at").single();
+  if (result.error) return fail(result.error.code === "23505" ? "CONFLICT" : "VALIDATION_ERROR", result.error.code === "23505" ? "A room with this name already exists." : "Room could not be created.", result.error.code === "23505" ? 409 : 400, id);
+  return ok(result.data, 201, id);
+}
+
+async function updateProjectRoom(request: Request, supabase: SupabaseClient, id: string, projectId: string, roomId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const input = await parsed(request, projectRoomPatchSchema, id); if (input.response) return input.response;
+  const map: Record<string, string> = { name: "name", roomType: "room_type", length: "length", width: "width", height: "height", unit: "unit", notes: "notes" };
+  const values = Object.fromEntries(Object.entries(input.data).map(([key, value]) => [map[key], value]).filter(([key]) => key));
+  const result = await supabase.from("project_rooms").update(values).eq("workspace_id", scoped.access.workspaceId).eq("project_id", projectId).eq("id", roomId)
+    .select("id,name,room_type,length,width,height,unit,notes,sort_order,created_at,updated_at").maybeSingle();
+  if (result.error) return fail("VALIDATION_ERROR", "Room could not be updated.", 400, id);
+  return result.data ? ok(result.data, 200, id) : fail("NOT_FOUND", "Room was not found.", 404, id);
+}
+
+async function deleteProjectRoom(supabase: SupabaseClient, id: string, projectId: string, roomId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const result = await supabase.from("project_rooms").delete().eq("workspace_id", scoped.access.workspaceId).eq("project_id", projectId).eq("id", roomId).select("id").maybeSingle();
+  if (result.error) return fail("VALIDATION_ERROR", "Room could not be deleted.", 400, id);
+  return result.data ? ok({ deleted: true, id: roomId }, 200, id) : fail("NOT_FOUND", "Room was not found.", 404, id);
+}
+
+const projectImportHeaders: Record<string, string> = {
+  projectname: "name", name: "name", project: "name",
+  clientname: "clientName", client: "clientName",
+  projecttype: "projectType", type: "projectType",
+  status: "status", location: "location", address: "location",
+  clientcontact: "clientContact", contact: "clientContact", phone: "clientContact",
+  clientemail: "clientEmail", email: "clientEmail",
+  description: "description", scope: "description",
+  areasqft: "areaSqft", area: "areaSqft", squarefeet: "areaSqft", squarefoot: "areaSqft",
+  projectvalue: "projectValue", value: "projectValue",
+  approvedbudget: "approvedBudget", budget: "approvedBudget",
+  startdate: "startDate", targetcompletiondate: "targetCompletionDate", completiondate: "targetCompletionDate", duedate: "targetCompletionDate",
+  tags: "tags",
+};
+
+function importKey(value: string) { return value.trim().toLowerCase().replace(/[^a-z0-9]/g, ""); }
+
+function importNumber(value: unknown) {
+  if (value == null || value === "") return null;
+  const parsed = typeof value === "number" ? value : Number(String(value).replace(/[₹,$\s]/g, ""));
+  return Number.isFinite(parsed) ? parsed : value;
+}
+
+function importDate(value: unknown) {
+  if (value == null || value === "") return null;
+  if (value instanceof Date && !Number.isNaN(value.valueOf())) return value.toISOString().slice(0, 10);
+  if (typeof value === "number") {
+    const parsed = XLSX.SSF.parse_date_code(value);
+    if (parsed) return `${parsed.y}-${String(parsed.m).padStart(2, "0")}-${String(parsed.d).padStart(2, "0")}`;
+  }
+  const text = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  const match = text.match(/^(\d{1,2})[-/]([A-Za-z]{3}|\d{1,2})[-/](\d{4})$/);
+  if (match) {
+    const months = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
+    const month = /^\d+$/.test(match[2]) ? Number(match[2]) : months.indexOf(match[2].toLowerCase()) + 1;
+    if (month > 0 && month < 13) return `${match[3]}-${String(month).padStart(2, "0")}-${String(Number(match[1])).padStart(2, "0")}`;
+  }
+  return text;
+}
+
+type ParsedProjectImport = { rowNumber: number; data: z.infer<typeof projectCreateSchema> | null; errors: Record<string, string[]> };
+
+async function parseProjectWorkbook(request: Request, id: string) {
+  let form: FormData;
+  try { form = await request.formData(); } catch { return { response: fail("VALIDATION_ERROR", "A multipart form with a file is required.", 400, id) }; }
+  const upload = form.get("file");
+  if (!(upload instanceof File)) return { response: fail("VALIDATION_ERROR", "The file field is required.", 400, id, { file: ["Choose a CSV, XLS, or XLSX file."] }) };
+  const extension = upload.name.split(".").pop()?.toLowerCase();
+  if (!extension || !["csv", "xls", "xlsx"].includes(extension)) return { response: fail("VALIDATION_ERROR", "Unsupported spreadsheet type.", 400, id, { file: ["Only .csv, .xls, and .xlsx files are accepted."] }) };
+  if (upload.size > 10 * 1024 * 1024) return { response: fail("PAYLOAD_TOO_LARGE", "Spreadsheet files are limited to 10 MB.", 413, id) };
+  let workbook: XLSX.WorkBook;
+  try { workbook = XLSX.read(Buffer.from(await upload.arrayBuffer()), { type: "buffer", cellDates: true }); }
+  catch { return { response: fail("VALIDATION_ERROR", "The spreadsheet could not be read.", 400, id, { file: ["The file may be corrupted or password protected."] }) }; }
+  const sheetName = String(form.get("sheet") ?? workbook.SheetNames[0] ?? "");
+  const sheet = workbook.Sheets[sheetName];
+  if (!sheet) return { response: fail("VALIDATION_ERROR", "The requested worksheet was not found.", 400, id, { sheet: [`Available sheets: ${workbook.SheetNames.join(", ")}`] }) };
+  const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null, raw: true });
+  if (rawRows.length > 5000) return { response: fail("PAYLOAD_TOO_LARGE", "A project import is limited to 5,000 data rows.", 413, id) };
+  const rows: ParsedProjectImport[] = rawRows.map((raw, index) => {
+    const mapped: Record<string, unknown> = {};
+    for (const [header, value] of Object.entries(raw)) {
+      const target = projectImportHeaders[importKey(header)];
+      if (target) mapped[target] = value;
+    }
+    for (const key of ["name","clientName","projectType","location","clientContact","clientEmail","description"]) if (mapped[key] != null) mapped[key] = String(mapped[key]).trim();
+    mapped.status = String(mapped.status ?? "planning").trim().toLowerCase().replace(/[ -]+/g, "_");
+    for (const key of ["areaSqft","projectValue","approvedBudget"]) mapped[key] = importNumber(mapped[key]);
+    for (const key of ["startDate","targetCompletionDate"]) mapped[key] = importDate(mapped[key]);
+    if (mapped.tags != null) mapped.tags = String(mapped.tags).split(",").map((tag) => tag.trim()).filter(Boolean);
+    const result = projectCreateSchema.safeParse(mapped);
+    return result.success
+      ? { rowNumber: index + 2, data: result.data, errors: {} }
+      : { rowNumber: index + 2, data: null, errors: fieldErrors(result.error) };
+  });
+  return { file: upload, extension: extension as "csv" | "xls" | "xlsx", workbook, sheetName, rows };
+}
+
+async function previewProjectImport(request: Request, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const parsedFile = await parseProjectWorkbook(request, id); if ("response" in parsedFile) return parsedFile.response;
+  const invalidRows = parsedFile.rows.filter((row) => !row.data);
+  return ok({ fileName: parsedFile.file.name, fileType: parsedFile.extension, sheets: parsedFile.workbook.SheetNames,
+    selectedSheet: parsedFile.sheetName, totalRows: parsedFile.rows.length, validRows: parsedFile.rows.length - invalidRows.length,
+    invalidRows: invalidRows.length, rows: parsedFile.rows.slice(0, 100) }, 200, id);
+}
+
+async function importProjects(request: Request, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const parsedFile = await parseProjectWorkbook(request, id); if ("response" in parsedFile) return parsedFile.response;
+  const invalidRows = parsedFile.rows.filter((row) => !row.data);
+  const skipInvalid = new URL(request.url).searchParams.get("skipInvalid") === "true";
+  if (invalidRows.length && !skipInvalid) {
+    return fail("IMPORT_VALIDATION_FAILED", `The spreadsheet contains ${invalidRows.length} invalid row(s). Preview the file or use skipInvalid=true.`, 422, id,
+      Object.fromEntries(invalidRows.slice(0, 100).map((row) => [`rows.${row.rowNumber}`, Object.entries(row.errors).flatMap(([field, messages]) => messages.map((message) => `${field}: ${message}`))])));
+  }
+  const valid = parsedFile.rows.filter((row): row is ParsedProjectImport & { data: z.infer<typeof projectCreateSchema> } => row.data !== null);
+  if (!valid.length) return fail("IMPORT_VALIDATION_FAILED", "The spreadsheet contains no valid project rows.", 422, id);
+  const result = await supabase.from("projects").insert(valid.map((row) => ({ workspace_id: scoped.access.workspaceId, created_by: scoped.access.userId, ...projectValues(row.data) }))).select(projectSelect);
+  if (result.error) {
+    console.error(JSON.stringify({ requestId: id, event: "project_import_failed", code: result.error.code, message: result.error.message }));
+    return fail("IMPORT_FAILED", "No projects were imported. Check duplicates and field values.", 400, id);
+  }
+  const log = await supabase.from("project_imports").insert({ workspace_id: scoped.access.workspaceId, created_by: scoped.access.userId,
+    file_name: parsedFile.file.name, file_type: parsedFile.extension, total_rows: parsedFile.rows.length,
+    imported_rows: result.data?.length ?? 0, skipped_rows: invalidRows.length, errors: invalidRows }).select("id").single();
+  await audit(supabase, "project.excel_imported", id);
+  return ok({ importId: log.data?.id ?? null, fileName: parsedFile.file.name, totalRows: parsedFile.rows.length,
+    importedRows: result.data?.length ?? 0, skippedRows: invalidRows.length,
+    projects: (result.data ?? []).map((row) => projectDto(row as Record<string, unknown>)), errors: invalidRows }, 201, id);
+}
+
+async function projectImportHistory(request: NextRequest, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const { page, pageSize, from, to } = pagination(request.nextUrl.searchParams);
+  const result = await supabase.from("project_imports").select("id,file_name,file_type,total_rows,imported_rows,skipped_rows,status,errors,created_at", { count: "exact" })
+    .eq("workspace_id", scoped.access.workspaceId).order("created_at", { ascending: false }).range(from, to);
+  if (result.error) return fail("INTERNAL_ERROR", "Import history could not be loaded.", 500, id);
+  const total = result.count ?? 0;
+  return ok({ items: result.data ?? [], page, pageSize, total, hasMore: to + 1 < total }, 200, id);
+}
+
+async function projectImportTemplate(supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const sheet = XLSX.utils.json_to_sheet([{ ProjectName: "Oberoi Residence", ClientName: "Nikhil Oberoi", ProjectType: "Residential",
+    Status: "planning", Location: "Bandra West, Mumbai", ClientContact: "+91 98765 43210", ClientEmail: "client@example.com",
+    AreaSqft: 3200, ProjectValue: 4800000, ApprovedBudget: 4250000, StartDate: "2026-09-15", TargetCompletionDate: "2026-12-15", Tags: "Luxury, Turnkey", Description: "Residential interior project" }]);
+  const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, sheet, "Projects");
+  const output = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }) as Buffer;
+  return new Response(new Uint8Array(output), { status: 200, headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "Content-Disposition": "attachment; filename=project-import-template.xlsx", "Cache-Control": "private, no-store", "X-Request-Id": id } });
 }
 
 async function createBoqImport(request: Request, supabase: SupabaseClient, id: string) {
-  const ctx = await context(supabase, id); if ("response" in ctx) return ctx.response;
-  const workspaceId = (ctx.data as { workspace?: { id?: string } } | null)?.workspace?.id;
-  if (!workspaceId) return fail("FORBIDDEN", "Active workspace membership required.", 403, id);
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
   const input = await parsed(request, boqImportSchema, id); if (input.response) return input.response;
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin.from("boq_imports").insert({
-    workspace_id: workspaceId, project_id: input.data.projectId || null, file_name: input.data.fileName,
+  if (input.data.projectId) {
+    const project = await supabase.from("projects").select("id").eq("workspace_id", scoped.access.workspaceId).eq("id", input.data.projectId).is("archived_at", null).maybeSingle();
+    if (!project.data) return fail("VALIDATION_ERROR", "projectId does not identify an active project in this workspace.", 400, id);
+  }
+  const { data, error } = await supabase.from("boq_imports").insert({
+    workspace_id: scoped.access.workspaceId, project_id: input.data.projectId || null, file_name: input.data.fileName,
     file_type: input.data.fileType, row_count: input.data.rowCount, columns: input.data.columns,
-    created_by: ctx.user.id, rows: input.data.rows ?? [],
+    created_by: scoped.access.userId, rows: input.data.rows ?? [],
   }).select("id,file_name,file_type,row_count,columns,created_at").single();
   if (error) {
     console.error(JSON.stringify({ requestId: id, event: "boq_import_create_failed", code: error.code, message: error.message }));
@@ -348,6 +633,57 @@ async function createBoqImport(request: Request, supabase: SupabaseClient, id: s
   }
   await audit(supabase, "boq.imported", id);
   return ok(data, 201, id);
+}
+
+async function parseBoqWorkbook(request: Request, id: string) {
+  let form: FormData;
+  try { form = await request.formData(); } catch { return { response: fail("VALIDATION_ERROR", "A multipart form with a file is required.", 400, id) }; }
+  const upload = form.get("file");
+  if (!(upload instanceof File)) return { response: fail("VALIDATION_ERROR", "The file field is required.", 400, id, { file: ["Choose a CSV, XLS, or XLSX file."] }) };
+  const extension = upload.name.split(".").pop()?.toLowerCase();
+  if (!extension || !["csv", "xls", "xlsx"].includes(extension)) return { response: fail("VALIDATION_ERROR", "Unsupported spreadsheet type.", 400, id) };
+  if (upload.size > 10 * 1024 * 1024) return { response: fail("PAYLOAD_TOO_LARGE", "Spreadsheet files are limited to 10 MB.", 413, id) };
+  let workbook: XLSX.WorkBook;
+  try { workbook = XLSX.read(Buffer.from(await upload.arrayBuffer()), { type: "buffer", cellDates: true }); }
+  catch { return { response: fail("VALIDATION_ERROR", "The spreadsheet could not be read.", 400, id) }; }
+  const sheetName = String(form.get("sheet") ?? workbook.SheetNames[0] ?? "");
+  const sheet = workbook.Sheets[sheetName];
+  if (!sheet) return { response: fail("VALIDATION_ERROR", "The requested worksheet was not found.", 400, id) };
+  const matrix = XLSX.utils.sheet_to_json<Array<string | number | boolean | Date | null>>(sheet, { header: 1, defval: null, raw: true });
+  if (matrix.length < 2) return { response: fail("VALIDATION_ERROR", "The worksheet must contain a header and at least one data row.", 400, id) };
+  if (matrix.length - 1 > 10_000) return { response: fail("PAYLOAD_TOO_LARGE", "A BOQ import is limited to 10,000 data rows.", 413, id) };
+  const columns = matrix[0].map((value, index) => String(value ?? `Column ${index + 1}`).trim()).filter(Boolean);
+  if (!columns.length || columns.length > 100 || new Set(columns.map(importKey)).size !== columns.length) return { response: fail("VALIDATION_ERROR", "BOQ headers must be non-empty and unique.", 400, id) };
+  const rows = matrix.slice(1).filter((row) => row.some((value) => value !== null && value !== "")).map((row) => columns.map((_, index) => {
+    const value = row[index]; return value instanceof Date ? value.toISOString() : value ?? null;
+  }));
+  const projectIdValue = form.get("projectId");
+  const projectId = projectIdValue ? z.string().uuid().safeParse(String(projectIdValue)) : null;
+  if (projectId && !projectId.success) return { response: fail("VALIDATION_ERROR", "projectId must be a UUID.", 400, id) };
+  return { file: upload, extension: extension as "csv" | "xls" | "xlsx", workbook, sheetName, columns, rows, projectId: projectId?.data };
+}
+
+async function previewBoqImport(request: Request, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const parsedFile = await parseBoqWorkbook(request, id); if ("response" in parsedFile) return parsedFile.response;
+  return ok({ fileName: parsedFile.file.name, fileType: parsedFile.extension, sheets: parsedFile.workbook.SheetNames,
+    selectedSheet: parsedFile.sheetName, columns: parsedFile.columns, rowCount: parsedFile.rows.length, rows: parsedFile.rows.slice(0, 100) }, 200, id);
+}
+
+async function uploadBoqImport(request: Request, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const parsedFile = await parseBoqWorkbook(request, id); if ("response" in parsedFile) return parsedFile.response;
+  if (parsedFile.projectId) {
+    const project = await supabase.from("projects").select("id").eq("workspace_id", scoped.access.workspaceId).eq("id", parsedFile.projectId).is("archived_at", null).maybeSingle();
+    if (!project.data) return fail("VALIDATION_ERROR", "projectId does not identify an active project in this workspace.", 400, id);
+  }
+  const result = await supabase.from("boq_imports").insert({ workspace_id: scoped.access.workspaceId, project_id: parsedFile.projectId ?? null,
+    file_name: parsedFile.file.name, file_type: parsedFile.extension, row_count: parsedFile.rows.length,
+    columns: parsedFile.columns, rows: parsedFile.rows, created_by: scoped.access.userId })
+    .select("id,project_id,file_name,file_type,row_count,columns,created_at").single();
+  if (result.error) return fail("IMPORT_FAILED", "BOQ spreadsheet could not be saved.", 400, id);
+  await audit(supabase, "boq.excel_imported", id);
+  return ok(result.data, 201, id);
 }
 
 async function dashboardList(request: NextRequest, supabase: SupabaseClient, id: string, name: string) {
@@ -932,7 +1268,28 @@ async function dispatch(request: NextRequest, path: string[]) {
   if ((request.method === "GET" || request.method === "PATCH") && route === "users/me/preferences") return preferences(request, supabase, id);
   if ((request.method === "GET" || request.method === "PATCH") && route === "onboarding/me") return onboarding(request, supabase, id);
   if (request.method === "GET" && route === "dashboard/overview") return dashboardOverview(request, supabase, id);
+  if (request.method === "GET" && route === "projects") return listProjects(request, supabase, id);
   if (request.method === "POST" && route === "projects") return createProject(request, supabase, id);
+  if (request.method === "GET" && route === "projects/import-template") return projectImportTemplate(supabase, id);
+  if (request.method === "GET" && route === "projects/imports") return projectImportHistory(request, supabase, id);
+  if (request.method === "POST" && route === "projects/imports/preview") return previewProjectImport(request, supabase, id);
+  if (request.method === "POST" && route === "projects/imports") return importProjects(request, supabase, id);
+  const projectMatch = route.match(/^projects\/([0-9a-f-]{36})$/i);
+  if (projectMatch && request.method === "GET") return getProject(supabase, id, projectMatch[1]);
+  if (projectMatch && request.method === "PATCH") return updateProject(request, supabase, id, projectMatch[1]);
+  if (projectMatch && request.method === "DELETE") return deleteProject(supabase, id, projectMatch[1]);
+  const projectStatusMatch = route.match(/^projects\/([0-9a-f-]{36})\/status$/i);
+  if (projectStatusMatch && request.method === "POST") return changeProjectStatus(request, supabase, id, projectStatusMatch[1]);
+  const projectDuplicateMatch = route.match(/^projects\/([0-9a-f-]{36})\/duplicate$/i);
+  if (projectDuplicateMatch && request.method === "POST") return duplicateProject(supabase, id, projectDuplicateMatch[1]);
+  const projectRoomsMatch = route.match(/^projects\/([0-9a-f-]{36})\/rooms$/i);
+  if (projectRoomsMatch && request.method === "GET") return listProjectRooms(supabase, id, projectRoomsMatch[1]);
+  if (projectRoomsMatch && request.method === "POST") return createProjectRoom(request, supabase, id, projectRoomsMatch[1]);
+  const projectRoomMatch = route.match(/^projects\/([0-9a-f-]{36})\/rooms\/([0-9a-f-]{36})$/i);
+  if (projectRoomMatch && request.method === "PATCH") return updateProjectRoom(request, supabase, id, projectRoomMatch[1], projectRoomMatch[2]);
+  if (projectRoomMatch && request.method === "DELETE") return deleteProjectRoom(supabase, id, projectRoomMatch[1], projectRoomMatch[2]);
+  if (request.method === "POST" && route === "boq-imports/preview") return previewBoqImport(request, supabase, id);
+  if (request.method === "POST" && route === "boq-imports/upload") return uploadBoqImport(request, supabase, id);
   if (request.method === "POST" && route === "boq-imports") return createBoqImport(request, supabase, id);
   const list = route.match(/^dashboard\/(recent-projects|recent-boqs|pending-actions|upcoming-deliverables|notifications)$/)?.[1];
   if (request.method === "GET" && list) return dashboardList(request, supabase, id, list);

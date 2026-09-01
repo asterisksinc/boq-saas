@@ -131,15 +131,59 @@ export const onboardingPatchSchema = z
   })
   .strict();
 
-export const projectCreateSchema = z
+const projectBaseSchema = z
   .object({
     name: z.string().trim().min(1).max(160),
     clientName: z.string().trim().min(1).max(160),
     projectType: z.string().trim().min(1).max(80),
-    status: z.enum(["active", "on_hold", "planning"]),
+    status: z.enum(["active", "planning", "in_progress", "on_hold", "completed"]).optional(),
     location: z.string().trim().max(240).optional(),
+    clientContact: z.string().trim().max(40).nullable().optional(),
+    clientEmail: z.string().trim().email().max(254).nullable().optional(),
+    description: z.string().trim().max(5000).nullable().optional(),
+    areaSqft: z.coerce.number().finite().positive().max(100_000_000).nullable().optional(),
+    projectValue: z.coerce.number().finite().min(0).max(999_999_999_999_999).nullable().optional(),
+    approvedBudget: z.coerce.number().finite().min(0).max(999_999_999_999_999).nullable().optional(),
+    startDate: z.string().date().nullable().optional(),
+    targetCompletionDate: z.string().date().nullable().optional(),
+    assignedDesignerId: z.string().uuid().nullable().optional(),
+    tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
   })
   .strict();
+
+export const projectCreateSchema = projectBaseSchema.extend({
+  status: z.enum(["active", "planning", "in_progress", "on_hold", "completed"]).default("planning"),
+}).superRefine((value, ctx) => {
+    if (value.startDate && value.targetCompletionDate && value.targetCompletionDate < value.startDate) {
+      ctx.addIssue({ code: "custom", path: ["targetCompletionDate"], message: "Target completion cannot be before the start date." });
+    }
+  });
+
+export const projectPatchSchema = projectBaseSchema.partial().strict().superRefine((value, ctx) => {
+  if (Object.keys(value).length === 0) ctx.addIssue({ code: "custom", path: [], message: "At least one field is required." });
+  if (value.startDate && value.targetCompletionDate && value.targetCompletionDate < value.startDate) {
+    ctx.addIssue({ code: "custom", path: ["targetCompletionDate"], message: "Target completion cannot be before the start date." });
+  }
+});
+
+export const projectStatusSchema = z.object({
+  status: z.enum(["active", "planning", "in_progress", "on_hold", "completed"]),
+}).strict();
+
+export const projectRoomCreateSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  roomType: z.string().trim().min(1).max(80),
+  length: z.coerce.number().finite().positive().max(100_000).nullable().optional(),
+  width: z.coerce.number().finite().positive().max(100_000).nullable().optional(),
+  height: z.coerce.number().finite().positive().max(100_000).nullable().optional(),
+  unit: z.enum(["ft", "m"]).default("ft"),
+  notes: z.string().trim().max(2000).nullable().optional(),
+}).strict();
+
+export const projectRoomPatchSchema = projectRoomCreateSchema.partial().strict().refine(
+  (value) => Object.keys(value).length > 0,
+  "At least one field is required.",
+);
 
 export const boqImportSchema = z
   .object({

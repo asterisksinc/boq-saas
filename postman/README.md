@@ -37,6 +37,11 @@ and archive requests last.
 The collection automatically stores created proposal, folder, document, and
 invoice IDs as collection variables.
 
+Folder 11 in the Complete collection covers project CRUD, lifecycle,
+duplication, room setup, and backend Excel/CSV import. Set the `projectFile`
+collection variable (or choose a file in each request) before running
+preview/import.
+
 ## Common failures
 
 - `401 UNAUTHENTICATED`: sign in again and check Postman's `localhost` cookie jar.

@@ -1,6 +1,76 @@
 # BOQ Design Arena frontend integration guide
 
-This guide describes how the existing Next.js App Router frontend should integrate with Auth/User/Dashboard plus the Proposals and Documents APIs. It does not require the frontend to call Supabase directly.
+This guide describes how the existing Next.js App Router frontend should integrate with Auth/User/Dashboard, Projects and project Excel import, Proposals, Documents, and Invoices. It does not require the frontend to call Supabase directly.
+
+## Projects screen integration (backend implemented; frontend unchanged)
+
+The Projects list, editor, lifecycle actions, duplication, room setup, and spreadsheet import are tenant-scoped to the authenticated user's active workspace. Never send `workspaceId`, `createdBy`, `projectCode`, `progress`, or financial totals from the browser; the server owns those fields.
+
+| UI action | API |
+|---|---|
+| List/search/filter projects | `GET /projects?page=1&pageSize=20&search=&status=&type=&assignedToMe=false` |
+| Create from scratch/template-derived form | `POST /projects` |
+| Open Project / Project Details | `GET /projects/{projectId}` |
+| Edit Project | `PATCH /projects/{projectId}` |
+| Put on hold / mark completed | `POST /projects/{projectId}/status` |
+| Duplicate Project | `POST /projects/{projectId}/duplicate` |
+| Delete Project | `DELETE /projects/{projectId}` (owner/admin only; permanent) |
+| List/add rooms | `GET` / `POST /projects/{projectId}/rooms` |
+| Edit/delete room | `PATCH` / `DELETE /projects/{projectId}/rooms/{roomId}` |
+| Download import template | `GET /projects/import-template` |
+| Validate Excel before confirmation | `POST /projects/imports/preview` (multipart) |
+| Commit Excel import | `POST /projects/imports` (multipart) |
+| Show import history | `GET /projects/imports?page=1&pageSize=20` |
+
+Create example:
+
+```ts
+const project = await api.post<Project>("/projects", {
+  name: "Oberoi Residence — Bandra West",
+  clientName: "Nikhil Oberoi",
+  clientContact: "+91 98765 43210",
+  clientEmail: "nikhil@example.com",
+  projectType: "Residential",
+  status: "planning",
+  location: "Bandra West, Mumbai",
+  description: "4-bedroom residential interior",
+  areaSqft: 3200,
+  projectValue: 4800000,
+  approvedBudget: 4250000,
+  startDate: "2026-09-15",
+  targetCompletionDate: "2026-12-15",
+  tags: ["Luxury", "Turnkey"],
+});
+```
+
+Valid project statuses are `planning`, `active`, `in_progress`, `on_hold`, and `completed`. Completing a project sets progress to 100. The detail response includes `rooms`; it intentionally does not fabricate Costing, BOQ, Payment, Documents, or Activity data.
+
+### Excel/CSV import
+
+The browser must upload the original file. It must not parse the workbook itself. Do not set `Content-Type` manually when sending `FormData`, because the browser must add the multipart boundary.
+
+```ts
+async function uploadProjectSheet(file: File, preview = true) {
+  const form = new FormData();
+  form.append("file", file);
+
+  const response = await fetch(
+    `/api/v1/projects/imports${preview ? "/preview" : ""}`,
+    { method: "POST", credentials: "include", body: form },
+  );
+  const payload = await response.json();
+  if (!response.ok) throw payload.error;
+  return payload.data;
+}
+```
+
+Accepted files are `.csv`, `.xls`, and `.xlsx`, up to 10 MB and 5,000 data rows. The first worksheet is used unless the multipart `sheet` field names another worksheet. Preview returns at most 100 row details, while counts cover the entire worksheet.
+
+Canonical headings are: `ProjectName`, `ClientName`, `ProjectType`, `Status`, `Location`, `ClientContact`, `ClientEmail`, `Description`, `AreaSqft`, `ProjectValue`, `ApprovedBudget`, `StartDate`, `TargetCompletionDate`, and `Tags`. Only the first three are required; status defaults to `planning`. Dates should use `YYYY-MM-DD`, and tags are comma-separated.
+
+Strict commit (`POST /projects/imports`) writes nothing when any row is invalid and returns `422 IMPORT_VALIDATION_FAILED`. After showing the preview and receiving explicit user confirmation, the UI may call `POST /projects/imports?skipInvalid=true` to import valid rows and return invalid rows as `errors`. A successful import response contains `importId`, counts, created projects, and skipped-row errors.
+
+For the BOQs tab, use the same multipart pattern with `POST /boq-imports/preview` and `POST /boq-imports/upload`. Add `projectId` to the form to link the BOQ to the open project. BOQ headers are preserved exactly, duplicate/blank headers are rejected, and the backend stores the parsed matrix. Limits are 10 MB, 100 columns, and 10,000 data rows. The older JSON `POST /boq-imports` contract remains available for compatibility, but new frontend work should upload the original file.
 
 ## 1. Integration architecture
 

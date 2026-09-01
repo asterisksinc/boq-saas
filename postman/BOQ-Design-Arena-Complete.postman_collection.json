@@ -56,6 +56,14 @@
       "value": "22222222-2222-4222-8222-222222222222"
     },
     {
+      "key": "roomId",
+      "value": ""
+    },
+    {
+      "key": "projectFile",
+      "value": "C:/path/to/project-import-template.xlsx"
+    },
+    {
       "key": "invoiceId",
       "value": ""
     },
@@ -1243,6 +1251,36 @@
             }
           ]
         }
+      ]
+    },
+    {
+      "name": "11 — Projects & Excel Import",
+      "description": "User-scoped Project CRUD, rooms, lifecycle, duplication, and server-side Project/BOQ spreadsheet parsing.",
+      "item": [
+        { "name": "List Projects", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/projects?page=1&pageSize=20" } },
+        {
+          "name": "Create Project",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Oberoi Residence - Bandra West\",\n  \"clientName\": \"Nikhil Oberoi\",\n  \"clientContact\": \"+91 98765 43210\",\n  \"clientEmail\": \"nikhil@example.com\",\n  \"projectType\": \"Residential\",\n  \"status\": \"planning\",\n  \"location\": \"Bandra West, Mumbai\",\n  \"areaSqft\": 3200,\n  \"projectValue\": 4800000,\n  \"approvedBudget\": 4250000,\n  \"startDate\": \"2026-09-15\",\n  \"targetCompletionDate\": \"2026-12-15\"\n}" }, "url": "{{baseUrl}}/api/v1/projects" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Created', () => pm.response.to.have.status(201));", "const body = pm.response.json();", "if (body.data?.id) pm.collectionVariables.set('projectId', body.data.id);"] } }]
+        },
+        { "name": "Get Project", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/projects/{{projectId}}" } },
+        { "name": "Update Project", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{ \"description\": \"Updated scope\", \"approvedBudget\": 4500000 }" }, "url": "{{baseUrl}}/api/v1/projects/{{projectId}}" } },
+        { "name": "Change Project Status", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{ \"status\": \"in_progress\" }" }, "url": "{{baseUrl}}/api/v1/projects/{{projectId}}/status" } },
+        { "name": "Duplicate Project", "request": { "method": "POST", "url": "{{baseUrl}}/api/v1/projects/{{projectId}}/duplicate" } },
+        {
+          "name": "Add Project Room",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{ \"name\": \"Master Bedroom\", \"roomType\": \"Master Bedroom\", \"length\": 12, \"width\": 14, \"height\": 10, \"unit\": \"ft\" }" }, "url": "{{baseUrl}}/api/v1/projects/{{projectId}}/rooms" },
+          "event": [{ "listen": "test", "script": { "exec": ["const body = pm.response.json();", "if (body.data?.id) pm.collectionVariables.set('roomId', body.data.id);"] } }]
+        },
+        { "name": "List Project Rooms", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/projects/{{projectId}}/rooms" } },
+        { "name": "Update Project Room", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{ \"notes\": \"Dimensions verified\" }" }, "url": "{{baseUrl}}/api/v1/projects/{{projectId}}/rooms/{{roomId}}" } },
+        { "name": "Download Project Import Template", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/projects/import-template" } },
+        { "name": "Preview Project Spreadsheet", "request": { "method": "POST", "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": "{{projectFile}}" }] }, "url": "{{baseUrl}}/api/v1/projects/imports/preview" } },
+        { "name": "Import Project Spreadsheet", "request": { "method": "POST", "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": "{{projectFile}}" }] }, "url": "{{baseUrl}}/api/v1/projects/imports" } },
+        { "name": "Project Import History", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/projects/imports?page=1&pageSize=20" } },
+        { "name": "Preview BOQ Spreadsheet", "request": { "method": "POST", "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": "{{projectFile}}" }, { "key": "projectId", "type": "text", "value": "{{projectId}}" }] }, "url": "{{baseUrl}}/api/v1/boq-imports/preview" } },
+        { "name": "Import BOQ Spreadsheet", "request": { "method": "POST", "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": "{{projectFile}}" }, { "key": "projectId", "type": "text", "value": "{{projectId}}" }] }, "url": "{{baseUrl}}/api/v1/boq-imports/upload" } },
+        { "name": "Delete Project (Owner/Admin)", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/v1/projects/{{projectId}}" } }
       ]
     }
   ]
