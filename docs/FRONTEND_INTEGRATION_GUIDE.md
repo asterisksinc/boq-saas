@@ -44,7 +44,7 @@ Then:
 1. Generate `AUTH_OTP_SECRET` once with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. Store the output only in the deployment secret manager and local `.env.local`.
 2. Create a Google App Password for the Gmail sender account (Google Account → Security → 2-Step Verification → App passwords). Put its 16-character value in `GMAIL_SMTP_APP_PASSWORD`.
 3. Copy the server-only Supabase secret key from Supabase Dashboard → Project Settings → API Keys into `SUPABASE_SECRET_KEY`.
-4. Apply the migrations in timestamp order, including `supabase/migrations/20260901120000_proposals_documents.sql`. It creates the private `workspace-documents` Storage bucket and its RLS policies.
+4. Apply all migrations in timestamp order, including `20260901120000_proposals_documents.sql` and `20260901150000_invoices.sql`. The former creates private document storage; the latter adds invoice totals, items, payments, and RLS.
 5. Configure the Supabase Auth Site URL and redirect allowlist for the local and production application URLs.
 6. Restart the application after changing secrets, then validate the request/verify flow with the supplied Postman collection.
 
@@ -68,6 +68,7 @@ features/
   dashboard/api.ts            # overview and paginated widgets
   proposals/api.ts            # proposal list, summary, create/edit, lifecycle
   documents/api.ts            # folders, multipart uploads, file operations
+  invoices/api.ts             # invoice list/summary, editor, PDF, payments
 app/
   (auth)/login/page.tsx
   (auth)/register/page.tsx
@@ -158,6 +159,13 @@ export interface PermissionFlags {
   canViewFinancials: boolean;
   canApprove: boolean;
   canExport: boolean;
+  canCreateProposal: boolean;
+  canManageDocuments: boolean;
+  canArchiveProposal: boolean;
+  canDeleteDocuments: boolean;
+  canCreateInvoice: boolean;
+  canRecordPayment: boolean;
+  canDeleteInvoice: boolean;
 }
 
 export interface CurrentContext {
@@ -203,6 +211,9 @@ export interface CurrentContext {
 }
 
 export interface DashboardOverview {
+  dataSource: "hardcoded_demo";
+  demoData: true;
+  period: "week" | "month" | "quarter";
   scope: { workspaceId: string; currency: string; timezone: string; generatedAt: string };
   kpis: {
     totalProjects: number;
@@ -212,9 +223,17 @@ export interface DashboardOverview {
     totalEstimatedValue: number | null;
     actualCost: number | null;
     grossMargin: number | null;
+    grossMarginPercent: number | null;
   };
   organization: { id: string; name: string; status: string; country: string | null };
   costOverview: { currency: string; series: unknown[] } | null;
+  analytics: { currency: string; series: Array<{ label: string; estimated: number; actual: number }> } | null;
+  projectsAndBoqs: {
+    projects: { total: number; inProgress: number; planning: number; onHold: number; completed: number };
+    totalBoqValue: number | null;
+    boqCompletionPercent: number;
+  };
+  highlightedBoq: unknown;
   boqActivity: unknown[];
   recentProjects: unknown[];
   recentBoqs: unknown[];
@@ -222,7 +241,8 @@ export interface DashboardOverview {
   upcomingDeliverables: unknown[];
   notifications: { unreadCount: number; items: unknown[] };
   permissions: PermissionFlags;
-  unavailableSections: Array<{ section: string; reason: "DOMAIN_DEFERRED" }>;
+  demoSections: string[];
+  unavailableSections: [];
 }
 
 export interface Page<T> {
@@ -252,8 +272,11 @@ Current-context database records use snake_case because they are returned from P
 | Change-password form | `PATCH /users/me/password` | Send current and new passwords; display 401 as incorrect current password. |
 | Preferences | `GET/PATCH /users/me/preferences` | Timezone and locale only. |
 | Onboarding | `GET/PATCH /onboarding/me` | Resume saved step and company configuration. Never send workspace ID. |
-| Dashboard landing | `GET /dashboard/overview` | Primary initial request; render permissions and empty/deferred states. |
-| Widget drill-down | Dashboard list endpoints | Use `page` and `pageSize`; Projects/BOQs/actions/deliverables are intentionally empty until later phases. |
+| Dashboard landing | `GET /dashboard/overview?period=month` | Primary request; Project/BOQ widgets are temporary demo values explicitly marked in the response. |
+| Widget drill-down | Dashboard list endpoints | Use `page` and `pageSize`; current Project/BOQ/action/deliverable items are marked demo data. |
+| Invoices list/empty state | `GET /invoices` + `GET /invoices/summary` | Render the empty illustration when `total=0`; filters do not change summary cards. |
+| Create/edit invoice | `POST /invoices`, `PATCH /invoices/{id}` | Submit line-item inputs; display server-calculated subtotal/tax/total. |
+| Invoice preview/actions | Detail, PDF, status, and payment endpoints | Never calculate balances or paid state only in the browser. |
 
 All paths in frontend code are prefixed by `/api/v1` through the shared API client.
 
@@ -387,15 +410,17 @@ Only owner/admin members may update company settings. Optional Project/BOQ onboa
 Load `GET /dashboard/overview` as the initial dashboard request. Render widgets independently:
 
 - If `permissions.canViewFinancials` is false, hide financial cards or show a locked state. Never convert `null` financial values to zero.
-- If `unavailableSections` includes a widget's domain, show a planned/deferred empty state—not an error toast.
-- Notifications are real data. Other Phase 1 list endpoints deliberately return typed empty pages.
+- Use `?period=week`, `?period=month`, or `?period=quarter` for the analytics series; invalid/missing values default to month.
+- Project/BOQ KPIs, analytics, breakdown, highlighted BOQ, activity, recent lists, pending actions, and deliverables currently return temporary populated values with `dataSource: "hardcoded_demo"` and `demoData: true`.
+- Notifications, authentication, workspace scope, organization, and permission flags remain real. Never persist demo records or use their IDs in mutations.
+- `demoSections` identifies every field that must be replaced when Project/BOQ domain queries are implemented.
 - Use `scope.currency` and `scope.timezone` for display formatting.
 - Use permission flags for action visibility; never infer capability solely from membership role.
 
 Example:
 
 ```ts
-const overview = await api.get<DashboardOverview>("/dashboard/overview");
+const overview = await api.get<DashboardOverview>("/dashboard/overview?period=month");
 
 const money = new Intl.NumberFormat(undefined, {
   style: "currency",
@@ -486,7 +511,64 @@ Uploads are restricted to 25 MB and the allowlisted PDF/image/Office/spreadsheet
 
 Role behavior is consistent across both modules: viewer = read, member = read/create/update, owner/admin = all operations including destructive actions. Use `permissions.canCreateProposal`, `canManageDocuments`, `canArchiveProposal`, and `canDeleteDocuments` for button visibility. The backend remains authoritative even if buttons are hidden.
 
-## 15. Error handling
+## 15. Invoices integration
+
+Invoices are currently an internal User-workspace feature. This does not change authentication or collapse the three product personas:
+
+1. Admin: future cross-workspace/user/client management.
+2. User: current authenticated workspace member who manages clients and invoices.
+3. Client: future separately linked identity that can view/pay only its own invoices.
+
+Until Client and Project tables are implemented, submit their selected UUIDs as soft references plus visible snapshot names. Invoice records remain valid commercial snapshots after a client/project name changes. Do not use internal `workspace_memberships` roles to represent a Client.
+
+Load summary cards and the table independently:
+
+```ts
+const [summary, page] = await Promise.all([
+  api.get<InvoiceSummary>("/invoices/summary"),
+  api.get<Page<Invoice>>("/invoices?page=1&pageSize=10&type=invoice&status=overdue"),
+]);
+```
+
+Create or save a draft with the same payload. Currency, line amounts, subtotal, GST, total, paid value, and outstanding value are server-owned:
+
+```ts
+const invoice = await api.post<Invoice>("/invoices", {
+  type: "invoice", // invoice | pro_forma | quote
+  invoiceNumber: values.invoiceNumber || undefined,
+  clientId: selectedClient.id,
+  clientName: selectedClient.name,
+  billingAddress: {
+    line1: values.line1,
+    line2: values.line2 || null,
+    city: values.city,
+    state: values.state,
+    pincode: values.pincode,
+  },
+  projectId: selectedProject.id,
+  projectName: selectedProject.name,
+  issueDate: values.issueDate,
+  dueDate: values.dueDate,
+  milestone: values.milestone,
+  reference: values.reference || null,
+  taxRate: 18,
+  additionalNotes: values.notes || null,
+  bankDetails: workspaceBankDetails || null,
+  status: saveAsDraft ? "draft" : "pending",
+  items: values.items.map(({ description, quantity, rate }) => ({ description, quantity, rate })),
+});
+```
+
+- `GET /invoices/{id}` returns preview fields, items, payment history, stored status, and effective status. Effective `overdue` is derived from due date and outstanding balance.
+- `PATCH /invoices/{id}` accepts an allowlisted subset and recalculates totals atomically. Paid/void invoices are locked.
+- `POST /invoices/{id}/status` supports `draft`, `pending`, `sent`, `accepted`, and `void`; void is owner/admin-only. “Send to Client” records sent state and timestamp until the communications module exists.
+- `POST /invoices/{id}/payments` records cash/bank/card/UPI/cheque/other payments. Overpayment is rejected and status becomes `partial` or `paid` transactionally.
+- `GET /invoices/{id}/pdf` returns an `application/pdf` attachment, not a JSON envelope.
+- `DELETE /invoices/{id}` archives unpaid invoices and is owner/admin-only. Invoices with payments must be voided instead, preserving their audit trail.
+
+Use `canCreateInvoice`, `canRecordPayment`, and `canDeleteInvoice` for controls. Viewer members are read-only. Import is intentionally not exposed until the Excel/CSV column template and duplicate-number policy are approved.
+
+## 16. Error handling
 
 | Status/code | UI behavior |
 |---|---|
@@ -499,7 +581,7 @@ Role behavior is consistent across both modules: viewer = read, member = read/cr
 
 Never display raw stack traces or Supabase internals. Log the backend `requestId`, not passwords, tokens, or recovery codes.
 
-## 16. Session refresh strategy
+## 17. Session refresh strategy
 
 Normal API calls and Supabase SSR handle cookie refresh. If an active screen receives a single 401 because the session expired:
 
@@ -509,7 +591,7 @@ Normal API calls and Supabase SSR handle cookie refresh. If an active screen rec
 
 Do not retry login, registration, password, or mutation requests automatically. Do not create an infinite refresh loop.
 
-## 17. Production checklist
+## 18. Production checklist
 
 - Use HTTPS for the frontend/API origin.
 - Set `APP_URL`, `PASSWORD_RESET_REDIRECT_URL`, and `EMAIL_VERIFICATION_REDIRECT_URL` to production HTTPS URLs.
@@ -519,17 +601,19 @@ Do not retry login, registration, password, or mutation requests automatically. 
 - Configure Supabase Auth email templates and production rate limits.
 - Test two separate users to prove workspace isolation.
 - Test owner/admin versus member/viewer financial visibility.
-- Verify registration, confirmation, login, refresh, logout, forgot/reset password, profile, onboarding resume, and dashboard empty state.
+- Verify registration, confirmation, login, refresh, logout, forgot/reset password, profile, onboarding resume, all dashboard periods, demo markers, and financial permission masking.
 - Never expose or commit the Supabase service-role key.
 - Verify the `workspace-documents` bucket is private and test upload/download/delete with two separate workspaces.
 - Test proposal create modes, status changes, duplicate behavior, search/filter pagination, and archive authorization.
+- Test invoice total/tax calculations, duplicate manual numbers, overdue derivation, partial/full payments, overpayment rejection, PDF response, and paid-invoice immutability.
 
-## 18. Source files
+## 19. Source files
 
 - API implementation: `app/api/v1/[...path]/route.ts`
 - Validation contracts: `lib/api/validation.ts`
 - Supabase server client: `lib/supabase/server.ts`
 - Database/RLS migration: `supabase/migrations/20260827173000_phase1_auth_user_dashboard.sql`
 - Proposals/Documents migration: `supabase/migrations/20260901120000_proposals_documents.sql`
+- Invoices migration: `supabase/migrations/20260901150000_invoices.sql`
 - OpenAPI: `openapi.yaml`
 - Postman assets: `postman/`

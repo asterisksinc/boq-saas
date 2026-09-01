@@ -13,5 +13,8 @@ export function permissionsFor(role: string) {
     canManageDocuments: contributor,
     canArchiveProposal: elevated,
     canDeleteDocuments: elevated,
+    canCreateInvoice: contributor,
+    canRecordPayment: contributor,
+    canDeleteInvoice: elevated,
   };
 }

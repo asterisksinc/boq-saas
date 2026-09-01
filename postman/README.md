@@ -26,6 +26,15 @@ Postman's cookie jar enabled. Run **Create Folder** before document requests,
 select a local allowlisted file in **Upload Document**, and run destructive
 requests last. The collection stores created proposal/folder/document UUIDs as
 collection variables automatically.
+
+## Invoices
+
+Import `BOQ-Design-Arena-Invoices.postman_collection.json`, authenticate first,
+and keep the cookie jar enabled. The collection creates a draft, verifies the
+server-calculated GST total, previews/downloads it, records sent state and a
+partial payment, then checks mass-assignment, overpayment, and paid-history
+archive protections. Project/client UUIDs are soft-reference fixtures until
+those domain APIs are installed.
 5. Run **Save Company Setup**, then **Get Onboarding**.
 6. Run **Overview** and the five dashboard list requests.
 7. Run **Logout**.

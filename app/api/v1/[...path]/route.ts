@@ -4,7 +4,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { EmailOtpError, issueEmailOtp, verifyEmailOtp } from "@/lib/auth/email-otp";
-import { emptyPage, pagination } from "@/lib/domain/dashboard";
+import { pagination } from "@/lib/domain/dashboard";
+import { dashboardPeriod, demoDashboard, demoPendingActions, demoRecentBoqs, demoRecentProjects, demoUpcomingDeliverables } from "@/lib/domain/dashboard-demo";
 import { consumeRateLimit, rateLimitKey } from "@/lib/api/rate-limit";
 import { fail, methodNotAllowed, ok, requestId } from "@/lib/api/response";
 import {
@@ -33,6 +34,10 @@ import {
   proposalCreateSchema,
   proposalPatchSchema,
   proposalStatusSchema,
+  invoiceCreateSchema,
+  invoicePatchSchema,
+  invoiceStatusSchema,
+  paymentCreateSchema,
 } from "@/lib/api/validation";
 import { z } from "zod";
 
@@ -291,14 +296,20 @@ async function onboarding(request: Request, supabase: SupabaseClient, id: string
   return ok(data, 200, id);
 }
 
-async function dashboardOverview(supabase: SupabaseClient, id: string) {
+async function dashboardOverview(request: NextRequest, supabase: SupabaseClient, id: string) {
   const auth = await requireUser(supabase, id); if (auth.response) return auth.response;
   const { data, error } = await supabase.rpc("get_dashboard_overview");
   if (error) {
     console.error(JSON.stringify({ requestId: id, event: "dashboard_overview_failed", code: error.code }));
     return fail("INTERNAL_ERROR", "Dashboard overview is temporarily unavailable.", 500, id);
   }
-  return ok(data, 200, id);
+  const base = (data ?? {}) as Record<string, unknown>;
+  const scope = (base.scope ?? {}) as { currency?: string };
+  const permissions = (base.permissions ?? {}) as { canViewFinancials?: boolean };
+  const demo = demoDashboard(dashboardPeriod(request.nextUrl.searchParams.get("period")), scope.currency ?? "INR", permissions.canViewFinancials === true);
+  // TODO(PROJECT_BOQ_BACKEND): Remove this merge once get_dashboard_overview
+  // returns real Project/BOQ/Costing/Workflow aggregates.
+  return ok({ ...base, ...demo, scope: base.scope, organization: base.organization, permissions: base.permissions, notifications: base.notifications }, 200, id);
 }
 
 async function createProject(request: Request, supabase: SupabaseClient, id: string) {
@@ -341,10 +352,24 @@ async function createBoqImport(request: Request, supabase: SupabaseClient, id: s
 
 async function dashboardList(request: NextRequest, supabase: SupabaseClient, id: string, name: string) {
   const ctx = await context(supabase, id); if ("response" in ctx) return ctx.response;
-  const workspaceId = (ctx.data as { workspace?: { id?: string } } | null)?.workspace?.id;
+  const dashboardContext = ctx.data as { workspace?: { id?: string }; permissions?: { canViewFinancials?: boolean } } | null;
+  const workspaceId = dashboardContext?.workspace?.id;
   if (!workspaceId) return fail("FORBIDDEN", "Active workspace membership required.", 403, id);
   const { page, pageSize, from, to } = pagination(request.nextUrl.searchParams);
-  if (name !== "notifications") return ok(emptyPage(page, pageSize), 200, id);
+  if (name !== "notifications") {
+    // TODO(PROJECT_BOQ_BACKEND): Replace these demo pages with tenant-scoped
+    // Project/BOQ/Workflow/Deliverable queries when those tables are available.
+    const demoItems: Record<string, unknown[]> = {
+      "recent-projects": demoRecentProjects,
+      "recent-boqs": demoRecentBoqs,
+      "pending-actions": demoPendingActions,
+      "upcoming-deliverables": demoUpcomingDeliverables,
+    };
+    const all = name === "recent-boqs" && dashboardContext?.permissions?.canViewFinancials !== true
+      ? (demoItems[name] ?? []).map((item) => ({ ...(item as Record<string, unknown>), value: null }))
+      : demoItems[name] ?? [];
+    return ok({ items: all.slice(from, to + 1), page, pageSize, total: all.length, hasMore: to + 1 < all.length, dataSource: "hardcoded_demo", demoData: true }, 200, id);
+  }
   const countQuery = supabase.from("notifications").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId);
   const itemsQuery = supabase.from("notifications").select("id,type,title,priority,target_type,target_id,read_at,created_at").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).range(from, to);
   const [count, items] = await Promise.all([countQuery, itemsQuery]);
@@ -711,6 +736,180 @@ async function deleteDocument(supabase: SupabaseClient, id: string, documentId: 
   return ok({ deleted: true }, 200, id);
 }
 
+const invoiceSelect = "id,invoice_code,manual_number,document_type,client_id,client_name,billing_address,project_id,project_name,issue_date,due_date,milestone,reference,additional_notes,bank_details,tax_rate,subtotal,tax_amount,total_amount,total_paid,currency,status,sent_at,created_at,updated_at";
+
+function effectiveInvoiceStatus(row: Record<string, unknown>) {
+  if (["pending", "sent", "partial"].includes(String(row.status)) && String(row.due_date) < new Date().toISOString().slice(0, 10) && Number(row.total_paid) < Number(row.total_amount)) return "overdue";
+  return row.status;
+}
+
+function invoiceDto(row: Record<string, unknown>, items?: Record<string, unknown>[], payments?: Record<string, unknown>[]) {
+  return {
+    id: row.id, invoiceNumber: row.manual_number ?? row.invoice_code, manualNumber: row.manual_number, systemCode: row.invoice_code, type: row.document_type,
+    clientId: row.client_id, clientName: row.client_name, billingAddress: row.billing_address,
+    projectId: row.project_id, projectName: row.project_name, issueDate: row.issue_date, dueDate: row.due_date,
+    milestone: row.milestone, reference: row.reference, additionalNotes: row.additional_notes, bankDetails: row.bank_details, taxRate: Number(row.tax_rate),
+    subtotal: Number(row.subtotal), taxAmount: Number(row.tax_amount), totalAmount: Number(row.total_amount),
+    totalPaid: Number(row.total_paid), outstanding: Number(row.total_amount) - Number(row.total_paid), currency: row.currency,
+    status: effectiveInvoiceStatus(row), storedStatus: row.status, sentAt: row.sent_at, createdAt: row.created_at, updatedAt: row.updated_at,
+    ...(items ? { items: items.map((item) => ({ id: item.id, position: item.position, description: item.description, quantity: Number(item.quantity), rate: Number(item.rate), amount: Number(item.amount) })) } : {}),
+    ...(payments ? { payments: payments.map((payment) => ({ id: payment.id, amount: Number(payment.amount), paidAt: payment.paid_at, method: payment.method, reference: payment.reference, notes: payment.notes, createdAt: payment.created_at })) } : {}),
+  };
+}
+
+async function listInvoices(request: NextRequest, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const { page, pageSize, from, to } = pagination(request.nextUrl.searchParams);
+  const type = request.nextUrl.searchParams.get("type");
+  const status = request.nextUrl.searchParams.get("status");
+  const search = request.nextUrl.searchParams.get("search")?.trim().slice(0, 120);
+  let query = supabase.from("invoices").select(invoiceSelect, { count: "exact" }).eq("workspace_id", scoped.access.workspaceId)
+    .is("archived_at", null).order("updated_at", { ascending: false }).range(from, to);
+  if (type && ["invoice","pro_forma","quote"].includes(type)) query = query.eq("document_type", type);
+  if (status === "overdue") query = query.in("status", ["pending","sent","partial"]).lt("due_date", new Date().toISOString().slice(0, 10));
+  else if (status && ["draft","pending","sent","accepted","partial","paid","void"].includes(status)) query = query.eq("status", status);
+  if (search) {
+    const safe = search.replace(/[%_,()]/g, " ");
+    query = query.or(`invoice_code.ilike.%${safe}%,manual_number.ilike.%${safe}%,project_name.ilike.%${safe}%,client_name.ilike.%${safe}%`);
+  }
+  const result = await query;
+  if (result.error) return fail("INTERNAL_ERROR", "Invoices could not be loaded.", 500, id);
+  const total = result.count ?? 0;
+  return ok({ items: (result.data ?? []).map((row) => invoiceDto(row as Record<string, unknown>)), page, pageSize, total, hasMore: to + 1 < total }, 200, id);
+}
+
+async function invoiceSummary(supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const { data, error } = await supabase.from("invoices").select("document_type,status,due_date,total_amount,total_paid")
+    .eq("workspace_id", scoped.access.workspaceId).eq("document_type", "invoice").is("archived_at", null).neq("status", "void");
+  if (error) return fail("INTERNAL_ERROR", "Invoice summary could not be loaded.", 500, id);
+  const today = new Date().toISOString().slice(0, 10);
+  const rows = data ?? [];
+  const overdue = rows.filter((row) => row.due_date < today && Number(row.total_paid) < Number(row.total_amount) && row.status !== "draft");
+  const totalInvoiced = rows.reduce((sum, row) => sum + Number(row.total_amount), 0);
+  const collected = rows.reduce((sum, row) => sum + Number(row.total_paid), 0);
+  return ok({ totalInvoices: rows.length, totalInvoiced, collected, outstanding: totalInvoiced - collected,
+    overdue: overdue.reduce((sum, row) => sum + Number(row.total_amount) - Number(row.total_paid), 0), overdueCount: overdue.length, currency: scoped.access.currency }, 200, id);
+}
+
+async function loadInvoice(supabase: SupabaseClient, workspaceId: string, invoiceId: string) {
+  const invoice = await supabase.from("invoices").select(invoiceSelect).eq("workspace_id", workspaceId).eq("id", invoiceId).is("archived_at", null).single();
+  if (invoice.error) return null;
+  const [items, payments] = await Promise.all([
+    supabase.from("invoice_items").select("id,position,description,quantity,rate,amount").eq("workspace_id", workspaceId).eq("invoice_id", invoiceId).order("position"),
+    supabase.from("invoice_payments").select("id,amount,paid_at,method,reference,notes,created_at").eq("workspace_id", workspaceId).eq("invoice_id", invoiceId).order("paid_at", { ascending: false }),
+  ]);
+  if (items.error || payments.error) return null;
+  return invoiceDto(invoice.data as Record<string, unknown>, (items.data ?? []) as Record<string, unknown>[], (payments.data ?? []) as Record<string, unknown>[]);
+}
+
+async function getInvoice(supabase: SupabaseClient, id: string, invoiceId: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const invoice = await loadInvoice(supabase, scoped.access.workspaceId, invoiceId);
+  return invoice ? ok(invoice, 200, id) : fail("NOT_FOUND", "Invoice was not found.", 404, id);
+}
+
+async function createInvoice(request: Request, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const input = await parsed(request, invoiceCreateSchema, id); if (input.response) return input.response;
+  const saved = await supabase.rpc("save_invoice", { p_invoice: input.data, p_items: input.data.items, p_invoice_id: null });
+  if (saved.error || !saved.data) return fail(saved.error?.code === "23505" ? "CONFLICT" : "VALIDATION_ERROR", saved.error?.code === "23505" ? "Invoice number already exists." : "Invoice could not be created.", saved.error?.code === "23505" ? 409 : 400, id);
+  const invoice = await loadInvoice(supabase, scoped.access.workspaceId, String(saved.data));
+  if (!invoice) return fail("INTERNAL_ERROR", "Invoice was created but could not be reloaded.", 500, id);
+  await audit(supabase, "invoice.created", id);
+  return ok(invoice, 201, id);
+}
+
+async function updateInvoice(request: Request, supabase: SupabaseClient, id: string, invoiceId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const input = await parsed(request, invoicePatchSchema, id); if (input.response) return input.response;
+  const current = await loadInvoice(supabase, scoped.access.workspaceId, invoiceId);
+  if (!current) return fail("NOT_FOUND", "Invoice was not found.", 404, id);
+  if (["paid","void"].includes(String(current.storedStatus))) return fail("CONFLICT", "Paid or void invoices cannot be edited.", 409, id);
+  const patch = input.data;
+  const merged = {
+    type: patch.type ?? current.type, clientId: patch.clientId !== undefined ? patch.clientId : current.clientId,
+    clientName: patch.clientName ?? current.clientName, billingAddress: patch.billingAddress ?? current.billingAddress,
+    projectId: patch.projectId !== undefined ? patch.projectId : current.projectId, projectName: patch.projectName ?? current.projectName,
+    invoiceNumber: patch.invoiceNumber !== undefined ? patch.invoiceNumber : current.manualNumber ?? undefined,
+    issueDate: patch.issueDate ?? current.issueDate, dueDate: patch.dueDate ?? current.dueDate, milestone: patch.milestone ?? current.milestone,
+    reference: patch.reference !== undefined ? patch.reference : current.reference, taxRate: patch.taxRate ?? current.taxRate,
+    additionalNotes: patch.additionalNotes !== undefined ? patch.additionalNotes : current.additionalNotes,
+    bankDetails: patch.bankDetails !== undefined ? patch.bankDetails : current.bankDetails,
+    status: patch.status ?? current.storedStatus, items: patch.items ?? current.items,
+  };
+  if (String(merged.dueDate) < String(merged.issueDate)) return fail("VALIDATION_ERROR", "Due date cannot be before issue date.", 400, id, { dueDate: ["Due date cannot be before issue date."] });
+  const saved = await supabase.rpc("save_invoice", { p_invoice: merged, p_items: merged.items, p_invoice_id: invoiceId });
+  if (saved.error) return fail(saved.error.code === "23505" ? "CONFLICT" : "VALIDATION_ERROR", saved.error.code === "23505" ? "Invoice number already exists." : "Invoice could not be updated.", saved.error.code === "23505" ? 409 : 400, id);
+  const invoice = await loadInvoice(supabase, scoped.access.workspaceId, invoiceId);
+  await audit(supabase, "invoice.updated", id);
+  return invoice ? ok(invoice, 200, id) : fail("INTERNAL_ERROR", "Invoice could not be reloaded.", 500, id);
+}
+
+async function changeInvoiceStatus(request: Request, supabase: SupabaseClient, id: string, invoiceId: string) {
+  const preliminary = await parsed(request, invoiceStatusSchema, id); if (preliminary.response) return preliminary.response;
+  const scoped = await workspaceAccess(supabase, id, true, preliminary.data.status === "void"); if ("response" in scoped) return scoped.response;
+  const changed = await supabase.rpc("set_invoice_status", { p_invoice_id: invoiceId, p_status: preliminary.data.status });
+  if (changed.error) return fail("CONFLICT", "Invoice status could not be changed.", 409, id);
+  await audit(supabase, `invoice.${preliminary.data.status}`, id);
+  const invoice = await loadInvoice(supabase, scoped.access.workspaceId, invoiceId);
+  return invoice ? ok(invoice, 200, id) : fail("INTERNAL_ERROR", "Invoice could not be reloaded.", 500, id);
+}
+
+async function recordInvoicePayment(request: Request, supabase: SupabaseClient, id: string, invoiceId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const input = await parsed(request, paymentCreateSchema, id); if (input.response) return input.response;
+  const paid = await supabase.rpc("record_invoice_payment", { p_invoice_id: invoiceId, p_payment: input.data });
+  if (paid.error) return fail("VALIDATION_ERROR", "Payment could not be recorded. Check the invoice type and outstanding balance.", 400, id);
+  await audit(supabase, "invoice.payment.recorded", id);
+  const invoice = await loadInvoice(supabase, scoped.access.workspaceId, invoiceId);
+  return invoice ? ok(invoice, 201, id) : fail("INTERNAL_ERROR", "Payment was recorded but the invoice could not be reloaded.", 500, id);
+}
+
+async function archiveInvoice(supabase: SupabaseClient, id: string, invoiceId: string) {
+  const scoped = await workspaceAccess(supabase, id, true, true); if ("response" in scoped) return scoped.response;
+  const result = await supabase.rpc("archive_invoice", { p_invoice_id: invoiceId });
+  if (result.error) return fail("CONFLICT", "Invoice could not be archived. Invoices with payments must be voided instead.", 409, id);
+  await audit(supabase, "invoice.archived", id);
+  return ok({ archived: true }, 200, id);
+}
+
+function basicInvoicePdf(invoice: Awaited<ReturnType<typeof loadInvoice>> & Record<string, unknown>) {
+  const address = invoice.billingAddress as { line1?: string; line2?: string; city?: string; state?: string; pincode?: string } | null;
+  const bank = invoice.bankDetails as { bankName?: string; accountHolder?: string; accountNumber?: string; ifscCode?: string } | null;
+  const itemLines = ((invoice.items as Array<{ description: string; quantity: number; rate: number; amount: number }>) ?? []).slice(0, 16)
+    .map((item) => `${item.description} | ${item.quantity} x ${item.rate.toFixed(2)} | ${item.amount.toFixed(2)}`);
+  const lines = [
+    `${invoice.invoiceNumber} - ${String(invoice.type).replace("_", " ").toUpperCase()}`,
+    `Billed to: ${invoice.clientName}`,
+    `Address: ${[address?.line1,address?.line2,address?.city,address?.state,address?.pincode].filter(Boolean).join(", ")}`,
+    `Project: ${invoice.projectName}`, `Issue date: ${invoice.issueDate}`, `Due date: ${invoice.dueDate}`, `Milestone: ${invoice.milestone}`, "",
+    "Description | Qty x Rate | Amount", ...itemLines, "", `Subtotal: ${invoice.currency} ${Number(invoice.subtotal).toFixed(2)}`,
+    `Tax (${invoice.taxRate}%): ${invoice.currency} ${Number(invoice.taxAmount).toFixed(2)}`, `Total: ${invoice.currency} ${Number(invoice.totalAmount).toFixed(2)}`,
+    `Paid: ${invoice.currency} ${Number(invoice.totalPaid).toFixed(2)}`, `Outstanding: ${invoice.currency} ${Number(invoice.outstanding).toFixed(2)}`,
+    ...(bank ? ["", `Bank: ${bank.bankName ?? ""}`, `Account holder: ${bank.accountHolder ?? ""}`, `Account: ${bank.accountNumber ?? ""}`, `IFSC: ${bank.ifscCode ?? ""}`] : []),
+  ];
+  const commands = lines.map((line, index) => `BT /F1 ${index === 0 ? 17 : 10} Tf 40 ${770 - index * 22} Td (${pdfEscape(line).slice(0, 115)}) Tj ET`).join("\n");
+  const objects = ["<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>", `<< /Length ${Buffer.byteLength(commands, "ascii")} >>\nstream\n${commands}\nendstream`];
+  let output = "%PDF-1.4\n"; const offsets = [0];
+  objects.forEach((object, index) => { offsets.push(Buffer.byteLength(output, "ascii")); output += `${index + 1} 0 obj\n${object}\nendobj\n`; });
+  const xref = Buffer.byteLength(output, "ascii");
+  output += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.slice(1).map((offset) => `${String(offset).padStart(10, "0")} 00000 n `).join("\n")}\ntrailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return new Uint8Array(Buffer.from(output, "ascii"));
+}
+
+async function invoicePdf(supabase: SupabaseClient, id: string, invoiceId: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const invoice = await loadInvoice(supabase, scoped.access.workspaceId, invoiceId);
+  if (!invoice) return fail("NOT_FOUND", "Invoice was not found.", 404, id);
+  return new Response(basicInvoicePdf(invoice as typeof invoice & Record<string, unknown>), { status: 200, headers: {
+    "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename=\"${pdfEscape(invoice.invoiceNumber)}.pdf\"`,
+    "Cache-Control": "private, no-store", "X-Request-Id": id,
+  } });
+}
+
 async function dispatch(request: NextRequest, path: string[]) {
   const id = requestId(request);
   const route = path.join("/");
@@ -732,7 +931,7 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (request.method === "PATCH" && route === "users/me/password") return changePassword(request, supabase, id);
   if ((request.method === "GET" || request.method === "PATCH") && route === "users/me/preferences") return preferences(request, supabase, id);
   if ((request.method === "GET" || request.method === "PATCH") && route === "onboarding/me") return onboarding(request, supabase, id);
-  if (request.method === "GET" && route === "dashboard/overview") return dashboardOverview(supabase, id);
+  if (request.method === "GET" && route === "dashboard/overview") return dashboardOverview(request, supabase, id);
   if (request.method === "POST" && route === "projects") return createProject(request, supabase, id);
   if (request.method === "POST" && route === "boq-imports") return createBoqImport(request, supabase, id);
   const list = route.match(/^dashboard\/(recent-projects|recent-boqs|pending-actions|upcoming-deliverables|notifications)$/)?.[1];
@@ -762,6 +961,19 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (documentMatch && request.method === "DELETE") return deleteDocument(supabase, id, documentMatch[1]);
   const downloadMatch = route.match(/^documents\/([0-9a-f-]{36})\/download$/i);
   if (downloadMatch && request.method === "GET") return downloadDocument(supabase, id, downloadMatch[1]);
+  if (request.method === "GET" && route === "invoices") return listInvoices(request, supabase, id);
+  if (request.method === "GET" && route === "invoices/summary") return invoiceSummary(supabase, id);
+  if (request.method === "POST" && route === "invoices") return createInvoice(request, supabase, id);
+  const invoiceMatch = route.match(/^invoices\/([0-9a-f-]{36})$/i);
+  if (invoiceMatch && request.method === "GET") return getInvoice(supabase, id, invoiceMatch[1]);
+  if (invoiceMatch && request.method === "PATCH") return updateInvoice(request, supabase, id, invoiceMatch[1]);
+  if (invoiceMatch && request.method === "DELETE") return archiveInvoice(supabase, id, invoiceMatch[1]);
+  const invoiceStatusMatch = route.match(/^invoices\/([0-9a-f-]{36})\/status$/i);
+  if (invoiceStatusMatch && request.method === "POST") return changeInvoiceStatus(request, supabase, id, invoiceStatusMatch[1]);
+  const invoicePaymentMatch = route.match(/^invoices\/([0-9a-f-]{36})\/payments$/i);
+  if (invoicePaymentMatch && request.method === "POST") return recordInvoicePayment(request, supabase, id, invoicePaymentMatch[1]);
+  const invoicePdfMatch = route.match(/^invoices\/([0-9a-f-]{36})\/pdf$/i);
+  if (invoicePdfMatch && request.method === "GET") return invoicePdf(supabase, id, invoicePdfMatch[1]);
   return methodNotAllowed(id);
 }
 

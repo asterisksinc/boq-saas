@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: BOQ Design Arena API
-  version: 1.1.0
+  version: 1.2.0
 servers:
   - url: /api/v1
 security:
@@ -99,14 +99,16 @@ paths:
       responses: { '200': { description: Updated }, '403': { $ref: '#/components/responses/Error' } }
   /dashboard/overview:
     get:
-      summary: Permission-aware workspace dashboard overview
+      summary: Permission-aware workspace dashboard overview with temporary demo Project/BOQ widgets
+      parameters:
+        - { in: query, name: period, schema: { type: string, enum: [week, month, quarter], default: month } }
       responses:
-        '200': { description: Overview, including safe empty states for deferred domains, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+        '200': { description: Overview; temporary sections are identified by dataSource=hardcoded_demo and demoData=true, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
         '401': { $ref: '#/components/responses/Error' }
-  /dashboard/recent-projects: { get: { summary: Paginated recent projects (typed empty until Phase 4), responses: { '200': { $ref: '#/components/responses/Page' } } } }
-  /dashboard/recent-boqs: { get: { summary: Paginated recent BOQs (typed empty until Phase 5), responses: { '200': { $ref: '#/components/responses/Page' } } } }
-  /dashboard/pending-actions: { get: { summary: Paginated pending actions (typed empty until workflow phase), responses: { '200': { $ref: '#/components/responses/Page' } } } }
-  /dashboard/upcoming-deliverables: { get: { summary: Paginated deliverables (typed empty until project phase), responses: { '200': { $ref: '#/components/responses/Page' } } } }
+  /dashboard/recent-projects: { get: { summary: Paginated temporary demo recent projects, responses: { '200': { $ref: '#/components/responses/Page' } } } }
+  /dashboard/recent-boqs: { get: { summary: Paginated temporary demo recent BOQs, responses: { '200': { $ref: '#/components/responses/Page' } } } }
+  /dashboard/pending-actions: { get: { summary: Paginated temporary demo pending actions, responses: { '200': { $ref: '#/components/responses/Page' } } } }
+  /dashboard/upcoming-deliverables: { get: { summary: Paginated temporary demo deliverables, responses: { '200': { $ref: '#/components/responses/Page' } } } }
   /dashboard/notifications: { get: { summary: Paginated user notifications, responses: { '200': { $ref: '#/components/responses/Page' } } } }
   /proposals:
     get:
@@ -222,6 +224,59 @@ paths:
     get:
       summary: Create a private 60-second download URL
       responses: { '200': { description: Signed download URL }, '404': { $ref: '#/components/responses/Error' } }
+  /invoices:
+    get:
+      summary: List workspace invoices, pro-formas, and quotes
+      parameters:
+        - { in: query, name: page, schema: { type: integer, minimum: 1 } }
+        - { in: query, name: pageSize, schema: { type: integer, minimum: 1, maximum: 100 } }
+        - { in: query, name: type, schema: { type: string, enum: [invoice, pro_forma, quote] } }
+        - { in: query, name: status, schema: { type: string, enum: [draft, pending, sent, accepted, partial, paid, overdue, void] } }
+        - { in: query, name: search, schema: { type: string, maxLength: 120 } }
+      responses: { '200': { $ref: '#/components/responses/Page' } }
+    post:
+      summary: Create an invoice with server-calculated totals
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/InvoiceCreate' } } } }
+      responses: { '201': { description: Invoice created }, '400': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } }
+  /invoices/summary:
+    get:
+      summary: Total invoiced, collected, outstanding, and overdue invoice values
+      responses: { '200': { description: Invoice summary } }
+  /invoices/{invoiceId}:
+    parameters:
+      - { $ref: '#/components/parameters/InvoiceId' }
+    get:
+      summary: Get invoice preview with line items and payments
+      responses: { '200': { description: Invoice details }, '404': { $ref: '#/components/responses/Error' } }
+    patch:
+      summary: Update an unpaid, non-void invoice and atomically recalculate totals
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/InvoicePatch' } } } }
+      responses: { '200': { description: Updated }, '400': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } }
+    delete:
+      summary: Archive an unpaid invoice (owner/admin)
+      responses: { '200': { description: Archived }, '403': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } }
+  /invoices/{invoiceId}/status:
+    parameters:
+      - { $ref: '#/components/parameters/InvoiceId' }
+    post:
+      summary: Save draft, mark pending/sent/accepted, or void (void is owner/admin)
+      requestBody: { required: true, content: { application/json: { schema: { type: object, additionalProperties: false, required: [status], properties: { status: { type: string, enum: [draft, pending, sent, accepted, void] } } } } } }
+      responses: { '200': { description: Status changed }, '409': { $ref: '#/components/responses/Error' } }
+  /invoices/{invoiceId}/payments:
+    parameters:
+      - { $ref: '#/components/parameters/InvoiceId' }
+    post:
+      summary: Record a non-overpaying payment and update partial/paid status atomically
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PaymentCreate' } } } }
+      responses: { '201': { description: Payment recorded }, '400': { $ref: '#/components/responses/Error' } }
+  /invoices/{invoiceId}/pdf:
+    parameters:
+      - { $ref: '#/components/parameters/InvoiceId' }
+    get:
+      summary: Download a generated invoice PDF
+      responses:
+        '200': { description: Invoice PDF, content: { application/pdf: { schema: { type: string, format: binary } } } }
+        '404': { $ref: '#/components/responses/Error' }
 components:
   securitySchemes:
     supabaseCookie: { type: apiKey, in: cookie, name: sb-access-token }
@@ -313,10 +368,92 @@ components:
         folderId: { type: string, format: uuid }
         projectId: { type: [string, 'null'], format: uuid }
         projectName: { type: [string, 'null'], maxLength: 200 }
+    InvoiceItem:
+      type: object
+      additionalProperties: false
+      required: [description, quantity, rate]
+      properties:
+        description: { type: string, maxLength: 500 }
+        quantity: { type: number, exclusiveMinimum: 0 }
+        rate: { type: number, minimum: 0 }
+    BillingAddress:
+      type: object
+      additionalProperties: false
+      required: [line1, city, state, pincode]
+      properties:
+        line1: { type: string, maxLength: 240 }
+        line2: { type: [string, 'null'], maxLength: 240 }
+        city: { type: string, maxLength: 120 }
+        state: { type: string, maxLength: 120 }
+        pincode: { type: string, maxLength: 20 }
+    BankDetails:
+      type: object
+      additionalProperties: false
+      required: [bankName, accountHolder, accountNumber, ifscCode]
+      properties:
+        bankName: { type: string, maxLength: 160 }
+        accountHolder: { type: string, maxLength: 160 }
+        accountNumber: { type: string, maxLength: 40 }
+        ifscCode: { type: string, maxLength: 20 }
+        branch: { type: [string, 'null'], maxLength: 160 }
+        branchAddress: { type: [string, 'null'], maxLength: 300 }
+    InvoiceCreate:
+      type: object
+      additionalProperties: false
+      required: [type, clientName, billingAddress, projectName, issueDate, dueDate, milestone, items]
+      properties:
+        type: { type: string, enum: [invoice, pro_forma, quote] }
+        invoiceNumber: { type: string, maxLength: 80, description: Optional workspace-unique manual number; otherwise a system code is generated }
+        clientId: { type: [string, 'null'], format: uuid }
+        clientName: { type: string, maxLength: 200 }
+        billingAddress: { $ref: '#/components/schemas/BillingAddress' }
+        projectId: { type: [string, 'null'], format: uuid }
+        projectName: { type: string, maxLength: 200 }
+        issueDate: { type: string, format: date }
+        dueDate: { type: string, format: date }
+        milestone: { type: string, maxLength: 200 }
+        reference: { type: [string, 'null'], maxLength: 200 }
+        taxRate: { type: number, minimum: 0, maximum: 100, default: 18 }
+        additionalNotes: { type: [string, 'null'], maxLength: 5000 }
+        bankDetails: { oneOf: [{ $ref: '#/components/schemas/BankDetails' }, { type: 'null' }] }
+        status: { type: string, enum: [draft, pending], default: draft }
+        items: { type: array, minItems: 1, maxItems: 200, items: { $ref: '#/components/schemas/InvoiceItem' } }
+    InvoicePatch:
+      type: object
+      description: Any allowlisted subset of InvoiceCreate; totals and currency cannot be supplied.
+      additionalProperties: false
+      properties:
+        type: { type: string, enum: [invoice, pro_forma, quote] }
+        invoiceNumber: { type: string, maxLength: 80 }
+        clientId: { type: [string, 'null'], format: uuid }
+        clientName: { type: string, maxLength: 200 }
+        billingAddress: { $ref: '#/components/schemas/BillingAddress' }
+        projectId: { type: [string, 'null'], format: uuid }
+        projectName: { type: string, maxLength: 200 }
+        issueDate: { type: string, format: date }
+        dueDate: { type: string, format: date }
+        milestone: { type: string, maxLength: 200 }
+        reference: { type: [string, 'null'], maxLength: 200 }
+        taxRate: { type: number, minimum: 0, maximum: 100 }
+        additionalNotes: { type: [string, 'null'], maxLength: 5000 }
+        bankDetails: { oneOf: [{ $ref: '#/components/schemas/BankDetails' }, { type: 'null' }] }
+        status: { type: string, enum: [draft, pending] }
+        items: { type: array, minItems: 1, maxItems: 200, items: { $ref: '#/components/schemas/InvoiceItem' } }
+    PaymentCreate:
+      type: object
+      additionalProperties: false
+      required: [amount, method]
+      properties:
+        amount: { type: number, exclusiveMinimum: 0 }
+        paidAt: { type: string, format: date-time }
+        method: { type: string, enum: [cash, bank_transfer, card, upi, cheque, other] }
+        reference: { type: [string, 'null'], maxLength: 200 }
+        notes: { type: [string, 'null'], maxLength: 1000 }
   parameters:
     ProposalId: { in: path, name: proposalId, required: true, schema: { type: string, format: uuid } }
     FolderId: { in: path, name: folderId, required: true, schema: { type: string, format: uuid } }
     DocumentId: { in: path, name: documentId, required: true, schema: { type: string, format: uuid } }
+    InvoiceId: { in: path, name: invoiceId, required: true, schema: { type: string, format: uuid } }
   responses:
     Error: { description: Error envelope, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     Page: { description: Paginated response, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
