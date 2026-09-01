@@ -931,7 +931,7 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (request.method === "PATCH" && route === "users/me/password") return changePassword(request, supabase, id);
   if ((request.method === "GET" || request.method === "PATCH") && route === "users/me/preferences") return preferences(request, supabase, id);
   if ((request.method === "GET" || request.method === "PATCH") && route === "onboarding/me") return onboarding(request, supabase, id);
-  if (request.method === "GET" && route === "dashboard/overview") return dashboardOverview(supabase, id);
+  if (request.method === "GET" && route === "dashboard/overview") return dashboardOverview(request, supabase, id);
   if (request.method === "POST" && route === "projects") return createProject(request, supabase, id);
   if (request.method === "POST" && route === "boq-imports") return createBoqImport(request, supabase, id);
   const list = route.match(/^dashboard\/(recent-projects|recent-boqs|pending-actions|upcoming-deliverables|notifications)$/)?.[1];
