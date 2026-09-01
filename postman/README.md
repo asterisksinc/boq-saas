@@ -2,55 +2,50 @@
 
 ## Import
 
-1. Configure `SUPABASE_SECRET_KEY`, `AUTH_OTP_SECRET`, `GMAIL_SMTP_USER`, and `GMAIL_SMTP_APP_PASSWORD` in `.env.local`, apply `20260830213500_custom_email_login_otps.sql`, then start the app with `npm run dev`.
-2. In Postman, select **Import** and import both files:
-   - `BOQ-Design-Arena-Phase-1.postman_collection.json`
-   - `BOQ-Design-Arena-Local.postman_environment.json`
-   - For authentication testing only, import `BOQ-Design-Arena-Auth-Only.postman_collection.json` instead of the full collection.
-3. Select **BOQ Design Arena — Local** from the environment selector.
-4. Replace `email`, `password`, `displayName`, and `companyName`. Leave `otp` blank until Gmail delivers the six-digit code.
-5. Confirm Postman's cookie jar is enabled. Do not create a Bearer token variable: this API uses Supabase SSR cookies.
+Import only these two files:
 
-## Recommended run order
+1. `BOQ-Design-Arena-Complete.postman_collection.json`
+2. `BOQ-Design-Arena-Local.postman_environment.json`
 
-1. For a new account, run **Register**, copy the Gmail code into `otp`, then run **Verify Registration OTP**.
-2. Run **Request Login OTP**, replace `otp` with the new Gmail code, and run **Verify Login OTP**. Existing accounts can start here.
-3. Postman stores the login response's Supabase cookies for `localhost`.
-4. Run **Auth Me** and **Get Current User**.
+Select the Local environment and keep Postman's cookie jar enabled. The API
+uses Supabase SSR cookies; do not create or store a bearer-token variable.
 
-## Proposals and Documents
+Before running the collection, configure the application `.env.local`, apply
+all Supabase migrations in timestamp order, and start the app with
+`npm run dev`.
 
-Import `BOQ-Design-Arena-Proposals-Documents.postman_collection.json` after the
-Local environment. Authenticate with either existing collection first and keep
-Postman's cookie jar enabled. Run **Create Folder** before document requests,
-select a local allowlisted file in **Upload Document**, and run destructive
-requests last. The collection stores created proposal/folder/document UUIDs as
-collection variables automatically.
+## Run order
 
-## Invoices
+Run the collection folders in numeric order:
 
-Import `BOQ-Design-Arena-Invoices.postman_collection.json`, authenticate first,
-and keep the cookie jar enabled. The collection creates a draft, verifies the
-server-calculated GST total, previews/downloads it, records sent state and a
-partial payment, then checks mass-assignment, overpayment, and paid-history
-archive protections. Project/client UUIDs are soft-reference fixtures until
-those domain APIs are installed.
-5. Run **Save Company Setup**, then **Get Onboarding**.
-6. Run **Overview** and the five dashboard list requests.
-7. Run **Logout**.
+1. Authentication
+2. Current User
+3. Onboarding
+4. Dashboard
+5. Negative Security Checks
+6. Proposals
+7. Document Folders
+8. Documents
+9. Proposal & Document Negative Checks
+10. Invoices
 
-For password recovery, run **Forgot Password**, open the email, copy the redirect's `code` into `resetCode`, and run **Reset Password**.
+For OTP requests, copy the six-digit Gmail code into the environment `otp`
+value before running the corresponding verification request. For document
+upload, choose a local allowlisted file in the Postman file field. Run delete
+and archive requests last.
 
-## Cookies and common failures
+The collection automatically stores created proposal, folder, document, and
+invoice IDs as collection variables.
 
-- `401 UNAUTHENTICATED`: run Login again and check Postman → Cookies → `localhost` for an `sb-...-auth-token` cookie.
-- `500 Backend is not configured`: fill all Supabase/Gmail/OTP server variables, apply the OTP migration, and restart Next.js.
-- `500 OTP_SEND_FAILED`: confirm the Gmail address matches the account that issued the App Password and inspect the server log reason.
-- `401 Invalid or expired OTP`: request a new code; codes expire after 10 minutes and are removed after five failed attempts.
-- `400 Reset link is invalid`: recovery codes are one-time and expire. Run Forgot Password again.
-- `429 RATE_LIMITED`: respect the 60-second resend cooldown or API abuse limit; do not retry in a loop.
-- A protected request immediately after Logout should return `401`; Postman may retain stale cookies in its cookie manager, so delete the `localhost` cookies if necessary.
+## Common failures
 
-## Production environment
+- `401 UNAUTHENTICATED`: sign in again and check Postman's `localhost` cookie jar.
+- `500 Backend is not configured`: configure Supabase/Gmail/OTP variables and restart Next.js.
+- `500 OTP_SEND_FAILED`: verify the Gmail App Password and server logs.
+- `401 Invalid or expired OTP`: request a new code; codes expire after 10 minutes.
+- `400 Reset link is invalid`: request another one-time recovery link.
+- `429 RATE_LIMITED`: wait for the cooldown instead of retrying in a loop.
 
-Duplicate the local Postman environment and change only `baseUrl` to the deployed application origin, for example `https://app.example.com`. Never put a Supabase service-role key in Postman or frontend variables.
+For production, duplicate the Local environment and change only `baseUrl` to
+the deployed HTTPS application origin. Never place the Supabase service-role
+key in Postman.
