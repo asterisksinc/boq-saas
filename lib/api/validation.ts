@@ -185,6 +185,70 @@ export const projectRoomPatchSchema = projectRoomCreateSchema.partial().strict()
   "At least one field is required.",
 );
 
+const money = z.coerce.number().finite().min(0).max(999_999_999_999_999);
+const percent = z.coerce.number().finite().min(0).max(100);
+
+export const boqCreateSchema = z.object({
+  boqNumber: z.string().trim().min(1).max(80),
+  projectId: z.string().uuid(),
+  version: z.string().trim().min(1).max(40).default("v1"),
+  assignedTo: z.string().uuid().nullable().optional(),
+  method: z.enum(["blank", "template"]).default("blank"),
+  templateId: z.string().uuid().nullable().optional(),
+  markupPercent: percent.default(0),
+  taxPercent: percent.default(18),
+}).strict().superRefine((value, ctx) => {
+  if (value.method === "template" && !value.templateId) ctx.addIssue({ code: "custom", path: ["templateId"], message: "templateId is required when method is template." });
+});
+
+export const boqPatchSchema = z.object({
+  version: z.string().trim().min(1).max(40).optional(),
+  assignedTo: z.string().uuid().nullable().optional(),
+  markupPercent: percent.optional(), taxPercent: percent.optional(),
+}).strict().refine((value) => Object.keys(value).length > 0, "At least one field is required.");
+
+export const boqStatusSchema = z.object({ status: z.enum(["draft", "in_review", "approved", "archived"]) }).strict();
+export const boqRoomSchema = z.object({ name: z.string().trim().min(1).max(120), description: z.string().trim().max(1000).nullable().optional() }).strict();
+export const boqCategorySchema = z.object({ name: z.string().trim().min(1).max(120), description: z.string().trim().max(1000).nullable().optional() }).strict();
+export const boqItemSchema = z.object({
+  name: z.string().trim().min(1).max(200), description: z.string().trim().max(2000).nullable().optional(),
+  unit: z.string().trim().min(1).max(40), quantity: z.coerce.number().finite().positive().max(999_999_999),
+  rate: money, wastePercent: percent.default(0), taxPercent: percent.default(18), sortOrder: z.number().int().min(0).optional(),
+}).strict();
+export const boqTemplateSchema = z.object({
+  name: z.string().trim().min(1).max(160), boqId: z.string().uuid(),
+  description: z.string().trim().max(2000).nullable().optional(), tags: z.array(z.string().trim().min(1).max(40)).max(20).default([]),
+}).strict();
+
+export const costingCategorySchema = z.object({
+  name: z.string().trim().min(1).max(120), code: z.string().trim().min(1).max(40).regex(/^[A-Za-z0-9-]+$/),
+  parentId: z.string().uuid().nullable().optional(), defaultUnit: z.string().trim().min(1).max(40),
+  defaultTaxPercent: percent.default(18), defaultMarkupPercent: percent.default(0), defaultWastePercent: percent.default(0),
+  transportIncluded: z.boolean().default(false), labourIncluded: z.boolean().default(false), description: z.string().trim().max(2000).nullable().optional(),
+}).strict();
+export const costingCategoryPatchSchema = costingCategorySchema.partial().strict().refine((value) => Object.keys(value).length > 0, "At least one field is required.");
+
+export const costingItemSchema = z.object({
+  name: z.string().trim().min(1).max(200), code: z.string().trim().min(1).max(60).regex(/^[A-Za-z0-9-]+$/),
+  categoryId: z.string().uuid(), unit: z.string().trim().min(1).max(40), baseCost: money, sellingRate: money,
+  preferredVendor: z.string().trim().max(160).nullable().optional(), spec: z.string().trim().max(1000).nullable().optional(),
+  rateStatus: z.enum(["draft", "active", "expired"]).default("draft"), imageUrl: z.string().url().max(2048).nullable().optional(),
+}).strict();
+export const costingItemPatchSchema = costingItemSchema.partial().strict().refine((value) => Object.keys(value).length > 0, "At least one field is required.");
+
+export const vendorQuoteSchema = z.object({
+  itemId: z.string().uuid(), vendorName: z.string().trim().min(1).max(160), quote: money,
+  leadTimeDays: z.number().int().min(0).max(3650), rating: z.coerce.number().min(0).max(5).nullable().optional(),
+}).strict();
+export const vendorSelectionSchema = z.object({ selected: z.boolean().default(true) }).strict();
+
+export const costingScenarioSchema = z.object({
+  name: z.string().trim().min(1).max(160), boqId: z.string().uuid(), description: z.string().trim().max(2000).nullable().optional(),
+  type: z.enum(["full_cost", "value_engineering", "vendor_switch", "custom"]).default("full_cost"),
+  adjustments: z.array(z.object({ itemId: z.string().uuid(), quantity: z.coerce.number().positive().optional(), rate: money.optional(), markupPercent: percent.optional() }).strict()).max(500).default([]),
+}).strict();
+export const costingScenarioPatchSchema = costingScenarioSchema.partial().strict().refine((value) => Object.keys(value).length > 0, "At least one field is required.");
+
 export const boqImportSchema = z
   .object({
     fileName: z.string().trim().min(1).max(255),

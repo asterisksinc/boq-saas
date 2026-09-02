@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: BOQ Design Arena API
-  version: 1.3.0
+  version: 2.0.0
 servers:
   - url: /api/v1
 security:
@@ -12,7 +12,7 @@ paths:
       security: []
       summary: Register an account and default workspace
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Register' } } } }
-      responses: { '201': { description: Registered; when email confirmation is required, a 6-digit signup OTP is sent }, '409': { $ref: '#/components/responses/Error' }, '429': { $ref: '#/components/responses/Error' } }
+      responses: { '201': { description: "Registered; when email confirmation is required, a 6-digit signup OTP is sent" }, '409': { $ref: '#/components/responses/Error' }, '429': { $ref: '#/components/responses/Error' } }
   /auth/login:
     post:
       security: []
@@ -174,12 +174,104 @@ paths:
     post:
       summary: Parse a BOQ CSV/XLS/XLSX on the backend without writing it
       requestBody: { required: true, content: { multipart/form-data: { schema: { $ref: '#/components/schemas/BoqImportUpload' } } } }
-      responses: { '200': { description: Columns, row count, and up to 100 preview rows }, '400': { $ref: '#/components/responses/Error' }, '413': { $ref: '#/components/responses/Error' } }
+      responses: { '200': { description: "Columns, row count, and up to 100 preview rows" }, '400': { $ref: '#/components/responses/Error' }, '413': { $ref: '#/components/responses/Error' } }
   /boq-imports/upload:
     post:
       summary: Parse and persist a BOQ CSV/XLS/XLSX on the backend
       requestBody: { required: true, content: { multipart/form-data: { schema: { $ref: '#/components/schemas/BoqImportUpload' } } } }
       responses: { '201': { description: BOQ import saved }, '400': { $ref: '#/components/responses/Error' }, '413': { $ref: '#/components/responses/Error' } }
+  /boqs:
+    get:
+      summary: List workspace BOQs with calculated room/item counts and totals
+      parameters:
+        - { in: query, name: page, schema: { type: integer, minimum: 1 } }
+        - { in: query, name: pageSize, schema: { type: integer, minimum: 1, maximum: 100 } }
+        - { in: query, name: search, schema: { type: string } }
+        - { in: query, name: projectId, schema: { type: string, format: uuid } }
+        - { in: query, name: status, schema: { type: string, enum: [draft, in_review, approved] } }
+      responses: { '200': { $ref: '#/components/responses/Page' } }
+    post:
+      summary: Create a blank BOQ or instantiate one from a template
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [boqNumber, projectId], properties: { boqNumber: { type: string }, projectId: { type: string, format: uuid }, version: { type: string }, assignedTo: { type: [string, 'null'], format: uuid }, method: { type: string, enum: [blank, template] }, templateId: { type: [string, 'null'], format: uuid }, markupPercent: { type: number }, taxPercent: { type: number } } } } } }
+      responses: { '201': { description: BOQ created }, '409': { $ref: '#/components/responses/Error' } }
+  /boqs/{boqId}:
+    parameters: [{ in: path, name: boqId, required: true, schema: { type: string, format: uuid } }]
+    get: { summary: Get the complete BOQ room/category/item tree and server totals, responses: { '200': { description: BOQ detail }, '404': { $ref: '#/components/responses/Error' } } }
+    patch: { summary: Update BOQ version assignment markup or tax, responses: { '200': { description: Updated } } }
+  /boqs/{boqId}/status:
+    parameters: [{ in: path, name: boqId, required: true, schema: { type: string, format: uuid } }]
+    post: { summary: Change BOQ lifecycle status; approve/archive requires owner or admin, responses: { '200': { description: Status changed } } }
+  /boqs/{boqId}/duplicate:
+    parameters: [{ in: path, name: boqId, required: true, schema: { type: string, format: uuid } }]
+    post: { summary: Deep-copy a BOQ and its complete hierarchy, responses: { '201': { description: Duplicated } } }
+  /boqs/{boqId}/rooms:
+    parameters: [{ in: path, name: boqId, required: true, schema: { type: string, format: uuid } }]
+    post: { summary: Add a BOQ room, responses: { '201': { description: Room created } } }
+  /boqs/{boqId}/rooms/{roomId}:
+    parameters: [{ in: path, name: boqId, required: true, schema: { type: string, format: uuid } }, { in: path, name: roomId, required: true, schema: { type: string, format: uuid } }]
+    patch: { summary: Update a BOQ room, responses: { '200': { description: Updated } } }
+    delete: { summary: Delete a BOQ room and descendants (owner/admin), responses: { '200': { description: Deleted } } }
+  /boqs/{boqId}/rooms/{roomId}/categories:
+    parameters: [{ in: path, name: boqId, required: true, schema: { type: string, format: uuid } }, { in: path, name: roomId, required: true, schema: { type: string, format: uuid } }]
+    post: { summary: Add a category to a BOQ room, responses: { '201': { description: Category created } } }
+  /boqs/{boqId}/categories/{categoryId}:
+    parameters: [{ in: path, name: boqId, required: true, schema: { type: string, format: uuid } }, { in: path, name: categoryId, required: true, schema: { type: string, format: uuid } }]
+    patch: { summary: Update a BOQ category, responses: { '200': { description: Updated } } }
+    delete: { summary: Delete a BOQ category and items (owner/admin), responses: { '200': { description: Deleted } } }
+  /boqs/{boqId}/categories/{categoryId}/items:
+    parameters: [{ in: path, name: boqId, required: true, schema: { type: string, format: uuid } }, { in: path, name: categoryId, required: true, schema: { type: string, format: uuid } }]
+    post: { summary: Add an item; amount is generated server-side, responses: { '201': { description: Item created } } }
+  /boqs/{boqId}/items/{itemId}:
+    parameters: [{ in: path, name: boqId, required: true, schema: { type: string, format: uuid } }, { in: path, name: itemId, required: true, schema: { type: string, format: uuid } }]
+    patch: { summary: Update allowlisted BOQ item inputs, responses: { '200': { description: Updated } } }
+    delete: { summary: Delete a BOQ item (owner/admin), responses: { '200': { description: Deleted } } }
+  /boq-templates:
+    get: { summary: List reusable BOQ templates ordered by use count, responses: { '200': { $ref: '#/components/responses/Page' } } }
+    post: { summary: Save an existing BOQ hierarchy as a template, responses: { '201': { description: Template created } } }
+  /costing/categories:
+    get: { summary: Paginated costing category tree source with counts, responses: { '200': { $ref: '#/components/responses/Page' } } }
+    post: { summary: Create a costing category or sub-category, responses: { '201': { description: Created } } }
+  /costing/categories/{categoryId}:
+    parameters: [{ in: path, name: categoryId, required: true, schema: { type: string, format: uuid } }]
+    get: { summary: Category detail with defaults sub-categories and items, responses: { '200': { description: Detail } } }
+    patch: { summary: Update category defaults, responses: { '200': { description: Updated } } }
+    delete: { summary: Delete an unused category (owner/admin), responses: { '200': { description: Deleted } } }
+  /costing/items:
+    get: { summary: Paginated costing library items with calculated margins, responses: { '200': { $ref: '#/components/responses/Page' } } }
+    post: { summary: Add a costing library item, responses: { '201': { description: Created } } }
+  /costing/items/{itemId}:
+    parameters: [{ in: path, name: itemId, required: true, schema: { type: string, format: uuid } }]
+    get: { summary: Item detail and vendor quotes, responses: { '200': { description: Detail } } }
+    patch: { summary: Update a costing item, responses: { '200': { description: Updated } } }
+    delete: { summary: Archive a costing item (owner/admin), responses: { '200': { description: Archived } } }
+  /costing/vendor-quotes:
+    post: { summary: Add a vendor quote for an item, responses: { '201': { description: Created } } }
+  /costing/vendor-quotes/{quoteId}/selection:
+    parameters: [{ in: path, name: quoteId, required: true, schema: { type: string, format: uuid } }]
+    post: { summary: Atomically select or clear a preferred quote, responses: { '200': { description: Selection saved } } }
+  /costing/scenarios:
+    get: { summary: Paginated costing scenarios, responses: { '200': { $ref: '#/components/responses/Page' } } }
+    post: { summary: Create a BOQ costing scenario, responses: { '201': { description: Created } } }
+  /costing/scenarios/{scenarioId}:
+    parameters: [{ in: path, name: scenarioId, required: true, schema: { type: string, format: uuid } }]
+    get: { summary: Scenario and derived savings, responses: { '200': { description: Detail } } }
+    patch: { summary: Update a scenario, responses: { '200': { description: Updated } } }
+  /costing/scenarios/{scenarioId}/duplicate:
+    parameters: [{ in: path, name: scenarioId, required: true, schema: { type: string, format: uuid } }]
+    post: { summary: Duplicate a scenario, responses: { '201': { description: Duplicated } } }
+  /costing/analysis:
+    get: { summary: Real workspace budget actual committed forecast variance and vendor data, responses: { '200': { description: Cost analysis } } }
+  /costing/margins:
+    get: { summary: Current/target margins category breakdown and low-margin items, responses: { '200': { description: Margin analysis } } }
+  /costing/settings:
+    get: { summary: Costing configuration health and available settings sections, responses: { '200': { description: Settings overview } } }
+  /reports/analytics:
+    get:
+      summary: Administrator-only business analytics derived from workspace projects BOQs invoices and costs
+      parameters: [{ in: query, name: period, schema: { type: string, enum: [month, quarter, year], default: year } }]
+      responses: { '200': { description: Reports and analytics payload }, '403': { $ref: '#/components/responses/Error' } }
+  /reports/analytics/pdf:
+    get: { summary: Download the administrator analytics summary as PDF, responses: { '200': { description: Analytics PDF, content: { application/pdf: { schema: { type: string, format: binary } } } }, '403': { $ref: '#/components/responses/Error' } } }
   /proposals:
     get:
       summary: List active workspace proposals
@@ -447,13 +539,13 @@ components:
       type: object
       required: [file]
       properties:
-        file: { type: string, format: binary, description: CSV, XLS, or XLSX; maximum 10 MB and 5,000 data rows }
+        file: { type: string, format: binary, description: "CSV, XLS, or XLSX; maximum 10 MB and 5,000 data rows" }
         sheet: { type: string, description: Optional worksheet name; defaults to the first sheet }
     BoqImportUpload:
       type: object
       required: [file]
       properties:
-        file: { type: string, format: binary, description: CSV, XLS, or XLSX; maximum 10 MB and 10,000 data rows }
+        file: { type: string, format: binary, description: "CSV, XLS, or XLSX; maximum 10 MB and 10,000 data rows" }
         sheet: { type: string, description: Optional worksheet name; defaults to the first sheet }
         projectId: { type: string, format: uuid, description: Optional active project to link the imported BOQ to }
     ProposalStatus: { type: string, enum: [draft, sent, approved, revisions, won, lost] }

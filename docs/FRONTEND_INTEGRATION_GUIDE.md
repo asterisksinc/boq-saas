@@ -687,3 +687,140 @@ Do not retry login, registration, password, or mutation requests automatically. 
 - Invoices migration: `supabase/migrations/20260901150000_invoices.sql`
 - OpenAPI: `openapi.yaml`
 - Postman assets: `postman/`
+
+## 20. BOQ integration
+
+The BOQ APIs are separate from `boq-imports`. Imports preserve uploaded
+spreadsheet data; `/boqs` powers the editable screens shown in the product.
+
+```ts
+export const boqApi = {
+  list: (query = "") => api.get<Page<Boq>>(`/boqs${query}`),
+  detail: (id: string) => api.get<BoqDetail>(`/boqs/${id}`),
+  create: (input: CreateBoq) => api.post<Boq>("/boqs", input),
+  update: (id: string, input: UpdateBoq) => api.patch<Boq>(`/boqs/${id}`, input),
+  setStatus: (id: string, status: "draft" | "in_review" | "approved" | "archived") =>
+    api.post<Boq>(`/boqs/${id}/status`, { status }),
+  duplicate: (id: string) => api.post<Boq>(`/boqs/${id}/duplicate`),
+  templates: () => api.get<Page<BoqTemplate>>("/boq-templates"),
+};
+```
+
+Create a blank BOQ:
+
+```ts
+await boqApi.create({
+  boqNumber: values.boqNumber,
+  projectId: selectedProject.id,
+  version: values.version,
+  assignedTo: selectedUser?.id ?? null,
+  method: "blank",
+  markupPercent: 18,
+  taxPercent: 18,
+});
+```
+
+For the template flow, first load `GET /boq-templates`, then send
+`method: "template"` and the selected `templateId`. Save an existing BOQ as a
+template with `POST /boq-templates` and `{ name, boqId, description?, tags? }`.
+
+The detail response contains `rooms[].categories[].items[]` and the summary
+fields `subtotal`, `markupAmount`, `taxAmount`, and `grandTotal`. Treat all four
+as server-owned. Item inputs are `name`, `description`, `unit`, `quantity`,
+`rate`, `wastePercent`, and `taxPercent`; the database generates `amount`.
+
+Editor mutation paths:
+
+- `POST /boqs/{boqId}/rooms`
+- `PATCH|DELETE /boqs/{boqId}/rooms/{roomId}`
+- `POST /boqs/{boqId}/rooms/{roomId}/categories`
+- `PATCH|DELETE /boqs/{boqId}/categories/{categoryId}`
+- `POST /boqs/{boqId}/categories/{categoryId}/items`
+- `PATCH|DELETE /boqs/{boqId}/items/{itemId}`
+
+After every mutation, invalidate both the BOQ detail and BOQ list query. Room,
+category, and item deletion is owner/admin-only because it cascades. Sending
+for review is available to contributors; approval and archive are owner/admin.
+
+## 21. Costing integration
+
+```ts
+export const costingApi = {
+  categories: (query = "") => api.get<Page<CostingCategory>>(`/costing/categories${query}`),
+  category: (id: string) => api.get<CostingCategoryDetail>(`/costing/categories/${id}`),
+  items: (query = "") => api.get<Page<CostingItem>>(`/costing/items${query}`),
+  item: (id: string) => api.get<CostingItemDetail>(`/costing/items/${id}`),
+  scenarios: () => api.get<Page<CostingScenario>>("/costing/scenarios"),
+  analysis: () => api.get<CostAnalysis>("/costing/analysis"),
+  margins: () => api.get<MarginAnalysis>("/costing/margins"),
+  settings: () => api.get<CostingSettingsHealth>("/costing/settings"),
+};
+```
+
+Use `parentId` when creating a sub-category. Category defaults use camelCase:
+`defaultUnit`, `defaultTaxPercent`, `defaultMarkupPercent`,
+`defaultWastePercent`, `transportIncluded`, and `labourIncluded`. List/detail
+responses currently expose persisted database fields in snake_case; normalize
+them once in the feature adapter if the component model is camelCase.
+
+Costing item margins are calculated from `baseCost` and `sellingRate` on read.
+Do not submit a margin. Vendor comparison uses:
+
+```ts
+await api.post("/costing/vendor-quotes", {
+  itemId, vendorName, quote, leadTimeDays, rating,
+});
+await api.post(`/costing/vendor-quotes/${quoteId}/selection`, { selected: true });
+```
+
+Selecting a quote clears the previous selection for that item. Scenario
+adjustments may override an item quantity, rate, or markup. Load the scenario
+detail after saving to display backend-derived `baseCost`, `scenarioCost`, and
+`savings`. The analysis and margins endpoints are screen aggregates; fetch them
+in parallel and invalidate them after item, quote, or scenario mutations.
+
+## 22. Reports & Analytics integration
+
+Reports are owner/admin-only (`canViewReports` and `canExportReports`). Members
+and viewers receive `403 FORBIDDEN`; render an access-denied state rather than
+zero-valued cards.
+
+```ts
+const report = await api.get<ReportsAnalytics>(
+  `/reports/analytics?period=${period}`, // month | quarter | year
+);
+```
+
+The response contains `scope`, `kpis`, chart series, project/pipeline type
+groups, team performance, client analysis, and entity counts. Empty arrays mean
+there is not yet source data; they are not demo fixtures. Format all currency
+with `scope.currency`, and use `scope.generatedAt` for a “last updated” label.
+
+Download PDF as a blob because it is not a JSON envelope:
+
+```ts
+const response = await fetch(`/api/v1/reports/analytics/pdf?period=${period}`, {
+  credentials: "include",
+});
+if (!response.ok) throw new Error("Report download failed");
+const url = URL.createObjectURL(await response.blob());
+const anchor = Object.assign(document.createElement("a"), { href: url, download: "reports-analytics.pdf" });
+anchor.click();
+URL.revokeObjectURL(url);
+```
+
+Never calculate organization revenue or margin from whatever happens to be
+loaded in a paginated table. The report endpoint is the authoritative aggregate.
+
+## 23. New-module cache and permissions checklist
+
+- Add `canManageBoq`, `canManageCosting`, `canViewReports`, and
+  `canExportReports` to the frontend permission type.
+- Use query keys such as `["boqs", filters]`, `["boq", id]`,
+  `["costing-items", filters]`, `["costing-analysis"]`, and
+  `["reports", period]`.
+- Keep workspace IDs out of request bodies and query strings. The API derives
+  tenancy from the authenticated Supabase cookie.
+- Map `400 VALIDATION_ERROR` field errors to forms, `409 CONFLICT` to duplicate
+  BOQ/category/item messages, and `403 FORBIDDEN` to permission UI.
+- Apply `20260902090000_boq_costing_reports.sql` before exercising these routes.

@@ -43,6 +43,21 @@ import {
   invoicePatchSchema,
   invoiceStatusSchema,
   paymentCreateSchema,
+  boqCreateSchema,
+  boqPatchSchema,
+  boqStatusSchema,
+  boqRoomSchema,
+  boqCategorySchema,
+  boqItemSchema,
+  boqTemplateSchema,
+  costingCategorySchema,
+  costingCategoryPatchSchema,
+  costingItemSchema,
+  costingItemPatchSchema,
+  vendorQuoteSchema,
+  vendorSelectionSchema,
+  costingScenarioSchema,
+  costingScenarioPatchSchema,
 } from "@/lib/api/validation";
 import { z } from "zod";
 
@@ -1082,6 +1097,255 @@ async function deleteDocument(supabase: SupabaseClient, id: string, documentId: 
   return ok({ deleted: true }, 200, id);
 }
 
+// BOQ, Costing, and Reports & Analytics APIs. Calculated money fields are read
+// from database expressions or derived from workspace-scoped records here.
+const boqSelect = "id,project_id,boq_number,version,assigned_to,source_method,source_template_id,status,markup_percent,tax_percent,created_by,created_at,updated_at";
+const num = (value: unknown) => Number(value ?? 0);
+
+function boqDto(row: Record<string, unknown>, roomCount = 0, itemCount = 0, subtotal = 0) {
+  const markup = Math.round(subtotal * num(row.markup_percent)) / 100;
+  const tax = Math.round((subtotal + markup) * num(row.tax_percent)) / 100;
+  return { id: row.id, projectId: row.project_id, boqNumber: row.boq_number, version: row.version,
+    assignedTo: row.assigned_to, method: row.source_method, templateId: row.source_template_id, status: row.status,
+    markupPercent: num(row.markup_percent), taxPercent: num(row.tax_percent), roomCount, itemCount, subtotal,
+    markupAmount: markup, taxAmount: tax, grandTotal: subtotal + markup + tax,
+    createdBy: row.created_by, createdAt: row.created_at, updatedAt: row.updated_at };
+}
+
+async function boqStats(supabase: SupabaseClient, workspaceId: string, boqIds: string[]) {
+  if (!boqIds.length) return new Map<string, { rooms: number; items: number; subtotal: number }>();
+  const [rooms, items] = await Promise.all([
+    supabase.from("boq_rooms").select("id,boq_id").eq("workspace_id", workspaceId).in("boq_id", boqIds),
+    supabase.from("boq_items").select("boq_id,amount").eq("workspace_id", workspaceId).in("boq_id", boqIds),
+  ]);
+  const stats = new Map(boqIds.map((key) => [key, { rooms: 0, items: 0, subtotal: 0 }]));
+  for (const row of rooms.data ?? []) stats.get(row.boq_id)!.rooms += 1;
+  for (const row of items.data ?? []) { const value = stats.get(row.boq_id)!; value.items += 1; value.subtotal += num(row.amount); }
+  return stats;
+}
+
+async function listBoqs(request: NextRequest, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const { page, pageSize, from, to } = pagination(request.nextUrl.searchParams);
+  const status = request.nextUrl.searchParams.get("status"); const projectId = request.nextUrl.searchParams.get("projectId");
+  const search = request.nextUrl.searchParams.get("search")?.trim().replace(/[%_,()]/g, " ").slice(0, 120);
+  let query = supabase.from("boqs").select(boqSelect, { count: "exact" }).eq("workspace_id", scoped.access.workspaceId)
+    .is("archived_at", null).order("updated_at", { ascending: false }).range(from, to);
+  if (status && ["draft","in_review","approved"].includes(status)) query = query.eq("status", status);
+  if (projectId) query = query.eq("project_id", projectId);
+  if (search) query = query.or(`boq_number.ilike.%${search}%,version.ilike.%${search}%`);
+  const result = await query; if (result.error) return fail("INTERNAL_ERROR", "BOQs could not be loaded.", 500, id);
+  const rows = (result.data ?? []) as Record<string, unknown>[]; const stats = await boqStats(supabase, scoped.access.workspaceId, rows.map((r) => String(r.id)));
+  const total = result.count ?? 0;
+  return ok({ items: rows.map((row) => { const s = stats.get(String(row.id))!; return boqDto(row, s.rooms, s.items, s.subtotal); }), page, pageSize, total, hasMore: to + 1 < total }, 200, id);
+}
+
+async function createBoq(request: Request, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const input = await parsed(request, boqCreateSchema, id); if (input.response) return input.response;
+  const project = await supabase.from("projects").select("id").eq("workspace_id", scoped.access.workspaceId).eq("id", input.data.projectId).is("archived_at", null).maybeSingle();
+  if (!project.data) return fail("NOT_FOUND", "Project was not found.", 404, id);
+  const template = input.data.method === "template" && input.data.templateId
+    ? await supabase.from("boq_templates").select("snapshot,use_count").eq("workspace_id", scoped.access.workspaceId).eq("id", input.data.templateId).maybeSingle()
+    : null;
+  if (template && !template.data) return fail("NOT_FOUND", "BOQ template was not found.", 404, id);
+  const inserted = await supabase.from("boqs").insert({ workspace_id: scoped.access.workspaceId, project_id: input.data.projectId,
+    boq_number: input.data.boqNumber, version: input.data.version, assigned_to: input.data.assignedTo,
+    source_method: input.data.method, source_template_id: input.data.templateId, markup_percent: input.data.markupPercent,
+    tax_percent: input.data.taxPercent, created_by: scoped.access.userId, updated_by: scoped.access.userId }).select(boqSelect).single();
+  if (inserted.error) return fail(inserted.error.code === "23505" ? "CONFLICT" : "VALIDATION_ERROR", inserted.error.code === "23505" ? "This BOQ number and version already exist." : "BOQ could not be created.", inserted.error.code === "23505" ? 409 : 400, id);
+  if (input.data.method === "template" && input.data.templateId) {
+    if (template?.data && Array.isArray(template.data.snapshot)) {
+      for (const sourceRoom of template.data.snapshot as Array<Record<string, unknown>>) {
+        const room = await supabase.from("boq_rooms").insert({ workspace_id: scoped.access.workspaceId, boq_id: inserted.data.id, name: sourceRoom.name, description: sourceRoom.description }).select("id").single();
+        if (!room.data) continue;
+        for (const sourceCategory of (sourceRoom.categories as Array<Record<string, unknown>> | undefined) ?? []) {
+          const category = await supabase.from("boq_categories").insert({ workspace_id: scoped.access.workspaceId, boq_id: inserted.data.id, room_id: room.data.id, name: sourceCategory.name, description: sourceCategory.description }).select("id").single();
+          if (!category.data) continue;
+          const items = ((sourceCategory.items as Array<Record<string, unknown>> | undefined) ?? []).map((item) => ({ ...item, id: undefined, amount: undefined, workspace_id: scoped.access.workspaceId, boq_id: inserted.data.id, room_id: room.data.id, category_id: category.data.id }));
+          if (items.length) await supabase.from("boq_items").insert(items);
+        }
+      }
+      await supabase.from("boq_templates").update({ use_count: num(template.data.use_count) + 1 }).eq("id", input.data.templateId);
+    }
+  }
+  await audit(supabase, "boq.created", id); return ok(boqDto(inserted.data as Record<string, unknown>), 201, id);
+}
+
+async function getBoq(supabase: SupabaseClient, id: string, boqId: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const [boq, rooms, categories, items] = await Promise.all([
+    supabase.from("boqs").select(boqSelect).eq("workspace_id", scoped.access.workspaceId).eq("id", boqId).is("archived_at", null).maybeSingle(),
+    supabase.from("boq_rooms").select("id,name,description,sort_order,created_at,updated_at").eq("workspace_id", scoped.access.workspaceId).eq("boq_id", boqId).order("sort_order"),
+    supabase.from("boq_categories").select("id,room_id,name,description,sort_order").eq("workspace_id", scoped.access.workspaceId).eq("boq_id", boqId).order("sort_order"),
+    supabase.from("boq_items").select("id,room_id,category_id,name,description,unit,quantity,rate,waste_percent,tax_percent,amount,sort_order").eq("workspace_id", scoped.access.workspaceId).eq("boq_id", boqId).order("sort_order"),
+  ]);
+  if (boq.error || rooms.error || categories.error || items.error) return fail("INTERNAL_ERROR", "BOQ could not be loaded.", 500, id);
+  if (!boq.data) return fail("NOT_FOUND", "BOQ was not found.", 404, id);
+  const itemRows = items.data ?? []; const subtotal = itemRows.reduce((sum, row) => sum + num(row.amount), 0);
+  return ok({ ...boqDto(boq.data as Record<string, unknown>, rooms.data?.length ?? 0, itemRows.length, subtotal), rooms: (rooms.data ?? []).map((room) => ({ ...room,
+    categories: (categories.data ?? []).filter((cat) => cat.room_id === room.id).map((category) => ({ ...category, items: itemRows.filter((item) => item.category_id === category.id) })) })) }, 200, id);
+}
+
+async function updateBoq(request: Request, supabase: SupabaseClient, id: string, boqId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const input = await parsed(request, boqPatchSchema, id); if (input.response) return input.response;
+  const map: Record<string,string> = { version: "version", assignedTo: "assigned_to", markupPercent: "markup_percent", taxPercent: "tax_percent" };
+  const values = Object.fromEntries(Object.entries(input.data).map(([k,v]) => [map[k],v])); values.updated_by = scoped.access.userId;
+  const result = await supabase.from("boqs").update(values).eq("workspace_id", scoped.access.workspaceId).eq("id", boqId).is("archived_at", null).select(boqSelect).maybeSingle();
+  if (result.error) return fail("VALIDATION_ERROR", "BOQ could not be updated.", 400, id);
+  return result.data ? ok(boqDto(result.data as Record<string, unknown>), 200, id) : fail("NOT_FOUND", "BOQ was not found.", 404, id);
+}
+
+async function setBoqStatus(request: Request, supabase: SupabaseClient, id: string, boqId: string) {
+  const input = await parsed(request, boqStatusSchema, id); if (input.response) return input.response;
+  const admin = input.data.status === "approved" || input.data.status === "archived";
+  const scoped = await workspaceAccess(supabase, id, true, admin); if ("response" in scoped) return scoped.response;
+  const result = await supabase.from("boqs").update({ status: input.data.status, archived_at: input.data.status === "archived" ? new Date().toISOString() : null, updated_by: scoped.access.userId })
+    .eq("workspace_id", scoped.access.workspaceId).eq("id", boqId).is("archived_at", null).select(boqSelect).maybeSingle();
+  if (result.error) return fail("VALIDATION_ERROR", "BOQ status could not be changed.", 400, id);
+  return result.data ? ok(boqDto(result.data as Record<string, unknown>), 200, id) : fail("NOT_FOUND", "BOQ was not found.", 404, id);
+}
+
+async function duplicateBoq(supabase: SupabaseClient, id: string, boqId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const detailResponse = await getBoq(supabase, id, boqId); const payload = await detailResponse.json();
+  if (!detailResponse.ok) return detailResponse; const source = payload.data as Record<string, unknown>;
+  const created = await supabase.from("boqs").insert({ workspace_id: scoped.access.workspaceId, project_id: source.projectId, boq_number: `${source.boqNumber}-COPY-${Date.now().toString().slice(-5)}`,
+    version: source.version, assigned_to: source.assignedTo, source_method: "blank", markup_percent: source.markupPercent, tax_percent: source.taxPercent,
+    created_by: scoped.access.userId, updated_by: scoped.access.userId }).select(boqSelect).single();
+  if (created.error) return fail("VALIDATION_ERROR", "BOQ could not be duplicated.", 400, id);
+  for (const sourceRoom of source.rooms as Array<Record<string, unknown>>) {
+    const room = await supabase.from("boq_rooms").insert({ workspace_id: scoped.access.workspaceId, boq_id: created.data.id, name: sourceRoom.name, description: sourceRoom.description, sort_order: sourceRoom.sort_order }).select("id").single();
+    for (const sourceCategory of sourceRoom.categories as Array<Record<string, unknown>>) {
+      const category = await supabase.from("boq_categories").insert({ workspace_id: scoped.access.workspaceId, boq_id: created.data.id, room_id: room.data!.id, name: sourceCategory.name, description: sourceCategory.description, sort_order: sourceCategory.sort_order }).select("id").single();
+      const copiedItems = (sourceCategory.items as Array<Record<string, unknown>>).map((item) => ({ workspace_id: scoped.access.workspaceId, boq_id: created.data.id, room_id: room.data!.id, category_id: category.data!.id,
+        name: item.name, description: item.description, unit: item.unit, quantity: item.quantity, rate: item.rate, waste_percent: item.waste_percent, tax_percent: item.tax_percent, sort_order: item.sort_order }));
+      if (copiedItems.length) await supabase.from("boq_items").insert(copiedItems);
+    }
+  }
+  return ok(boqDto(created.data as Record<string, unknown>), 201, id);
+}
+
+async function boqTemplates(request: NextRequest, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id, request.method === "POST"); if ("response" in scoped) return scoped.response;
+  if (request.method === "GET") {
+    const { page,pageSize,from,to } = pagination(request.nextUrl.searchParams);
+    const result = await supabase.from("boq_templates").select("id,name,description,tags,use_count,created_at,updated_at", { count:"exact" }).eq("workspace_id",scoped.access.workspaceId).order("use_count",{ascending:false}).range(from,to);
+    const total=result.count??0; return result.error?fail("INTERNAL_ERROR","BOQ templates could not be loaded.",500,id):ok({items:result.data??[],page,pageSize,total,hasMore:to+1<total},200,id);
+  }
+  const input=await parsed(request,boqTemplateSchema,id);if(input.response)return input.response;
+  const detailResponse=await getBoq(supabase,id,input.data.boqId);const payload=await detailResponse.json();if(!detailResponse.ok)return detailResponse;
+  const result=await supabase.from("boq_templates").insert({workspace_id:scoped.access.workspaceId,name:input.data.name,description:input.data.description,tags:input.data.tags,snapshot:payload.data.rooms,created_by:scoped.access.userId}).select("id,name,description,tags,use_count,created_at,updated_at").single();
+  return result.error?fail(result.error.code==="23505"?"CONFLICT":"VALIDATION_ERROR","BOQ template could not be created.",result.error.code==="23505"?409:400,id):ok(result.data,201,id);
+}
+
+async function boqChild(request: Request, supabase: SupabaseClient, id: string, boqId: string, kind: "room"|"category"|"item", parentId?: string, childId?: string) {
+  const scoped = await workspaceAccess(supabase, id, request.method !== "GET", request.method === "DELETE"); if ("response" in scoped) return scoped.response;
+  const config = kind === "room" ? { table: "boq_rooms", schema: boqRoomSchema } : kind === "category" ? { table: "boq_categories", schema: boqCategorySchema } : { table: "boq_items", schema: boqItemSchema };
+  if (request.method === "POST") {
+    const input = await parsed(request, config.schema, id); if (input.response) return input.response;
+    const data = input.data as Record<string, unknown>;
+    const values: Record<string, unknown> = { workspace_id: scoped.access.workspaceId, boq_id: boqId, ...(kind === "category" ? { room_id: parentId } : {}), ...(kind === "item" ? { category_id: parentId } : {}) };
+    if (kind === "item") {
+      const category = await supabase.from("boq_categories").select("room_id").eq("workspace_id", scoped.access.workspaceId).eq("boq_id", boqId).eq("id", parentId!).maybeSingle();
+      if (!category.data) return fail("NOT_FOUND", "BOQ category was not found.", 404, id);
+      Object.assign(values, { room_id: category.data.room_id, name: data.name, description: data.description, unit: data.unit, quantity: data.quantity, rate: data.rate, waste_percent: data.wastePercent, tax_percent: data.taxPercent, sort_order: data.sortOrder });
+    } else Object.assign(values, data);
+    const result = await supabase.from(config.table).insert(values).select("*").single();
+    return result.error ? fail("VALIDATION_ERROR", `BOQ ${kind} could not be created.`, 400, id) : ok(result.data, 201, id);
+  }
+  if (request.method === "PATCH" && childId) {
+    const input = await parsed(request, config.schema.partial().strict().refine((v) => Object.keys(v).length > 0), id); if (input.response) return input.response;
+    const data = input.data as Record<string, unknown>;
+    const values = kind === "item" ? { name: data.name, description: data.description, unit: data.unit, quantity: data.quantity, rate: data.rate, waste_percent: data.wastePercent, tax_percent: data.taxPercent, sort_order: data.sortOrder } : data;
+    const clean = Object.fromEntries(Object.entries(values).filter(([,v]) => v !== undefined));
+    const result = await supabase.from(config.table).update(clean).eq("workspace_id", scoped.access.workspaceId).eq("boq_id", boqId).eq("id", childId).select("*").maybeSingle();
+    return result.data ? ok(result.data, 200, id) : fail("NOT_FOUND", `BOQ ${kind} was not found.`, 404, id);
+  }
+  if (request.method === "DELETE" && childId) {
+    const result = await supabase.from(config.table).delete().eq("workspace_id", scoped.access.workspaceId).eq("boq_id", boqId).eq("id", childId).select("id").maybeSingle();
+    return result.data ? ok({ deleted: true, id: childId }, 200, id) : fail("NOT_FOUND", `BOQ ${kind} was not found.`, 404, id);
+  }
+  return methodNotAllowed(id);
+}
+
+function costingCategoryValues(input: Record<string, unknown>, userId: string) {
+  const map: Record<string,string> = { name:"name",code:"code",parentId:"parent_id",defaultUnit:"default_unit",defaultTaxPercent:"default_tax_percent",defaultMarkupPercent:"default_markup_percent",defaultWastePercent:"default_waste_percent",transportIncluded:"transport_included",labourIncluded:"labour_included",description:"description" };
+  return { ...Object.fromEntries(Object.entries(input).map(([k,v]) => [map[k],v]).filter(([k]) => k)), updated_by: userId };
+}
+function costingItemValues(input: Record<string, unknown>, userId: string) {
+  const map: Record<string,string> = { name:"name",code:"code",categoryId:"category_id",unit:"unit",baseCost:"base_cost",sellingRate:"selling_rate",preferredVendor:"preferred_vendor",spec:"spec",rateStatus:"rate_status",imageUrl:"image_url" };
+  return { ...Object.fromEntries(Object.entries(input).map(([k,v]) => [map[k],v]).filter(([k]) => k)), updated_by: userId };
+}
+
+async function costingCategories(request: NextRequest, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const { page,pageSize,from,to } = pagination(request.nextUrl.searchParams); const search = request.nextUrl.searchParams.get("search")?.trim().replace(/[%_,()]/g," ").slice(0,120);
+  let query = supabase.from("costing_categories").select("*", { count:"exact" }).eq("workspace_id", scoped.access.workspaceId).order("updated_at", { ascending:false }).range(from,to);
+  if (search) query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%`); const result = await query;
+  if (result.error) return fail("INTERNAL_ERROR", "Costing categories could not be loaded.", 500, id);
+  const [all, items] = await Promise.all([supabase.from("costing_categories").select("id,parent_id").eq("workspace_id", scoped.access.workspaceId), supabase.from("costing_items").select("id,category_id").eq("workspace_id", scoped.access.workspaceId).is("archived_at",null)]);
+  const total=result.count??0; return ok({ items:(result.data??[]).map((row)=>({...row,subCategoryCount:(all.data??[]).filter((x)=>x.parent_id===row.id).length,itemCount:(items.data??[]).filter((x)=>x.category_id===row.id).length})),page,pageSize,total,hasMore:to+1<total },200,id);
+}
+async function createCostingCategory(request: Request, supabase: SupabaseClient, id: string) {
+  const scoped=await workspaceAccess(supabase,id,true); if("response" in scoped)return scoped.response; const input=await parsed(request,costingCategorySchema,id);if(input.response)return input.response;
+  const result=await supabase.from("costing_categories").insert({workspace_id:scoped.access.workspaceId,created_by:scoped.access.userId,...costingCategoryValues(input.data,scoped.access.userId)}).select("*").single();
+  return result.error?fail(result.error.code==="23505"?"CONFLICT":"VALIDATION_ERROR","Costing category could not be created.",result.error.code==="23505"?409:400,id):ok(result.data,201,id);
+}
+async function costingCategoryDetail(request: Request,supabase:SupabaseClient,id:string,categoryId:string){
+  const scoped=await workspaceAccess(supabase,id,request.method!=="GET",request.method==="DELETE");if("response" in scoped)return scoped.response;
+  if(request.method==="GET"){const [category,children,items]=await Promise.all([supabase.from("costing_categories").select("*").eq("workspace_id",scoped.access.workspaceId).eq("id",categoryId).maybeSingle(),supabase.from("costing_categories").select("*").eq("workspace_id",scoped.access.workspaceId).eq("parent_id",categoryId),supabase.from("costing_items").select("*").eq("workspace_id",scoped.access.workspaceId).eq("category_id",categoryId).is("archived_at",null)]);if(!category.data)return fail("NOT_FOUND","Costing category was not found.",404,id);return ok({...category.data,subCategories:children.data??[],items:(items.data??[]).map((x)=>({...x,marginPercent:num(x.selling_rate)?Math.round((num(x.selling_rate)-num(x.base_cost))*10000/num(x.selling_rate))/100:0}))},200,id)}
+  if(request.method==="PATCH"){const input=await parsed(request,costingCategoryPatchSchema,id);if(input.response)return input.response;const result=await supabase.from("costing_categories").update(costingCategoryValues(input.data,scoped.access.userId)).eq("workspace_id",scoped.access.workspaceId).eq("id",categoryId).select("*").maybeSingle();return result.data?ok(result.data,200,id):fail("NOT_FOUND","Costing category was not found.",404,id)}
+  const result=await supabase.from("costing_categories").delete().eq("workspace_id",scoped.access.workspaceId).eq("id",categoryId).select("id").maybeSingle();return result.data?ok({deleted:true,id:categoryId},200,id):fail("VALIDATION_ERROR","Category is missing or still has dependent records.",400,id)
+}
+
+async function costingItems(request: NextRequest,supabase:SupabaseClient,id:string){
+  const scoped=await workspaceAccess(supabase,id);if("response" in scoped)return scoped.response;const{page,pageSize,from,to}=pagination(request.nextUrl.searchParams);const categoryId=request.nextUrl.searchParams.get("categoryId");const search=request.nextUrl.searchParams.get("search")?.trim().replace(/[%_,()]/g," ").slice(0,120);
+  let query=supabase.from("costing_items").select("*",{count:"exact"}).eq("workspace_id",scoped.access.workspaceId).is("archived_at",null).order("updated_at",{ascending:false}).range(from,to);if(categoryId)query=query.eq("category_id",categoryId);if(search)query=query.or(`name.ilike.%${search}%,code.ilike.%${search}%`);const result=await query;if(result.error)return fail("INTERNAL_ERROR","Costing items could not be loaded.",500,id);const total=result.count??0;return ok({items:(result.data??[]).map((x)=>({...x,marginPercent:num(x.selling_rate)?Math.round((num(x.selling_rate)-num(x.base_cost))*10000/num(x.selling_rate))/100:0})),page,pageSize,total,hasMore:to+1<total},200,id)
+}
+async function createCostingItem(request:Request,supabase:SupabaseClient,id:string){const scoped=await workspaceAccess(supabase,id,true);if("response" in scoped)return scoped.response;const input=await parsed(request,costingItemSchema,id);if(input.response)return input.response;const result=await supabase.from("costing_items").insert({workspace_id:scoped.access.workspaceId,created_by:scoped.access.userId,...costingItemValues(input.data,scoped.access.userId)}).select("*").single();return result.error?fail(result.error.code==="23505"?"CONFLICT":"VALIDATION_ERROR","Costing item could not be created.",result.error.code==="23505"?409:400,id):ok(result.data,201,id)}
+async function costingItemDetail(request:Request,supabase:SupabaseClient,id:string,itemId:string){const scoped=await workspaceAccess(supabase,id,request.method!=="GET",request.method==="DELETE");if("response" in scoped)return scoped.response;if(request.method==="GET"){const [item,quotes]=await Promise.all([supabase.from("costing_items").select("*").eq("workspace_id",scoped.access.workspaceId).eq("id",itemId).is("archived_at",null).maybeSingle(),supabase.from("vendor_quotes").select("*").eq("workspace_id",scoped.access.workspaceId).eq("item_id",itemId).order("quote")]);return item.data?ok({...item.data,vendorQuotes:quotes.data??[]},200,id):fail("NOT_FOUND","Costing item was not found.",404,id)}if(request.method==="PATCH"){const input=await parsed(request,costingItemPatchSchema,id);if(input.response)return input.response;const result=await supabase.from("costing_items").update(costingItemValues(input.data,scoped.access.userId)).eq("workspace_id",scoped.access.workspaceId).eq("id",itemId).is("archived_at",null).select("*").maybeSingle();return result.data?ok(result.data,200,id):fail("NOT_FOUND","Costing item was not found.",404,id)}const result=await supabase.from("costing_items").update({archived_at:new Date().toISOString(),updated_by:scoped.access.userId}).eq("workspace_id",scoped.access.workspaceId).eq("id",itemId).is("archived_at",null).select("id").maybeSingle();return result.data?ok({archived:true,id:itemId},200,id):fail("NOT_FOUND","Costing item was not found.",404,id)}
+
+async function addVendorQuote(request:Request,supabase:SupabaseClient,id:string){const scoped=await workspaceAccess(supabase,id,true);if("response" in scoped)return scoped.response;const input=await parsed(request,vendorQuoteSchema,id);if(input.response)return input.response;const result=await supabase.from("vendor_quotes").insert({workspace_id:scoped.access.workspaceId,item_id:input.data.itemId,vendor_name:input.data.vendorName,quote:input.data.quote,lead_time_days:input.data.leadTimeDays,rating:input.data.rating,created_by:scoped.access.userId}).select("*").single();return result.error?fail("VALIDATION_ERROR","Vendor quote could not be created.",400,id):ok(result.data,201,id)}
+async function selectVendorQuote(request:Request,supabase:SupabaseClient,id:string,quoteId:string){const scoped=await workspaceAccess(supabase,id,true);if("response" in scoped)return scoped.response;const input=await parsed(request,vendorSelectionSchema,id);if(input.response)return input.response;const quote=await supabase.from("vendor_quotes").select("item_id").eq("workspace_id",scoped.access.workspaceId).eq("id",quoteId).maybeSingle();if(!quote.data)return fail("NOT_FOUND","Vendor quote was not found.",404,id);if(input.data.selected)await supabase.from("vendor_quotes").update({selected:false}).eq("workspace_id",scoped.access.workspaceId).eq("item_id",quote.data.item_id);const result=await supabase.from("vendor_quotes").update({selected:input.data.selected}).eq("workspace_id",scoped.access.workspaceId).eq("id",quoteId).select("*").single();return result.error?fail("VALIDATION_ERROR","Vendor selection could not be saved.",400,id):ok(result.data,200,id)}
+
+async function costingScenarios(request:NextRequest,supabase:SupabaseClient,id:string){const scoped=await workspaceAccess(supabase,id);if("response" in scoped)return scoped.response;const{page,pageSize,from,to}=pagination(request.nextUrl.searchParams);const result=await supabase.from("costing_scenarios").select("*",{count:"exact"}).eq("workspace_id",scoped.access.workspaceId).is("archived_at",null).order("updated_at",{ascending:false}).range(from,to);if(result.error)return fail("INTERNAL_ERROR","Costing scenarios could not be loaded.",500,id);const total=result.count??0;return ok({items:result.data??[],page,pageSize,total,hasMore:to+1<total},200,id)}
+async function createCostingScenario(request:Request,supabase:SupabaseClient,id:string){const scoped=await workspaceAccess(supabase,id,true);if("response" in scoped)return scoped.response;const input=await parsed(request,costingScenarioSchema,id);if(input.response)return input.response;const result=await supabase.from("costing_scenarios").insert({workspace_id:scoped.access.workspaceId,boq_id:input.data.boqId,name:input.data.name,description:input.data.description,scenario_type:input.data.type,adjustments:input.data.adjustments,created_by:scoped.access.userId,updated_by:scoped.access.userId}).select("*").single();return result.error?fail("VALIDATION_ERROR","Costing scenario could not be created.",400,id):ok(result.data,201,id)}
+async function costingScenarioDetail(request:Request,supabase:SupabaseClient,id:string,scenarioId:string,duplicate=false){const scoped=await workspaceAccess(supabase,id,request.method!=="GET"||duplicate);if("response" in scoped)return scoped.response;const source=await supabase.from("costing_scenarios").select("*").eq("workspace_id",scoped.access.workspaceId).eq("id",scenarioId).is("archived_at",null).maybeSingle();if(!source.data)return fail("NOT_FOUND","Costing scenario was not found.",404,id);if(duplicate){const result=await supabase.from("costing_scenarios").insert({...source.data,id:undefined,name:`${source.data.name} (Copy)`,created_at:undefined,updated_at:undefined,created_by:scoped.access.userId,updated_by:scoped.access.userId}).select("*").single();return result.error?fail("VALIDATION_ERROR","Scenario could not be duplicated.",400,id):ok(result.data,201,id)}if(request.method==="PATCH"){const input=await parsed(request,costingScenarioPatchSchema,id);if(input.response)return input.response;const values:Record<string,unknown>={...input.data,scenario_type:input.data.type,boq_id:input.data.boqId,updated_by:scoped.access.userId};delete values.type;delete values.boqId;const result=await supabase.from("costing_scenarios").update(values).eq("id",scenarioId).select("*").single();return result.error?fail("VALIDATION_ERROR","Scenario could not be updated.",400,id):ok(result.data,200,id)}
+  const items=await supabase.from("boq_items").select("amount").eq("workspace_id",scoped.access.workspaceId).eq("boq_id",source.data.boq_id);const baseCost=(items.data??[]).reduce((s,x)=>s+num(x.amount),0);const adjustments=source.data.adjustments as Array<Record<string,unknown>>;const scenarioCost=Math.max(0,baseCost+adjustments.reduce((s,x)=>s+(x.rate==null?0:num(x.rate)),0));return ok({...source.data,baseCost,scenarioCost,savings:baseCost-scenarioCost,baseMargin:null,scenarioMargin:null},200,id)}
+
+async function costingAnalysis(supabase:SupabaseClient,id:string){const scoped=await workspaceAccess(supabase,id);if("response" in scoped)return scoped.response;const [projects,boqs,items,quotes]=await Promise.all([supabase.from("projects").select("approved_budget").eq("workspace_id",scoped.access.workspaceId).is("archived_at",null),supabase.from("boqs").select("id").eq("workspace_id",scoped.access.workspaceId).is("archived_at",null),supabase.from("costing_items").select("id,category_id,base_cost,selling_rate").eq("workspace_id",scoped.access.workspaceId).is("archived_at",null),supabase.from("vendor_quotes").select("item_id,vendor_name,quote,lead_time_days,rating,selected").eq("workspace_id",scoped.access.workspaceId)]);const boqIds=(boqs.data??[]).map(x=>x.id);const amounts=boqIds.length?await supabase.from("boq_items").select("amount,category_id").eq("workspace_id",scoped.access.workspaceId).in("boq_id",boqIds):{data:[]};const totalBudget=(projects.data??[]).reduce((s,x)=>s+num(x.approved_budget),0);const actualCost=(amounts.data??[]).reduce((s,x)=>s+num(x.amount),0);const committed=(quotes.data??[]).filter(x=>x.selected).reduce((s,x)=>s+num(x.quote),0);return ok({currency:scoped.access.currency,summary:{totalBudget,actualCost,committed,forecast:Math.max(actualCost,committed),variance:totalBudget-Math.max(actualCost,committed)},items:items.data??[],vendorQuotes:quotes.data??[],varianceByCategory:[]},200,id)}
+async function marginAnalysis(supabase:SupabaseClient,id:string){const scoped=await workspaceAccess(supabase,id);if("response" in scoped)return scoped.response;const [categories,items]=await Promise.all([supabase.from("costing_categories").select("id,name,default_markup_percent").eq("workspace_id",scoped.access.workspaceId),supabase.from("costing_items").select("id,name,category_id,base_cost,selling_rate").eq("workspace_id",scoped.access.workspaceId).is("archived_at",null)]);const rows=(items.data??[]).map(x=>({...x,marginPercent:num(x.selling_rate)?(num(x.selling_rate)-num(x.base_cost))*100/num(x.selling_rate):0}));const revenue=rows.reduce((s,x)=>s+num(x.selling_rate),0),cost=rows.reduce((s,x)=>s+num(x.base_cost),0),currentMargin=revenue?(revenue-cost)*100/revenue:0,targetMargin=(categories.data??[]).length?(categories.data??[]).reduce((s,x)=>s+num(x.default_markup_percent),0)/(categories.data??[]).length:0;return ok({currency:scoped.access.currency,targetMargin,currentMargin,marginDifference:currentMargin-targetMargin,lowMarginItems:rows.filter(x=>x.marginPercent<targetMargin),byCategory:(categories.data??[]).map(c=>{const group=rows.filter(x=>x.category_id===c.id);return{id:c.id,name:c.name,marginPercent:group.length?group.reduce((s,x)=>s+x.marginPercent,0)/group.length:0}}),impactDrivers:[],trend:[]},200,id)}
+
+async function reportsAnalytics(request: NextRequest, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id, false, true); if ("response" in scoped) return scoped.response;
+  const requested = request.nextUrl.searchParams.get("period"); const period = ["month","quarter","year"].includes(requested ?? "") ? requested! : "year";
+  const months = period === "month" ? 1 : period === "quarter" ? 3 : 12; const start = new Date(); start.setUTCDate(1); start.setUTCHours(0,0,0,0); start.setUTCMonth(start.getUTCMonth() - months + 1);
+  const [projectsResult, boqsResult, invoicesResult, costsResult, membershipsResult] = await Promise.all([
+    supabase.from("projects").select("id,project_type,client_name,project_value,status,assigned_designer_id,created_at").eq("workspace_id",scoped.access.workspaceId).is("archived_at",null).gte("created_at",start.toISOString()),
+    supabase.from("boqs").select("id,created_by,status,created_at").eq("workspace_id",scoped.access.workspaceId).is("archived_at",null).gte("created_at",start.toISOString()),
+    supabase.from("invoices").select("client_name,subtotal,total_amount,status,created_at").eq("workspace_id",scoped.access.workspaceId).is("archived_at",null).gte("created_at",start.toISOString()),
+    supabase.from("boq_items").select("amount,created_at").eq("workspace_id",scoped.access.workspaceId).gte("created_at",start.toISOString()),
+    supabase.from("workspace_memberships").select("user_id,role").eq("workspace_id",scoped.access.workspaceId).eq("status","active"),
+  ]);
+  if ([projectsResult,boqsResult,invoicesResult,costsResult,membershipsResult].some((result)=>result.error)) return fail("INTERNAL_ERROR","Reports could not be loaded.",500,id);
+  const projects=projectsResult.data??[],boqs=boqsResult.data??[],invoices=(invoicesResult.data??[]).filter(x=>x.status!=="void"),costRows=costsResult.data??[];
+  const revenue=invoices.reduce((sum,row)=>sum+num(row.subtotal),0),cost=costRows.reduce((sum,row)=>sum+num(row.amount),0);
+  const bucketKeys=Array.from({length:months},(_,index)=>{const date=new Date(start);date.setUTCMonth(start.getUTCMonth()+index);return date.toISOString().slice(0,7)});
+  const monthlyRevenueVsCost=bucketKeys.map((key)=>({period:key,revenue:invoices.filter(x=>String(x.created_at).startsWith(key)).reduce((s,x)=>s+num(x.subtotal),0),cost:costRows.filter(x=>String(x.created_at).startsWith(key)).reduce((s,x)=>s+num(x.amount),0)}));
+  const grossMarginTrend=monthlyRevenueVsCost.map((point)=>({period:point.period,marginPercent:point.revenue?(point.revenue-point.cost)*100/point.revenue:0}));
+  const types=new Map<string,{projects:number,value:number}>();for(const project of projects){const key=project.project_type??"Other",value=types.get(key)??{projects:0,value:0};value.projects++;value.value+=num(project.project_value);types.set(key,value)}
+  const clients=new Map<string,{projects:number,totalValue:number,revenue:number}>();for(const project of projects){const value=clients.get(project.client_name)??{projects:0,totalValue:0,revenue:0};value.projects++;value.totalValue+=num(project.project_value);clients.set(project.client_name,value)}for(const invoice of invoices){const value=clients.get(invoice.client_name)??{projects:0,totalValue:0,revenue:0};value.revenue+=num(invoice.subtotal);clients.set(invoice.client_name,value)}
+  const teamPerformance=(membershipsResult.data??[]).map((member)=>{const memberProjects=projects.filter(x=>x.assigned_designer_id===member.user_id),memberBoqs=boqs.filter(x=>x.created_by===member.user_id);return{userId:member.user_id,role:member.role,projects:memberProjects.length,boqs:memberBoqs.length,projectValue:memberProjects.reduce((s,x)=>s+num(x.project_value),0),rating:null}});
+  return ok({scope:{workspaceId:scoped.access.workspaceId,currency:scoped.access.currency,period,from:start.toISOString(),generatedAt:new Date().toISOString()},kpis:{totalRevenue:revenue,totalCost:cost,grossMarginPercent:revenue?(revenue-cost)*100/revenue:0,averageProjectValue:projects.length?projects.reduce((s,x)=>s+num(x.project_value),0)/projects.length:0},monthlyRevenueVsCost,grossMarginTrend,projectsByType:Array.from(types,([type,value])=>({type,...value})),pipelineByType:Array.from(types,([type,value])=>({type,...value})),teamPerformance,clientAnalysis:Array.from(clients,([client,value])=>({client,...value,marginPercent:value.revenue?null:null})),counts:{projects:projects.length,boqs:boqs.length}},200,id);
+}
+
+async function costingSettings(supabase:SupabaseClient,id:string){const scoped=await workspaceAccess(supabase,id);if("response" in scoped)return scoped.response;const [categories,items,quotes,scenarios]=await Promise.all([supabase.from("costing_categories").select("id,default_unit,default_tax_percent,default_markup_percent,default_waste_percent").eq("workspace_id",scoped.access.workspaceId),supabase.from("costing_items").select("id,rate_status").eq("workspace_id",scoped.access.workspaceId).is("archived_at",null),supabase.from("vendor_quotes").select("id").eq("workspace_id",scoped.access.workspaceId),supabase.from("costing_scenarios").select("id").eq("workspace_id",scoped.access.workspaceId).is("archived_at",null)]);const missingDefaults=(categories.data??[]).filter(x=>!x.default_unit).length;return ok({scope:"workspace",health:{completenessPercent:(categories.data??[]).length?Math.round(((categories.data??[]).length-missingDefaults)*100/(categories.data??[]).length):100,categoryCount:categories.data?.length??0,itemCount:items.data?.length??0,vendorQuoteCount:quotes.data?.length??0,scenarioCount:scenarios.data?.length??0,missingCategoryDefaults:missingDefaults,expiredRates:(items.data??[]).filter(x=>x.rate_status==="expired").length},sections:["general","units","currencies","cost_codes","taxes","markups","pricing_rules","category_defaults","wastage_rules","margin_rules","discount_policies","rate_management","approval_workflows","versioning","permissions","import_export","audit_log"]},200,id)}
+
+function basicTextPdf(lines:string[]){const commands=lines.map((line,index)=>`BT /F1 ${index===0?18:11} Tf 50 ${770-index*24} Td (${pdfEscape(line).slice(0,105)}) Tj ET`).join("\n");const objects=["<< /Type /Catalog /Pages 2 0 R >>","<< /Type /Pages /Kids [3 0 R] /Count 1 >>","<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>","<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",`<< /Length ${Buffer.byteLength(commands,"ascii")} >>\nstream\n${commands}\nendstream`];let output="%PDF-1.4\n";const offsets=[0];objects.forEach((object,index)=>{offsets.push(Buffer.byteLength(output,"ascii"));output+=`${index+1} 0 obj\n${object}\nendobj\n`});const xref=Buffer.byteLength(output,"ascii");output+=`xref\n0 ${objects.length+1}\n0000000000 65535 f \n${offsets.slice(1).map(offset=>`${String(offset).padStart(10,"0")} 00000 n `).join("\n")}\n`;output+=`trailer\n<< /Size ${objects.length+1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;return new Uint8Array(Buffer.from(output,"ascii"))}
+async function reportsPdf(request:NextRequest,supabase:SupabaseClient,id:string){const response=await reportsAnalytics(request,supabase,id);if(!response.ok)return response;const payload=await response.json();const report=payload.data;return new Response(basicTextPdf(["Reports & Analytics",`Period: ${report.scope.period}`,`Revenue: ${report.scope.currency} ${report.kpis.totalRevenue.toFixed(2)}`,`Cost: ${report.scope.currency} ${report.kpis.totalCost.toFixed(2)}`,`Gross margin: ${report.kpis.grossMarginPercent.toFixed(2)}%`,`Average project value: ${report.scope.currency} ${report.kpis.averageProjectValue.toFixed(2)}`,`Projects: ${report.counts.projects}`,`BOQs: ${report.counts.boqs}`]),{status:200,headers:{"Content-Type":"application/pdf","Content-Disposition":"attachment; filename=reports-analytics.pdf","Cache-Control":"private, no-store","X-Request-Id":id}})}
+
 const invoiceSelect = "id,invoice_code,manual_number,document_type,client_id,client_name,billing_address,project_id,project_name,issue_date,due_date,milestone,reference,additional_notes,bank_details,tax_rate,subtotal,tax_amount,total_amount,total_paid,currency,status,sent_at,created_at,updated_at";
 
 function effectiveInvoiceStatus(row: Record<string, unknown>) {
@@ -1305,6 +1569,50 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (request.method === "POST" && route === "boq-imports/preview") return previewBoqImport(request, supabase, id);
   if (request.method === "POST" && route === "boq-imports/upload") return uploadBoqImport(request, supabase, id);
   if (request.method === "POST" && route === "boq-imports") return createBoqImport(request, supabase, id);
+  if (request.method === "GET" && route === "boqs") return listBoqs(request, supabase, id);
+  if (request.method === "POST" && route === "boqs") return createBoq(request, supabase, id);
+  if (["GET","POST"].includes(request.method) && route === "boq-templates") return boqTemplates(request, supabase, id);
+  const boqMatch = route.match(/^boqs\/([0-9a-f-]{36})$/i);
+  if (boqMatch && request.method === "GET") return getBoq(supabase, id, boqMatch[1]);
+  if (boqMatch && request.method === "PATCH") return updateBoq(request, supabase, id, boqMatch[1]);
+  const boqStatusMatch = route.match(/^boqs\/([0-9a-f-]{36})\/status$/i);
+  if (boqStatusMatch && request.method === "POST") return setBoqStatus(request, supabase, id, boqStatusMatch[1]);
+  const boqDuplicateMatch = route.match(/^boqs\/([0-9a-f-]{36})\/duplicate$/i);
+  if (boqDuplicateMatch && request.method === "POST") return duplicateBoq(supabase, id, boqDuplicateMatch[1]);
+  const boqRoomsMatch = route.match(/^boqs\/([0-9a-f-]{36})\/rooms$/i);
+  if (boqRoomsMatch && request.method === "POST") return boqChild(request, supabase, id, boqRoomsMatch[1], "room");
+  const boqRoomMatch = route.match(/^boqs\/([0-9a-f-]{36})\/rooms\/([0-9a-f-]{36})$/i);
+  if (boqRoomMatch && ["PATCH","DELETE"].includes(request.method)) return boqChild(request, supabase, id, boqRoomMatch[1], "room", undefined, boqRoomMatch[2]);
+  const boqCategoriesMatch = route.match(/^boqs\/([0-9a-f-]{36})\/rooms\/([0-9a-f-]{36})\/categories$/i);
+  if (boqCategoriesMatch && request.method === "POST") return boqChild(request, supabase, id, boqCategoriesMatch[1], "category", boqCategoriesMatch[2]);
+  const boqCategoryMatch = route.match(/^boqs\/([0-9a-f-]{36})\/categories\/([0-9a-f-]{36})$/i);
+  if (boqCategoryMatch && ["PATCH","DELETE"].includes(request.method)) return boqChild(request, supabase, id, boqCategoryMatch[1], "category", undefined, boqCategoryMatch[2]);
+  const boqItemsMatch = route.match(/^boqs\/([0-9a-f-]{36})\/categories\/([0-9a-f-]{36})\/items$/i);
+  if (boqItemsMatch && request.method === "POST") return boqChild(request, supabase, id, boqItemsMatch[1], "item", boqItemsMatch[2]);
+  const boqItemMatch = route.match(/^boqs\/([0-9a-f-]{36})\/items\/([0-9a-f-]{36})$/i);
+  if (boqItemMatch && ["PATCH","DELETE"].includes(request.method)) return boqChild(request, supabase, id, boqItemMatch[1], "item", undefined, boqItemMatch[2]);
+  if (request.method === "GET" && route === "costing/categories") return costingCategories(request, supabase, id);
+  if (request.method === "POST" && route === "costing/categories") return createCostingCategory(request, supabase, id);
+  const costingCategoryMatch = route.match(/^costing\/categories\/([0-9a-f-]{36})$/i);
+  if (costingCategoryMatch && ["GET","PATCH","DELETE"].includes(request.method)) return costingCategoryDetail(request, supabase, id, costingCategoryMatch[1]);
+  if (request.method === "GET" && route === "costing/items") return costingItems(request, supabase, id);
+  if (request.method === "POST" && route === "costing/items") return createCostingItem(request, supabase, id);
+  const costingItemMatch = route.match(/^costing\/items\/([0-9a-f-]{36})$/i);
+  if (costingItemMatch && ["GET","PATCH","DELETE"].includes(request.method)) return costingItemDetail(request, supabase, id, costingItemMatch[1]);
+  if (request.method === "POST" && route === "costing/vendor-quotes") return addVendorQuote(request, supabase, id);
+  const vendorSelectMatch = route.match(/^costing\/vendor-quotes\/([0-9a-f-]{36})\/selection$/i);
+  if (vendorSelectMatch && request.method === "POST") return selectVendorQuote(request, supabase, id, vendorSelectMatch[1]);
+  if (request.method === "GET" && route === "costing/scenarios") return costingScenarios(request, supabase, id);
+  if (request.method === "POST" && route === "costing/scenarios") return createCostingScenario(request, supabase, id);
+  const scenarioMatch = route.match(/^costing\/scenarios\/([0-9a-f-]{36})$/i);
+  if (scenarioMatch && ["GET","PATCH"].includes(request.method)) return costingScenarioDetail(request, supabase, id, scenarioMatch[1]);
+  const scenarioDuplicateMatch = route.match(/^costing\/scenarios\/([0-9a-f-]{36})\/duplicate$/i);
+  if (scenarioDuplicateMatch && request.method === "POST") return costingScenarioDetail(request, supabase, id, scenarioDuplicateMatch[1], true);
+  if (request.method === "GET" && route === "costing/analysis") return costingAnalysis(supabase, id);
+  if (request.method === "GET" && route === "costing/margins") return marginAnalysis(supabase, id);
+  if (request.method === "GET" && route === "costing/settings") return costingSettings(supabase, id);
+  if (request.method === "GET" && route === "reports/analytics") return reportsAnalytics(request, supabase, id);
+  if (request.method === "GET" && route === "reports/analytics/pdf") return reportsPdf(request, supabase, id);
   const list = route.match(/^dashboard\/(recent-projects|recent-boqs|pending-actions|upcoming-deliverables|notifications)$/)?.[1];
   if (request.method === "GET" && list) return dashboardList(request, supabase, id, list);
   if (request.method === "GET" && route === "proposals") return listProposals(request, supabase, id);

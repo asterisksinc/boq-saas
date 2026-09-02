@@ -2,8 +2,9 @@
   "info": {
     "_postman_id": "14bb9735-4d2c-4ca0-b253-f0ef23690c11",
     "name": "BOQ Design Arena — Complete API",
-    "description": "Single authenticated collection for Auth, User, Onboarding, Dashboard, Proposals, Documents, and Invoices. Import the Local environment, keep Postman's cookie jar enabled, and run folders in numeric order.",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    "description": "Complete authenticated API for Auth, User, Projects, BOQs, Costing, Reports, Proposals, Documents, and Invoices. Keep Postman's cookie jar enabled.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "2.0.0"
   },
   "event": [
     {
@@ -70,6 +71,38 @@
     {
       "key": "clientId",
       "value": "33333333-3333-4333-8333-333333333333"
+    },
+    {
+      "key": "boqId",
+      "value": ""
+    },
+    {
+      "key": "boqRoomId",
+      "value": ""
+    },
+    {
+      "key": "boqCategoryId",
+      "value": ""
+    },
+    {
+      "key": "boqItemId",
+      "value": ""
+    },
+    {
+      "key": "costingCategoryId",
+      "value": ""
+    },
+    {
+      "key": "costingItemId",
+      "value": ""
+    },
+    {
+      "key": "vendorQuoteId",
+      "value": ""
+    },
+    {
+      "key": "scenarioId",
+      "value": ""
     }
   ],
   "item": [
@@ -1257,30 +1290,720 @@
       "name": "11 — Projects & Excel Import",
       "description": "User-scoped Project CRUD, rooms, lifecycle, duplication, and server-side Project/BOQ spreadsheet parsing.",
       "item": [
-        { "name": "List Projects", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/projects?page=1&pageSize=20" } },
+        {
+          "name": "List Projects",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/projects?page=1&pageSize=20"
+          }
+        },
         {
           "name": "Create Project",
-          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Oberoi Residence - Bandra West\",\n  \"clientName\": \"Nikhil Oberoi\",\n  \"clientContact\": \"+91 98765 43210\",\n  \"clientEmail\": \"nikhil@example.com\",\n  \"projectType\": \"Residential\",\n  \"status\": \"planning\",\n  \"location\": \"Bandra West, Mumbai\",\n  \"areaSqft\": 3200,\n  \"projectValue\": 4800000,\n  \"approvedBudget\": 4250000,\n  \"startDate\": \"2026-09-15\",\n  \"targetCompletionDate\": \"2026-12-15\"\n}" }, "url": "{{baseUrl}}/api/v1/projects" },
-          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Created', () => pm.response.to.have.status(201));", "const body = pm.response.json();", "if (body.data?.id) pm.collectionVariables.set('projectId', body.data.id);"] } }]
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Oberoi Residence - Bandra West\",\n  \"clientName\": \"Nikhil Oberoi\",\n  \"clientContact\": \"+91 98765 43210\",\n  \"clientEmail\": \"nikhil@example.com\",\n  \"projectType\": \"Residential\",\n  \"status\": \"planning\",\n  \"location\": \"Bandra West, Mumbai\",\n  \"areaSqft\": 3200,\n  \"projectValue\": 4800000,\n  \"approvedBudget\": 4250000,\n  \"startDate\": \"2026-09-15\",\n  \"targetCompletionDate\": \"2026-12-15\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/projects"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Created', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "if (body.data?.id) pm.collectionVariables.set('projectId', body.data.id);"
+                ]
+              }
+            }
+          ]
         },
-        { "name": "Get Project", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/projects/{{projectId}}" } },
-        { "name": "Update Project", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{ \"description\": \"Updated scope\", \"approvedBudget\": 4500000 }" }, "url": "{{baseUrl}}/api/v1/projects/{{projectId}}" } },
-        { "name": "Change Project Status", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{ \"status\": \"in_progress\" }" }, "url": "{{baseUrl}}/api/v1/projects/{{projectId}}/status" } },
-        { "name": "Duplicate Project", "request": { "method": "POST", "url": "{{baseUrl}}/api/v1/projects/{{projectId}}/duplicate" } },
+        {
+          "name": "Get Project",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/projects/{{projectId}}"
+          }
+        },
+        {
+          "name": "Update Project",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"description\": \"Updated scope\", \"approvedBudget\": 4500000 }"
+            },
+            "url": "{{baseUrl}}/api/v1/projects/{{projectId}}"
+          }
+        },
+        {
+          "name": "Change Project Status",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"status\": \"in_progress\" }"
+            },
+            "url": "{{baseUrl}}/api/v1/projects/{{projectId}}/status"
+          }
+        },
+        {
+          "name": "Duplicate Project",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/projects/{{projectId}}/duplicate"
+          }
+        },
         {
           "name": "Add Project Room",
-          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{ \"name\": \"Master Bedroom\", \"roomType\": \"Master Bedroom\", \"length\": 12, \"width\": 14, \"height\": 10, \"unit\": \"ft\" }" }, "url": "{{baseUrl}}/api/v1/projects/{{projectId}}/rooms" },
-          "event": [{ "listen": "test", "script": { "exec": ["const body = pm.response.json();", "if (body.data?.id) pm.collectionVariables.set('roomId', body.data.id);"] } }]
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"name\": \"Master Bedroom\", \"roomType\": \"Master Bedroom\", \"length\": 12, \"width\": 14, \"height\": 10, \"unit\": \"ft\" }"
+            },
+            "url": "{{baseUrl}}/api/v1/projects/{{projectId}}/rooms"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.data?.id) pm.collectionVariables.set('roomId', body.data.id);"
+                ]
+              }
+            }
+          ]
         },
-        { "name": "List Project Rooms", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/projects/{{projectId}}/rooms" } },
-        { "name": "Update Project Room", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{ \"notes\": \"Dimensions verified\" }" }, "url": "{{baseUrl}}/api/v1/projects/{{projectId}}/rooms/{{roomId}}" } },
-        { "name": "Download Project Import Template", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/projects/import-template" } },
-        { "name": "Preview Project Spreadsheet", "request": { "method": "POST", "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": "{{projectFile}}" }] }, "url": "{{baseUrl}}/api/v1/projects/imports/preview" } },
-        { "name": "Import Project Spreadsheet", "request": { "method": "POST", "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": "{{projectFile}}" }] }, "url": "{{baseUrl}}/api/v1/projects/imports" } },
-        { "name": "Project Import History", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/projects/imports?page=1&pageSize=20" } },
-        { "name": "Preview BOQ Spreadsheet", "request": { "method": "POST", "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": "{{projectFile}}" }, { "key": "projectId", "type": "text", "value": "{{projectId}}" }] }, "url": "{{baseUrl}}/api/v1/boq-imports/preview" } },
-        { "name": "Import BOQ Spreadsheet", "request": { "method": "POST", "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": "{{projectFile}}" }, { "key": "projectId", "type": "text", "value": "{{projectId}}" }] }, "url": "{{baseUrl}}/api/v1/boq-imports/upload" } },
-        { "name": "Delete Project (Owner/Admin)", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/v1/projects/{{projectId}}" } }
+        {
+          "name": "List Project Rooms",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/projects/{{projectId}}/rooms"
+          }
+        },
+        {
+          "name": "Update Project Room",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"notes\": \"Dimensions verified\" }"
+            },
+            "url": "{{baseUrl}}/api/v1/projects/{{projectId}}/rooms/{{roomId}}"
+          }
+        },
+        {
+          "name": "Download Project Import Template",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/projects/import-template"
+          }
+        },
+        {
+          "name": "Preview Project Spreadsheet",
+          "request": {
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "{{projectFile}}"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/v1/projects/imports/preview"
+          }
+        },
+        {
+          "name": "Import Project Spreadsheet",
+          "request": {
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "{{projectFile}}"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/v1/projects/imports"
+          }
+        },
+        {
+          "name": "Project Import History",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/projects/imports?page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "Preview BOQ Spreadsheet",
+          "request": {
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "{{projectFile}}"
+                },
+                {
+                  "key": "projectId",
+                  "type": "text",
+                  "value": "{{projectId}}"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/v1/boq-imports/preview"
+          }
+        },
+        {
+          "name": "Import BOQ Spreadsheet",
+          "request": {
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "{{projectFile}}"
+                },
+                {
+                  "key": "projectId",
+                  "type": "text",
+                  "value": "{{projectId}}"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/v1/boq-imports/upload"
+          }
+        },
+        {
+          "name": "Delete Project (Owner/Admin)",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/v1/projects/{{projectId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 — BOQ Management",
+      "description": "Blank/template-ready BOQ CRUD and the room/category/item editor hierarchy. Run after creating a project in folder 11.",
+      "item": [
+        {
+          "name": "List BOQs",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/boqs?page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "Create Blank BOQ",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"boqNumber\": \"BOQ-0071\",\n  \"projectId\": \"{{projectId}}\",\n  \"version\": \"v1\",\n  \"method\": \"blank\",\n  \"markupPercent\": 18,\n  \"taxPercent\": 18\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/boqs"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json(); if (b.data?.id) pm.collectionVariables.set('boqId', b.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get BOQ Detail",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/boqs/{{boqId}}"
+          }
+        },
+        {
+          "name": "Update BOQ",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": \"v1.1\",\n  \"markupPercent\": 20\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/boqs/{{boqId}}"
+          }
+        },
+        {
+          "name": "Add Room",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Master Bedroom\",\n  \"description\": \"Primary bedroom scope\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/boqs/{{boqId}}/rooms"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json(); if (b.data?.id) pm.collectionVariables.set('boqRoomId', b.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add Room Category",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Furniture\",\n  \"description\": \"Custom furniture\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/boqs/{{boqId}}/rooms/{{boqRoomId}}/categories"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json(); if (b.data?.id) pm.collectionVariables.set('boqCategoryId', b.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add BOQ Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Full Height Wardrobe\",\n  \"description\": \"19mm BWP ply, laminate finish\",\n  \"unit\": \"Sq.ft\",\n  \"quantity\": 72,\n  \"rate\": 2875,\n  \"wastePercent\": 5,\n  \"taxPercent\": 18\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/boqs/{{boqId}}/categories/{{boqCategoryId}}/items"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json(); if (b.data?.id) pm.collectionVariables.set('boqItemId', b.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update BOQ Item",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Full Height Wardrobe\",\n  \"unit\": \"Sq.ft\",\n  \"quantity\": 75,\n  \"rate\": 2875,\n  \"wastePercent\": 5,\n  \"taxPercent\": 18\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/boqs/{{boqId}}/items/{{boqItemId}}"
+          }
+        },
+        {
+          "name": "Send BOQ for Review",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"in_review\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/boqs/{{boqId}}/status"
+          }
+        },
+        {
+          "name": "Approve BOQ — Owner/Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"approved\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/boqs/{{boqId}}/status"
+          }
+        },
+        {
+          "name": "Duplicate BOQ",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/boqs/{{boqId}}/duplicate"
+          }
+        },
+        {
+          "name": "Save BOQ as Template",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Residential - 3BHK Standard\",\n  \"boqId\": \"{{boqId}}\",\n  \"tags\": [\n    \"Residential\",\n    \"Popular\"\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/boq-templates"
+          }
+        },
+        {
+          "name": "List BOQ Templates",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/boq-templates?page=1&pageSize=20"
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 — Costing",
+      "description": "Cost library, category defaults, vendor comparison, scenarios, budget variance, and margin analysis.",
+      "item": [
+        {
+          "name": "List Categories",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/costing/categories?page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "Create Category",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Boards\",\n  \"code\": \"MAT-BRD\",\n  \"defaultUnit\": \"Sheet\",\n  \"defaultTaxPercent\": 18,\n  \"defaultMarkupPercent\": 22,\n  \"defaultWastePercent\": 5,\n  \"transportIncluded\": false,\n  \"labourIncluded\": true,\n  \"description\": \"Board and panel products\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/costing/categories"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json(); if (b.data?.id) pm.collectionVariables.set('costingCategoryId', b.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Category Detail",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/costing/categories/{{costingCategoryId}}"
+          }
+        },
+        {
+          "name": "Update Category Defaults",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"defaultMarkupPercent\": 25\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/costing/categories/{{costingCategoryId}}"
+          }
+        },
+        {
+          "name": "List Costing Items",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/costing/items?page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "Create Costing Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"18MM HDHMR Board\",\n  \"code\": \"MAT-BRD-001\",\n  \"categoryId\": \"{{costingCategoryId}}\",\n  \"unit\": \"Sheet\",\n  \"baseCost\": 1200,\n  \"sellingRate\": 1650,\n  \"preferredVendor\": \"Century Ply\",\n  \"spec\": \"18mm premium board\",\n  \"rateStatus\": \"active\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/costing/items"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json(); if (b.data?.id) pm.collectionVariables.set('costingItemId', b.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Item & Vendor Quotes",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/costing/items/{{costingItemId}}"
+          }
+        },
+        {
+          "name": "Add Vendor Quote",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"itemId\": \"{{costingItemId}}\",\n  \"vendorName\": \"Monarch Furnitures\",\n  \"quote\": 1180,\n  \"leadTimeDays\": 21,\n  \"rating\": 4.8\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/costing/vendor-quotes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json(); if (b.data?.id) pm.collectionVariables.set('vendorQuoteId', b.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Select Vendor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"selected\": true\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/costing/vendor-quotes/{{vendorQuoteId}}/selection"
+          }
+        },
+        {
+          "name": "Create Scenario",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Value Engineering - Kitchen\",\n  \"boqId\": \"{{boqId}}\",\n  \"type\": \"value_engineering\",\n  \"description\": \"Cost reduction opportunities\",\n  \"adjustments\": []\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/costing/scenarios"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json(); if (b.data?.id) pm.collectionVariables.set('scenarioId', b.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Scenarios",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/costing/scenarios?page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "Get Scenario",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/costing/scenarios/{{scenarioId}}"
+          }
+        },
+        {
+          "name": "Duplicate Scenario",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/costing/scenarios/{{scenarioId}}/duplicate"
+          }
+        },
+        {
+          "name": "Cost Analysis",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/costing/analysis"
+          }
+        },
+        {
+          "name": "Margin Analysis",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/costing/margins"
+          }
+        },
+        {
+          "name": "Costing Settings Health",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/costing/settings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "14 — Reports & Analytics",
+      "description": "Owner/admin-only workspace business intelligence. Values are derived by the backend and cannot be submitted by the browser.",
+      "item": [
+        {
+          "name": "Reports — This Year",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/reports/analytics?period=year"
+          }
+        },
+        {
+          "name": "Reports — This Quarter",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/reports/analytics?period=quarter"
+          }
+        },
+        {
+          "name": "Download Reports PDF",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/reports/analytics/pdf?period=year"
+          }
+        },
+        {
+          "name": "Reports Forbidden for Member/Viewer",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/reports/analytics?period=year"
+          }
+        }
       ]
     }
   ]

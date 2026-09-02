@@ -29,6 +29,9 @@ Run the collection folders in numeric order:
 9. Proposal & Document Negative Checks
 10. Invoices
 11. Projects & Excel Import
+12. BOQ Management
+13. Costing
+14. Reports & Analytics
 
 For OTP requests, copy the six-digit Gmail code into the environment `otp`
 value before running the corresponding verification request. For document
@@ -42,6 +45,13 @@ Folder 11 in the Complete collection covers project CRUD, lifecycle,
 duplication, room setup, and backend Excel/CSV import. Set the `projectFile`
 collection variable (or choose a file in each request) before running
 preview/import.
+
+Folders 12-14 cover the new User APIs. Run folder 12 after Create Project so
+`projectId` is populated; it automatically stores the BOQ room/category/item
+IDs used by later requests. Folder 13 builds a costing category/item, adds and
+selects a vendor quote, then creates a scenario and loads cost/margin analysis.
+Folder 14 requires an owner/admin session because business-wide revenue,
+cost, margin, team, and client analytics are financially sensitive.
 
 ## Common failures
 

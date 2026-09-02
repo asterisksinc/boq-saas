@@ -16,5 +16,9 @@ export function permissionsFor(role: string) {
     canCreateInvoice: contributor,
     canRecordPayment: contributor,
     canDeleteInvoice: elevated,
+    canManageBoq: contributor,
+    canManageCosting: contributor,
+    canViewReports: elevated,
+    canExportReports: elevated,
   };
 }
