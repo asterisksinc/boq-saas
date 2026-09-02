@@ -86,9 +86,10 @@ function DashboardRail() {
 }
 
 function DashboardHeader() {
+    const router = useRouter();
     return <header className="fig-dashboard-header"><h1>Overview</h1><div className="fig-dashboard-header-actions">
         <label className="fig-dashboard-search"><img src="/assets/dashboard/dashboard-search.svg" alt="" /><input placeholder="Search..." aria-label="Search" /></label>
-        <button type="button" className="fig-dashboard-new"><Plus size={20} /><span>New</span><i /><ChevronDown size={20} /></button>
+        <button type="button" className="fig-dashboard-new" onClick={() => router.push("/projects")}><Plus size={20} /><span>New</span><i /><ChevronDown size={20} /></button>
         <button type="button" className="fig-dashboard-bell" aria-label="Notifications"><img src="/assets/dashboard/dashboard-notifications.svg" alt="" /></button><div className="fig-dashboard-avatar">BO</div>
     </div></header>;
 }
@@ -112,9 +113,9 @@ function Metric({ value, label, trend }: { value: string; label: string; trend: 
 function EmptyAnalytics() {
     return <div className="fig-empty-analytics">
         <div className="fig-chart-placeholder">
-            <div className="fig-placeholder-chart"><FilePlus2 size={17} /></div>
-            <strong>No analytics data yet</strong>
-            <p>Once you create projects, your analytics and insights will appear here.</p>
+            <img src="/assets/dashboard/empty-analytics.png" alt="No analytics data" style={{ maxWidth: '280px', marginBottom: '16px' }} />
+            <strong style={{ display: 'block', fontSize: '18px', color: '#1f2d3d', marginBottom: '8px' }}>No analytics data yet</strong>
+            <p style={{ color: '#6b7280', fontSize: '14px', maxWidth: '300px', margin: '0 auto', lineHeight: '1.5' }}>Once you create projects, your analytics and insights will appear here.</p>
         </div>
         <em>No data to display yet</em>
         <div className="fig-chart-control"><span>Week</span><strong>Month</strong><span>Quarter</span></div>
@@ -126,5 +127,23 @@ function AnalyticsChart() { return <div className="fig-chart"><div className="fi
 function ProjectsCard({ overview, hasContent }: { overview: DashboardOverview; hasContent: boolean }) { return <section className="fig-projects-card"><h2>Projects &amp; BOQ</h2>{hasContent ? <><div className="fig-project-legend"><span>○ In Progress <b>{formatNumber(overview.kpis.activeProjects)}</b></span><span>○ Planning <b>0</b></span><span>○ On Hold <b>0</b></span><span className="complete">● Completed <b>{Math.max(0, overview.kpis.totalProjects - overview.kpis.activeProjects)}</b></span></div><div className="fig-project-graph"><div className="fig-value-label"><span>Total BOQ Value</span><strong>₹{formatNumber(overview.kpis.totalEstimatedValue ?? 0)}</strong></div><div className="fig-project-bars">{Array.from({ length: 18 }, (_, index) => <i key={index} />)}<b /></div></div></> : <EmptyCard icon="dashboard-projects" title="No projects or BOQ yet" detail="Create your first project or BOQ to see the overview here." />}</section>; }
 function BoqCard({ items, hasContent, money }: { items: DashboardItem[]; hasContent: boolean; money: Intl.NumberFormat | null }) { const item = items[0]; return <section className="fig-boq-card"><div className="fig-small-card-header"><h2>BOQ</h2>{hasContent && <div><button><ChevronLeft size={16} /></button><button><ChevronRight size={16} /></button></div>}</div>{hasContent && item ? <div className="fig-boq-item"><em>{item.status?.toUpperCase() === "OVERDUE" ? "OVERDUE" : "ACTIVE"}</em><strong>{item.name}</strong><span>{item.subtitle ?? "Project BOQ"}</span><b>{item.value !== undefined ? money?.format(item.value) : "—"}</b></div> : <EmptyCard icon="dashboard-boqs" title="No BOQ available" detail="You haven't created any BOQs yet." compact />}</section>; }
 function EmptyCard({ icon, title, detail, compact = false }: { icon: string; title: string; detail: string; compact?: boolean }) { return <div className={`fig-empty-card ${compact ? "compact" : ""}`}><span><img src={`/assets/dashboard/${icon}.svg`} alt="" /></span><strong>{title}</strong><p>{detail}</p></div>; }
-function QuickActions() { const actions = [[FilePlus2, "Create BOQ"], [FileSpreadsheet, "Import Excel"], [UserPlus, "Invite Team"], [FilePlus2, "Generate Rep."]] as const; return <section className="fig-quick-actions"><h2>Quick Actions</h2><div>{actions.map(([Icon, label]) => <button type="button" key={label}><Icon size={20} /><span>{label}</span></button>)}</div></section>; }
+function QuickActions() {
+    const router = useRouter();
+    const actions = [
+        { Icon: FilePlus2, label: "Create BOQ", path: "/boqs" },
+        { Icon: FileSpreadsheet, label: "Import Excel", path: "/projects" },
+        { Icon: UserPlus, label: "Invite Team", path: "/workspace" },
+        { Icon: FilePlus2, label: "Generate Rep.", path: "/analytics" }
+    ];
+    return <section className="fig-quick-actions">
+        <h2>Quick Actions</h2>
+        <div>
+            {actions.map(({ Icon, label, path }) => (
+                <button type="button" key={label} onClick={() => router.push(path)}>
+                    <Icon size={20} /><span>{label}</span>
+                </button>
+            ))}
+        </div>
+    </section>;
+}
 function DashboardLoading() { return <div className="fig-dashboard-layout fig-dashboard-loading"><div className="fig-dashboard-left"><div /><div /><div /></div><div /></div>; }
