@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { getApiErrorMessage, parseApiResponse } from "@/lib/api/auth";
-import { mapBoqListItem, type BoqListItem } from "@/lib/domain/boq-data";
+import { BoqStatusUi, mapBoqListItem, type BoqListItem } from "@/lib/domain/boq-data";
 
 type CreateMode = "blank" | "template";
 
@@ -282,18 +282,80 @@ export default function BoqsPage() {
                                                         {boq.status} <ChevronDown size={14} />
                                                     </span>
                                                     {openStatusId === boq.id && (
-                                                        <div className="boq-dropdown-menu" style={{ position: "absolute", top: "100%", left: "16px", background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)", zIndex: 10, minWidth: "140px", padding: "4px 0", marginTop: "4px" }}>
-                                                            {["DRAFT", "IN REVIEW", "APPROVED", "ARCHIVED"].map(status => (
-                                                                <button key={status} style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 16px", background: "none", border: "none", fontSize: "13px", color: "#374151", cursor: "pointer" }} onClick={async (e) => { 
-                                                                    e.stopPropagation(); 
-                                                                    setOpenStatusId(null);
-                                                                    if (boq.id.startsWith("mock-")) {
-                                                                        setBoqRows(boqRows.map(b => b.id === boq.id ? { ...b, status } : b)); return;
-                                                                    }
-                                                                    // API call to update status
-                                                                    const res = await fetch(`/api/v1/boqs/${boq.id}/status`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: status.toLowerCase().replace(" ", "_") }), credentials: "include" });
-                                                                    if(res.ok) setBoqRows(boqRows.map(b => b.id === boq.id ? { ...b, status } : b));
-                                                                }}>{status}</button>
+                                                        <div
+                                                            className="boq-dropdown-menu"
+                                                            style={{
+                                                                position: "absolute",
+                                                                top: "100%",
+                                                                left: "16px",
+                                                                background: "#fff",
+                                                                border: "1px solid #e5e7eb",
+                                                                borderRadius: "8px",
+                                                                boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+                                                                zIndex: 10,
+                                                                minWidth: "140px",
+                                                                padding: "4px 0",
+                                                                marginTop: "4px"
+                                                            }}
+                                                        >
+                                                            {(["DRAFT", "IN REVIEW", "APPROVED", "ARCHIVED"] as BoqStatusUi[]).map(status => (
+                                                                <button
+                                                                    key={status}
+                                                                    style={{
+                                                                        display: "block",
+                                                                        width: "100%",
+                                                                        textAlign: "left",
+                                                                        padding: "8px 16px",
+                                                                        background: "none",
+                                                                        border: "none",
+                                                                        fontSize: "13px",
+                                                                        color: "#374151",
+                                                                        cursor: "pointer"
+                                                                    }}
+                                                                    onClick={async (e) => {
+                                                                        e.stopPropagation();
+                                                                        setOpenStatusId(null);
+
+                                                                        if (boq.id.startsWith("mock-")) {
+                                                                            setBoqRows(
+                                                                                boqRows.map(b =>
+                                                                                    b.id === boq.id
+                                                                                        ? { ...b, status }
+                                                                                        : b
+                                                                                )
+                                                                            );
+                                                                            return;
+                                                                        }
+
+                                                                        const res = await fetch(
+                                                                            `/api/v1/boqs/${boq.id}/status`,
+                                                                            {
+                                                                                method: "POST",
+                                                                                headers: {
+                                                                                    "Content-Type": "application/json"
+                                                                                },
+                                                                                body: JSON.stringify({
+                                                                                    status: status
+                                                                                        .toLowerCase()
+                                                                                        .replace(" ", "_")
+                                                                                }),
+                                                                                credentials: "include"
+                                                                            }
+                                                                        );
+
+                                                                        if (res.ok) {
+                                                                            setBoqRows(
+                                                                                boqRows.map(b =>
+                                                                                    b.id === boq.id
+                                                                                        ? { ...b, status }
+                                                                                        : b
+                                                                                )
+                                                                            );
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    {status}
+                                                                </button>
                                                             ))}
                                                         </div>
                                                     )}
