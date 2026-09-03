@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { EmailOtpError, issueEmailOtp, verifyEmailOtp } from "@/lib/auth/email-otp";
+import { isEmailOtpBypassed } from "@/lib/auth/otp-bypass";
 import { pagination } from "@/lib/domain/dashboard";
 import { demoPendingActions, demoRecentBoqs, demoRecentProjects, demoUpcomingDeliverables } from "@/lib/domain/dashboard-demo";
 import { consumeRateLimit, rateLimitKey } from "@/lib/api/rate-limit";
@@ -171,15 +172,15 @@ async function login(request: Request, supabase: SupabaseClient, id: string) {
   if (error || !data.user) {
     return fail("UNAUTHENTICATED", "otp" in input.data ? "Invalid or expired OTP." : "Invalid email or password.", 401, id);
   }
-  if (!("otp" in input.data)) {
+  if (!("otp" in input.data) && !isEmailOtpBypassed(input.data.email)) {
     try { await issueEmailOtp(input.data.email, data.user.id); }
     catch (otpError) { return emailOtpFailure(otpError, id); }
     await supabase.auth.signOut({ scope: "local" });
-    return ok({ otpSent: true, message: "A 6-digit login code has been sent through Gmail." }, 200, id);
+    return ok({ otpRequired: true, otpSent: true, message: "A 6-digit login code has been sent through Gmail." }, 200, id);
   }
   const ctx = await context(supabase, id); if ("response" in ctx) return ctx.response;
   await audit(supabase, "auth.login.succeeded", id);
-  return ok({ user: { id: data.user.id, email: data.user.email }, context: ctx.data }, 200, id);
+  return ok({ otpRequired: false, user: { id: data.user.id, email: data.user.email }, context: ctx.data }, 200, id);
 }
 
 async function refresh(supabase: SupabaseClient, id: string) {

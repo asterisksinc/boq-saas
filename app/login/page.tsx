@@ -21,7 +21,12 @@ export default function LoginPage() {
         setIsSubmitting(true);
 
         try {
-            await login({ email: email.trim(), password });
+            const response = await login({ email: email.trim(), password });
+            if (!response.otpRequired) {
+                router.push("/dashboard");
+                return;
+            }
+
             const params = new URLSearchParams({ flow: "login", email: email.trim() });
             router.push(`/verify-email?${params.toString()}`);
         } catch (requestError) {

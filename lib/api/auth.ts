@@ -23,6 +23,14 @@ export type AuthContext = {
     [key: string]: unknown;
 };
 
+export type LoginResult = {
+    user?: AuthUser;
+    context?: AuthContext;
+    otpRequired: boolean;
+    otpSent?: boolean;
+    message?: string;
+};
+
 export type DashboardNotification = {
     id: string;
     type: string;
@@ -93,7 +101,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export async function login(input: { email: string; password: string }) {
-    const payload = await request<{ user: AuthUser; context?: AuthContext }>("/api/v1/auth/login", {
+    const payload = await request<LoginResult>("/api/v1/auth/login", {
         method: "POST",
         body: JSON.stringify(input),
     });

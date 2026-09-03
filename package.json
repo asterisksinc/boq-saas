@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "seed:demo-user": "node scripts/seed-demo-user.mjs",
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
