@@ -627,6 +627,26 @@ async function projectImportTemplate(supabase: SupabaseClient, id: string) {
     "Content-Disposition": "attachment; filename=project-import-template.xlsx", "Cache-Control": "private, no-store", "X-Request-Id": id } });
 }
 
+async function projectExport(supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const result = await supabase.from("projects").select(projectSelect)
+    .eq("workspace_id", scoped.access.workspaceId).is("archived_at", null).order("updated_at", { ascending: false });
+  if (result.error) return fail("INTERNAL_ERROR", "Projects could not be exported.", 500, id);
+  const rows = (result.data ?? []).map((row) => {
+    const project = projectDto(row as Record<string, unknown>);
+    return { ProjectCode: project.projectCode, ProjectName: project.name, ClientName: project.clientName,
+      ClientContact: project.clientContact, ProjectType: project.projectType, Status: project.status,
+      Location: project.location, AreaSqft: project.areaSqft, ProjectValue: project.projectValue,
+      ApprovedBudget: project.approvedBudget, StartDate: project.startDate,
+      TargetCompletionDate: project.targetCompletionDate, Description: project.description };
+  });
+  const sheet = XLSX.utils.json_to_sheet(rows);
+  const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, sheet, "Projects");
+  const output = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }) as Buffer;
+  return new Response(new Uint8Array(output), { status: 200, headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "Content-Disposition": "attachment; filename=projects.xlsx", "Cache-Control": "private, no-store", "X-Request-Id": id } });
+}
+
 async function createBoqImport(request: Request, supabase: SupabaseClient, id: string) {
   const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
   const input = await parsed(request, boqImportSchema, id); if (input.response) return input.response;
@@ -1550,6 +1570,7 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (request.method === "GET" && route === "projects") return listProjects(request, supabase, id);
   if (request.method === "POST" && route === "projects") return createProject(request, supabase, id);
   if (request.method === "GET" && route === "projects/import-template") return projectImportTemplate(supabase, id);
+  if (request.method === "GET" && route === "projects/export") return projectExport(supabase, id);
   if (request.method === "GET" && route === "projects/imports") return projectImportHistory(request, supabase, id);
   if (request.method === "POST" && route === "projects/imports/preview") return previewProjectImport(request, supabase, id);
   if (request.method === "POST" && route === "projects/imports") return importProjects(request, supabase, id);
