@@ -20,5 +20,9 @@ export function permissionsFor(role: string) {
     canManageCosting: contributor,
     canViewReports: elevated,
     canExportReports: elevated,
+    canCreateTemplate: contributor,
+    canEditTemplate: contributor,
+    canArchiveTemplate: elevated,
+    canUseTemplate: contributor,
   };
 }

@@ -59,6 +59,12 @@ import {
   vendorSelectionSchema,
   costingScenarioSchema,
   costingScenarioPatchSchema,
+  projectTemplateCreateSchema,
+  projectTemplatePatchSchema,
+  projectTemplateSectionSchema,
+  projectTemplateDocumentsSchema,
+  projectTemplateUseSchema,
+  projectTemplatePublishSchema,
 } from "@/lib/api/validation";
 import { z } from "zod";
 
@@ -1545,6 +1551,199 @@ async function invoicePdf(supabase: SupabaseClient, id: string, invoiceId: strin
   });
 }
 
+const projectTemplateSelect = "id,template_code,name,description,business_type,project_type,team,region,visibility,image_url,tags,status,current_version,structure,costing_boq,workflow,documents,use_count,last_used_at,published_at,created_by,updated_by,created_at,updated_at";
+
+function projectTemplateDto(row: Record<string, unknown>, includeContent = false) {
+  const structure = (row.structure ?? {}) as Record<string, unknown>;
+  const costingBoq = (row.costing_boq ?? {}) as Record<string, unknown>;
+  const workflow = (row.workflow ?? {}) as Record<string, unknown>;
+  const documents = (row.documents ?? []) as unknown[];
+  const dto: Record<string, unknown> = {
+    id: row.id, templateCode: row.template_code, name: row.name, description: row.description,
+    businessType: row.business_type, projectType: row.project_type, team: row.team, region: row.region,
+    visibility: row.visibility, imageUrl: row.image_url, tags: row.tags ?? [], status: row.status,
+    version: Number(row.current_version), useCount: Number(row.use_count), lastUsedAt: row.last_used_at,
+    publishedAt: row.published_at, createdBy: row.created_by, updatedBy: row.updated_by,
+    createdAt: row.created_at, updatedAt: row.updated_at,
+    composition: {
+      rooms: Array.isArray(structure.areas) ? structure.areas.length : Number(structure.roomCount ?? 0),
+      boqSections: Array.isArray(costingBoq.sections) ? costingBoq.sections.length : Number(costingBoq.sectionCount ?? 0),
+      items: Number(costingBoq.itemCount ?? 0),
+      stages: Array.isArray(workflow.stages) ? workflow.stages.length : 0,
+      tasks: Array.isArray(workflow.tasks) ? workflow.tasks.length : 0,
+      milestones: Array.isArray(workflow.milestones) ? workflow.milestones.length : 0,
+      approvals: Array.isArray(workflow.approvals) ? workflow.approvals.length : 0,
+      rules: Array.isArray(workflow.rules) ? workflow.rules.length : 0,
+      documents: documents.length,
+    },
+  };
+  if (includeContent) Object.assign(dto, { structure, costingBoq, workflow, documents });
+  return dto;
+}
+
+async function listProjectTemplates(request: NextRequest, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const { page, pageSize, from, to } = pagination(request.nextUrl.searchParams);
+  const search = request.nextUrl.searchParams.get("search")?.trim().slice(0, 120);
+  const status = request.nextUrl.searchParams.get("status");
+  const type = request.nextUrl.searchParams.get("type")?.trim().slice(0, 80);
+  let query = supabase.from("project_templates").select(projectTemplateSelect, { count: "exact" })
+    .eq("workspace_id", scoped.access.workspaceId).is("archived_at", null).order("updated_at", { ascending: false }).range(from, to);
+  if (status && ["draft", "active", "needs_review"].includes(status)) query = query.eq("status", status);
+  if (type) query = query.eq("business_type", type);
+  if (search) {
+    const safe = search.replace(/[%_,()]/g, " ");
+    query = query.or(`template_code.ilike.%${safe}%,name.ilike.%${safe}%,description.ilike.%${safe}%`);
+  }
+  const result = await query;
+  if (result.error) return fail("INTERNAL_ERROR", "Project templates could not be loaded.", 500, id);
+  const total = result.count ?? 0;
+  return ok({ items: (result.data ?? []).map((row) => projectTemplateDto(row as Record<string, unknown>)), page, pageSize, total, hasMore: to + 1 < total }, 200, id);
+}
+
+async function projectTemplatesOverview(supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const result = await supabase.from("project_templates").select(projectTemplateSelect)
+    .eq("workspace_id", scoped.access.workspaceId).is("archived_at", null).order("last_used_at", { ascending: false, nullsFirst: false });
+  if (result.error) return fail("INTERNAL_ERROR", "Template overview could not be loaded.", 500, id);
+  const rows = result.data ?? [];
+  const byType = rows.reduce<Record<string, number>>((counts, row) => { counts[row.business_type] = (counts[row.business_type] ?? 0) + 1; return counts; }, {});
+  return ok({ total: rows.length, active: rows.filter((row) => row.status === "active").length,
+    draft: rows.filter((row) => row.status === "draft").length, needsReview: rows.filter((row) => row.status === "needs_review").length,
+    byType, recentlyUsed: rows.filter((row) => row.last_used_at).slice(0, 8).map((row) => projectTemplateDto(row as Record<string, unknown>)) }, 200, id);
+}
+
+async function createProjectTemplate(request: Request, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const input = await parsed(request, projectTemplateCreateSchema, id); if (input.response) return input.response;
+  const value = input.data;
+  const result = await supabase.from("project_templates").insert({ workspace_id: scoped.access.workspaceId,
+    name: value.name, description: value.description ?? null, business_type: value.businessType, project_type: value.projectType,
+    team: value.team ?? null, region: value.region ?? null, visibility: value.visibility, image_url: value.imageUrl ?? null,
+    tags: value.tags, structure: value.structure, costing_boq: value.costingBoq, workflow: value.workflow, documents: value.documents,
+    created_by: scoped.access.userId, updated_by: scoped.access.userId }).select(projectTemplateSelect).single();
+  if (result.error) return fail("VALIDATION_ERROR", "Project template could not be created.", 400, id);
+  await audit(supabase, "project_template.created", id);
+  return ok(projectTemplateDto(result.data as Record<string, unknown>, true), 201, id);
+}
+
+async function getProjectTemplate(supabase: SupabaseClient, id: string, templateId: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const result = await supabase.from("project_templates").select(projectTemplateSelect).eq("workspace_id", scoped.access.workspaceId)
+    .eq("id", templateId).is("archived_at", null).single();
+  return result.error ? fail("NOT_FOUND", "Project template was not found.", 404, id) : ok(projectTemplateDto(result.data as Record<string, unknown>, true), 200, id);
+}
+
+async function updateProjectTemplate(request: Request, supabase: SupabaseClient, id: string, templateId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const input = await parsed(request, projectTemplatePatchSchema, id); if (input.response) return input.response;
+  const value = input.data;
+  const patch: Record<string, unknown> = { updated_by: scoped.access.userId };
+  const keys: Record<string, string> = { name: "name", description: "description", businessType: "business_type", projectType: "project_type",
+    team: "team", region: "region", visibility: "visibility", imageUrl: "image_url", tags: "tags", status: "status" };
+  for (const [key, column] of Object.entries(keys)) if (key in value) patch[column] = value[key as keyof typeof value];
+  const result = await supabase.from("project_templates").update(patch).eq("workspace_id", scoped.access.workspaceId).eq("id", templateId)
+    .is("archived_at", null).select(projectTemplateSelect).single();
+  if (result.error) return fail("NOT_FOUND", "Project template was not found or could not be updated.", 404, id);
+  await audit(supabase, "project_template.updated", id);
+  return ok(projectTemplateDto(result.data as Record<string, unknown>, true), 200, id);
+}
+
+async function projectTemplateSection(request: Request, supabase: SupabaseClient, id: string, templateId: string, section: string) {
+  const column = section === "costing-boq" ? "costing_boq" : section;
+  const scoped = await workspaceAccess(supabase, id, request.method === "PATCH"); if ("response" in scoped) return scoped.response;
+  if (request.method === "GET") {
+    const result = await supabase.from("project_templates").select(projectTemplateSelect).eq("workspace_id", scoped.access.workspaceId).eq("id", templateId).is("archived_at", null).single();
+    if (result.error) return fail("NOT_FOUND", "Project template was not found.", 404, id);
+    const data = result.data as unknown as Record<string, unknown>;
+    return ok({ templateId, version: data.current_version, data: data[column] }, 200, id);
+  }
+  const input = await parsed(request, projectTemplateSectionSchema, id); if (input.response) return input.response;
+  const result = await supabase.from("project_templates").update({ [column]: input.data.data, updated_by: scoped.access.userId })
+    .eq("workspace_id", scoped.access.workspaceId).eq("id", templateId).is("archived_at", null).select(projectTemplateSelect).single();
+  if (result.error) return fail("NOT_FOUND", "Project template was not found or could not be updated.", 404, id);
+  await audit(supabase, `project_template.${section}.updated`, id);
+  const data = result.data as unknown as Record<string, unknown>;
+  return ok({ templateId, version: data.current_version, data: data[column] }, 200, id);
+}
+
+async function projectTemplateDocuments(request: Request, supabase: SupabaseClient, id: string, templateId: string) {
+  const scoped = await workspaceAccess(supabase, id, request.method === "PATCH"); if ("response" in scoped) return scoped.response;
+  if (request.method === "GET") {
+    const result = await supabase.from("project_templates").select("documents,current_version").eq("workspace_id", scoped.access.workspaceId).eq("id", templateId).is("archived_at", null).single();
+    return result.error ? fail("NOT_FOUND", "Project template was not found.", 404, id) : ok({ templateId, version: result.data.current_version, documents: result.data.documents }, 200, id);
+  }
+  const input = await parsed(request, projectTemplateDocumentsSchema, id); if (input.response) return input.response;
+  const result = await supabase.from("project_templates").update({ documents: input.data.documents, updated_by: scoped.access.userId })
+    .eq("workspace_id", scoped.access.workspaceId).eq("id", templateId).is("archived_at", null).select("documents,current_version").single();
+  if (result.error) return fail("NOT_FOUND", "Project template was not found or could not be updated.", 404, id);
+  await audit(supabase, "project_template.documents.updated", id);
+  return ok({ templateId, version: result.data.current_version, documents: result.data.documents }, 200, id);
+}
+
+async function publishProjectTemplate(request: Request, supabase: SupabaseClient, id: string, templateId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const input = await parsed(request, projectTemplatePublishSchema, id); if (input.response) return input.response;
+  const current = await supabase.from("project_templates").select(projectTemplateSelect).eq("workspace_id", scoped.access.workspaceId).eq("id", templateId).is("archived_at", null).single();
+  if (current.error) return fail("NOT_FOUND", "Project template was not found.", 404, id);
+  const version = Number(current.data.current_version) + 1;
+  const snapshot = { ...projectTemplateDto(current.data as Record<string, unknown>, true), version };
+  const saved = await supabase.from("project_template_versions").insert({ workspace_id: scoped.access.workspaceId, template_id: templateId,
+    version, snapshot, change_note: input.data.changeNote ?? null, created_by: scoped.access.userId });
+  if (saved.error) return fail("CONFLICT", "Template version could not be published.", 409, id);
+  const updated = await supabase.from("project_templates").update({ current_version: version, status: "active", published_at: new Date().toISOString(), updated_by: scoped.access.userId })
+    .eq("workspace_id", scoped.access.workspaceId).eq("id", templateId).select(projectTemplateSelect).single();
+  if (updated.error) return fail("INTERNAL_ERROR", "Template was versioned but could not be activated.", 500, id);
+  await audit(supabase, "project_template.published", id);
+  return ok(projectTemplateDto(updated.data as Record<string, unknown>, true), 200, id);
+}
+
+async function projectTemplateHistory(request: NextRequest, supabase: SupabaseClient, id: string, templateId: string, resource: "versions" | "usage") {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const { page, pageSize, from, to } = pagination(request.nextUrl.searchParams);
+  const table = resource === "versions" ? "project_template_versions" : "project_template_usage";
+  const select = resource === "versions" ? "id,version,change_note,created_by,created_at" : "id,template_version,project_id,used_by,created_at,projects(project_code,name,client_name,status,progress,updated_at)";
+  const result = await supabase.from(table).select(select, { count: "exact" }).eq("workspace_id", scoped.access.workspaceId).eq("template_id", templateId)
+    .order("created_at", { ascending: false }).range(from, to);
+  if (result.error) return fail("INTERNAL_ERROR", `Template ${resource} could not be loaded.`, 500, id);
+  const total = result.count ?? 0;
+  return ok({ items: result.data ?? [], page, pageSize, total, hasMore: to + 1 < total }, 200, id);
+}
+
+async function useProjectTemplate(request: Request, supabase: SupabaseClient, id: string, templateId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const input = await parsed(request, projectTemplateUseSchema, id); if (input.response) return input.response;
+  const result = await supabase.rpc("use_project_template", { p_workspace_id: scoped.access.workspaceId, p_template_id: templateId,
+    p_name: input.data.projectName, p_client_name: input.data.clientName, p_location: input.data.location ?? null,
+    p_start_date: input.data.startDate ?? null, p_target_completion_date: input.data.targetCompletionDate ?? null });
+  if (result.error) return fail("CONFLICT", "Only an active template can be used to create a project.", 409, id);
+  await audit(supabase, "project_template.used", id);
+  return ok(result.data, 201, id);
+}
+
+async function duplicateProjectTemplate(supabase: SupabaseClient, id: string, templateId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const source = await supabase.from("project_templates").select(projectTemplateSelect).eq("workspace_id", scoped.access.workspaceId).eq("id", templateId).is("archived_at", null).single();
+  if (source.error) return fail("NOT_FOUND", "Project template was not found.", 404, id);
+  const row = source.data;
+  const created = await supabase.from("project_templates").insert({ workspace_id: scoped.access.workspaceId, name: `${row.name} Copy`, description: row.description,
+    business_type: row.business_type, project_type: row.project_type, team: row.team, region: row.region, visibility: row.visibility,
+    image_url: row.image_url, tags: row.tags, structure: row.structure, costing_boq: row.costing_boq, workflow: row.workflow,
+    documents: row.documents, status: "draft", created_by: scoped.access.userId, updated_by: scoped.access.userId }).select(projectTemplateSelect).single();
+  if (created.error) return fail("VALIDATION_ERROR", "Project template could not be duplicated.", 400, id);
+  await audit(supabase, "project_template.duplicated", id);
+  return ok(projectTemplateDto(created.data as Record<string, unknown>, true), 201, id);
+}
+
+async function archiveProjectTemplate(supabase: SupabaseClient, id: string, templateId: string) {
+  const scoped = await workspaceAccess(supabase, id, true, true); if ("response" in scoped) return scoped.response;
+  const result = await supabase.from("project_templates").update({ status: "archived", archived_at: new Date().toISOString(), updated_by: scoped.access.userId })
+    .eq("workspace_id", scoped.access.workspaceId).eq("id", templateId).is("archived_at", null).select("id").single();
+  if (result.error) return fail("NOT_FOUND", "Project template was not found.", 404, id);
+  await audit(supabase, "project_template.archived", id);
+  return ok({ archived: true }, 200, id);
+}
+
 async function dispatch(request: NextRequest, path: string[]) {
   const id = requestId(request);
   const route = path.join("/");
@@ -1567,6 +1766,27 @@ async function dispatch(request: NextRequest, path: string[]) {
   if ((request.method === "GET" || request.method === "PATCH") && route === "users/me/preferences") return preferences(request, supabase, id);
   if ((request.method === "GET" || request.method === "PATCH") && route === "onboarding/me") return onboarding(request, supabase, id);
   if (request.method === "GET" && route === "dashboard/overview") return dashboardOverview(request, supabase, id);
+  if (request.method === "GET" && route === "project-templates/overview") return projectTemplatesOverview(supabase, id);
+  if (request.method === "GET" && route === "project-templates") return listProjectTemplates(request, supabase, id);
+  if (request.method === "POST" && route === "project-templates") return createProjectTemplate(request, supabase, id);
+  const projectTemplateMatch = route.match(/^project-templates\/([0-9a-f-]{36})$/i);
+  if (projectTemplateMatch && request.method === "GET") return getProjectTemplate(supabase, id, projectTemplateMatch[1]);
+  if (projectTemplateMatch && request.method === "PATCH") return updateProjectTemplate(request, supabase, id, projectTemplateMatch[1]);
+  if (projectTemplateMatch && request.method === "DELETE") return archiveProjectTemplate(supabase, id, projectTemplateMatch[1]);
+  const projectTemplateSectionMatch = route.match(/^project-templates\/([0-9a-f-]{36})\/(structure|costing-boq|workflow)$/i);
+  if (projectTemplateSectionMatch && ["GET", "PATCH"].includes(request.method)) return projectTemplateSection(request, supabase, id, projectTemplateSectionMatch[1], projectTemplateSectionMatch[2]);
+  const projectTemplateDocumentsMatch = route.match(/^project-templates\/([0-9a-f-]{36})\/documents$/i);
+  if (projectTemplateDocumentsMatch && ["GET", "PATCH"].includes(request.method)) return projectTemplateDocuments(request, supabase, id, projectTemplateDocumentsMatch[1]);
+  const projectTemplateVersionsMatch = route.match(/^project-templates\/([0-9a-f-]{36})\/versions$/i);
+  if (projectTemplateVersionsMatch && request.method === "GET") return projectTemplateHistory(request, supabase, id, projectTemplateVersionsMatch[1], "versions");
+  const projectTemplateUsageMatch = route.match(/^project-templates\/([0-9a-f-]{36})\/usage$/i);
+  if (projectTemplateUsageMatch && request.method === "GET") return projectTemplateHistory(request, supabase, id, projectTemplateUsageMatch[1], "usage");
+  const projectTemplatePublishMatch = route.match(/^project-templates\/([0-9a-f-]{36})\/publish$/i);
+  if (projectTemplatePublishMatch && request.method === "POST") return publishProjectTemplate(request, supabase, id, projectTemplatePublishMatch[1]);
+  const projectTemplateUseMatch = route.match(/^project-templates\/([0-9a-f-]{36})\/use$/i);
+  if (projectTemplateUseMatch && request.method === "POST") return useProjectTemplate(request, supabase, id, projectTemplateUseMatch[1]);
+  const projectTemplateDuplicateMatch = route.match(/^project-templates\/([0-9a-f-]{36})\/duplicate$/i);
+  if (projectTemplateDuplicateMatch && request.method === "POST") return duplicateProjectTemplate(supabase, id, projectTemplateDuplicateMatch[1]);
   if (request.method === "GET" && route === "projects") return listProjects(request, supabase, id);
   if (request.method === "POST" && route === "projects") return createProject(request, supabase, id);
   if (request.method === "GET" && route === "projects/import-template") return projectImportTemplate(supabase, id);

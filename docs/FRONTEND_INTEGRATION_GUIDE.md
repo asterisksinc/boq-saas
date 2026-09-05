@@ -2,6 +2,107 @@
 
 This guide describes how the existing Next.js App Router frontend should integrate with Auth/User/Dashboard, Projects and project Excel import, Proposals, Documents, and Invoices. It does not require the frontend to call Supabase directly.
 
+## Project Templates integration (backend implemented; frontend unchanged)
+
+The template screens shown in the supplied designs map to authenticated, workspace-scoped APIs. There is no separate public/admin template API. Active workspace users can read templates; `owner`, `admin`, and `member` can create/edit/publish/duplicate/use them; `viewer` is read-only; only `owner`/`admin` can archive.
+
+| UI area/action | API |
+|---|---|
+| Template landing KPIs and recently used | `GET /project-templates/overview` |
+| Grid/list, search, filters, pagination | `GET /project-templates?page=1&pageSize=20&search=&status=&type=` |
+| New Project Template | `POST /project-templates` |
+| Template header, Overview, composition | `GET /project-templates/{templateId}` |
+| Edit template metadata | `PATCH /project-templates/{templateId}` |
+| Structure | `GET` / `PATCH /project-templates/{templateId}/structure` |
+| Costing & BOQ | `GET` / `PATCH /project-templates/{templateId}/costing-boq` |
+| Workflow (stages/tasks/milestones/approvals/rules) | `GET` / `PATCH /project-templates/{templateId}/workflow` |
+| Document requirements | `GET` / `PATCH /project-templates/{templateId}/documents` |
+| Publish and create immutable version | `POST /project-templates/{templateId}/publish` |
+| Versions tab | `GET /project-templates/{templateId}/versions?page=1&pageSize=20` |
+| Use Template | `POST /project-templates/{templateId}/use` |
+| Usage tab | `GET /project-templates/{templateId}/usage?page=1&pageSize=20` |
+| Duplicate | `POST /project-templates/{templateId}/duplicate` |
+| Archive | `DELETE /project-templates/{templateId}` |
+
+The section endpoints intentionally store each complex designer as one bounded JSON document. This lets the frontend implement drag/drop and nested condition builders without issuing a request per row. Send the complete latest section after an edit, debounce autosave, and use the returned `version` as the displayed published-version baseline. Publishing snapshots all sections into immutable version history.
+
+```ts
+export type TemplateSection = Record<string, unknown>;
+
+export interface ProjectTemplate {
+  id: string;
+  templateCode: string;
+  name: string;
+  description: string | null;
+  businessType: string;
+  projectType: string;
+  team: string | null;
+  region: string | null;
+  visibility: "workspace";
+  status: "draft" | "active" | "needs_review" | "archived";
+  version: number;
+  useCount: number;
+  composition: {
+    rooms: number; boqSections: number; items: number; stages: number;
+    tasks: number; milestones: number; approvals: number; rules: number; documents: number;
+  };
+  structure?: TemplateSection;
+  costingBoq?: TemplateSection;
+  workflow?: TemplateSection;
+  documents?: TemplateSection[];
+}
+```
+
+Create a draft with all designer state when available:
+
+```ts
+const template = await api.post<ProjectTemplate>("/project-templates", {
+  name: "Premium 3BHK Residential",
+  description: "Reusable residential project delivery template",
+  businessType: "Residential",
+  projectType: "3BHK",
+  team: "Residential Design",
+  region: "India",
+  visibility: "workspace",
+  tags: ["Premium", "3BHK"],
+  structure: { areas: [] },
+  costingBoq: { sections: [], itemCount: 0 },
+  workflow: { stages: [], tasks: [], milestones: [], approvals: [], rules: [] },
+  documents: [],
+});
+```
+
+Replace one complex section after editing:
+
+```ts
+await api.patch(`/project-templates/${template.id}/workflow`, {
+  data: { stages, tasks, milestones, approvals, rules },
+});
+```
+
+`Use Template` is enabled only for an active (published) template. It atomically creates a planning project, stores the exact immutable template snapshot on the usage record, increments usage, and returns `{ projectId, templateId, templateVersion, snapshot }`:
+
+```ts
+const created = await api.post<{
+  projectId: string;
+  templateId: string;
+  templateVersion: number;
+  snapshot: ProjectTemplate;
+}>(
+  `/project-templates/${template.id}/use`,
+  {
+    projectName: "Sharma Residence",
+    clientName: "Sharma Group",
+    location: "Hyderabad",
+    startDate: "2026-09-15",
+    targetCompletionDate: "2026-12-15",
+  },
+);
+router.push(`/projects/${created.projectId}`);
+```
+
+Do not send `workspaceId`, template/project codes, creator/updater IDs, use counts, version numbers, timestamps, or project template provenance. Those are server-owned. The supplied Postman folder `15 — Project Templates (User)` follows the intended create → section editing → publish → use flow.
+
 ## Projects screen integration (backend implemented; frontend unchanged)
 
 The Projects list, editor, lifecycle actions, duplication, room setup, and spreadsheet import are tenant-scoped to the authenticated user's active workspace. Never send `workspaceId`, `createdBy`, `projectCode`, `progress`, or financial totals from the browser; the server owns those fields.

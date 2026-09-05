@@ -439,6 +439,63 @@ paths:
       responses:
         '200': { description: Invoice PDF, content: { application/pdf: { schema: { type: string, format: binary } } } }
         '404': { $ref: '#/components/responses/Error' }
+  /project-templates/overview:
+    get:
+      summary: Template counts by status/type and recently used templates
+      responses: { '200': { description: Template overview } }
+  /project-templates:
+    get:
+      summary: List/search/filter workspace project templates
+      parameters:
+        - { in: query, name: page, schema: { type: integer, minimum: 1 } }
+        - { in: query, name: pageSize, schema: { type: integer, minimum: 1, maximum: 100 } }
+        - { in: query, name: search, schema: { type: string, maxLength: 120 } }
+        - { in: query, name: status, schema: { type: string, enum: [draft, active, needs_review] } }
+        - { in: query, name: type, schema: { type: string, maxLength: 80 } }
+      responses: { '200': { $ref: '#/components/responses/Page' } }
+    post:
+      summary: Create a project template draft (owner/admin/member)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProjectTemplateCreate' } } } }
+      responses: { '201': { description: Template created }, '400': { $ref: '#/components/responses/Error' } }
+  /project-templates/{templateId}:
+    parameters: [{ $ref: '#/components/parameters/TemplateId' }]
+    get: { summary: Get template metadata, composition, and all designer sections, responses: { '200': { description: Template detail }, '404': { $ref: '#/components/responses/Error' } } }
+    patch:
+      summary: Update allowlisted template metadata (owner/admin/member)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProjectTemplatePatch' } } } }
+      responses: { '200': { description: Updated }, '400': { $ref: '#/components/responses/Error' } }
+    delete: { summary: Archive template (owner/admin), responses: { '200': { description: Archived }, '403': { $ref: '#/components/responses/Error' } } }
+  /project-templates/{templateId}/structure:
+    parameters: [{ $ref: '#/components/parameters/TemplateId' }]
+    get: { summary: Get project structure designer state, responses: { '200': { description: Structure } } }
+    patch: { summary: Replace project structure designer state, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/TemplateSection' } } } }, responses: { '200': { description: Updated } } }
+  /project-templates/{templateId}/costing-boq:
+    parameters: [{ $ref: '#/components/parameters/TemplateId' }]
+    get: { summary: Get Costing and BOQ designer state, responses: { '200': { description: Costing and BOQ } } }
+    patch: { summary: Replace Costing and BOQ designer state, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/TemplateSection' } } } }, responses: { '200': { description: Updated } } }
+  /project-templates/{templateId}/workflow:
+    parameters: [{ $ref: '#/components/parameters/TemplateId' }]
+    get: { summary: Get stages tasks milestones approvals and rules, responses: { '200': { description: Workflow } } }
+    patch: { summary: Replace workflow designer state, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/TemplateSection' } } } }, responses: { '200': { description: Updated } } }
+  /project-templates/{templateId}/documents:
+    parameters: [{ $ref: '#/components/parameters/TemplateId' }]
+    get: { summary: Get template document requirements, responses: { '200': { description: Documents } } }
+    patch: { summary: Replace template document requirements, responses: { '200': { description: Updated } } }
+  /project-templates/{templateId}/publish:
+    parameters: [{ $ref: '#/components/parameters/TemplateId' }]
+    post: { summary: Publish an immutable template version, responses: { '200': { description: Published }, '409': { $ref: '#/components/responses/Error' } } }
+  /project-templates/{templateId}/versions:
+    parameters: [{ $ref: '#/components/parameters/TemplateId' }]
+    get: { summary: List immutable template versions, responses: { '200': { $ref: '#/components/responses/Page' } } }
+  /project-templates/{templateId}/usage:
+    parameters: [{ $ref: '#/components/parameters/TemplateId' }]
+    get: { summary: List projects created from a template, responses: { '200': { $ref: '#/components/responses/Page' } } }
+  /project-templates/{templateId}/use:
+    parameters: [{ $ref: '#/components/parameters/TemplateId' }]
+    post: { summary: Atomically create a project from an active template, responses: { '201': { description: Project and immutable source snapshot created }, '409': { $ref: '#/components/responses/Error' } } }
+  /project-templates/{templateId}/duplicate:
+    parameters: [{ $ref: '#/components/parameters/TemplateId' }]
+    post: { summary: Duplicate a template as a new draft, responses: { '201': { description: Duplicated } } }
 components:
   securitySchemes:
     supabaseCookie: { type: apiKey, in: cookie, name: sb-access-token }
@@ -677,6 +734,44 @@ components:
         method: { type: string, enum: [cash, bank_transfer, card, upi, cheque, other] }
         reference: { type: [string, 'null'], maxLength: 200 }
         notes: { type: [string, 'null'], maxLength: 1000 }
+    TemplateSection:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties: { data: { type: object, additionalProperties: true } }
+    ProjectTemplateCreate:
+      type: object
+      additionalProperties: false
+      required: [name, businessType, projectType]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 160 }
+        description: { type: [string, 'null'], maxLength: 5000 }
+        businessType: { type: string, minLength: 1, maxLength: 80 }
+        projectType: { type: string, minLength: 1, maxLength: 80 }
+        team: { type: [string, 'null'], maxLength: 120 }
+        region: { type: [string, 'null'], maxLength: 120 }
+        visibility: { type: string, enum: [workspace], default: workspace }
+        imageUrl: { type: [string, 'null'], format: uri }
+        tags: { type: array, maxItems: 20, items: { type: string, maxLength: 40 } }
+        structure: { type: object, additionalProperties: true }
+        costingBoq: { type: object, additionalProperties: true }
+        workflow: { type: object, additionalProperties: true }
+        documents: { type: array, maxItems: 500, items: { type: object, additionalProperties: true } }
+    ProjectTemplatePatch:
+      type: object
+      description: Any non-empty allowlisted subset of project-template metadata.
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 160 }
+        description: { type: [string, 'null'], maxLength: 5000 }
+        businessType: { type: string, minLength: 1, maxLength: 80 }
+        projectType: { type: string, minLength: 1, maxLength: 80 }
+        team: { type: [string, 'null'], maxLength: 120 }
+        region: { type: [string, 'null'], maxLength: 120 }
+        visibility: { type: string, enum: [workspace] }
+        imageUrl: { type: [string, 'null'], format: uri }
+        tags: { type: array, maxItems: 20, items: { type: string, maxLength: 40 } }
+        status: { type: string, enum: [draft, needs_review], description: Active is set by publish; archived is set by DELETE. }
   parameters:
     ProjectId: { in: path, name: projectId, required: true, schema: { type: string, format: uuid } }
     RoomId: { in: path, name: roomId, required: true, schema: { type: string, format: uuid } }
@@ -684,6 +779,7 @@ components:
     FolderId: { in: path, name: folderId, required: true, schema: { type: string, format: uuid } }
     DocumentId: { in: path, name: documentId, required: true, schema: { type: string, format: uuid } }
     InvoiceId: { in: path, name: invoiceId, required: true, schema: { type: string, format: uuid } }
+    TemplateId: { in: path, name: templateId, required: true, schema: { type: string, format: uuid } }
   responses:
     Error: { description: Error envelope, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     Page: { description: Paginated response, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }

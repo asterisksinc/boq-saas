@@ -32,6 +32,7 @@ Run the collection folders in numeric order:
 12. BOQ Management
 13. Costing
 14. Reports & Analytics
+15. Project Templates (User)
 
 For OTP requests, copy the six-digit Gmail code into the environment `otp`
 value before running the corresponding verification request. For document
@@ -52,6 +53,12 @@ IDs used by later requests. Folder 13 builds a costing category/item, adds and
 selects a vendor quote, then creates a scenario and loads cost/margin analysis.
 Folder 14 requires an owner/admin session because business-wide revenue,
 cost, margin, team, and client analytics are financially sensitive.
+
+Folder 15 covers the authenticated project-template flow. Run Create Project
+Template first so `projectTemplateId` is captured, replace the designer
+sections, publish the template, and only then run Use Template. Workspace
+`owner`, `admin`, and `member` roles can run those writes; `viewer` can run the
+GET requests only. Archive is restricted to `owner` and `admin`.
 
 ## Common failures
 

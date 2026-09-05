@@ -220,6 +220,60 @@ export const boqTemplateSchema = z.object({
   description: z.string().trim().max(2000).nullable().optional(), tags: z.array(z.string().trim().min(1).max(40)).max(20).default([]),
 }).strict();
 
+const templateVisibility = z.literal("workspace");
+const templateJson = z.record(z.string(), z.unknown());
+
+export const projectTemplateCreateSchema = z.object({
+  name: z.string().trim().min(1).max(160),
+  description: z.string().trim().max(5000).nullable().optional(),
+  businessType: z.string().trim().min(1).max(80),
+  projectType: z.string().trim().min(1).max(80),
+  team: z.string().trim().max(120).nullable().optional(),
+  region: z.string().trim().max(120).nullable().optional(),
+  visibility: templateVisibility.default("workspace"),
+  imageUrl: z.string().url().max(2048).nullable().optional(),
+  tags: z.array(z.string().trim().min(1).max(40)).max(20).default([]),
+  structure: templateJson.default({}),
+  costingBoq: templateJson.default({}),
+  workflow: templateJson.default({}),
+  documents: z.array(templateJson).max(500).default([]),
+}).strict();
+
+export const projectTemplatePatchSchema = z.object({
+  name: z.string().trim().min(1).max(160).optional(),
+  description: z.string().trim().max(5000).nullable().optional(),
+  businessType: z.string().trim().min(1).max(80).optional(),
+  projectType: z.string().trim().min(1).max(80).optional(),
+  team: z.string().trim().max(120).nullable().optional(),
+  region: z.string().trim().max(120).nullable().optional(),
+  visibility: templateVisibility.optional(),
+  imageUrl: z.string().url().max(2048).nullable().optional(),
+  tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
+  status: z.enum(["draft", "needs_review"]).optional(),
+}).strict().refine((value) => Object.keys(value).length > 0, "At least one field is required.");
+
+export const projectTemplateSectionSchema = z.object({ data: templateJson }).strict();
+
+export const projectTemplateDocumentsSchema = z.object({
+  documents: z.array(templateJson).max(500),
+}).strict();
+
+export const projectTemplateUseSchema = z.object({
+  projectName: z.string().trim().min(1).max(160),
+  clientName: z.string().trim().min(1).max(160),
+  location: z.string().trim().max(240).nullable().optional(),
+  startDate: z.string().date().nullable().optional(),
+  targetCompletionDate: z.string().date().nullable().optional(),
+}).strict().superRefine((value, ctx) => {
+  if (value.startDate && value.targetCompletionDate && value.targetCompletionDate < value.startDate) {
+    ctx.addIssue({ code: "custom", path: ["targetCompletionDate"], message: "Target completion cannot be before the start date." });
+  }
+});
+
+export const projectTemplatePublishSchema = z.object({
+  changeNote: z.string().trim().max(500).nullable().optional(),
+}).strict();
+
 export const costingCategorySchema = z.object({
   name: z.string().trim().min(1).max(120), code: z.string().trim().min(1).max(40).regex(/^[A-Za-z0-9-]+$/),
   parentId: z.string().uuid().nullable().optional(), defaultUnit: z.string().trim().min(1).max(40),

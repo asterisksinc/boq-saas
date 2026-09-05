@@ -103,6 +103,10 @@
     {
       "key": "scenarioId",
       "value": ""
+    },
+    {
+      "key": "projectTemplateId",
+      "value": ""
     }
   ],
   "item": [
@@ -2004,6 +2008,57 @@
             "url": "{{baseUrl}}/api/v1/reports/analytics?period=year"
           }
         }
+      ]
+    },
+    {
+      "name": "15 — Project Templates (User)",
+      "description": "Authenticated workspace template APIs. Owner/admin/member can create, edit, publish, duplicate and use; viewer is read-only; archive is owner/admin only.",
+      "item": [
+        { "name": "Template Overview", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/project-templates/overview" } },
+        { "name": "List Project Templates", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/project-templates?page={{page}}&pageSize={{pageSize}}&search=&status=&type=" } },
+        {
+          "name": "Create Project Template",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Premium 3BHK Residential\",\n  \"description\": \"Reusable residential project delivery template\",\n  \"businessType\": \"Residential\",\n  \"projectType\": \"3BHK\",\n  \"team\": \"Residential Design\",\n  \"region\": \"India\",\n  \"visibility\": \"workspace\",\n  \"tags\": [\"Premium\", \"3BHK\"],\n  \"structure\": { \"areas\": [] },\n  \"costingBoq\": { \"sections\": [], \"itemCount\": 0 },\n  \"workflow\": { \"stages\": [], \"tasks\": [], \"milestones\": [], \"approvals\": [], \"rules\": [] },\n  \"documents\": []\n}" },
+            "url": "{{baseUrl}}/api/v1/project-templates"
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["const b = pm.response.json(); if (b.data?.id) pm.collectionVariables.set('projectTemplateId', b.data.id);"] } }]
+        },
+        { "name": "Get Template Detail", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}" } },
+        {
+          "name": "Update Template Metadata",
+          "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"description\": \"Updated reusable residential template\",\n  \"tags\": [\"Premium\", \"Residential\", \"3BHK\"]\n}" }, "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}" }
+        },
+        {
+          "name": "Replace Structure",
+          "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"data\": {\n    \"areas\": [{ \"code\": \"BED-MST\", \"name\": \"Master Bedroom\", \"required\": true, \"boqSections\": [] }]\n  }\n}" }, "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/structure" }
+        },
+        {
+          "name": "Replace Costing & BOQ",
+          "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"data\": { \"sections\": [], \"itemCount\": 0, \"currency\": \"INR\" }\n}" }, "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/costing-boq" }
+        },
+        {
+          "name": "Replace Workflow",
+          "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"data\": { \"stages\": [], \"tasks\": [], \"milestones\": [], \"approvals\": [], \"rules\": [] }\n}" }, "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/workflow" }
+        },
+        {
+          "name": "Replace Template Documents",
+          "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"documents\": [{ \"name\": \"Client Brief\", \"category\": \"Brief\", \"required\": true }]\n}" }, "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/documents" }
+        },
+        {
+          "name": "Publish Template Version",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{ \"changeNote\": \"Initial production version\" }" }, "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/publish" }
+        },
+        { "name": "List Template Versions", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/versions?page={{page}}&pageSize={{pageSize}}" } },
+        {
+          "name": "Use Template to Create Project",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"projectName\": \"Sharma Residence\",\n  \"clientName\": \"Sharma Group\",\n  \"location\": \"Hyderabad\",\n  \"startDate\": \"2026-09-15\",\n  \"targetCompletionDate\": \"2026-12-15\"\n}" }, "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/use" }
+        },
+        { "name": "List Template Usage", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/usage?page={{page}}&pageSize={{pageSize}}" } },
+        { "name": "Duplicate Template", "request": { "method": "POST", "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/duplicate" } },
+        { "name": "Archive Template (Owner/Admin)", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}" } }
       ]
     }
   ]
