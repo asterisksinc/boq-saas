@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { ChevronDown, MoreHorizontal, Copy, Edit2, Trash2, UploadCloud, X, RefreshCw } from "lucide-react";
-import { CostingItem, getCostingItems } from "@/lib/api/costing";
+import { getCostingItems } from "@/lib/api/costing";
+import type { CostingItemBackend } from "@/lib/types";
 
 export default function LibraryTab() {
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
-    const [items, setItems] = useState<CostingItem[]>([]);
+    const [items, setItems] = useState<CostingItemBackend[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
@@ -81,23 +82,23 @@ export default function LibraryTab() {
                                         {item.status}
                                     </span>
                                 </td>
-                                <td style={{ padding: "16px", color: "#4b5563" }}>{item.category.split(" > ").map((p, i) => <span key={i}>{i > 0 && <br />}<span style={{ color: i === 0 ? "#1f2d3d" : "#9ca3af" }}>{i > 0 && "> "}{p}</span></span>)}</td>
+                                <td style={{ padding: "16px", color: "#4b5563" }}>{(item.category ?? item.category_id ?? "-").split(" > ").map((p: string, i: number) => <span key={i}>{i > 0 && <br />}<span style={{ color: i === 0 ? "#1f2d3d" : "#9ca3af" }}>{i > 0 && "> "}{p}</span></span>)}</td>
                                 <td style={{ padding: "16px", color: "#4b5563" }}>{item.unit}</td>
-                                <td style={{ padding: "16px", color: "#1f2d3d" }}>{formatMoney(item.baseCost)}</td>
-                                <td style={{ padding: "16px", color: "#1f2d3d" }}>{formatMoney(item.sellingRate)}</td>
-                                <td style={{ padding: "16px", color: "#10b981" }}>{item.margin}</td>
+                                <td style={{ padding: "16px", color: "#1f2d3d" }}>{formatMoney(item.baseCost ?? item.base_cost)}</td>
+                                <td style={{ padding: "16px", color: "#1f2d3d" }}>{formatMoney(item.sellingRate ?? item.selling_rate)}</td>
+                                <td style={{ padding: "16px", color: "#10b981" }}>{item.margin ?? (item.selling_rate > 0 ? `${(((item.selling_rate - item.base_cost) / item.selling_rate) * 100).toFixed(1)}%` : "-")}</td>
                                 <td style={{ padding: "16px" }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#4b5563" }}>
-                                        {item.vendor !== "-" && <div style={{ width: "20px", height: "20px", background: "#e5e7eb", borderRadius: "50%" }} />}
-                                        {item.vendor}
+                                        {(item.vendor ?? item.preferred_vendor ?? "-") !== "-" && <div style={{ width: "20px", height: "20px", background: "#e5e7eb", borderRadius: "50%" }} />}
+                                        {item.vendor ?? item.preferred_vendor ?? "-"}
                                     </div>
                                 </td>
                                 <td style={{ padding: "16px" }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: "4px", color: "#6b7280" }}>
-                                        {item.rateStatus} <ChevronDown size={14} />
+                                        {item.rateStatus ?? item.rate_status ?? "-"} <ChevronDown size={14} />
                                     </div>
                                 </td>
-                                <td style={{ padding: "16px", color: "#6b7280" }}>{item.updatedAt}</td>
+                                <td style={{ padding: "16px", color: "#6b7280" }}>{item.updatedAt ?? (item.updated_at ? new Date(item.updated_at).toLocaleDateString("en-IN") : "-")}</td>
                                 <td style={{ padding: "16px", position: "relative" }}>
                                     <button 
                                         style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af" }}

@@ -37,23 +37,21 @@ export default function CategoryDetail({ category, onBack }: { category: any; on
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "16px", marginBottom: "24px" }}>
                 <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "20px" }}>
                     <div style={{ color: "#6b7280", fontSize: "14px", marginBottom: "8px" }}>Items</div>
-                    <div style={{ fontSize: "24px", fontWeight: 600, color: "#1f2d3d", marginBottom: "8px" }}>42</div>
+                    <div style={{ fontSize: "24px", fontWeight: 600, color: "#1f2d3d", marginBottom: "8px" }}>{category.items ?? 0}</div>
                     <div style={{ color: "#2563eb", fontSize: "12px", fontWeight: 500 }}>View Items →</div>
                 </div>
                 <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "20px" }}>
                     <div style={{ color: "#6b7280", fontSize: "14px", marginBottom: "8px" }}>Sub-Categories</div>
-                    <div style={{ fontSize: "24px", fontWeight: 600, color: "#1f2d3d", marginBottom: "8px" }}>3</div>
+                    <div style={{ fontSize: "24px", fontWeight: 600, color: "#1f2d3d", marginBottom: "8px" }}>{category.subCategories ?? 0}</div>
                     <div style={{ color: "#2563eb", fontSize: "12px", fontWeight: 500 }}>View Sub-Categories →</div>
                 </div>
                 <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "20px" }}>
-                    <div style={{ color: "#6b7280", fontSize: "14px", marginBottom: "8px" }}>Used in BOQs</div>
-                    <div style={{ fontSize: "24px", fontWeight: 600, color: "#1f2d3d", marginBottom: "8px" }}>18</div>
-                    <div style={{ color: "#2563eb", fontSize: "12px", fontWeight: 500 }}>View BOQs →</div>
+                    <div style={{ color: "#6b7280", fontSize: "14px", marginBottom: "8px" }}>Category Code</div>
+                    <div style={{ fontSize: "18px", fontWeight: 600, color: "#1f2d3d", marginBottom: "8px" }}>{category.code ?? "-"}</div>
                 </div>
                 <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "20px" }}>
-                    <div style={{ color: "#6b7280", fontSize: "14px", marginBottom: "8px" }}>Used in Projects</div>
-                    <div style={{ fontSize: "24px", fontWeight: 600, color: "#1f2d3d", marginBottom: "8px" }}>7</div>
-                    <div style={{ color: "#2563eb", fontSize: "12px", fontWeight: 500 }}>View Projects →</div>
+                    <div style={{ color: "#6b7280", fontSize: "14px", marginBottom: "8px" }}>Status</div>
+                    <div style={{ fontSize: "18px", fontWeight: 600, color: category.status === "ACTIVE" ? "#10b981" : "#6b7280", marginBottom: "8px" }}>{category.status}</div>
                 </div>
             </div>
 

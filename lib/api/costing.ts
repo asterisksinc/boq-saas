@@ -1,46 +1,22 @@
 import { getApiErrorMessage, parseApiResponse } from "./auth";
-
-export interface CostingCategory {
-    id: string;
-    name: string;
-    code: string;
-    items: number;
-    subCategories: number;
-    usedInBoqs: number;
-    usedInProjects: number;
-    status: string;
-    createdAt?: string;
-    updatedAt?: string;
-}
-
-export interface CostingItem {
-    id: string;
-    name: string;
-    code: string;
-    status: string;
-    category: string;
-    unit: string;
-    baseCost: number;
-    sellingRate: number;
-    margin: string;
-    vendor: string;
-    rateStatus: string;
-    updatedAt: string;
-}
-
-export interface CostingAnalysis {
-    totalBudget: number;
-    actualCost: number;
-    committed: number;
-    forecast: number;
-    variance: number;
-}
+import type {
+    CostingCategoryBackend,
+    CostingCategoryDetail,
+    CostingItemBackend,
+    CostingItemDetail,
+    CostingAnalysisResponse,
+    MarginAnalysisResponse,
+    CostingSettingsResponse,
+    CostingScenario,
+    VendorQuote,
+    PaginatedResponse,
+} from "../types";
 
 async function fetchApi<T>(path: string, options: RequestInit = {}): Promise<T> {
     const response = await fetch(path, {
         credentials: "include",
         headers: {
-            "Content-Type": "application/json",
+            ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
             ...(options.headers ?? {}),
         },
         ...options,
@@ -54,81 +30,175 @@ async function fetchApi<T>(path: string, options: RequestInit = {}): Promise<T> 
     return parseApiResponse<T>(payload);
 }
 
-// Items
-export async function getCostingItems(): Promise<{ items: CostingItem[]; total: number }> {
-    try {
-        const res = await fetchApi<{ items: any[]; total: number }>("/api/v1/costing/items");
-        return {
-            items: res.items.map(item => ({
-                id: item.id,
-                name: item.name || "Unknown",
-                code: item.code || "-",
-                status: item.status || "DRAFT",
-                category: item.categoryName || "-",
-                unit: item.unit || "-",
-                baseCost: item.baseCost || 0,
-                sellingRate: item.sellingRate || 0,
-                margin: item.margin ? `${item.margin}%` : "0%",
-                vendor: item.vendorName || "-",
-                rateStatus: item.rateStatus || "DRAFT",
-                updatedAt: item.updatedAt ? new Date(item.updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : "N/A"
-            })),
-            total: res.total || res.items.length
-        };
-    } catch (e) {
-        // Fallback to mock data if backend not fully implemented
-        console.warn("Using mock data for items due to API error:", e);
-        return {
-            items: [
-                { id: "1", name: "18MM HDHMR Board", code: "MAT-8871", status: "APPROVED", category: "Boards > Plywood", unit: "Sheet", baseCost: 1200, sellingRate: 1650, margin: "27.33%", vendor: "Century Ply", rateStatus: "DRAFT", updatedAt: "5 Aug 2024" },
-                { id: "2", name: "Soft Close Hinge", code: "MATHWD-0023-8871", status: "APPROVED", category: "Hardware > Hinges", unit: "Piece", baseCost: 85, sellingRate: 120, margin: "29.20%", vendor: "Hettich India", rateStatus: "DRAFT", updatedAt: "5 Aug 2024" },
-            ],
-            total: 2
-        };
-    }
+// ── Items ───────────────────────────────────────────────────────────────────
+
+export async function getCostingItems(params?: { page?: number; pageSize?: number; search?: string; categoryId?: string }): Promise<PaginatedResponse<CostingItemBackend>> {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set("page", String(params.page));
+    if (params?.pageSize) searchParams.set("pageSize", String(params.pageSize));
+    if (params?.search) searchParams.set("search", params.search);
+    if (params?.categoryId) searchParams.set("categoryId", params.categoryId);
+    const query = searchParams.toString();
+    return fetchApi<PaginatedResponse<CostingItemBackend>>(`/api/v1/costing/items${query ? `?${query}` : ""}`);
 }
 
-// Categories
-export async function getCostingCategories(): Promise<{ items: CostingCategory[]; total: number }> {
-    try {
-        const res = await fetchApi<{ items: any[]; total: number }>("/api/v1/costing/categories");
-        return {
-            items: res.items.map(cat => ({
-                id: cat.id,
-                name: cat.name || "Unknown",
-                code: cat.code || "-",
-                items: cat.itemsCount || 0,
-                subCategories: cat.subCategoriesCount || 0,
-                usedInBoqs: cat.usedInBoqs || 0,
-                usedInProjects: cat.usedInProjects || 0,
-                status: cat.status || "ACTIVE",
-            })),
-            total: res.total || res.items.length
-        };
-    } catch (e) {
-        console.warn("Using mock data for categories due to API error:", e);
-        return {
-            items: [
-                { id: "1", name: "Boards", code: "MAT-BRD", items: 42, subCategories: 3, usedInBoqs: 18, usedInProjects: 7, status: "ACTIVE" },
-                { id: "2", name: "Hardware", code: "MAT-HWD", items: 124, subCategories: 5, usedInBoqs: 32, usedInProjects: 12, status: "ACTIVE" },
-            ],
-            total: 2
-        };
-    }
+export async function createCostingItem(input: {
+    name: string;
+    code?: string;
+    categoryId?: string;
+    unit?: string;
+    baseCost?: number;
+    sellingRate?: number;
+    preferredVendor?: string;
+    spec?: string;
+    rateStatus?: string;
+    imageUrl?: string;
+}): Promise<CostingItemBackend> {
+    return fetchApi<CostingItemBackend>("/api/v1/costing/items", {
+        method: "POST",
+        body: JSON.stringify(input),
+    });
 }
 
-// Analysis
-export async function getCostingAnalysis(): Promise<CostingAnalysis> {
-    try {
-        return await fetchApi<CostingAnalysis>("/api/v1/costing/analysis");
-    } catch (e) {
-        console.warn("Using mock data for analysis due to API error:", e);
-        return {
-            totalBudget: 4250000,
-            actualCost: 2890000,
-            committed: 3200000,
-            forecast: 4100000,
-            variance: -150000
-        };
-    }
+export async function getCostingItemDetail(itemId: string): Promise<CostingItemDetail> {
+    return fetchApi<CostingItemDetail>(`/api/v1/costing/items/${itemId}`);
+}
+
+export async function updateCostingItem(itemId: string, input: Record<string, unknown>): Promise<CostingItemBackend> {
+    return fetchApi<CostingItemBackend>(`/api/v1/costing/items/${itemId}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+    });
+}
+
+export async function deleteCostingItem(itemId: string): Promise<{ archived: true; id: string }> {
+    return fetchApi<{ archived: true; id: string }>(`/api/v1/costing/items/${itemId}`, {
+        method: "DELETE",
+    });
+}
+
+// ── Categories ──────────────────────────────────────────────────────────────
+
+export async function getCostingCategories(params?: { page?: number; pageSize?: number; search?: string }): Promise<PaginatedResponse<CostingCategoryBackend>> {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set("page", String(params.page));
+    if (params?.pageSize) searchParams.set("pageSize", String(params.pageSize));
+    if (params?.search) searchParams.set("search", params.search);
+    const query = searchParams.toString();
+    return fetchApi<PaginatedResponse<CostingCategoryBackend>>(`/api/v1/costing/categories${query ? `?${query}` : ""}`);
+}
+
+export async function createCostingCategory(input: {
+    name: string;
+    code?: string;
+    parentId?: string;
+    defaultUnit?: string;
+    defaultTaxPercent?: number;
+    defaultMarkupPercent?: number;
+    defaultWastePercent?: number;
+    transportIncluded?: boolean;
+    labourIncluded?: boolean;
+    description?: string;
+}): Promise<CostingCategoryBackend> {
+    return fetchApi<CostingCategoryBackend>("/api/v1/costing/categories", {
+        method: "POST",
+        body: JSON.stringify(input),
+    });
+}
+
+export async function getCostingCategoryDetail(categoryId: string): Promise<CostingCategoryDetail> {
+    return fetchApi<CostingCategoryDetail>(`/api/v1/costing/categories/${categoryId}`);
+}
+
+export async function updateCostingCategory(categoryId: string, input: Record<string, unknown>): Promise<CostingCategoryBackend> {
+    return fetchApi<CostingCategoryBackend>(`/api/v1/costing/categories/${categoryId}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+    });
+}
+
+export async function deleteCostingCategory(categoryId: string): Promise<{ deleted: true; id: string }> {
+    return fetchApi<{ deleted: true; id: string }>(`/api/v1/costing/categories/${categoryId}`, {
+        method: "DELETE",
+    });
+}
+
+// ── Vendor Quotes ───────────────────────────────────────────────────────────
+
+export async function addVendorQuote(input: {
+    itemId: string;
+    vendorName: string;
+    quote: number;
+    leadTimeDays?: number;
+    rating?: number;
+}): Promise<VendorQuote> {
+    return fetchApi<VendorQuote>("/api/v1/costing/vendor-quotes", {
+        method: "POST",
+        body: JSON.stringify(input),
+    });
+}
+
+export async function selectVendorQuote(quoteId: string, selected: boolean): Promise<VendorQuote> {
+    return fetchApi<VendorQuote>(`/api/v1/costing/vendor-quotes/${quoteId}/selection`, {
+        method: "POST",
+        body: JSON.stringify({ selected }),
+    });
+}
+
+// ── Analysis ────────────────────────────────────────────────────────────────
+
+export async function getCostingAnalysis(): Promise<CostingAnalysisResponse> {
+    return fetchApi<CostingAnalysisResponse>("/api/v1/costing/analysis");
+}
+
+// ── Margins ─────────────────────────────────────────────────────────────────
+
+export async function getCostingMargins(): Promise<MarginAnalysisResponse> {
+    return fetchApi<MarginAnalysisResponse>("/api/v1/costing/margins");
+}
+
+// ── Settings ────────────────────────────────────────────────────────────────
+
+export async function getCostingSettings(): Promise<CostingSettingsResponse> {
+    return fetchApi<CostingSettingsResponse>("/api/v1/costing/settings");
+}
+
+// ── Scenarios ───────────────────────────────────────────────────────────────
+
+export async function getCostingScenarios(params?: { page?: number; pageSize?: number }): Promise<PaginatedResponse<CostingScenario>> {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set("page", String(params.page));
+    if (params?.pageSize) searchParams.set("pageSize", String(params.pageSize));
+    const query = searchParams.toString();
+    return fetchApi<PaginatedResponse<CostingScenario>>(`/api/v1/costing/scenarios${query ? `?${query}` : ""}`);
+}
+
+export async function createCostingScenario(input: {
+    boqId: string;
+    name: string;
+    description?: string;
+    type?: string;
+    adjustments?: Array<{ name?: string; rate?: number | null }>;
+}): Promise<CostingScenario> {
+    return fetchApi<CostingScenario>("/api/v1/costing/scenarios", {
+        method: "POST",
+        body: JSON.stringify(input),
+    });
+}
+
+export async function getCostingScenarioDetail(scenarioId: string): Promise<CostingScenario> {
+    return fetchApi<CostingScenario>(`/api/v1/costing/scenarios/${scenarioId}`);
+}
+
+export async function updateCostingScenario(scenarioId: string, input: Record<string, unknown>): Promise<CostingScenario> {
+    return fetchApi<CostingScenario>(`/api/v1/costing/scenarios/${scenarioId}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+    });
+}
+
+export async function duplicateCostingScenario(scenarioId: string): Promise<CostingScenario> {
+    return fetchApi<CostingScenario>(`/api/v1/costing/scenarios/${scenarioId}/duplicate`, {
+        method: "POST",
+    });
 }

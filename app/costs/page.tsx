@@ -10,6 +10,9 @@ import { useState } from "react";
 import LibraryTab from "./components/LibraryTab";
 import CategoriesTab from "./components/CategoriesTab";
 import AnalysisTab from "./components/AnalysisTab";
+import ScenariosTab from "./components/ScenariosTab";
+import MarginsTab from "./components/MarginsTab";
+import SettingsTab from "./components/SettingsTab";
 
 const menuRoutes = [
     "/dashboard",
@@ -185,11 +188,9 @@ export default function CostsPage() {
                         {activeTab === "Library" && <LibraryTab />}
                         {activeTab === "Categories" && <CategoriesTab />}
                         {activeTab === "Analysis" && <AnalysisTab />}
-                        {["Scenarios", "Margins", "Settings"].includes(activeTab) && (
-                            <div style={{ textAlign: "center", padding: "64px", color: "#6b7280" }}>
-                                {activeTab} coming soon...
-                            </div>
-                        )}
+                        {activeTab === "Scenarios" && <ScenariosTab />}
+                        {activeTab === "Margins" && <MarginsTab />}
+                        {activeTab === "Settings" && <SettingsTab />}
                     </div>
                 </section>
             </div>

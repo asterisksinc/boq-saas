@@ -3,11 +3,12 @@
 import { useState, useEffect } from "react";
 import CategoryDetail from "./CategoryDetail";
 import { Plus, RefreshCw } from "lucide-react";
-import { CostingCategory, getCostingCategories } from "@/lib/api/costing";
+import { getCostingCategories } from "@/lib/api/costing";
+import type { CostingCategoryBackend } from "@/lib/types";
 
 export default function CategoriesTab() {
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-    const [categories, setCategories] = useState<CostingCategory[]>([]);
+    const [categories, setCategories] = useState<CostingCategoryBackend[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 

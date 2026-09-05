@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { CostingAnalysis, getCostingAnalysis } from "@/lib/api/costing";
+import { getCostingAnalysis } from "@/lib/api/costing";
+import type { CostingAnalysisResponse } from "@/lib/types";
 import { RefreshCw } from "lucide-react";
 
 type SubTab = "Cost Overview" | "Vendor Comparison" | "Variance Analysis";
 
 export default function AnalysisTab() {
     const [activeTab, setActiveTab] = useState<SubTab>("Cost Overview");
-    const [data, setData] = useState<CostingAnalysis | null>(null);
+    const [data, setData] = useState<CostingAnalysisResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
@@ -54,11 +55,11 @@ export default function AnalysisTab() {
         <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
             {/* Top Metrics */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: "16px" }}>
-                <MetricCard title="Total Budget" amount={formatMoney(data.totalBudget)} progress={75} />
-                <MetricCard title="Actual Cost" amount={formatMoney(data.actualCost)} progress={50} />
-                <MetricCard title="Committed" amount={formatMoney(data.committed)} progress={60} />
-                <MetricCard title="Forecast" amount={formatMoney(data.forecast)} progress={85} />
-                <MetricCard title="Variance" amount={formatMoney(data.variance)} progress={30} />
+                <MetricCard title="Total Budget" amount={formatMoney(data.summary.totalBudget)} progress={75} />
+                <MetricCard title="Actual Cost" amount={formatMoney(data.summary.actualCost)} progress={50} />
+                <MetricCard title="Committed" amount={formatMoney(data.summary.committed)} progress={60} />
+                <MetricCard title="Forecast" amount={formatMoney(data.summary.forecast)} progress={85} />
+                <MetricCard title="Variance" amount={formatMoney(data.summary.variance)} progress={30} />
             </div>
 
             {/* Sub Tabs */}
@@ -90,7 +91,7 @@ export default function AnalysisTab() {
                 {activeTab === "Variance Analysis" && <VarianceAnalysis />}
                 {activeTab === "Vendor Comparison" && (
                     <div style={{ textAlign: "center", padding: "64px", color: "#6b7280", background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb" }}>
-                        Vendor Comparison coming soon...
+                        No vendor comparison data available yet. Add vendor quotes to your costing items to see comparisons.
                     </div>
                 )}
             </div>
@@ -114,7 +115,7 @@ function CostOverview() {
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
             <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "24px" }}>
-                {/* Bar Chart Mockup */}
+                {/* Budget vs Actual Chart */}
                 <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "24px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "32px" }}>
                         <div>
@@ -131,7 +132,7 @@ function CostOverview() {
                         </div>
                     </div>
                     
-                    {/* Fake Chart */}
+                    {/* Chart bars */}
                     <div style={{ height: "250px", display: "flex", alignItems: "flex-end", gap: "40px", paddingLeft: "40px", position: "relative" }}>
                         {/* Y-Axis labels */}
                         <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, display: "flex", flexDirection: "column", justifyContent: "space-between", color: "#9ca3af", fontSize: "12px" }}>

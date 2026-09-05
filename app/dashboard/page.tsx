@@ -22,12 +22,36 @@ function formatNumber(value: number) { return new Intl.NumberFormat("en-IN").for
 export default function DashboardPage() {
     const router = useRouter();
     const [overview, setOverview] = useState<DashboardOverview | null>(null);
+    const [recentProjects, setRecentProjects] = useState<DashboardItem[]>([]);
+    const [recentBoqs, setRecentBoqs] = useState<DashboardItem[]>([]);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(true);
 
     const load = useCallback(async () => {
         setLoading(true); setError("");
-        try { setOverview(await getDashboardOverview()); }
+        try {
+            const [overviewData, projRes, boqRes] = await Promise.all([
+                getDashboardOverview(),
+                fetch("/api/v1/projects?pageSize=5&sortBy=updatedAt&sortOrder=desc", { credentials: "include" }).then(r => r.ok ? r.json() : null).catch(() => null),
+                fetch("/api/v1/boqs?pageSize=5", { credentials: "include" }).then(r => r.ok ? r.json() : null).catch(() => null),
+            ]);
+            setOverview(overviewData);
+            // Use real project data instead of demo data
+            const projItems = (projRes?.data?.items ?? []).map((p: any) => ({
+                name: p.name || p.projectCode || "Untitled",
+                subtitle: p.clientName || p.projectType || undefined,
+                value: p.projectValue ?? p.approvedBudget ?? undefined,
+                status: p.status,
+            }));
+            setRecentProjects(projItems);
+            const boqItems = (boqRes?.data?.items ?? []).map((b: any) => ({
+                name: b.boqNumber || b.boq_number || "Untitled",
+                subtitle: b.projectName || b.project_name || undefined,
+                value: b.grandTotal ?? b.grand_total ?? b.estimatedValue ?? undefined,
+                status: b.status,
+            }));
+            setRecentBoqs(boqItems);
+        }
         catch (requestError) {
             const message = getApiErrorMessage(requestError);
             if (/authentication|required|unauthenticated/i.test(message)) router.replace("/login");
@@ -37,12 +61,7 @@ export default function DashboardPage() {
 
     useEffect(() => { void load(); }, [load]);
 
-    const data = useMemo(() => {
-        if (!overview) return { boqs: [] as DashboardItem[], hasContent: false };
-        const projects = asItems(overview.recentProjects);
-        const boqs = asItems(overview.recentBoqs);
-        return { boqs, hasContent: projects.length > 0 || boqs.length > 0 || overview.kpis.totalProjects > 0 || overview.kpis.draftBoqs > 0 };
-    }, [overview]);
+    const hasContent = overview ? (recentProjects.length > 0 || recentBoqs.length > 0 || overview.kpis.totalProjects > 0 || overview.kpis.draftBoqs > 0) : false;
     const money = useMemo(() => overview ? new Intl.NumberFormat("en-IN", { style: "currency", currency: overview.scope.currency || "INR", notation: "compact", maximumFractionDigits: 1 }) : null, [overview]);
 
     return <main className="fig-dashboard">
@@ -52,10 +71,10 @@ export default function DashboardPage() {
             <DashboardHeader />
             {loading ? <DashboardLoading /> : error ? <section className="fig-dashboard-error"><h2>Couldn&apos;t load your dashboard</h2><p>{error}</p><button onClick={() => void load()}><RefreshCw size={16} /> Try again</button></section> : overview ? <section className="fig-dashboard-layout">
                 <div className="fig-dashboard-left">
-                    <Analytics overview={overview} hasContent={data.hasContent} money={money} />
+                    <Analytics overview={overview} hasContent={hasContent} money={money} />
                     <div className="fig-dashboard-bottom">
-                        <ProjectsCard overview={overview} hasContent={data.hasContent} />
-                        <div className="fig-dashboard-stack"><BoqCard items={data.boqs} hasContent={data.hasContent} money={money} /><QuickActions /></div>
+                        <ProjectsCard overview={overview} hasContent={hasContent} />
+                        <div className="fig-dashboard-stack"><BoqCard items={recentBoqs} hasContent={hasContent} money={money} /><QuickActions /></div>
                     </div>
                 </div>
                 <aside className="fig-dashboard-art" aria-hidden="true"><span /><i /><b /></aside>

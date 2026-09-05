@@ -56,11 +56,7 @@ const menuIcons = [
     "dashboard-billing",
 ];
 
-const dossierTemplates = [
-    { name: "Residential - 3BHK Standard", rooms: 8, items: 124, size: "128 sq.ft", tag: "Residential", category: "Popular", price: "₹1,85,000/No" },
-    { name: "Office Fit-Out - Corporate", rooms: 5, items: 86, size: "18 sq.ft", tag: "Commercial", category: "Office", price: "₹4,40,000/No" },
-    { name: "Modular Kitchen - L-Shape", rooms: 1, items: 22, size: "24 sq.ft", tag: "Kitchen", category: "Modular", price: "₹1,85,000/No" },
-];
+// Templates are loaded dynamically from the API
 
 function formatMoney(value: number) {
     return new Intl.NumberFormat("en-IN", {
@@ -83,12 +79,17 @@ export default function BoqsPage() {
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
     const [openStatusId, setOpenStatusId] = useState<string | null>(null);
     const [projects, setProjects] = useState<{id: string, name: string}[]>([]);
+    const [templates, setTemplates] = useState<{id: string; name: string; description: string | null; tags: string[] | null; use_count: number}[]>([]);
 
     useEffect(() => {
         const loadProj = async () => {
             try { const res = await fetch("/api/v1/projects?pageSize=100", { credentials: "include" }); if(res.ok){ const d = await res.json(); setProjects((d.data?.items ?? []).map((p:any) => ({ id: p.id, name: p.name }))); } } catch (e) {}
         };
+        const loadTemplates = async () => {
+            try { const res = await fetch("/api/v1/boq-templates?pageSize=50", { credentials: "include" }); if(res.ok){ const d = await res.json(); setTemplates(d.data?.items ?? []); } } catch (e) {}
+        };
         void loadProj();
+        void loadTemplates();
         const handleClick = () => { setOpenMenuId(null); setOpenStatusId(null); };
         window.addEventListener("click", handleClick);
         return () => window.removeEventListener("click", handleClick);
@@ -316,16 +317,8 @@ export default function BoqsPage() {
                                                                         e.stopPropagation();
                                                                         setOpenStatusId(null);
 
-                                                                        if (boq.id.startsWith("mock-")) {
-                                                                            setBoqRows(
-                                                                                boqRows.map(b =>
-                                                                                    b.id === boq.id
-                                                                                        ? { ...b, status }
-                                                                                        : b
-                                                                                )
-                                                                            );
-                                                                            return;
-                                                                        }
+
+
 
                                                                         const res = await fetch(
                                                                             `/api/v1/boqs/${boq.id}/status`,
@@ -370,14 +363,14 @@ export default function BoqsPage() {
                                                             <button style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", textAlign: "left", padding: "8px 16px", background: "none", border: "none", fontSize: "13px", color: "#374151", cursor: "pointer" }} onClick={async (e) => { 
                                                                 e.stopPropagation(); 
                                                                 setOpenMenuId(null);
-                                                                if (boq.id.startsWith("mock-")) {
-                                                                    const newB = { ...boq, id: 'mock-'+Date.now(), boqNumber: boq.boqNumber + ' (Copy)' }; setBoqRows([newB, ...boqRows]); return;
-                                                                }
-                                                                const res = await fetch(`/api/v1/boqs/${boq.id}/duplicate`, { method: "POST", credentials: "include" });
-                                                                if (res.ok) window.location.reload();
+                                                                try {
+                                                                    const res = await fetch(`/api/v1/boqs/${boq.id}/duplicate`, { method: "POST", credentials: "include" });
+                                                                    if (res.ok) window.location.reload();
+                                                                    else { const p = await res.json().catch(() => ({})); setError(getApiErrorMessage(p)); }
+                                                                } catch (err) { setError("Failed to duplicate BOQ"); }
                                                             }}><Copy size={14} color="#6b7280" /> Duplicate BOQ</button>
-                                                            <button style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", textAlign: "left", padding: "8px 16px", background: "none", border: "none", fontSize: "13px", color: "#374151", cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); alert("PDF"); setOpenMenuId(null); }}><FileDown size={14} color="#6b7280" /> Export as PDF</button>
-                                                            <button style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", textAlign: "left", padding: "8px 16px", background: "none", border: "none", fontSize: "13px", color: "#374151", cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); alert("Excel"); setOpenMenuId(null); }}><FileSpreadsheet size={14} color="#6b7280" /> Export Excel</button>
+                                                            <button style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", textAlign: "left", padding: "8px 16px", background: "none", border: "none", fontSize: "13px", color: "#374151", cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); window.open(`/api/v1/boqs/${boq.id}/pdf`, "_blank"); }}><FileDown size={14} color="#6b7280" /> Export as PDF</button>
+                                                            <button style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", textAlign: "left", padding: "8px 16px", background: "none", border: "none", fontSize: "13px", color: "#374151", cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); window.open(`/api/v1/boqs/${boq.id}/excel`, "_blank"); }}><FileSpreadsheet size={14} color="#6b7280" /> Export Excel</button>
                                                         </div>
                                                     )}
                                                 </td>
@@ -389,7 +382,7 @@ export default function BoqsPage() {
                         </div>
 
                         <div className="boq-footer-row">
-                            <span>Total Arrivals: 30</span>
+                            <span>Total: {boqRows.length}</span>
                             <div className="boq-pagination">
                                 <button type="button">‹</button>
                                 <button type="button" className="active">1</button>
@@ -410,130 +403,7 @@ export default function BoqsPage() {
                         </div>
                     </section>
                 ) : activeBoq ? (
-                    <section className="boq-detail-shell">
-                        <div className="boq-detail-breadcrumb">
-                            <span>Bill of Quantities</span>
-                            <ChevronRight size={15} />
-                            <span className="active">{activeBoq.boqNumber}</span>
-                        </div>
-
-                        <div className="boq-detail-header-row">
-                            <div className="boq-detail-heading-wrap">
-                                <button type="button" className="boq-icon-back" onClick={() => setScreen("list")}>
-                                    <ArrowLeft size={17} />
-                                </button>
-                                <div className="boq-title-stack">
-                                    <div className="boq-title-line">
-                                        <span className="boq-big-title">{activeBoq.boqNumber}</span>
-                                        <span className={`boq-status-pill ${activeBoq.status.toLowerCase().replace(/\s/g, "-")}`}>
-                                            {activeBoq.status}
-                                        </span>
-                                    </div>
-                                    <span className="boq-subtitle">{activeBoq.projectName} - {activeBoq.version}</span>
-                                </div>
-                            </div>
-
-                            <div className="boq-detail-actions-row">
-                                <button type="button" className="boq-ghost-button">Duplicate</button>
-                                <button type="button" className="boq-ghost-button">Export PDF</button>
-                                <button type="button" className="boq-ghost-button">Send for Review</button>
-                                <button type="button" className="fig-dashboard-new boq-save-button">Save Draft</button>
-                            </div>
-                        </div>
-
-                        <div className="boq-detail-layout">
-                            <div className="boq-main-panel">
-                                <div className="boq-panel-toolbar">
-                                    <label className="boq-search-field">
-                                        <Search size={15} />
-                                        <input placeholder="Search..." aria-label="Search rooms" />
-                                    </label>
-
-                                    <div className="boq-toolbar-right">
-                                        <button type="button" className="boq-ghost-button">Import Excel</button>
-                                        <button type="button" className="boq-ghost-button">Use Template</button>
-                                        <button type="button" className="fig-dashboard-new boq-add-room">
-                                            <Plus size={18} />
-                                            <span>Add Room</span>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="boq-table-card">
-                                    <div className="boq-table-heading">8 Rooms</div>
-                                    <table className="boq-room-table">
-                                        <thead>
-                                            <tr>
-                                                <th>#</th>
-                                                <th>Room</th>
-                                                <th>Category</th>
-                                                <th>Spec</th>
-                                                <th>Unit</th>
-                                                <th>Items</th>
-                                                <th>Amount (₹)</th>
-                                                <th>Description</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {[
-                                                [1, "Master Bedroom", "3", "Custom. 6×6.5ft", "No", 8, "₹1,85,000", "King Size Platform Bed with Upholstered Headboard W..."],
-                                                [2, "Bedroom 02", "2", "Custom. 18×24in", "Set", 15, "₹42,000", "Bedside Tables - Pair, with Soft-Close Drawers"],
-                                                [3, "Bedroom 03", "2", "Custom. 18×24in", "Set", 20, "₹42,000", "Bedside Tables - Pair, with Soft-Close Drawers"],
-                                                [4, "Living Room", "2", "MDF + PU Lacquer", "Rft", 10, "₹15,200", "Sliding Wardrobe 3-Panel Mirror Finish..."],
-                                                [5, "Dining Room", "3", "18mm thick, honed", "Sqft", 320, "₹1,53,600", "Italian Marble 600×600mm - Blanco Carrara"],
-                                                [6, "Kitchen", "2", "Double layer GRP", "No", 24, "₹79,200", "False Ceiling - Gypsum Board with Cove Lighting"],
-                                                [7, "Study Room", "1", "Double layer GRP", "No", 24, "₹79,200", "False Ceiling - Gypsum Board with Cove Lighting"],
-                                                [8, "Guest Bedroom", "3", "Double layer GRP", "No", 24, "₹79,200", "False Ceiling - Gypsum Board with Cove Lighting"],
-                                            ].map(([no, room, category, spec, unit, items, amount, description]) => (
-                                                <tr key={String(no)}>
-                                                    <td>{no}</td>
-                                                    <td>{room}</td>
-                                                    <td>{category}</td>
-                                                    <td>{spec}</td>
-                                                    <td>{unit}</td>
-                                                    <td>{items}</td>
-                                                    <td>{amount}</td>
-                                                    <td>{description}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-
-                            <aside className="boq-summary-panel">
-                                <div className="boq-summary-card">
-                                    <div className="boq-summary-row">
-                                        <span>Subtotal</span>
-                                        <strong>₹12,65,800</strong>
-                                    </div>
-                                    <div className="boq-summary-row">
-                                        <span>Markup (18%)</span>
-                                        <strong>₹2,27,844</strong>
-                                    </div>
-                                    <div className="boq-summary-row">
-                                        <span>GST (18%)</span>
-                                        <strong>₹2,68,855.92</strong>
-                                    </div>
-                                    <div className="boq-summary-row total">
-                                        <span>Grand Total</span>
-                                        <strong>₹17,62,499.92</strong>
-                                    </div>
-                                </div>
-
-                                <div className="boq-summary-metric">
-                                    <span>Rooms Covered</span>
-                                    <strong>8</strong>
-                                </div>
-                                <div className="boq-summary-metric">
-                                    <span>Items</span>
-                                    <strong>580</strong>
-                                </div>
-
-                                <button type="button" className="fig-dashboard-new boq-submit-button">Generate Proposal</button>
-                            </aside>
-                        </div>
-                    </section>
+                    <BoqDetail activeBoq={activeBoq} onBack={() => setScreen("list")} />
                 ) : null}
             </div>
 
@@ -587,7 +457,7 @@ export default function BoqsPage() {
                         <div className="boq-create-header">
                             <div>
                                 <h3>Templates</h3>
-                                <p>25 templates</p>
+                                <p>{templates.length} templates</p>
                             </div>
                             <button type="button" className="boq-close-button" onClick={() => setShowTemplateModal(false)}>
                                 <X size={18} />
@@ -600,8 +470,10 @@ export default function BoqsPage() {
                         </div>
 
                         <div className="boq-template-list">
-                            {dossierTemplates.map((template) => (
-                                <div key={template.name} className="boq-template-item">
+                            {templates.length === 0 ? (
+                                <div style={{ textAlign: "center", padding: "32px", color: "#6b7280" }}>No templates found. Create a BOQ first, then save it as a template.</div>
+                            ) : templates.map((template) => (
+                                <div key={template.id} className="boq-template-item">
                                     <div className="boq-template-meta">
                                         <div className="boq-template-name-row">
                                             <strong>{template.name}</strong>
@@ -617,16 +489,15 @@ export default function BoqsPage() {
                                             </button>
                                         </div>
                                         <div className="boq-template-detail-line">
-                                            <span>{template.rooms} Rooms</span>
-                                            <span>{template.items} Items</span>
-                                            <span>{template.size}</span>
+                                            <span>{template.description || "No description"}</span>
+                                            <span>Used {template.use_count} times</span>
                                         </div>
-                                        <div className="boq-template-tags">
-                                            <span>{template.tag}</span>
-                                            <span>{template.category}</span>
-                                        </div>
+                                        {template.tags && template.tags.length > 0 && (
+                                            <div className="boq-template-tags">
+                                                {template.tags.map(tag => <span key={tag}>{tag}</span>)}
+                                            </div>
+                                        )}
                                     </div>
-                                    <strong className="boq-template-price">{template.price}</strong>
                                 </div>
                             ))}
                         </div>
@@ -656,7 +527,7 @@ export default function BoqsPage() {
                                 <select id="createBoqProjectId">
                                     {projects.length > 0 ? projects.map(p => (
                                         <option key={p.id} value={p.id}>{p.name}</option>
-                                    )) : <option value="mock">Create a Project first...</option>}
+                                    )) : <option value="">Create a Project first...</option>}
                                 </select>
                             </label>
 
@@ -670,10 +541,12 @@ export default function BoqsPage() {
                             {createMode === "template" ? (
                                 <label className="boq-form-field">
                                     <span>Select Template <em>*</em></span>
-                                    <select defaultValue="Residential - 3BHK Standard">
-                                        <option>Residential - 3BHK Standard</option>
-                                        <option>Office Fit-Out - Corporate</option>
-                                        <option>Modular Kitchen - L-Shape</option>
+                                    <select id="createBoqTemplateId">
+                                        {templates.length === 0 ? (
+                                            <option value="">No templates available</option>
+                                        ) : templates.map(t => (
+                                            <option key={t.id} value={t.id}>{t.name}</option>
+                                        ))}
                                     </select>
                                 </label>
                             ) : null}
@@ -694,24 +567,28 @@ export default function BoqsPage() {
                                 const projId = (document.getElementById("createBoqProjectId") as HTMLSelectElement)?.value;
                                 const version = (document.getElementById("createBoqVersion") as HTMLInputElement)?.value || "v1";
                                 
-                                if (!projId || projId === "mock") {
-                                    alert("Please create a Project first!");
+                                if (!projId) {
+                                    setError("Please create a Project first!");
+                                    setShowDetailsModal(false);
                                     return;
                                 }
                                 
                                 try {
+                                    const templateId = createMode === "template" ? (document.getElementById("createBoqTemplateId") as HTMLSelectElement)?.value : undefined;
                                     const res = await fetch("/api/v1/boqs", {
                                         method: "POST",
                                         headers: { "Content-Type": "application/json" },
-                                        body: JSON.stringify({ boqNumber: "BOQ-" + Math.floor(Math.random() * 10000), projectId: projId, version, method: "blank" }),
+                                        body: JSON.stringify({ boqNumber: "BOQ-" + Math.floor(Math.random() * 10000), projectId: projId, version, method: createMode || "blank", templateId: templateId || undefined }),
                                         credentials: "include"
                                     });
-                                    if (!res.ok) throw new Error("Failed to create BOQ");
-                                    const data = await res.json();
-                                    window.location.reload(); // Quick refresh
+                                    if (!res.ok) {
+                                        const payload = await res.json().catch(() => ({}));
+                                        throw new Error(getApiErrorMessage(payload));
+                                    }
+                                    window.location.reload();
                                 } catch (e) {
-                                    alert("Could not create BOQ. Check console.");
-                                    console.error(e);
+                                    setError(e instanceof Error ? e.message : "Could not create BOQ.");
+                                    setShowDetailsModal(false);
                                 }
                             }}>
                                 Create BOQ
@@ -727,29 +604,76 @@ export default function BoqsPage() {
 function BoqDetail({ activeBoq, onBack }: { activeBoq: BoqListItem; onBack: () => void }) {
     const [loading, setLoading] = useState(true);
     const [rooms, setRooms] = useState<any[]>([]);
+    const [boqData, setBoqData] = useState<any>(null);
+    const [actionError, setActionError] = useState("");
+    const [addingRoom, setAddingRoom] = useState(false);
+    const [newRoomName, setNewRoomName] = useState("");
 
-    useEffect(() => {
-        const loadDetail = async () => {
-            setLoading(true);
-            try {
-                if (activeBoq.id.startsWith('mock-')) throw new Error('Mock ID');
-                const res = await fetch(`/api/v1/boqs/${activeBoq.id}`, { credentials: 'include' });
-                if (!res.ok) throw new Error('Failed');
-                const data = await res.json();
-                const actualRooms = data.data?.rooms;
-                if (actualRooms && Array.isArray(actualRooms)) {
-                    setRooms(actualRooms);
-                } else {
-                    setRooms([]);
-                }
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
-        };
-        void loadDetail();
-    }, [activeBoq.id]);
+    const loadDetail = async () => {
+        setLoading(true);
+        setActionError("");
+        try {
+            const res = await fetch(`/api/v1/boqs/${activeBoq.id}`, { credentials: 'include' });
+            if (!res.ok) throw new Error('Failed to load BOQ details');
+            const data = await res.json();
+            const boq = data.data;
+            setBoqData(boq);
+            setRooms(boq?.rooms && Array.isArray(boq.rooms) ? boq.rooms : []);
+        } catch (err) {
+            setActionError(err instanceof Error ? err.message : "Failed to load BOQ details");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { void loadDetail(); }, [activeBoq.id]);
+
+    const handleDuplicate = async () => {
+        try {
+            const res = await fetch(`/api/v1/boqs/${activeBoq.id}/duplicate`, { method: 'POST', credentials: 'include' });
+            if (!res.ok) { const p = await res.json().catch(() => ({})); throw new Error(getApiErrorMessage(p)); }
+            window.location.reload();
+        } catch (err) { setActionError(err instanceof Error ? err.message : "Failed to duplicate"); }
+    };
+
+    const handleStatusChange = async (status: string) => {
+        try {
+            const res = await fetch(`/api/v1/boqs/${activeBoq.id}/status`, {
+                method: 'POST', credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            });
+            if (!res.ok) { const p = await res.json().catch(() => ({})); throw new Error(getApiErrorMessage(p)); }
+            window.location.reload();
+        } catch (err) { setActionError(err instanceof Error ? err.message : "Failed to change status"); }
+    };
+
+    const handleAddRoom = async () => {
+        if (!newRoomName.trim()) return;
+        try {
+            const res = await fetch(`/api/v1/boqs/${activeBoq.id}/rooms`, {
+                method: 'POST', credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: newRoomName.trim() })
+            });
+            if (!res.ok) { const p = await res.json().catch(() => ({})); throw new Error(getApiErrorMessage(p)); }
+            setNewRoomName("");
+            setAddingRoom(false);
+            void loadDetail();
+        } catch (err) { setActionError(err instanceof Error ? err.message : "Failed to add room"); }
+    };
+
+    const totalItems = rooms.reduce((acc: number, r: any) => {
+        const cats = r.categories || [];
+        return acc + cats.reduce((a: number, c: any) => a + (c.items?.length || 0), 0);
+    }, 0);
+
+    const subtotal = boqData?.subtotal ?? activeBoq.estimatedValue;
+    const markupPercent = boqData?.markupPercent ?? 0;
+    const taxPercent = boqData?.taxPercent ?? 0;
+    const markupAmount = boqData?.markupAmount ?? 0;
+    const taxAmount = boqData?.taxAmount ?? 0;
+    const grandTotal = boqData?.grandTotal ?? activeBoq.estimatedValue;
 
     return (
         <section className="boq-detail-shell">
@@ -776,12 +700,13 @@ function BoqDetail({ activeBoq, onBack }: { activeBoq: BoqListItem; onBack: () =
                 </div>
 
                 <div className="boq-detail-actions-row">
-                    <button type="button" className="boq-ghost-button" onClick={() => alert('Duplicate BOQ')}>Duplicate</button>
-                    <button type="button" className="boq-ghost-button" onClick={() => alert('Exporting PDF...')}>Export PDF</button>
-                    <button type="button" className="boq-ghost-button" onClick={() => alert('Sent for Review!')}>Send for Review</button>
-                    <button type="button" className="fig-dashboard-new boq-save-button" onClick={() => alert('Saved Draft!')}>Save Draft</button>
+                    <button type="button" className="boq-ghost-button" onClick={handleDuplicate}>Duplicate</button>
+                    <button type="button" className="boq-ghost-button" onClick={() => handleStatusChange('in_review')}>Send for Review</button>
+                    <button type="button" className="fig-dashboard-new boq-save-button" onClick={() => handleStatusChange('draft')}>Save Draft</button>
                 </div>
             </div>
+
+            {actionError && <div className="boq-alert" style={{margin: '0 0 16px'}}>{actionError}</div>}
 
             <div className="boq-detail-layout">
                 <div className="boq-main-panel">
@@ -792,14 +717,26 @@ function BoqDetail({ activeBoq, onBack }: { activeBoq: BoqListItem; onBack: () =
                         </label>
 
                         <div className="boq-toolbar-right">
-                            <button type="button" className="boq-ghost-button" onClick={() => alert('Importing Excel...')}>Import Excel</button>
-                            <button type="button" className="boq-ghost-button" onClick={() => alert('Using Template...')}>Use Template</button>
-                            <button type="button" className="fig-dashboard-new boq-add-room" onClick={() => alert('Added Room!')}>
+                            <button type="button" className="fig-dashboard-new boq-add-room" onClick={() => setAddingRoom(true)}>
                                 <Plus size={18} />
                                 <span>Add Room</span>
                             </button>
                         </div>
                     </div>
+
+                    {addingRoom && (
+                        <div style={{display: 'flex', gap: '8px', padding: '12px 16px', background: '#f9fafb', borderRadius: '8px', marginBottom: '12px'}}>
+                            <input
+                                type="text" placeholder="Room name" value={newRoomName}
+                                onChange={e => setNewRoomName(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && handleAddRoom()}
+                                style={{flex: 1, padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px'}}
+                                autoFocus
+                            />
+                            <button type="button" className="fig-dashboard-new" onClick={handleAddRoom} style={{padding: '8px 16px'}}>Add</button>
+                            <button type="button" className="boq-ghost-button" onClick={() => { setAddingRoom(false); setNewRoomName(""); }}>Cancel</button>
+                        </div>
+                    )}
 
                     <div className="boq-table-card">
                         <div className="boq-table-heading">{rooms.length} Rooms</div>
@@ -808,31 +745,32 @@ function BoqDetail({ activeBoq, onBack }: { activeBoq: BoqListItem; onBack: () =
                                 <tr>
                                     <th>#</th>
                                     <th>Room</th>
-                                    <th>Category</th>
-                                    <th>Spec</th>
-                                    <th>Unit</th>
+                                    <th>Categories</th>
                                     <th>Items</th>
-                                    <th>Amount (?)</th>
+                                    <th>Amount (₹)</th>
                                     <th>Description</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loading ? (
-                                    <tr><td colSpan={8} style={{textAlign: 'center', padding: '16px'}}>Loading rooms...</td></tr>
+                                    <tr><td colSpan={6} style={{textAlign: 'center', padding: '16px'}}>Loading rooms...</td></tr>
                                 ) : rooms.length === 0 ? (
-                                    <tr><td colSpan={8} style={{textAlign: 'center', padding: '16px'}}>No rooms found. Add a room to get started!</td></tr>
-                                ) : rooms.map((room, idx) => (
-                                    <tr key={room.id} onClick={() => alert(`Opened Room: ${room.name}`)} style={{ cursor: 'pointer' }}>
-                                        <td>{idx + 1}</td>
-                                        <td>{room.name}</td>
-                                        <td>{room.categories?.length ?? '-'}</td>
-                                        <td>{room.spec ?? '-'}</td>
-                                        <td>{room.unit ?? '-'}</td>
-                                        <td>{room.items?.length ?? 0}</td>
-                                        <td>{room.totalValue != null ? '?' + room.totalValue.toLocaleString('en-IN') : '-'}</td>
-                                        <td>{room.description ?? '-'}</td>
-                                    </tr>
-                                ))}
+                                    <tr><td colSpan={6} style={{textAlign: 'center', padding: '16px'}}>No rooms found. Add a room to get started!</td></tr>
+                                ) : rooms.map((room, idx) => {
+                                    const cats = room.categories || [];
+                                    const itemCount = cats.reduce((a: number, c: any) => a + (c.items?.length || 0), 0);
+                                    const roomTotal = cats.reduce((a: number, c: any) => a + (c.items || []).reduce((s: number, i: any) => s + (i.amount || 0), 0), 0);
+                                    return (
+                                        <tr key={room.id} style={{ cursor: 'pointer' }}>
+                                            <td>{idx + 1}</td>
+                                            <td>{room.name}</td>
+                                            <td>{cats.length}</td>
+                                            <td>{itemCount}</td>
+                                            <td>{roomTotal > 0 ? formatMoney(roomTotal) : '-'}</td>
+                                            <td>{room.description ?? '-'}</td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
@@ -842,11 +780,23 @@ function BoqDetail({ activeBoq, onBack }: { activeBoq: BoqListItem; onBack: () =
                     <div className="boq-summary-card">
                         <div className="boq-summary-row">
                             <span>Subtotal</span>
-                            <strong>?{activeBoq.estimatedValue.toLocaleString('en-IN')}</strong>
+                            <strong>{formatMoney(subtotal)}</strong>
                         </div>
+                        {markupPercent > 0 && (
+                            <div className="boq-summary-row">
+                                <span>Markup ({markupPercent}%)</span>
+                                <strong>{formatMoney(markupAmount)}</strong>
+                            </div>
+                        )}
+                        {taxPercent > 0 && (
+                            <div className="boq-summary-row">
+                                <span>GST ({taxPercent}%)</span>
+                                <strong>{formatMoney(taxAmount)}</strong>
+                            </div>
+                        )}
                         <div className="boq-summary-row total">
                             <span>Grand Total</span>
-                            <strong>?{activeBoq.estimatedValue.toLocaleString('en-IN')}</strong>
+                            <strong>{formatMoney(grandTotal)}</strong>
                         </div>
                     </div>
 
@@ -856,10 +806,10 @@ function BoqDetail({ activeBoq, onBack }: { activeBoq: BoqListItem; onBack: () =
                     </div>
                     <div className="boq-summary-metric">
                         <span>Items</span>
-                        <strong>{rooms.reduce((acc, r) => acc + (r.items?.length || 0), 0)}</strong>
+                        <strong>{totalItems}</strong>
                     </div>
 
-                    <button type="button" className="fig-dashboard-new boq-submit-button" onClick={() => alert('Generating Proposal...')}>Generate Proposal</button>
+                    <button type="button" className="fig-dashboard-new boq-submit-button" onClick={() => window.location.assign('/proposals')}>Generate Proposal</button>
                 </aside>
             </div>
         </section>

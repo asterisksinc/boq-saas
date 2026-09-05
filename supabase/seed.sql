@@ -671,6 +671,1299 @@ select
 where not exists (
   select 1 from public.audit_logs where request_id = 'seed:phase1:workspace-b'
 );
+-- ===========================================================================
+-- CHANDU PERSONAL DEMO TENANT
+-- ===========================================================================
+-- DEV / TEST ONLY
+-- User: everythingillegal03@gmail.com
+-- Password: BoqChandu#2026!
+-- OTP flow remains unchanged.
+--
+-- Paste this section BEFORE the final `commit;`
+-- ===========================================================================
+
+
+-- ---------------------------------------------------------------------------
+-- CHANDU 1. Auth user
+-- ---------------------------------------------------------------------------
+
+insert into auth.users (
+  instance_id,
+  id,
+  aud,
+  role,
+  email,
+  email_confirmed_at,
+  confirmation_token,
+  email_change,
+  email_change_token_new,
+  recovery_token,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at
+)
+values (
+  '00000000-0000-0000-0000-000000000000',
+  'c1000000-0000-4000-8000-000000000001',
+  'authenticated',
+  'authenticated',
+  'everythingillegal03@gmail.com',
+  now(),
+  '',
+  '',
+  '',
+  '',
+    '{"provider":"email","providers":["email"]}'::jsonb,
+  '{
+    "display_name":"Chandu",
+    "company_name":"Chandu Design Studio"
+  }'::jsonb,
+  now(),
+  now()
+)
+on conflict (id) do update
+set
+  email = excluded.email,
+  email_confirmed_at = excluded.email_confirmed_at,
+  confirmation_token = excluded.confirmation_token,
+  email_change = excluded.email_change,
+  email_change_token_new = excluded.email_change_token_new,
+  recovery_token = excluded.recovery_token,
+  raw_app_meta_data = excluded.raw_app_meta_data,
+  raw_user_meta_data = excluded.raw_user_meta_data,
+  updated_at = now();
+
+
+-- DEV / TEST ONLY password
+update auth.users
+set
+  encrypted_password = crypt(
+    'BoqChandu#2026!',
+    gen_salt('bf')
+  ),
+  updated_at = now()
+where id = 'c1000000-0000-4000-8000-000000000001';
+
+
+-- ---------------------------------------------------------------------------
+-- CHANDU 2. Email identity
+-- ---------------------------------------------------------------------------
+
+insert into auth.identities (
+  id,
+  provider_id,
+  user_id,
+  identity_data,
+  provider,
+  last_sign_in_at,
+  created_at,
+  updated_at
+)
+values (
+  'c1000000-0000-4000-8000-000000000001',
+  'c1000000-0000-4000-8000-000000000001',
+  'c1000000-0000-4000-8000-000000000001',
+  '{
+    "sub":"c1000000-0000-4000-8000-000000000001",
+    "email":"everythingillegal03@gmail.com",
+    "email_verified":true
+  }'::jsonb,
+  'email',
+  now(),
+  now(),
+  now()
+)
+on conflict (provider_id, provider) do update
+set
+  user_id = excluded.user_id,
+  identity_data = excluded.identity_data,
+  updated_at = now();
+
+
+-- ---------------------------------------------------------------------------
+-- CHANDU 3. Workspace
+-- ---------------------------------------------------------------------------
+
+insert into public.workspaces (
+  id,
+  name,
+  status,
+  currency,
+  timezone,
+  country
+)
+values (
+  'c2000000-0000-4000-8000-000000000001',
+  'Chandu Design Studio',
+  'active',
+  'INR',
+  'Asia/Kolkata',
+  'India'
+)
+on conflict (id) do update
+set
+  name = excluded.name,
+  status = excluded.status,
+  currency = excluded.currency,
+  timezone = excluded.timezone,
+  country = excluded.country;
+
+
+-- ---------------------------------------------------------------------------
+-- CHANDU 4. Workspace membership
+-- ---------------------------------------------------------------------------
+
+insert into public.workspace_memberships (
+  id,
+  workspace_id,
+  user_id,
+  role,
+  status,
+  joined_at
+)
+values (
+  'c2100000-0000-4000-8000-000000000001',
+  'c2000000-0000-4000-8000-000000000001',
+  'c1000000-0000-4000-8000-000000000001',
+  'owner',
+  'active',
+  now()
+)
+on conflict (workspace_id, user_id) do update
+set
+  role = excluded.role,
+  status = excluded.status,
+  joined_at = excluded.joined_at;
+
+
+-- ---------------------------------------------------------------------------
+-- CHANDU 5. User profile
+-- ---------------------------------------------------------------------------
+
+insert into public.user_profiles (
+  user_id,
+  display_name,
+  avatar_url
+)
+values (
+  'c1000000-0000-4000-8000-000000000001',
+  'Chandu',
+  null
+)
+on conflict (user_id) do update
+set
+  display_name = excluded.display_name,
+  avatar_url = excluded.avatar_url;
+
+
+-- ---------------------------------------------------------------------------
+-- CHANDU 6. User preferences
+-- ---------------------------------------------------------------------------
+
+insert into public.user_preferences (
+  user_id,
+  timezone,
+  locale
+)
+values (
+  'c1000000-0000-4000-8000-000000000001',
+  'Asia/Kolkata',
+  'en-IN'
+)
+on conflict (user_id) do update
+set
+  timezone = excluded.timezone,
+  locale = excluded.locale;
+
+
+-- ---------------------------------------------------------------------------
+-- CHANDU 7. Workspace company profile
+-- ---------------------------------------------------------------------------
+
+insert into public.workspace_profiles (
+  workspace_id,
+  logo_url,
+  website,
+  business_email,
+  phone,
+  address,
+  tax_id
+)
+values (
+  'c2000000-0000-4000-8000-000000000001',
+  null,
+  'https://chandu-design.example',
+  'everythingillegal03@gmail.com',
+  '+91 90000 00000',
+  'Tirupati, Andhra Pradesh, India',
+  '37CHANDU0000A1Z5'
+)
+on conflict (workspace_id) do update
+set
+  logo_url = excluded.logo_url,
+  website = excluded.website,
+  business_email = excluded.business_email,
+  phone = excluded.phone,
+  address = excluded.address,
+  tax_id = excluded.tax_id;
+
+
+-- ---------------------------------------------------------------------------
+-- CHANDU 8. Onboarding
+-- ---------------------------------------------------------------------------
+
+insert into public.onboarding_progress (
+  workspace_id,
+  user_id,
+  current_step,
+  completed_steps,
+  skipped_steps,
+  status
+)
+values (
+  'c2000000-0000-4000-8000-000000000001',
+  'c1000000-0000-4000-8000-000000000001',
+  'complete',
+  array[
+    'account_created',
+    'company_setup',
+    'project_setup',
+    'boq_setup'
+  ],
+  array[]::text[],
+  'completed'
+)
+on conflict (workspace_id, user_id) do update
+set
+  current_step = excluded.current_step,
+  completed_steps = excluded.completed_steps,
+  skipped_steps = excluded.skipped_steps,
+  status = excluded.status;
+
+
+-- ===========================================================================
+-- CHANDU PROJECT DATA
+-- ===========================================================================
+
+
+-- ---------------------------------------------------------------------------
+-- CHANDU 9. Projects
+-- ---------------------------------------------------------------------------
+
+insert into public.projects (
+  id,
+  project_code,
+  workspace_id,
+  name,
+  client_name,
+  client_contact,
+  client_email,
+  project_type,
+  status,
+  location,
+  description,
+  area_sqft,
+  project_value,
+  approved_budget,
+  start_date,
+  target_completion_date,
+  assigned_designer_id,
+  tags,
+  progress,
+  created_by,
+  created_at,
+  updated_at
+)
+values
+
+(
+  'c3000000-0000-4000-8000-000000000001',
+  'CHD-PRJ-001',
+  'c2000000-0000-4000-8000-000000000001',
+  'Skyline Luxury Villa',
+  'Rahul Reddy',
+  '+91 98765 10001',
+  'rahul.reddy@example.com',
+  'Residential',
+  'in_progress',
+  'Banjara Hills, Hyderabad',
+  'Luxury villa interior with complete turnkey furniture and lighting scope.',
+  4200,
+  6800000,
+  6200000,
+  '2026-07-01',
+  '2026-12-15',
+  'c1000000-0000-4000-8000-000000000001',
+  array['Luxury','Villa','Turnkey'],
+  62,
+  'c1000000-0000-4000-8000-000000000001',
+  now() - interval '75 days',
+  now() - interval '2 days'
+),
+
+(
+  'c3000000-0000-4000-8000-000000000002',
+  'CHD-PRJ-002',
+  'c2000000-0000-4000-8000-000000000001',
+  'TechPark Corporate Office',
+  'Vertex Technologies Pvt. Ltd.',
+  '+91 98765 10002',
+  'facilities@vertex.example.com',
+  'Commercial',
+  'active',
+  'HITEC City, Hyderabad',
+  'Corporate office fit-out including workstations, cabins and meeting rooms.',
+  18500,
+  14500000,
+  13200000,
+  '2026-08-01',
+  '2027-01-31',
+  'c1000000-0000-4000-8000-000000000001',
+  array['Commercial','Office','Fit-out'],
+  38,
+  'c1000000-0000-4000-8000-000000000001',
+  now() - interval '45 days',
+  now() - interval '1 day'
+),
+
+(
+  'c3000000-0000-4000-8000-000000000003',
+  'CHD-PRJ-003',
+  'c2000000-0000-4000-8000-000000000001',
+  'Lakeview Apartment',
+  'Priya Sharma',
+  '+91 98765 10003',
+  'priya.sharma@example.com',
+  'Residential',
+  'planning',
+  'Whitefield, Bengaluru',
+  'Three-bedroom apartment renovation and interior design.',
+  1850,
+  3200000,
+  2900000,
+  '2026-10-01',
+  '2027-01-15',
+  'c1000000-0000-4000-8000-000000000001',
+  array['Apartment','Renovation'],
+  12,
+  'c1000000-0000-4000-8000-000000000001',
+  now() - interval '20 days',
+  now() - interval '5 hours'
+),
+
+(
+  'c3000000-0000-4000-8000-000000000004',
+  'CHD-PRJ-004',
+  'c2000000-0000-4000-8000-000000000001',
+  'Urban Cafe Fit-Out',
+  'Urban Brew Cafe',
+  '+91 98765 10004',
+  'admin@urbanbrew.example.com',
+  'Retail',
+  'on_hold',
+  'Tirupati, Andhra Pradesh',
+  'Cafe interiors, furniture and lighting package.',
+  2400,
+  2100000,
+  1950000,
+  '2026-06-15',
+  '2026-10-30',
+  'c1000000-0000-4000-8000-000000000001',
+  array['Cafe','Retail','Fit-out'],
+  27,
+  'c1000000-0000-4000-8000-000000000001',
+  now() - interval '90 days',
+  now() - interval '7 days'
+),
+
+(
+  'c3000000-0000-4000-8000-000000000005',
+  'CHD-PRJ-005',
+  'c2000000-0000-4000-8000-000000000001',
+  'Studio Apartment',
+  'Ananya Rao',
+  '+91 98765 10005',
+  'ananya.rao@example.com',
+  'Studio',
+  'completed',
+  'Indiranagar, Bengaluru',
+  'Compact studio redesign and space optimization.',
+  780,
+  1250000,
+  1180000,
+  '2026-03-01',
+  '2026-06-30',
+  'c1000000-0000-4000-8000-000000000001',
+  array['Studio','Compact','Completed'],
+  100,
+  'c1000000-0000-4000-8000-000000000001',
+  now() - interval '180 days',
+  now() - interval '25 days'
+)
+
+on conflict (id) do update
+set
+  project_code = excluded.project_code,
+  workspace_id = excluded.workspace_id,
+  name = excluded.name,
+  client_name = excluded.client_name,
+  client_contact = excluded.client_contact,
+  client_email = excluded.client_email,
+  project_type = excluded.project_type,
+  status = excluded.status,
+  location = excluded.location,
+  description = excluded.description,
+  area_sqft = excluded.area_sqft,
+  project_value = excluded.project_value,
+  approved_budget = excluded.approved_budget,
+  start_date = excluded.start_date,
+  target_completion_date = excluded.target_completion_date,
+  assigned_designer_id = excluded.assigned_designer_id,
+  tags = excluded.tags,
+  progress = excluded.progress,
+  created_by = excluded.created_by,
+  updated_at = excluded.updated_at;
+
+
+-- ===========================================================================
+-- CHANDU PROJECT ROOMS
+-- ===========================================================================
+
+
+-- ---------------------------------------------------------------------------
+-- CHANDU 10. Project rooms
+-- ---------------------------------------------------------------------------
+
+insert into public.project_rooms (
+  id,
+  workspace_id,
+  project_id,
+  name,
+  room_type,
+  length,
+  width,
+  height,
+  unit,
+  notes,
+  sort_order,
+  created_by
+)
+values
+
+(
+  'c4000000-0000-4000-8000-000000000001',
+  'c2000000-0000-4000-8000-000000000001',
+  'c3000000-0000-4000-8000-000000000001',
+  'Living Room',
+  'Living Room',
+  22,
+  18,
+  10,
+  'ft',
+  'Large living area with TV wall and feature ceiling.',
+  1,
+  'c1000000-0000-4000-8000-000000000001'
+),
+
+(
+  'c4000000-0000-4000-8000-000000000002',
+  'c2000000-0000-4000-8000-000000000001',
+  'c3000000-0000-4000-8000-000000000001',
+  'Master Bedroom',
+  'Master Bedroom',
+  16,
+  14,
+  10,
+  'ft',
+  'Walk-in wardrobe and upholstered bed-back wall.',
+  2,
+  'c1000000-0000-4000-8000-000000000001'
+),
+
+(
+  'c4000000-0000-4000-8000-000000000003',
+  'c2000000-0000-4000-8000-000000000001',
+  'c3000000-0000-4000-8000-000000000001',
+  'Kitchen',
+  'Kitchen',
+  14,
+  12,
+  10,
+  'ft',
+  'Full modular kitchen with island.',
+  3,
+  'c1000000-0000-4000-8000-000000000001'
+),
+
+(
+  'c4000000-0000-4000-8000-000000000004',
+  'c2000000-0000-4000-8000-000000000001',
+  'c3000000-0000-4000-8000-000000000001',
+  'Dining Room',
+  'Dining Room',
+  14,
+  12,
+  10,
+  'ft',
+  'Dining table and decorative lighting.',
+  4,
+  'c1000000-0000-4000-8000-000000000001'
+),
+
+(
+  'c4000000-0000-4000-8000-000000000005',
+  'c2000000-0000-4000-8000-000000000001',
+  'c3000000-0000-4000-8000-000000000001',
+  'Bedroom 02',
+  'Bedroom',
+  12,
+  12,
+  10,
+  'ft',
+  'Guest bedroom with wardrobe.',
+  5,
+  'c1000000-0000-4000-8000-000000000001'
+),
+
+(
+  'c4000000-0000-4000-8000-000000000006',
+  'c2000000-0000-4000-8000-000000000001',
+  'c3000000-0000-4000-8000-000000000002',
+  'Reception',
+  'Reception',
+  20,
+  18,
+  10,
+  'ft',
+  'Corporate reception and waiting area.',
+  1,
+  'c1000000-0000-4000-8000-000000000001'
+),
+
+(
+  'c4000000-0000-4000-8000-000000000007',
+  'c2000000-0000-4000-8000-000000000001',
+  'c3000000-0000-4000-8000-000000000002',
+  'Conference Room',
+  'Conference Room',
+  22,
+  16,
+  10,
+  'ft',
+  'Boardroom with integrated AV.',
+  2,
+  'c1000000-0000-4000-8000-000000000001'
+),
+
+(
+  'c4000000-0000-4000-8000-000000000008',
+  'c2000000-0000-4000-8000-000000000001',
+  'c3000000-0000-4000-8000-000000000002',
+  'Workstation Area',
+  'Office',
+  45,
+  30,
+  10,
+  'ft',
+  'Open workstation zone.',
+  3,
+  'c1000000-0000-4000-8000-000000000001'
+)
+
+on conflict (id) do update
+set
+  name = excluded.name,
+  room_type = excluded.room_type,
+  length = excluded.length,
+  width = excluded.width,
+  height = excluded.height,
+  unit = excluded.unit,
+  notes = excluded.notes,
+  sort_order = excluded.sort_order;
+
+
+-- ===========================================================================
+-- CHANDU BOQ IMPORT
+-- ===========================================================================
+
+
+insert into public.boq_imports (
+  id,
+  workspace_id,
+  project_id,
+  file_name,
+  file_type,
+  row_count,
+  columns,
+  rows,
+  created_by,
+  created_at
+)
+values (
+  'c5000000-0000-4000-8000-000000000001',
+  'c2000000-0000-4000-8000-000000000001',
+  'c3000000-0000-4000-8000-000000000001',
+  'Skyline-Villa-BOQ.xlsx',
+  'xlsx',
+  10,
+  '[
+    "Room",
+    "Category",
+    "Description",
+    "Quantity",
+    "Unit",
+    "Rate",
+    "Amount"
+  ]'::jsonb,
+  '[
+    ["Living Room","Furniture","TV Unit",1,"nos",320000,320000],
+    ["Living Room","Furniture","Sofa",1,"nos",175000,175000],
+    ["Master Bedroom","Furniture","Wardrobe",1,"nos",850000,850000],
+    ["Master Bedroom","Furniture","Bed Back Panel",1,"nos",240000,240000],
+    ["Master Bedroom","Electrical","Bedside Lights",2,"nos",18500,37000],
+    ["Kitchen","Modular Kitchen","Base Cabinets",18,"rft",22000,396000],
+    ["Kitchen","Modular Kitchen","Wall Cabinets",14,"rft",18500,259000],
+    ["Dining Room","Lighting","Pendant Lights",3,"nos",28000,84000],
+    ["Bedroom 02","Furniture","Wardrobe",1,"nos",420000,420000],
+    ["Living Room","Lighting","Decorative Lights",4,"nos",22000,88000]
+  ]'::jsonb,
+  'c1000000-0000-4000-8000-000000000001',
+  now() - interval '4 days'
+)
+on conflict (id) do update
+set
+  project_id = excluded.project_id,
+  file_name = excluded.file_name,
+  row_count = excluded.row_count,
+  columns = excluded.columns,
+  rows = excluded.rows;
+
+
+-- ===========================================================================
+-- CHANDU PROJECT IMPORT
+-- ===========================================================================
+
+
+insert into public.project_imports (
+  id,
+  workspace_id,
+  file_name,
+  file_type,
+  total_rows,
+  imported_rows,
+  skipped_rows,
+  status,
+  errors,
+  created_by,
+  created_at
+)
+values (
+  'c5100000-0000-4000-8000-000000000001',
+  'c2000000-0000-4000-8000-000000000001',
+  'chandu-projects.xlsx',
+  'xlsx',
+  5,
+  5,
+  0,
+  'completed',
+  '[]'::jsonb,
+  'c1000000-0000-4000-8000-000000000001',
+  now() - interval '20 days'
+)
+on conflict (id) do update
+set
+  total_rows = excluded.total_rows,
+  imported_rows = excluded.imported_rows,
+  skipped_rows = excluded.skipped_rows,
+  status = excluded.status,
+  errors = excluded.errors;
+
+
+-- ===========================================================================
+-- CHANDU PROPOSALS
+-- ===========================================================================
+
+
+insert into public.proposals (
+  id,
+  workspace_id,
+  project_id,
+  project_name,
+  client_name,
+  source_type,
+  source_id,
+  source_label,
+  proposed_value,
+  currency,
+  expiry_date,
+  internal_notes,
+  scope_items,
+  status,
+  view_count,
+  sent_at,
+  created_by,
+  updated_by,
+  created_at,
+  updated_at
+)
+values
+
+(
+  'c6000000-0000-4000-8000-000000000001',
+  'c2000000-0000-4000-8000-000000000001',
+  'c3000000-0000-4000-8000-000000000001',
+  'Skyline Luxury Villa',
+  'Rahul Reddy',
+  'boq',
+  'c5000000-0000-4000-8000-000000000001',
+  'Skyline Villa BOQ.xlsx',
+  6350000,
+  'INR',
+  '2026-10-15',
+  'Complete turnkey interior scope based on approved BOQ.',
+  array[
+    'Design and detailing',
+    'Furniture and joinery',
+    'Modular kitchen',
+    'Lighting',
+    'Site coordination'
+  ],
+  'approved',
+  8,
+  now() - interval '12 days',
+  'c1000000-0000-4000-8000-000000000001',
+  'c1000000-0000-4000-8000-000000000001',
+  now() - interval '18 days',
+  now() - interval '2 days'
+),
+
+(
+  'c6000000-0000-4000-8000-000000000002',
+  'c2000000-0000-4000-8000-000000000001',
+  'c3000000-0000-4000-8000-000000000002',
+  'TechPark Corporate Office',
+  'Vertex Technologies Pvt. Ltd.',
+  'scratch',
+  null,
+  null,
+  13800000,
+  'INR',
+  '2026-10-30',
+  'Commercial proposal awaiting client approval.',
+  array[
+    'Workplace design',
+    'Civil and MEP coordination',
+    'Workstations',
+    'Meeting room furniture'
+  ],
+  'sent',
+  5,
+  now() - interval '5 days',
+  'c1000000-0000-4000-8000-000000000001',
+  'c1000000-0000-4000-8000-000000000001',
+  now() - interval '10 days',
+  now() - interval '1 day'
+),
+
+(
+  'c6000000-0000-4000-8000-000000000003',
+  'c2000000-0000-4000-8000-000000000001',
+  'c3000000-0000-4000-8000-000000000003',
+  'Lakeview Apartment',
+  'Priya Sharma',
+  'scratch',
+  null,
+  null,
+  3050000,
+  'INR',
+  '2026-11-15',
+  'Initial residential proposal.',
+  array[
+    'Interior design',
+    'Furniture',
+    'Kitchen',
+    'Lighting'
+  ],
+  'draft',
+  0,
+  null,
+  'c1000000-0000-4000-8000-000000000001',
+  'c1000000-0000-4000-8000-000000000001',
+  now() - interval '6 days',
+  now() - interval '6 days'
+)
+
+on conflict (id) do update
+set
+  project_id = excluded.project_id,
+  project_name = excluded.project_name,
+  client_name = excluded.client_name,
+  proposed_value = excluded.proposed_value,
+  expiry_date = excluded.expiry_date,
+  internal_notes = excluded.internal_notes,
+  scope_items = excluded.scope_items,
+  status = excluded.status,
+  view_count = excluded.view_count,
+  sent_at = excluded.sent_at,
+  updated_by = excluded.updated_by,
+  updated_at = excluded.updated_at;
+
+
+-- ===========================================================================
+-- CHANDU INVOICES
+-- ===========================================================================
+
+
+insert into public.invoices (
+  id,
+  manual_number,
+  workspace_id,
+  document_type,
+  client_name,
+  billing_address,
+  project_id,
+  project_name,
+  issue_date,
+  due_date,
+  milestone,
+  reference,
+  additional_notes,
+  bank_details,
+  tax_rate,
+  subtotal,
+  tax_amount,
+  total_amount,
+  total_paid,
+  currency,
+  status,
+  sent_at,
+  created_by,
+  updated_by,
+  created_at,
+  updated_at
+)
+values
+
+(
+  'c7000000-0000-4000-8000-000000000001',
+  'INV-CHD-001',
+  'c2000000-0000-4000-8000-000000000001',
+  'invoice',
+  'Rahul Reddy',
+  '{
+    "line1":"Skyline Villa",
+    "line2":"Banjara Hills",
+    "city":"Hyderabad",
+    "state":"Telangana",
+    "pincode":"500034"
+  }'::jsonb,
+  'c3000000-0000-4000-8000-000000000001',
+  'Skyline Luxury Villa',
+  '2026-08-20',
+  '2026-09-20',
+  'Milestone 2 — BOQ Approval',
+  'PO-CHD-001',
+  'Partial payment received.',
+  '{
+    "bankName":"HDFC Bank",
+    "accountHolder":"Chandu Design Studio",
+    "accountNumber":"0000000002",
+    "ifscCode":"HDFC0000002",
+    "branch":"Hyderabad"
+  }'::jsonb,
+  18,
+  525000,
+  94500,
+  619500,
+  300000,
+  'INR',
+  'partial',
+  now() - interval '12 days',
+  'c1000000-0000-4000-8000-000000000001',
+  'c1000000-0000-4000-8000-000000000001',
+  now() - interval '15 days',
+  now() - interval '2 days'
+),
+
+(
+  'c7000000-0000-4000-8000-000000000002',
+  'INV-CHD-002',
+  'c2000000-0000-4000-8000-000000000001',
+  'invoice',
+  'Vertex Technologies Pvt. Ltd.',
+  '{
+    "line1":"TechPark",
+    "line2":"HITEC City",
+    "city":"Hyderabad",
+    "state":"Telangana",
+    "pincode":"500081"
+  }'::jsonb,
+  'c3000000-0000-4000-8000-000000000002',
+  'TechPark Corporate Office',
+  '2026-08-25',
+  '2026-09-25',
+  'Mobilisation Advance',
+  'PO-CHD-002',
+  'Commercial project mobilisation invoice.',
+  '{
+    "bankName":"HDFC Bank",
+    "accountHolder":"Chandu Design Studio",
+    "accountNumber":"0000000002",
+    "ifscCode":"HDFC0000002",
+    "branch":"Hyderabad"
+  }'::jsonb,
+  18,
+  800000,
+  144000,
+  944000,
+  0,
+  'INR',
+  'sent',
+  now() - interval '7 days',
+  'c1000000-0000-4000-8000-000000000001',
+  'c1000000-0000-4000-8000-000000000001',
+  now() - interval '10 days',
+  now() - interval '7 days'
+),
+
+(
+  'c7000000-0000-4000-8000-000000000003',
+  'INV-CHD-003',
+  'c2000000-0000-4000-8000-000000000001',
+  'invoice',
+  'Ananya Rao',
+  '{
+    "line1":"Indiranagar",
+    "city":"Bengaluru",
+    "state":"Karnataka",
+    "pincode":"560038"
+  }'::jsonb,
+  'c3000000-0000-4000-8000-000000000005',
+  'Studio Apartment',
+  '2026-06-15',
+  '2026-07-15',
+  'Final Payment',
+  'PO-CHD-005',
+  'Final invoice for completed project.',
+  '{
+    "bankName":"HDFC Bank",
+    "accountHolder":"Chandu Design Studio",
+    "accountNumber":"0000000002",
+    "ifscCode":"HDFC0000002",
+    "branch":"Hyderabad"
+  }'::jsonb,
+  18,
+  500000,
+  90000,
+  590000,
+  590000,
+  'INR',
+  'paid',
+  now() - interval '80 days',
+  'c1000000-0000-4000-8000-000000000001',
+  'c1000000-0000-4000-8000-000000000001',
+  now() - interval '85 days',
+  now() - interval '75 days'
+)
+
+on conflict (id) do update
+set
+  manual_number = excluded.manual_number,
+  client_name = excluded.client_name,
+  billing_address = excluded.billing_address,
+  project_id = excluded.project_id,
+  project_name = excluded.project_name,
+  issue_date = excluded.issue_date,
+  due_date = excluded.due_date,
+  milestone = excluded.milestone,
+  reference = excluded.reference,
+  additional_notes = excluded.additional_notes,
+  bank_details = excluded.bank_details,
+  tax_rate = excluded.tax_rate,
+  subtotal = excluded.subtotal,
+  tax_amount = excluded.tax_amount,
+  total_amount = excluded.total_amount,
+  total_paid = excluded.total_paid,
+  status = excluded.status,
+  updated_at = excluded.updated_at;
+
+
+-- ---------------------------------------------------------------------------
+-- CHANDU invoice items
+-- ---------------------------------------------------------------------------
+
+insert into public.invoice_items (
+  id,
+  invoice_id,
+  workspace_id,
+  position,
+  description,
+  quantity,
+  rate
+)
+values
+
+(
+  'c7100000-0000-4000-8000-000000000001',
+  'c7000000-0000-4000-8000-000000000001',
+  'c2000000-0000-4000-8000-000000000001',
+  1,
+  'Interior Design Services — Stage 2',
+  1,
+  450000
+),
+
+(
+  'c7100000-0000-4000-8000-000000000002',
+  'c7000000-0000-4000-8000-000000000001',
+  'c2000000-0000-4000-8000-000000000001',
+  2,
+  'Project Management',
+  1,
+  75000
+),
+
+(
+  'c7100000-0000-4000-8000-000000000003',
+  'c7000000-0000-4000-8000-000000000002',
+  'c2000000-0000-4000-8000-000000000001',
+  1,
+  'Office Design and Coordination',
+  1,
+  600000
+),
+
+(
+  'c7100000-0000-4000-8000-000000000004',
+  'c7000000-0000-4000-8000-000000000002',
+  'c2000000-0000-4000-8000-000000000001',
+  2,
+  'Mobilisation and Site Setup',
+  1,
+  200000
+),
+
+(
+  'c7100000-0000-4000-8000-000000000005',
+  'c7000000-0000-4000-8000-000000000003',
+  'c2000000-0000-4000-8000-000000000001',
+  1,
+  'Final Interior Design Package',
+  1,
+  500000
+)
+
+on conflict (id) do update
+set
+  position = excluded.position,
+  description = excluded.description,
+  quantity = excluded.quantity,
+  rate = excluded.rate;
+
+
+-- ---------------------------------------------------------------------------
+-- CHANDU invoice payments
+-- ---------------------------------------------------------------------------
+
+insert into public.invoice_payments (
+  id,
+  invoice_id,
+  workspace_id,
+  amount,
+  paid_at,
+  method,
+  reference,
+  notes,
+  recorded_by,
+  created_at
+)
+values
+
+(
+  'c7200000-0000-4000-8000-000000000001',
+  'c7000000-0000-4000-8000-000000000001',
+  'c2000000-0000-4000-8000-000000000001',
+  300000,
+  now() - interval '5 days',
+  'bank_transfer',
+  'UTR-CHD-10001',
+  'First milestone payment.',
+  'c1000000-0000-4000-8000-000000000001',
+  now() - interval '5 days'
+),
+
+(
+  'c7200000-0000-4000-8000-000000000002',
+  'c7000000-0000-4000-8000-000000000003',
+  'c2000000-0000-4000-8000-000000000001',
+  590000,
+  now() - interval '75 days',
+  'bank_transfer',
+  'UTR-CHD-10002',
+  'Final payment received.',
+  'c1000000-0000-4000-8000-000000000001',
+  now() - interval '75 days'
+)
+
+on conflict (id) do update
+set
+  amount = excluded.amount,
+  paid_at = excluded.paid_at,
+  method = excluded.method,
+  reference = excluded.reference,
+  notes = excluded.notes;
+
+
+-- ===========================================================================
+-- CHANDU NOTIFICATIONS
+-- ===========================================================================
+
+insert into public.notifications (
+  id,
+  workspace_id,
+  recipient_user_id,
+  type,
+  title,
+  priority,
+  target_type,
+  target_id,
+  read_at,
+  created_at
+)
+values
+
+(
+  'c8000000-0000-4000-8000-000000000001',
+  'c2000000-0000-4000-8000-000000000001',
+  'c1000000-0000-4000-8000-000000000001',
+  'workspace_ready',
+  'Your Chandu Design Studio workspace is ready',
+  'normal',
+  'workspace',
+  'c2000000-0000-4000-8000-000000000001',
+  null,
+  now() - interval '10 minutes'
+),
+
+(
+  'c8000000-0000-4000-8000-000000000002',
+  'c2000000-0000-4000-8000-000000000001',
+  'c1000000-0000-4000-8000-000000000001',
+  'project_action',
+  'Skyline Luxury Villa has pending BOQ and payment actions',
+  'high',
+  'project',
+  'c3000000-0000-4000-8000-000000000001',
+  null,
+  now() - interval '20 minutes'
+),
+
+(
+  'c8000000-0000-4000-8000-000000000003',
+  'c2000000-0000-4000-8000-000000000001',
+  'c1000000-0000-4000-8000-000000000001',
+  'invoice_action',
+  'INV-CHD-001 has an outstanding balance',
+  'high',
+  'invoice',
+  'c7000000-0000-4000-8000-000000000001',
+  null,
+  now() - interval '45 minutes'
+),
+
+(
+  'c8000000-0000-4000-8000-000000000004',
+  'c2000000-0000-4000-8000-000000000001',
+  'c1000000-0000-4000-8000-000000000001',
+  'proposal_action',
+  'TechPark Corporate Office proposal is awaiting approval',
+  'normal',
+  'proposal',
+  'c6000000-0000-4000-8000-000000000002',
+  now() - interval '1 hour',
+  now() - interval '1 day'
+)
+
+on conflict (id) do update
+set
+  workspace_id = excluded.workspace_id,
+  recipient_user_id = excluded.recipient_user_id,
+  type = excluded.type,
+  title = excluded.title,
+  priority = excluded.priority,
+  target_type = excluded.target_type,
+  target_id = excluded.target_id,
+  read_at = excluded.read_at;
+
+
+-- ===========================================================================
+-- CHANDU AUDIT LOG
+-- ===========================================================================
+
+insert into public.audit_logs (
+  workspace_id,
+  actor_user_id,
+  action,
+  entity_type,
+  entity_id,
+  metadata,
+  request_id,
+  created_at
+)
+select
+  'c2000000-0000-4000-8000-000000000001',
+  'c1000000-0000-4000-8000-000000000001',
+  'seed.workspace.ready',
+  'workspace',
+  'c2000000-0000-4000-8000-000000000001',
+  '{"source":"supabase/seed.sql","tenant":"chandu"}'::jsonb,
+  'seed:chandu:workspace',
+  now() - interval '2 days'
+where not exists (
+  select 1
+  from public.audit_logs
+  where request_id = 'seed:chandu:workspace'
+);
+
+
+-- ===========================================================================
+-- CHANDU SEED SUMMARY
+-- ===========================================================================
+-- Email:
+--   everythingillegal03@gmail.com
+--
+-- DEV password:
+--   BoqChandu#2026!
+--
+-- Workspace:
+--   Chandu Design Studio
+--
+-- Projects:
+--   5
+--
+-- Project rooms:
+--   8
+--
+-- BOQ imports:
+--   1
+--
+-- Proposals:
+--   3
+--
+-- Invoices:
+--   3
+--
+-- Invoice payments:
+--   2
+--
+-- Notifications:
+--   4
+--
+-- Audit record:
+--   1
+--
+-- ===========================================================================
 
 commit;
 
