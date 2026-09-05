@@ -459,7 +459,7 @@ paths:
       responses: { '201': { description: Template created }, '400': { $ref: '#/components/responses/Error' } }
   /project-templates/{templateId}:
     parameters: [{ $ref: '#/components/parameters/TemplateId' }]
-    get: { summary: Get template metadata, composition, and all designer sections, responses: { '200': { description: Template detail }, '404': { $ref: '#/components/responses/Error' } } }
+    get: { summary: "Get template metadata, composition, and all designer sections", responses: { '200': { description: Template detail }, '404': { $ref: '#/components/responses/Error' } } }
     patch:
       summary: Update allowlisted template metadata (owner/admin/member)
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProjectTemplatePatch' } } } }
