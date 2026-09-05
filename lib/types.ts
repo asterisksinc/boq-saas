@@ -429,6 +429,83 @@ export interface AnalyticsResponse {
   counts: { projects: number; boqs: number };
 }
 
+// ── Activities ────────────────────────────────────────────────────────────────
+
+export interface ActivityStage {
+  id: string;
+  name: string;
+  color: string | null;
+  sortOrder: number;
+  terminalType: "completed" | "lost" | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ActivityTask {
+  id: string;
+  projectId: string;
+  stageId: string;
+  name: string;
+  description: string | null;
+  assignedTo: string | null;
+  ownerId: string | null;
+  dueDate: string | null;
+  priority: "low" | "medium" | "high" | "critical";
+  status: "not_started" | "in_progress" | "blocked" | "completed" | "cancelled";
+  attachments: Record<string, unknown>[];
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  project?: { projectCode: string | null; name: string };
+  stage?: { name: string; color: string | null };
+}
+
+export interface ActivityApproval {
+  id: string;
+  projectId: string;
+  stageId: string;
+  name: string;
+  description: string | null;
+  approverId: string | null;
+  approverName: string | null;
+  dueDate: string;
+  status: "draft" | "sent" | "in_review" | "approved" | "changes_required" | "rejected" | "cancelled";
+  requestedAt: string | null;
+  decidedAt: string | null;
+  attachments: Record<string, unknown>[];
+  requestedBy: string;
+  createdAt: string;
+  updatedAt: string;
+  project?: { projectCode: string | null; name: string };
+  stage?: { name: string; color: string | null };
+}
+
+export interface ActivityComment {
+  id: string;
+  entityType: "task" | "approval";
+  entityId: string;
+  body: string;
+  attachments: Record<string, unknown>[];
+  authorId: string;
+  createdAt: string;
+}
+
+export interface ActivitySummary {
+  stages: number;
+  tasks: {
+    total: number;
+    overdue: number;
+    inProgress: number;
+    completed: number;
+  };
+  approvals: {
+    total: number;
+    overdue: number;
+    inReview: number;
+    approved: number;
+  };
+}
+
 // ── Paginated Response ──────────────────────────────────────────────────────
 
 export interface PaginatedResponse<T> {
