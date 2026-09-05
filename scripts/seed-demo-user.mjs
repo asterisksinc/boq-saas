@@ -223,6 +223,86 @@ assertResult("link demo projects to template", await admin.from("projects").upda
   source_template_id: templateFixtures[0].id, source_template_version: 3,
 }).in("id", projects.slice(0, 3).map((project) => project.id)));
 
+await upsert("subscription_plans", [
+  { code: "starter", name: "Starter", description: "For small teams starting out.", monthly_price: 2999, currency: "INR", sort_order: 1, limits: { users: 3, projects: 10, boqs: "limited", templates: "standard" }, features: { integrations: "limited", reports: "basic", support: "standard", storage: "standard", aiUsage: "basic" } },
+  { code: "professional", name: "Professional", description: "For growing construction teams.", monthly_price: 9999, currency: "INR", sort_order: 2, limits: { users: 20, projects: 100, boqs: "expanded", templates: "advanced" }, features: { integrations: "available", reports: "full", support: "priority", storage: "expanded", aiUsage: "standard" } },
+  { code: "business", name: "Business", description: "For organizations that need scale.", monthly_price: 18000, currency: "INR", sort_order: 3, limits: { users: 50, projects: null, boqs: "advanced", templates: "organization_wide" }, features: { integrations: "advanced", reports: "advanced", support: "priority", storage: "advanced", aiUsage: "advanced" } },
+  { code: "enterprise", name: "Enterprise", description: "For custom requirements at scale.", monthly_price: null, currency: "INR", sort_order: 4, limits: { users: null, projects: null, boqs: "custom", templates: "custom" }, features: { integrations: "enterprise", reports: "custom", support: "dedicated", storage: "custom", aiUsage: "custom" } },
+], "code");
+await upsert("workspace_subscriptions", [{
+  id: "f1000000-0000-4000-8000-000000000001", workspace_id: WORKSPACE_ID, plan_code: "professional", status: "active",
+  billing_frequency: "monthly", billing_contact: "accounts@boq-demo.com", seats_used: 5,
+  period_start: "2026-08-14", period_end: "2026-09-14", trial_ends_at: null, cancel_at_period_end: false,
+}]);
+await upsert("workspace_payment_methods", [{
+  id: "f1100000-0000-4000-8000-000000000001", workspace_id: WORKSPACE_ID, brand: "Visa", last4: "4242",
+  expiry_month: 12, expiry_year: 2028, is_default: true, created_by: userId,
+}]);
+await upsert("subscription_invoices", [
+  { id: "f1200000-0000-4000-8000-000000000001", workspace_id: WORKSPACE_ID, invoice_number: "SUB-2026-008", amount: 9999, tax_amount: 1799.82, currency: "INR", status: "paid", issued_at: "2026-08-14T04:00:00Z", due_at: "2026-08-14T04:00:00Z", paid_at: "2026-08-14T04:05:00Z" },
+  { id: "f1200000-0000-4000-8000-000000000002", workspace_id: WORKSPACE_ID, invoice_number: "SUB-2026-009", amount: 9999, tax_amount: 1799.82, currency: "INR", status: "open", issued_at: "2026-09-14T04:00:00Z", due_at: "2026-09-14T04:00:00Z" },
+]);
+await upsert("workspace_settings", [{
+  workspace_id: WORKSPACE_ID,
+  branding: { logoUrl: null, primaryColor: "#2563EB", companyName: "Arena Design Studio", status: "warning" },
+  boq_costing: { currency: "INR", defaultTaxPercent: 18, defaultMarkupPercent: 12, fiscalYearStartMonth: 4, status: "done" },
+  integrations: { connected: [], available: ["Google Drive", "Meta Lead Forms"], status: "done" },
+  notifications: { email: true, approvals: true, tasks: true, billing: true, weeklyDigest: true },
+  security: { twoFactorEnabled: true, sessionTimeoutMinutes: 480, status: "done" },
+  advanced: { dateFormat: "DD MMM YYYY", numberFormat: "en-IN", dataRetentionDays: 365 }, updated_by: userId,
+}], "workspace_id");
+
+const activityStages = [
+  ["f2000000-0000-4000-8000-000000000001", "Initiation", "#DBEAFE", 1, null],
+  ["f2000000-0000-4000-8000-000000000002", "Design", "#DBEAFE", 2, null],
+  ["f2000000-0000-4000-8000-000000000003", "Estimation", "#FEF3C7", 3, null],
+  ["f2000000-0000-4000-8000-000000000004", "Approval", "#FEF3C7", 4, null],
+  ["f2000000-0000-4000-8000-000000000005", "Completed", "#DCFCE7", 5, "completed"],
+  ["f2000000-0000-4000-8000-000000000006", "Lost", "#FEE2E2", 6, "lost"],
+].map(([id,name,color,sort_order,terminal_type])=>({id,workspace_id:WORKSPACE_ID,name,color,sort_order,terminal_type,created_by:userId}));
+await upsert("activity_stages", activityStages);
+const activityTasks = [
+  ["f2100000-0000-4000-8000-000000000001","Finalise Floor Plan",1,"Review and finalise floor plan layouts based on client feedback.","2026-09-10","high","in_progress"],
+  ["f2100000-0000-4000-8000-000000000002","Select Materials",1,"Finalise materials and finishes.","2026-09-12","high","in_progress"],
+  ["f2100000-0000-4000-8000-000000000003","Create 3D Renderings",1,"Prepare 3D visualisations.","2026-09-14","low","not_started"],
+  ["f2100000-0000-4000-8000-000000000004","Prepare Client Presentation",1,"Compile design presentation.","2026-09-16","high","not_started"],
+  ["f2100000-0000-4000-8000-000000000005","Client Review & Feedback",1,"Collect feedback from client.","2026-09-18","medium","not_started"],
+  ["f2100000-0000-4000-8000-000000000006","Incorporate Feedback",2,"Update design with feedback.","2026-09-09","medium","completed"],
+].map(([id,name,projectIndex,description,due_date,priority,status])=>({id,workspace_id:WORKSPACE_ID,project_id:projects[Number(projectIndex)-1].id,stage_id:activityStages[1].id,name,description,due_date,priority,status,assigned_to:userId,owner_id:userId,attachments:[],created_by:userId}));
+await upsert("activity_tasks", activityTasks);
+const activityApprovals = [
+  ["f2200000-0000-4000-8000-000000000001","Design Concept Approval","in_review","2026-09-14"],
+  ["f2200000-0000-4000-8000-000000000002","Material Selection Approval","changes_required","2026-09-04"],
+  ["f2200000-0000-4000-8000-000000000003","Floor Plan Approval","approved","2026-09-04"],
+  ["f2200000-0000-4000-8000-000000000004","Structural Review Approval","sent","2026-09-18"],
+  ["f2200000-0000-4000-8000-000000000005","Electrical Layout Approval","draft",null],
+  ["f2200000-0000-4000-8000-000000000006","Landscape Design Approval","rejected","2026-09-10"],
+].map(([id,name,status,due_date])=>({id,workspace_id:WORKSPACE_ID,project_id:projects[0].id,stage_id:activityStages[1].id,name,description:`Approval request for ${name}.`,approver_name:"Mehta Residence Group",due_date,status,attachments:[],requested_by:userId,requested_at:status==="draft"?null:now,decided_at:["approved","rejected","changes_required"].includes(String(status))?now:null}));
+await upsert("activity_approvals", activityApprovals);
+await upsert("activity_comments", [
+  { id:"f2300000-0000-4000-8000-000000000001",workspace_id:WORKSPACE_ID,entity_type:"task",entity_id:activityTasks[0].id,body:"Status updated to In Progress.",attachments:[],author_id:userId },
+  { id:"f2300000-0000-4000-8000-000000000002",workspace_id:WORKSPACE_ID,entity_type:"approval",entity_id:activityApprovals[0].id,body:"The concept looks good. Please explore another kitchen countertop option.",attachments:[],author_id:userId },
+]);
+
+const helpCategories = [
+  ["f3000000-0000-4000-8000-000000000001","getting-started","Getting Started","Set up your workspace and create your first project."],
+  ["f3000000-0000-4000-8000-000000000002","projects-activities","Projects & Activities","Manage stages, milestones, tasks, and approvals."],
+  ["f3000000-0000-4000-8000-000000000003","boqs-costing","BOQs & Costing","Create BOQs, manage items, rates, and margins."],
+  ["f3000000-0000-4000-8000-000000000004","proposals-invoices","Proposals & Invoices","Create, send, and track commercial documents."],
+  ["f3000000-0000-4000-8000-000000000005","documents","Documents","Upload, organize, preview, and share files."],
+  ["f3000000-0000-4000-8000-000000000006","account-billing","Account & Billing","Manage plans, usage, subscriptions, and payments."],
+].map(([id,slug,name,description],index)=>({id,slug,name,description,sort_order:index+1,active:true}));
+await upsert("help_categories",helpCategories);
+const helpArticles = [
+  ["f3100000-0000-4000-8000-000000000001",2,"how-to-import-an-excel-boq","How to Import an Excel BOQ","Bring your existing estimate into BOQ and map columns to your costing library."],
+  ["f3100000-0000-4000-8000-000000000002",0,"create-your-first-project","Create Your First Project","Set up a project workspace, invite your team, and start building your estimate."],
+  ["f3100000-0000-4000-8000-000000000003",2,"add-a-costing-item","Add a Costing Item","Add materials, labour, and custom rates to your Costing Library."],
+  ["f3100000-0000-4000-8000-000000000004",3,"send-a-proposal","Send a Proposal to a Client","Turn your approved BOQ into a polished proposal and send it for review."],
+].map(([id,categoryIndex,slug,title,summary])=>({id,category_id:helpCategories[Number(categoryIndex)].id,slug,title,summary,content:{shortAnswer:summary,sections:[{heading:"Before you start",body:"Check that your project data and permissions are ready."},{heading:"Steps",items:["Open the relevant module.","Choose the action.","Review the validation summary.","Confirm to finish."]},{heading:"Troubleshooting",body:"Review validation messages and contact support if the issue continues."}]},read_minutes:4,helpful_yes:96,helpful_no:4,popular:true,active:true}));
+await upsert("help_articles",helpArticles);
+await upsert("support_tickets",[{id:"f3200000-0000-4000-8000-000000000001",workspace_id:WORKSPACE_ID,ticket_number:"SUP-DEMO-001",issue_type:"BOQs",subject:"Excel BOQ column mapping question",description:"Need help mapping a custom material code column.",priority:"normal",status:"open",created_by:userId}]);
+await upsert("support_ticket_messages",[{id:"f3300000-0000-4000-8000-000000000001",workspace_id:WORKSPACE_ID,ticket_id:"f3200000-0000-4000-8000-000000000001",body:"Please share the supported column names.",attachments:[],author_id:userId}]);
+
 await upsert("project_rooms", [
   { id: "d2000000-0000-4000-8000-000000000001", workspace_id: WORKSPACE_ID, project_id: projects[0].id, name: "Master Bedroom", room_type: "Bedroom", length: 14, width: 12, height: 10, unit: "ft", sort_order: 1, created_by: userId },
   { id: "d2000000-0000-4000-8000-000000000002", workspace_id: WORKSPACE_ID, project_id: projects[0].id, name: "Living Room", room_type: "Living Room", length: 22, width: 18, height: 10, unit: "ft", sort_order: 2, created_by: userId },
@@ -283,7 +363,7 @@ await upsert("notifications", [{
 }]);
 
 const counts = {};
-for (const table of ["projects", "project_templates", "project_template_versions", "project_template_usage", "boqs", "boq_items", "proposals", "invoices", "notifications"]) {
+for (const table of ["projects", "project_templates", "project_template_versions", "project_template_usage", "workspace_subscriptions", "activity_stages", "activity_tasks", "activity_approvals", "support_tickets", "boqs", "boq_items", "proposals", "invoices", "notifications"]) {
   const result = await admin.from(table).select("id", { count: "exact", head: true }).eq("workspace_id", WORKSPACE_ID);
   assertResult(`verify ${table}`, result);
   counts[table] = result.count;
@@ -292,9 +372,16 @@ for (const table of ["projects", "project_templates", "project_template_versions
 const verified = await publicClient.auth.signInWithPassword({ email: EMAIL, password: PASSWORD });
 assertResult("verify password login", verified);
 const context = assertResult("verify user context", await publicClient.rpc("get_current_context"));
+const memberVisibleCounts = {};
+for (const table of ["workspace_subscriptions", "workspace_settings", "activity_stages", "activity_tasks", "activity_approvals", "support_tickets", "help_articles"]) {
+  const result = await publicClient.from(table).select("*", { count: "exact", head: true });
+  assertResult(`verify member read access to ${table}`, result);
+  memberVisibleCounts[table] = result.count;
+}
 
 console.log(JSON.stringify({
   user: { id: userId, email: EMAIL, appRole: USER_ROLE },
   workspace: { id: context.workspace.id, name: context.workspace.name, membershipRole: context.membership.role },
   seededRowCounts: counts,
+  memberVisibleCounts,
 }, null, 2));

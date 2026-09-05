@@ -2,6 +2,78 @@
 
 This guide describes how the existing Next.js App Router frontend should integrate with Auth/User/Dashboard, Projects and project Excel import, Proposals, Documents, and Invoices. It does not require the frontend to call Supabase directly.
 
+## Billing, Settings, Activities, and Help integration (backend implemented; frontend unchanged)
+
+All endpoints below require the same-origin authenticated cookie. Workspace members can read these modules. Members can create and update activities and support tickets. Billing mutations and organization-wide settings changes require `owner` or `admin`; use `canManageBilling` from the billing response to hide those controls.
+
+### Billing and plan management
+
+| UI action | API |
+|---|---|
+| Billing screen, status banners, usage, invoices | `GET /billing/overview` |
+| Upgrade/downgrade confirmation breakdown | `GET /billing/plans/preview?plan=business` |
+| Billing contact | `PATCH /billing/contact` |
+| Replace default payment method | `POST /billing/payment-methods` |
+| Confirm plan change | `POST /billing/subscription/change` |
+| Cancel at period end | `POST /billing/subscription/cancel` |
+| Reactivate | `POST /billing/subscription/reactivate` |
+| Retry failed payment | `POST /billing/subscription/retry-payment` |
+
+The current implementation reports `providerMode: "internal"`: it persists and demonstrates subscription lifecycle state but does not charge a card. Connect a payment-provider webhook before treating these state changes as financial settlement. Never collect or send a full card number/CVV; the API accepts only tokenized-display metadata (`brand`, `last4`, expiry) for the current provider-free backend.
+
+```ts
+const billing = await api.get<BillingOverview>("/billing/overview");
+const preview = await api.get<PlanPreview>("/billing/plans/preview?plan=business");
+await api.post("/billing/subscription/change", { planCode: "business", billingFrequency: "monthly" });
+```
+
+Render subscription banners directly from `subscription.status`: `trial`, `active`, `past_due`, `suspended`, `cancelled_at_period_end`, or `cancelled`. Usage values can be `null` when the metric is unavailable or unlimited.
+
+### Settings
+
+Use `GET /settings/overview` for profile completion, usage cards, configuration health inputs, and recent audit changes. Organization setting sections use `GET`/`PATCH /settings/{section}` where section is `branding`, `boq-costing`, `integrations`, `notifications`, `security`, or `advanced`.
+
+```ts
+await api.patch("/settings/notifications", {
+  data: { email: true, tasks: true, approvals: true, billing: true, weeklyDigest: true },
+});
+```
+
+The browser sends the complete section in `{ data: Record<string, unknown> }`. Personal profile, password, and locale/timezone continue to use `/users/me`, `/users/me/password`, and `/users/me/preferences`.
+
+### Activities
+
+| UI area | API |
+|---|---|
+| KPI cards | `GET /activities/summary` |
+| Stage board | `GET /activities/stages` |
+| Create stage | `POST /activities/stages` |
+| Edit/delete stage | `PATCH` / `DELETE /activities/stages/{stageId}` |
+| Task list/create | `GET` / `POST /activities/tasks` |
+| Task drawer/edit | `GET` / `PATCH /activities/tasks/{taskId}` |
+| Task comments/activity | `GET` / `POST /activities/tasks/{taskId}/comments` |
+| Approval list/create | `GET` / `POST /activities/approvals` |
+| Approval drawer/edit | `GET` / `PATCH /activities/approvals/{approvalId}` |
+| Approve/request changes/reject | `POST /activities/approvals/{approvalId}/decision` |
+| Approval feedback | `GET` / `POST /activities/approvals/{approvalId}/comments` |
+
+Activity creation rejects cross-workspace `projectId` and `stageId` values. Attachment arrays are document references/metadata; upload binary files through the existing authenticated Documents API first.
+
+### Help centre and support tickets
+
+| UI action | API |
+|---|---|
+| Popular articles/categories | `GET /help` |
+| Search | `GET /help?search=excel` |
+| Article detail | `GET /help/articles/{slug}` |
+| Helpful yes/no | `POST /help/articles/{slug}` with `{ helpful: boolean }` |
+| My workspace tickets | `GET /support/tickets` |
+| Raise/save ticket | `POST /support/tickets` |
+| Ticket detail/status | `GET` / `PATCH /support/tickets/{ticketId}` |
+| Conversation | `GET` / `POST /support/tickets/{ticketId}/messages` |
+
+Postman folders `16 — Billing & Settings (User)`, `17 — Activities (User)`, and `18 — Help & Support (User)` contain ready-to-run examples. Billing/settings writes intentionally return `403` for the seeded `demo@boq.com` member account; its read endpoints, activities, and support flows are fully usable.
+
 ## Project Templates integration (backend implemented; frontend unchanged)
 
 The template screens shown in the supplied designs map to authenticated, workspace-scoped APIs. There is no separate public/admin template API. Active workspace users can read templates; `owner`, `admin`, and `member` can create/edit/publish/duplicate/use them; `viewer` is read-only; only `owner`/`admin` can archive.

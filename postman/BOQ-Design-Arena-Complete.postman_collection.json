@@ -107,7 +107,11 @@
     {
       "key": "projectTemplateId",
       "value": ""
-    }
+    },
+    { "key": "activityStageId", "value": "f2000000-0000-4000-8000-000000000002" },
+    { "key": "activityTaskId", "value": "f2100000-0000-4000-8000-000000000001" },
+    { "key": "activityApprovalId", "value": "f2200000-0000-4000-8000-000000000001" },
+    { "key": "supportTicketId", "value": "f3200000-0000-4000-8000-000000000001" }
   ],
   "item": [
     {
@@ -2059,6 +2063,55 @@
         { "name": "List Template Usage", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/usage?page={{page}}&pageSize={{pageSize}}" } },
         { "name": "Duplicate Template", "request": { "method": "POST", "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/duplicate" } },
         { "name": "Archive Template (Owner/Admin)", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}" } }
+      ]
+    },
+    {
+      "name": "16 — Billing & Settings (User)",
+      "description": "Workspace members can read billing/settings. Billing and organization-wide setting changes require owner/admin. Provider mode is internal until a payment provider is connected.",
+      "item": [
+        { "name": "Billing Overview", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/billing/overview" } },
+        { "name": "Preview Business Upgrade", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/billing/plans/preview?plan=business" } },
+        { "name": "Update Billing Contact", "request": { "method": "PATCH", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"email\": \"accounts@boq-demo.com\" }"}, "url": "{{baseUrl}}/api/v1/billing/contact" } },
+        { "name": "Update Payment Method", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"brand\": \"Visa\", \"last4\": \"4242\", \"expiryMonth\": 12, \"expiryYear\": 2028 }"}, "url": "{{baseUrl}}/api/v1/billing/payment-methods" } },
+        { "name": "Change Plan", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"planCode\": \"business\", \"billingFrequency\": \"monthly\" }"}, "url": "{{baseUrl}}/api/v1/billing/subscription/change" } },
+        { "name": "Cancel at Period End", "request": { "method": "POST", "url": "{{baseUrl}}/api/v1/billing/subscription/cancel" } },
+        { "name": "Reactivate Subscription", "request": { "method": "POST", "url": "{{baseUrl}}/api/v1/billing/subscription/reactivate" } },
+        { "name": "Retry Failed Payment", "request": { "method": "POST", "url": "{{baseUrl}}/api/v1/billing/subscription/retry-payment" } },
+        { "name": "Settings Overview", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/settings/overview" } },
+        { "name": "Get Notification Settings", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/settings/notifications" } },
+        { "name": "Update Notification Settings", "request": { "method": "PATCH", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"data\": { \"email\": true, \"tasks\": true, \"approvals\": true, \"billing\": true } }"}, "url": "{{baseUrl}}/api/v1/settings/notifications" } }
+      ]
+    },
+    {
+      "name": "17 — Activities (User)",
+      "item": [
+        { "name": "Activity Summary", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/activities/summary" } },
+        { "name": "List Stages", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/activities/stages" } },
+        { "name": "Create Stage", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"name\": \"Site Execution\", \"color\": \"#DBEAFE\" }"}, "url": "{{baseUrl}}/api/v1/activities/stages" } },
+        { "name": "List Tasks", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/activities/tasks" } },
+        { "name": "Create Task", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"name\": \"Finalise Floor Plan\", \"projectId\": \"{{projectId}}\", \"stageId\": \"{{activityStageId}}\", \"description\": \"Review final layouts\", \"dueDate\": \"2026-09-10\", \"priority\": \"high\", \"status\": \"in_progress\" }"}, "url": "{{baseUrl}}/api/v1/activities/tasks" } },
+        { "name": "Get Task", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/activities/tasks/{{activityTaskId}}" } },
+        { "name": "Update Task", "request": { "method": "PATCH", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"status\": \"completed\" }"}, "url": "{{baseUrl}}/api/v1/activities/tasks/{{activityTaskId}}" } },
+        { "name": "Add Task Comment", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"body\": \"Floor plan reviewed.\" }"}, "url": "{{baseUrl}}/api/v1/activities/tasks/{{activityTaskId}}/comments" } },
+        { "name": "List Approvals", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/activities/approvals" } },
+        { "name": "Create Approval", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"name\": \"Design Concept Approval\", \"projectId\": \"{{projectId}}\", \"stageId\": \"{{activityStageId}}\", \"approverName\": \"Client\", \"dueDate\": \"2026-09-14\", \"status\": \"in_review\" }"}, "url": "{{baseUrl}}/api/v1/activities/approvals" } },
+        { "name": "Get Approval", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/activities/approvals/{{activityApprovalId}}" } },
+        { "name": "Approve", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"decision\": \"approved\", \"comment\": \"Approved for execution.\" }"}, "url": "{{baseUrl}}/api/v1/activities/approvals/{{activityApprovalId}}/decision" } },
+        { "name": "Approval Comments", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/activities/approvals/{{activityApprovalId}}/comments" } }
+      ]
+    },
+    {
+      "name": "18 — Help & Support (User)",
+      "item": [
+        { "name": "Help Centre", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/help" } },
+        { "name": "Search Help", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/help?search=excel" } },
+        { "name": "Get Article", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/help/articles/how-to-import-an-excel-boq" } },
+        { "name": "Article Helpful", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"helpful\": true }"}, "url": "{{baseUrl}}/api/v1/help/articles/how-to-import-an-excel-boq" } },
+        { "name": "List My Tickets", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/support/tickets" } },
+        { "name": "Raise Ticket", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"issueType\": \"BOQs\", \"subject\": \"Column mapping question\", \"description\": \"Need help with a custom material code.\", \"priority\": \"normal\" }"}, "url": "{{baseUrl}}/api/v1/support/tickets" } },
+        { "name": "Get Ticket", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/support/tickets/{{supportTicketId}}" } },
+        { "name": "Add Ticket Message", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"body\": \"Please share the supported columns.\" }"}, "url": "{{baseUrl}}/api/v1/support/tickets/{{supportTicketId}}/messages" } },
+        { "name": "Close Ticket", "request": { "method": "PATCH", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"status\": \"closed\" }"}, "url": "{{baseUrl}}/api/v1/support/tickets/{{supportTicketId}}" } }
       ]
     }
   ]

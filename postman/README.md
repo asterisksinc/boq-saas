@@ -33,6 +33,9 @@ Run the collection folders in numeric order:
 13. Costing
 14. Reports & Analytics
 15. Project Templates (User)
+16. Billing & Settings (User)
+17. Activities (User)
+18. Help & Support (User)
 
 For OTP requests, copy the six-digit Gmail code into the environment `otp`
 value before running the corresponding verification request. For document
@@ -59,6 +62,12 @@ Template first so `projectTemplateId` is captured, replace the designer
 sections, publish the template, and only then run Use Template. Workspace
 `owner`, `admin`, and `member` roles can run those writes; `viewer` can run the
 GET requests only. Archive is restricted to `owner` and `admin`.
+
+Folders 16-18 cover Billing/Settings, Activities, and Help/Support. The seeded
+`demo@boq.com` member can run all reads plus activity and support writes.
+Billing and organization-setting mutations require an owner/admin session and
+will correctly return `403` for the demo member. Billing uses internal provider
+mode and never accepts raw card numbers.
 
 ## Common failures
 

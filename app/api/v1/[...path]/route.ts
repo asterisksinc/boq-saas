@@ -65,6 +65,20 @@ import {
   projectTemplateDocumentsSchema,
   projectTemplateUseSchema,
   projectTemplatePublishSchema,
+  settingsSectionSchema,
+  billingContactSchema,
+  paymentMethodSchema,
+  subscriptionChangeSchema,
+  activityStageSchema,
+  activityTaskSchema,
+  activityTaskPatchSchema,
+  activityApprovalSchema,
+  activityApprovalPatchSchema,
+  approvalDecisionSchema,
+  activityCommentSchema,
+  articleFeedbackSchema,
+  supportTicketSchema,
+  supportTicketPatchSchema,
 } from "@/lib/api/validation";
 import { z } from "zod";
 
@@ -1744,6 +1758,147 @@ async function archiveProjectTemplate(supabase: SupabaseClient, id: string, temp
   return ok({ archived: true }, 200, id);
 }
 
+async function billingOverview(supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const wid = scoped.access.workspaceId;
+  const [subscription, payment, invoices, plans, members, projects, boqs, templates] = await Promise.all([
+    supabase.from("workspace_subscriptions").select("*,subscription_plans(*)").eq("workspace_id", wid).maybeSingle(),
+    supabase.from("workspace_payment_methods").select("id,brand,last4,expiry_month,expiry_year,is_default").eq("workspace_id", wid).eq("is_default", true).maybeSingle(),
+    supabase.from("subscription_invoices").select("id,invoice_number,amount,tax_amount,currency,status,issued_at,due_at,paid_at").eq("workspace_id", wid).order("issued_at", { ascending: false }).limit(10),
+    supabase.from("subscription_plans").select("code,name,description,monthly_price,currency,limits,features,sort_order").order("sort_order"),
+    supabase.from("workspace_memberships").select("id", { count: "exact", head: true }).eq("workspace_id", wid).eq("status", "active"),
+    supabase.from("projects").select("id", { count: "exact", head: true }).eq("workspace_id", wid).is("archived_at", null),
+    supabase.from("boqs").select("id", { count: "exact", head: true }).eq("workspace_id", wid).is("archived_at", null),
+    supabase.from("project_templates").select("id", { count: "exact", head: true }).eq("workspace_id", wid).is("archived_at", null),
+  ]);
+  if (subscription.error || plans.error) return fail("INTERNAL_ERROR", "Billing details could not be loaded.", 500, id);
+  const plan = subscription.data?.subscription_plans as unknown as Record<string, unknown> | null;
+  return ok({ subscription: subscription.data, paymentMethod: payment.data, invoices: invoices.data ?? [], plans: plans.data ?? [],
+    usage: { teamMembers: { used: members.count ?? 0, limit: (plan?.limits as Record<string, unknown> | undefined)?.users ?? null },
+      projects: { used: projects.count ?? 0, limit: (plan?.limits as Record<string, unknown> | undefined)?.projects ?? null },
+      boqs: { used: boqs.count ?? 0, limit: (plan?.limits as Record<string, unknown> | undefined)?.boqs ?? null },
+      templates: { used: templates.count ?? 0, limit: (plan?.limits as Record<string, unknown> | undefined)?.templates ?? null }, storageBytes: null },
+    canManageBilling: ["owner", "admin"].includes(scoped.access.role) }, 200, id);
+}
+
+async function billingMutation(request: Request, supabase: SupabaseClient, id: string, action: string) {
+  const scoped = await workspaceAccess(supabase, id, true, true); if ("response" in scoped) return scoped.response;
+  const wid = scoped.access.workspaceId;
+  if (action === "contact") {
+    const input = await parsed(request, billingContactSchema, id); if (input.response) return input.response;
+    const result = await supabase.from("workspace_subscriptions").update({ billing_contact: input.data.email }).eq("workspace_id", wid).select().single();
+    return result.error ? fail("VALIDATION_ERROR", "Billing contact could not be updated.", 400, id) : ok(result.data, 200, id);
+  }
+  if (action === "payment-method") {
+    const input = await parsed(request, paymentMethodSchema, id); if (input.response) return input.response;
+    await supabase.from("workspace_payment_methods").update({ is_default: false }).eq("workspace_id", wid);
+    const result = await supabase.from("workspace_payment_methods").insert({ workspace_id: wid, brand: input.data.brand, last4: input.data.last4,
+      expiry_month: input.data.expiryMonth ?? null, expiry_year: input.data.expiryYear ?? null, is_default: true, created_by: scoped.access.userId }).select().single();
+    return result.error ? fail("VALIDATION_ERROR", "Payment method could not be saved.", 400, id) : ok(result.data, 201, id);
+  }
+  if (action === "change") {
+    const input = await parsed(request, subscriptionChangeSchema, id); if (input.response) return input.response;
+    const plan = await supabase.from("subscription_plans").select("code,name,monthly_price,currency").eq("code", input.data.planCode).eq("active", true).single();
+    if (plan.error) return fail("NOT_FOUND", "Subscription plan was not found.", 404, id);
+    const result = await supabase.from("workspace_subscriptions").update({ plan_code: input.data.planCode, billing_frequency: input.data.billingFrequency,
+      status: "active", cancel_at_period_end: false, last_payment_error: null, next_retry_at: null }).eq("workspace_id", wid).select().single();
+    if (result.error) return fail("VALIDATION_ERROR", "Subscription could not be changed.", 400, id);
+    await audit(supabase, "billing.subscription.changed", id); return ok({ subscription: result.data, plan: plan.data, providerMode: "internal" }, 200, id);
+  }
+  const values: Record<string, unknown> = action === "cancel" ? { cancel_at_period_end: true, status: "cancelled_at_period_end" }
+    : action === "reactivate" ? { cancel_at_period_end: false, status: "active" }
+      : { status: "active", last_payment_error: null, next_retry_at: null };
+  const result = await supabase.from("workspace_subscriptions").update(values).eq("workspace_id", wid).select().single();
+  if (result.error) return fail("CONFLICT", "Subscription state could not be updated.", 409, id);
+  await audit(supabase, `billing.subscription.${action}`, id); return ok(result.data, 200, id);
+}
+
+async function billingPreview(request: NextRequest, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const planCode = request.nextUrl.searchParams.get("plan");
+  if (!planCode) return fail("VALIDATION_ERROR", "plan is required.", 400, id);
+  const [current, next] = await Promise.all([
+    supabase.from("workspace_subscriptions").select("plan_code,period_end,subscription_plans(monthly_price,currency)").eq("workspace_id", scoped.access.workspaceId).single(),
+    supabase.from("subscription_plans").select("code,name,monthly_price,currency,limits,features").eq("code", planCode).eq("active", true).single(),
+  ]);
+  if (current.error || next.error) return fail("NOT_FOUND", "Current or requested plan was not found.", 404, id);
+  const charge = Number(next.data.monthly_price ?? 0), credit = 0, tax = Math.round(charge * 0.18 * 100) / 100;
+  return ok({ currentPlan: current.data.plan_code, newPlan: next.data, breakdown: { planCharge: charge, unusedPeriodCredit: credit, tax, dueToday: charge - credit + tax }, nextRenewal: current.data.period_end, providerMode: "internal" }, 200, id);
+}
+
+const settingsSections: Record<string, string> = { branding: "branding", "boq-costing": "boq_costing", integrations: "integrations", notifications: "notifications", security: "security", advanced: "advanced" };
+async function settingsApi(request: Request, supabase: SupabaseClient, id: string, section?: string) {
+  const scoped = await workspaceAccess(supabase, id, request.method === "PATCH", request.method === "PATCH"); if ("response" in scoped) return scoped.response;
+  const wid = scoped.access.workspaceId;
+  if (!section) {
+    const [settings, projects, boqs, templates, profile, changes] = await Promise.all([
+      supabase.from("workspace_settings").select("*").eq("workspace_id", wid).maybeSingle(),
+      supabase.from("projects").select("id", { count: "exact", head: true }).eq("workspace_id", wid).is("archived_at", null),
+      supabase.from("boqs").select("id", { count: "exact", head: true }).eq("workspace_id", wid).is("archived_at", null),
+      supabase.from("project_templates").select("id", { count: "exact", head: true }).eq("workspace_id", wid).is("archived_at", null),
+      supabase.from("user_profiles").select("display_name,avatar_url").eq("user_id", scoped.access.userId).maybeSingle(),
+      supabase.from("audit_logs").select("id,action,created_at,actor_user_id").eq("workspace_id", wid).order("created_at", { ascending: false }).limit(10),
+    ]);
+    return ok({ profile: profile.data, role: scoped.access.role, completionPercent: 75, usage: { projects: projects.count ?? 0, boqs: boqs.count ?? 0, templates: templates.count ?? 0, storageBytes: null, aiCredits: null }, settings: settings.data, recentChanges: changes.data ?? [] }, 200, id);
+  }
+  const column = settingsSections[section]; if (!column) return fail("NOT_FOUND", "Settings section was not found.", 404, id);
+  if (request.method === "GET") {
+    const result = await supabase.from("workspace_settings").select(column).eq("workspace_id", wid).single();
+    return result.error ? fail("NOT_FOUND", "Settings were not found.", 404, id) : ok({ section, data: (result.data as unknown as Record<string, unknown>)[column] }, 200, id);
+  }
+  const input = await parsed(request, settingsSectionSchema, id); if (input.response) return input.response;
+  const result = await supabase.from("workspace_settings").update({ [column]: input.data.data, updated_by: scoped.access.userId }).eq("workspace_id", wid).select(column).single();
+  if (result.error) return fail("VALIDATION_ERROR", "Settings could not be updated.", 400, id);
+  await audit(supabase, `settings.${section}.updated`, id); return ok({ section, data: (result.data as unknown as Record<string, unknown>)[column] }, 200, id);
+}
+
+async function activitySummary(supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const [tasks, approvals, stages] = await Promise.all([supabase.from("activity_tasks").select("status,due_date").eq("workspace_id", scoped.access.workspaceId), supabase.from("activity_approvals").select("status,due_date").eq("workspace_id", scoped.access.workspaceId), supabase.from("activity_stages").select("id").eq("workspace_id", scoped.access.workspaceId)]);
+  const today = new Date().toISOString().slice(0, 10), taskRows = tasks.data ?? [], approvalRows = approvals.data ?? [];
+  return ok({ stages: stages.data?.length ?? 0, tasks: { total: taskRows.length, overdue: taskRows.filter(x => x.due_date && x.due_date < today && !["completed","cancelled"].includes(x.status)).length, inProgress: taskRows.filter(x => x.status === "in_progress").length, completed: taskRows.filter(x => x.status === "completed").length }, approvals: { total: approvalRows.length, overdue: approvalRows.filter(x => x.due_date && x.due_date < today && !["approved","rejected","cancelled"].includes(x.status)).length, inReview: approvalRows.filter(x => x.status === "in_review").length, approved: approvalRows.filter(x => x.status === "approved").length } }, 200, id);
+}
+
+async function stagesApi(request: NextRequest, supabase: SupabaseClient, id: string, stageId?: string) {
+  const scoped = await workspaceAccess(supabase, id, request.method !== "GET"); if ("response" in scoped) return scoped.response; const wid = scoped.access.workspaceId;
+  if (request.method === "GET") {
+    const result = await supabase.from("activity_stages").select("id,name,color,sort_order,terminal_type,created_at,updated_at").eq("workspace_id",wid).order("sort_order");
+    return result.error ? fail("INTERNAL_ERROR","Stages could not be loaded.",500,id) : ok({ items: result.data ?? [] },200,id);
+  }
+  if (request.method === "DELETE" && stageId) { const result=await supabase.from("activity_stages").delete().eq("workspace_id",wid).eq("id",stageId); return result.error?fail("CONFLICT","Stage could not be deleted.",409,id):ok({deleted:true},200,id); }
+  const input=await parsed(request,activityStageSchema,id); if(input.response)return input.response;
+  const values={name:input.data.name,color:input.data.color??null,terminal_type:input.data.terminalType??null,created_by:scoped.access.userId};
+  const query=stageId?supabase.from("activity_stages").update(values).eq("workspace_id",wid).eq("id",stageId):supabase.from("activity_stages").insert({workspace_id:wid,...values});
+  const result=await query.select().single(); return result.error?fail("VALIDATION_ERROR","Stage could not be saved.",400,id):ok(result.data,stageId?200:201,id);
+}
+
+async function verifyActivityParents(supabase: SupabaseClient,wid:string,projectId:string,stageId:string){const [p,s]=await Promise.all([supabase.from("projects").select("id").eq("workspace_id",wid).eq("id",projectId).maybeSingle(),supabase.from("activity_stages").select("id").eq("workspace_id",wid).eq("id",stageId).maybeSingle()]);return Boolean(p.data&&s.data);}
+async function tasksApi(request: NextRequest,supabase:SupabaseClient,id:string,taskId?:string){
+  const scoped=await workspaceAccess(supabase,id,request.method!=="GET");if("response"in scoped)return scoped.response;const wid=scoped.access.workspaceId;
+  if(request.method==="GET"){let q=supabase.from("activity_tasks").select("*,projects(project_code,name),activity_stages(name,color)").eq("workspace_id",wid).order("updated_at",{ascending:false});if(taskId)q=q.eq("id",taskId);const r=taskId?await q.single():await q;return r.error?fail(taskId?"NOT_FOUND":"INTERNAL_ERROR","Task(s) could not be loaded.",taskId?404:500,id):ok(taskId?r.data:{items:r.data??[]},200,id);}
+  const input=await parsed(request,taskId?activityTaskPatchSchema:activityTaskSchema,id);if(input.response)return input.response;const v=input.data as Record<string,unknown>;
+  if(!taskId&&!await verifyActivityParents(supabase,wid,String(v.projectId),String(v.stageId)))return fail("VALIDATION_ERROR","projectId and stageId must belong to this workspace.",400,id);
+  const values={...(v.name!==undefined?{name:v.name}:{}),...(v.stageId!==undefined?{stage_id:v.stageId}:{}),...(v.description!==undefined?{description:v.description}:{}),...(v.assignedTo!==undefined?{assigned_to:v.assignedTo}:{}),...(v.ownerId!==undefined?{owner_id:v.ownerId}:{}),...(v.dueDate!==undefined?{due_date:v.dueDate}:{}),...(v.priority!==undefined?{priority:v.priority}:{}),...(v.status!==undefined?{status:v.status}:{}),...(v.attachments!==undefined?{attachments:v.attachments}:{})};
+  const q=taskId?supabase.from("activity_tasks").update(values).eq("workspace_id",wid).eq("id",taskId):supabase.from("activity_tasks").insert({workspace_id:wid,project_id:v.projectId,created_by:scoped.access.userId,...values});const r=await q.select().single();return r.error?fail("VALIDATION_ERROR","Task could not be saved.",400,id):ok(r.data,taskId?200:201,id);
+}
+
+async function approvalsApi(request:NextRequest,supabase:SupabaseClient,id:string,approvalId?:string){
+  const scoped=await workspaceAccess(supabase,id,request.method!=="GET");if("response"in scoped)return scoped.response;const wid=scoped.access.workspaceId;
+  if(request.method==="GET"){let q=supabase.from("activity_approvals").select("*,projects(project_code,name),activity_stages(name,color)").eq("workspace_id",wid).order("updated_at",{ascending:false});if(approvalId)q=q.eq("id",approvalId);const r=approvalId?await q.single():await q;return r.error?fail(approvalId?"NOT_FOUND":"INTERNAL_ERROR","Approval(s) could not be loaded.",approvalId?404:500,id):ok(approvalId?r.data:{items:r.data??[]},200,id);}
+  const input=await parsed(request,approvalId?activityApprovalPatchSchema:activityApprovalSchema,id);if(input.response)return input.response;const v=input.data as Record<string,unknown>;
+  if(!approvalId&&!await verifyActivityParents(supabase,wid,String(v.projectId),String(v.stageId)))return fail("VALIDATION_ERROR","projectId and stageId must belong to this workspace.",400,id);
+  const values={...(v.name!==undefined?{name:v.name}:{}),...(v.stageId!==undefined?{stage_id:v.stageId}:{}),...(v.description!==undefined?{description:v.description}:{}),...(v.approverId!==undefined?{approver_id:v.approverId}:{}),...(v.approverName!==undefined?{approver_name:v.approverName}:{}),...(v.dueDate!==undefined?{due_date:v.dueDate}:{}),...(v.status!==undefined?{status:v.status}:{}),...(v.attachments!==undefined?{attachments:v.attachments}:{})};
+  const q=approvalId?supabase.from("activity_approvals").update(values).eq("workspace_id",wid).eq("id",approvalId):supabase.from("activity_approvals").insert({workspace_id:wid,project_id:v.projectId,requested_by:scoped.access.userId,requested_at:v.status==="draft"?null:new Date().toISOString(),...values});const r=await q.select().single();return r.error?fail("VALIDATION_ERROR","Approval could not be saved.",400,id):ok(r.data,approvalId?200:201,id);
+}
+
+async function approvalDecision(request:Request,supabase:SupabaseClient,id:string,approvalId:string){const scoped=await workspaceAccess(supabase,id,true);if("response"in scoped)return scoped.response;const input=await parsed(request,approvalDecisionSchema,id);if(input.response)return input.response;const r=await supabase.from("activity_approvals").update({status:input.data.decision,decided_at:new Date().toISOString()}).eq("workspace_id",scoped.access.workspaceId).eq("id",approvalId).select().single();if(r.error)return fail("NOT_FOUND","Approval was not found.",404,id);if(input.data.comment)await supabase.from("activity_comments").insert({workspace_id:scoped.access.workspaceId,entity_type:"approval",entity_id:approvalId,body:input.data.comment,author_id:scoped.access.userId});return ok(r.data,200,id);}
+async function commentsApi(request:NextRequest,supabase:SupabaseClient,id:string,type:"task"|"approval",entityId:string){const scoped=await workspaceAccess(supabase,id,request.method==="POST");if("response"in scoped)return scoped.response;if(request.method==="GET"){const r=await supabase.from("activity_comments").select("id,body,attachments,author_id,created_at").eq("workspace_id",scoped.access.workspaceId).eq("entity_type",type).eq("entity_id",entityId).order("created_at");return r.error?fail("INTERNAL_ERROR","Comments could not be loaded.",500,id):ok({items:r.data??[]},200,id);}const input=await parsed(request,activityCommentSchema,id);if(input.response)return input.response;const parent=await supabase.from(type==="task"?"activity_tasks":"activity_approvals").select("id").eq("workspace_id",scoped.access.workspaceId).eq("id",entityId).maybeSingle();if(!parent.data)return fail("NOT_FOUND",`${type} was not found.`,404,id);const r=await supabase.from("activity_comments").insert({workspace_id:scoped.access.workspaceId,entity_type:type,entity_id:entityId,body:input.data.body,attachments:input.data.attachments,author_id:scoped.access.userId}).select().single();return r.error?fail("VALIDATION_ERROR","Comment could not be added.",400,id):ok(r.data,201,id);}
+
+async function helpOverview(request:NextRequest,supabase:SupabaseClient,id:string){const auth=await requireUser(supabase,id);if(auth.response)return auth.response;const search=request.nextUrl.searchParams.get("search")?.trim().slice(0,120);let articles=supabase.from("help_articles").select("id,slug,title,summary,read_minutes,helpful_yes,helpful_no,popular,updated_at,help_categories(slug,name)").eq("active",true).order("popular",{ascending:false}).limit(50);if(search){const safe=search.replace(/[%_,()]/g," ");articles=articles.or(`title.ilike.%${safe}%,summary.ilike.%${safe}%`);}const [a,c]=await Promise.all([articles,supabase.from("help_categories").select("id,slug,name,description,sort_order").eq("active",true).order("sort_order")]);return a.error||c.error?fail("INTERNAL_ERROR","Help centre could not be loaded.",500,id):ok({articles:a.data??[],categories:c.data??[]},200,id);}
+async function helpArticle(request:NextRequest,supabase:SupabaseClient,id:string,slug:string){const auth=await requireUser(supabase,id);if(auth.response)return auth.response;if(request.method==="GET"){const r=await supabase.from("help_articles").select("*,help_categories(slug,name)").eq("slug",slug).eq("active",true).single();return r.error?fail("NOT_FOUND","Help article was not found.",404,id):ok(r.data,200,id);}const input=await parsed(request,articleFeedbackSchema,id);if(input.response)return input.response;const admin=createSupabaseAdminClient();const current=await admin.from("help_articles").select("id,helpful_yes,helpful_no").eq("slug",slug).single();if(current.error)return fail("NOT_FOUND","Help article was not found.",404,id);const column=input.data.helpful?"helpful_yes":"helpful_no";await admin.from("help_articles").update({[column]:Number(current.data[column])+1}).eq("id",current.data.id);return ok({recorded:true},200,id);}
+async function ticketsApi(request:NextRequest,supabase:SupabaseClient,id:string,ticketId?:string){const scoped=await workspaceAccess(supabase,id,request.method!=="GET");if("response"in scoped)return scoped.response;const wid=scoped.access.workspaceId;if(request.method==="GET"){let q=supabase.from("support_tickets").select("*").eq("workspace_id",wid).order("updated_at",{ascending:false});if(ticketId)q=q.eq("id",ticketId);const r=ticketId?await q.single():await q;return r.error?fail(ticketId?"NOT_FOUND":"INTERNAL_ERROR","Ticket(s) could not be loaded.",ticketId?404:500,id):ok(ticketId?r.data:{items:r.data??[]},200,id);}if(request.method==="PATCH"&&ticketId){const input=await parsed(request,supportTicketPatchSchema,id);if(input.response)return input.response;const r=await supabase.from("support_tickets").update({status:input.data.status}).eq("workspace_id",wid).eq("id",ticketId).select().single();return r.error?fail("NOT_FOUND","Ticket was not found.",404,id):ok(r.data,200,id);}const input=await parsed(request,supportTicketSchema,id);if(input.response)return input.response;const ticketNumber=`SUP-${Date.now().toString(36).toUpperCase()}`;const r=await supabase.from("support_tickets").insert({workspace_id:wid,ticket_number:ticketNumber,issue_type:input.data.issueType,subject:input.data.subject,description:input.data.description,priority:input.data.priority,status:input.data.status,created_by:scoped.access.userId}).select().single();return r.error?fail("VALIDATION_ERROR","Support ticket could not be created.",400,id):ok(r.data,201,id);}
+async function ticketMessages(request:NextRequest,supabase:SupabaseClient,id:string,ticketId:string){const scoped=await workspaceAccess(supabase,id,request.method==="POST");if("response"in scoped)return scoped.response;if(request.method==="GET"){const r=await supabase.from("support_ticket_messages").select("id,body,attachments,author_id,created_at").eq("workspace_id",scoped.access.workspaceId).eq("ticket_id",ticketId).order("created_at");return r.error?fail("INTERNAL_ERROR","Ticket messages could not be loaded.",500,id):ok({items:r.data??[]},200,id);}const input=await parsed(request,activityCommentSchema,id);if(input.response)return input.response;const r=await supabase.from("support_ticket_messages").insert({workspace_id:scoped.access.workspaceId,ticket_id:ticketId,body:input.data.body,attachments:input.data.attachments,author_id:scoped.access.userId}).select().single();return r.error?fail("NOT_FOUND","Ticket was not found.",404,id):ok(r.data,201,id);}
+
 async function dispatch(request: NextRequest, path: string[]) {
   const id = requestId(request);
   const route = path.join("/");
@@ -1766,6 +1921,41 @@ async function dispatch(request: NextRequest, path: string[]) {
   if ((request.method === "GET" || request.method === "PATCH") && route === "users/me/preferences") return preferences(request, supabase, id);
   if ((request.method === "GET" || request.method === "PATCH") && route === "onboarding/me") return onboarding(request, supabase, id);
   if (request.method === "GET" && route === "dashboard/overview") return dashboardOverview(request, supabase, id);
+  if (request.method === "GET" && route === "billing/overview") return billingOverview(supabase, id);
+  if (request.method === "GET" && route === "billing/plans/preview") return billingPreview(request, supabase, id);
+  if (request.method === "PATCH" && route === "billing/contact") return billingMutation(request, supabase, id, "contact");
+  if (request.method === "POST" && route === "billing/payment-methods") return billingMutation(request, supabase, id, "payment-method");
+  if (request.method === "POST" && route === "billing/subscription/change") return billingMutation(request, supabase, id, "change");
+  if (request.method === "POST" && route === "billing/subscription/cancel") return billingMutation(request, supabase, id, "cancel");
+  if (request.method === "POST" && route === "billing/subscription/reactivate") return billingMutation(request, supabase, id, "reactivate");
+  if (request.method === "POST" && route === "billing/subscription/retry-payment") return billingMutation(request, supabase, id, "retry-payment");
+  if (request.method === "GET" && route === "settings/overview") return settingsApi(request, supabase, id);
+  const settingsMatch = route.match(/^settings\/(branding|boq-costing|integrations|notifications|security|advanced)$/i);
+  if (settingsMatch && ["GET", "PATCH"].includes(request.method)) return settingsApi(request, supabase, id, settingsMatch[1]);
+  if (request.method === "GET" && route === "activities/summary") return activitySummary(supabase, id);
+  if (["GET", "POST"].includes(request.method) && route === "activities/stages") return stagesApi(request, supabase, id);
+  const activityStageMatch = route.match(/^activities\/stages\/([0-9a-f-]{36})$/i);
+  if (activityStageMatch && ["PATCH", "DELETE"].includes(request.method)) return stagesApi(request, supabase, id, activityStageMatch[1]);
+  if (["GET", "POST"].includes(request.method) && route === "activities/tasks") return tasksApi(request, supabase, id);
+  const activityTaskMatch = route.match(/^activities\/tasks\/([0-9a-f-]{36})$/i);
+  if (activityTaskMatch && ["GET", "PATCH"].includes(request.method)) return tasksApi(request, supabase, id, activityTaskMatch[1]);
+  const taskCommentsMatch = route.match(/^activities\/tasks\/([0-9a-f-]{36})\/comments$/i);
+  if (taskCommentsMatch && ["GET", "POST"].includes(request.method)) return commentsApi(request, supabase, id, "task", taskCommentsMatch[1]);
+  if (["GET", "POST"].includes(request.method) && route === "activities/approvals") return approvalsApi(request, supabase, id);
+  const activityApprovalMatch = route.match(/^activities\/approvals\/([0-9a-f-]{36})$/i);
+  if (activityApprovalMatch && ["GET", "PATCH"].includes(request.method)) return approvalsApi(request, supabase, id, activityApprovalMatch[1]);
+  const approvalDecisionMatch = route.match(/^activities\/approvals\/([0-9a-f-]{36})\/decision$/i);
+  if (approvalDecisionMatch && request.method === "POST") return approvalDecision(request, supabase, id, approvalDecisionMatch[1]);
+  const approvalCommentsMatch = route.match(/^activities\/approvals\/([0-9a-f-]{36})\/comments$/i);
+  if (approvalCommentsMatch && ["GET", "POST"].includes(request.method)) return commentsApi(request, supabase, id, "approval", approvalCommentsMatch[1]);
+  if (request.method === "GET" && route === "help") return helpOverview(request, supabase, id);
+  const helpArticleMatch = route.match(/^help\/articles\/([a-z0-9-]+)$/i);
+  if (helpArticleMatch && ["GET", "POST"].includes(request.method)) return helpArticle(request, supabase, id, helpArticleMatch[1]);
+  if (["GET", "POST"].includes(request.method) && route === "support/tickets") return ticketsApi(request, supabase, id);
+  const supportTicketMatch = route.match(/^support\/tickets\/([0-9a-f-]{36})$/i);
+  if (supportTicketMatch && ["GET", "PATCH"].includes(request.method)) return ticketsApi(request, supabase, id, supportTicketMatch[1]);
+  const supportMessagesMatch = route.match(/^support\/tickets\/([0-9a-f-]{36})\/messages$/i);
+  if (supportMessagesMatch && ["GET", "POST"].includes(request.method)) return ticketMessages(request, supabase, id, supportMessagesMatch[1]);
   if (request.method === "GET" && route === "project-templates/overview") return projectTemplatesOverview(supabase, id);
   if (request.method === "GET" && route === "project-templates") return listProjectTemplates(request, supabase, id);
   if (request.method === "POST" && route === "project-templates") return createProjectTemplate(request, supabase, id);

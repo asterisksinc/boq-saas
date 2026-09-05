@@ -24,5 +24,9 @@ export function permissionsFor(role: string) {
     canEditTemplate: contributor,
     canArchiveTemplate: elevated,
     canUseTemplate: contributor,
+    canManageBilling: elevated,
+    canManageSettings: elevated,
+    canManageActivities: contributor,
+    canUseSupport: contributor,
   };
 }

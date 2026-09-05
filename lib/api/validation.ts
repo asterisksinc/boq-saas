@@ -274,6 +274,43 @@ export const projectTemplatePublishSchema = z.object({
   changeNote: z.string().trim().max(500).nullable().optional(),
 }).strict();
 
+export const settingsSectionSchema = z.object({ data: z.record(z.string(), z.unknown()) }).strict();
+export const billingContactSchema = z.object({ email: z.string().trim().email().max(254) }).strict();
+export const paymentMethodSchema = z.object({
+  brand: z.string().trim().min(1).max(40), last4: z.string().regex(/^\d{4}$/),
+  expiryMonth: z.number().int().min(1).max(12).optional(), expiryYear: z.number().int().min(2020).max(2200).optional(),
+}).strict();
+export const subscriptionChangeSchema = z.object({ planCode: z.enum(["starter", "professional", "business", "enterprise"]), billingFrequency: z.enum(["monthly", "annual"]).default("monthly") }).strict();
+
+export const activityStageSchema = z.object({ name: z.string().trim().min(1).max(120), color: z.string().trim().max(40).nullable().optional(), terminalType: z.enum(["completed", "lost"]).nullable().optional() }).strict();
+export const activityTaskSchema = z.object({
+  name: z.string().trim().min(1).max(200), projectId: z.string().uuid(), stageId: z.string().uuid(),
+  description: z.string().trim().max(5000).nullable().optional(), assignedTo: z.string().uuid().nullable().optional(), ownerId: z.string().uuid().nullable().optional(),
+  dueDate: z.string().date().nullable().optional(), priority: z.enum(["low", "medium", "high", "critical"]).default("medium"),
+  status: z.enum(["not_started", "in_progress", "blocked", "completed", "cancelled"]).default("not_started"),
+  attachments: z.array(z.record(z.string(), z.unknown())).max(20).default([]),
+}).strict();
+export const activityTaskPatchSchema = activityTaskSchema.omit({ projectId: true }).partial().strict().refine((value) => Object.keys(value).length > 0, "At least one field is required.");
+export const activityApprovalSchema = z.object({
+  name: z.string().trim().min(1).max(200), projectId: z.string().uuid(), stageId: z.string().uuid(),
+  description: z.string().trim().max(5000).nullable().optional(), approverId: z.string().uuid().nullable().optional(), approverName: z.string().trim().max(160).nullable().optional(),
+  dueDate: z.string().date(), status: z.enum(["draft", "sent", "in_review"]).default("draft"), attachments: z.array(z.record(z.string(), z.unknown())).max(20).default([]),
+}).strict().refine((value) => value.approverId || value.approverName, { path: ["approverId"], message: "An approver is required." });
+export const activityApprovalPatchSchema = z.object({
+  name: z.string().trim().min(1).max(200).optional(), stageId: z.string().uuid().optional(), description: z.string().trim().max(5000).nullable().optional(),
+  approverId: z.string().uuid().nullable().optional(), approverName: z.string().trim().max(160).nullable().optional(), dueDate: z.string().date().optional(),
+  status: z.enum(["draft", "sent", "in_review", "cancelled"]).optional(), attachments: z.array(z.record(z.string(), z.unknown())).max(20).optional(),
+}).strict().refine((value) => Object.keys(value).length > 0, "At least one field is required.");
+export const approvalDecisionSchema = z.object({ decision: z.enum(["approved", "changes_required", "rejected"]), comment: z.string().trim().max(5000).optional() }).strict();
+export const activityCommentSchema = z.object({ body: z.string().trim().min(1).max(5000), attachments: z.array(z.record(z.string(), z.unknown())).max(10).default([]) }).strict();
+
+export const articleFeedbackSchema = z.object({ helpful: z.boolean() }).strict();
+export const supportTicketSchema = z.object({
+  issueType: z.string().trim().min(1).max(80), subject: z.string().trim().min(1).max(200), description: z.string().trim().min(1).max(10000),
+  priority: z.enum(["low", "normal", "high", "urgent"]).default("normal"), status: z.enum(["draft", "open"]).default("open"),
+}).strict();
+export const supportTicketPatchSchema = z.object({ status: z.enum(["open", "in_progress", "waiting_on_user", "resolved", "closed"]) }).strict();
+
 export const costingCategorySchema = z.object({
   name: z.string().trim().min(1).max(120), code: z.string().trim().min(1).max(40).regex(/^[A-Za-z0-9-]+$/),
   parentId: z.string().uuid().nullable().optional(), defaultUnit: z.string().trim().min(1).max(40),
