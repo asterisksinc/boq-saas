@@ -128,6 +128,101 @@ const projects = [
 }));
 await upsert("projects", projects);
 
+const premiumStructure = {
+  areas: [
+    ["ENT", "Entrance"], ["LIV", "Living Room"], ["DIN", "Dining"], ["KIT", "Kitchen"],
+    ["BED-MST", "Master Bedroom"], ["BED-02", "Bedroom 02"], ["BED-03", "Bedroom 03"], ["BATH", "Bathrooms"],
+  ].map(([code, name], index) => ({ code, name, sortOrder: index + 1, includedByDefault: true, allowRename: true, required: index < 5 })),
+};
+const premiumCosting = {
+  currency: "INR",
+  sectionCount: 18,
+  itemCount: 186,
+  sections: Array.from({ length: 18 }, (_, index) => ({
+    code: `BOQ-${String(index + 1).padStart(2, "0")}`,
+    name: ["Furniture", "Painting", "Electrical", "Flooring", "False Ceiling", "Civil Work"][index % 6],
+    areaCode: premiumStructure.areas[index % premiumStructure.areas.length].code,
+    items: index === 0 ? [
+      { code: "FUR-001", name: "Full Height Wardrobe", unit: "Sq.ft", quantity: 72, rate: 2875, wastePercent: 5, taxPercent: 18 },
+      { code: "FUR-002", name: "King Size Bed", unit: "Nos", quantity: 1, rate: 45800, wastePercent: 0, taxPercent: 18 },
+      { code: "FUR-003", name: "Side Table", unit: "Nos", quantity: 2, rate: 6250, wastePercent: 5, taxPercent: 18 },
+    ] : [],
+  })),
+};
+const premiumWorkflow = {
+  stages: ["Discovery", "Design", "Costing", "Approval", "Execution", "Handover", "Closure"].map((name, index) => ({
+    code: `STG-${String(index + 1).padStart(3, "0")}`, name, sortOrder: index + 1, status: "active", expectedDurationDays: [3, 12, 5, 4, 30, 3, 2][index],
+  })),
+  tasks: [
+    ["Client Briefing & Requirement", "Discovery", "Project Manager", 1, "medium"],
+    ["Site Visit & Measurement", "Discovery", "Site Engineer", 2, "medium"],
+    ["Concept Development", "Design", "Lead Designer", 5, "high"],
+    ["Client Review Concept", "Design", "Project Manager", 2, "high"],
+    ["Design Approval", "Approval", "Client", 1, "critical"],
+    ["BOQ Finalisation", "Costing", "Quantity Surveyor", 4, "high"],
+  ].map(([name, stage, assigneeRole, durationDays, criticality], index) => ({ code: `TSK-${String(index + 1).padStart(3, "0")}`, name, stage, assigneeRole, durationDays, criticality })),
+  milestones: [
+    ["Project Kickoff", 2, "No Approval"], ["Site Measurement", 2, "No Approval"], ["Concept Design", 7, "No Approval"],
+    ["3D Design Approval", 3, "Client Approval"], ["BOQ Finalisation", 4, "Finance Approval"], ["Client Approval", 2, "Client Approval"],
+    ["Execution Start", 1, "No Approval"], ["Project Handover", 2, "Client Approval"],
+  ].map(([name, durationDays, approval], index) => ({ code: `MS-${String(index + 1).padStart(3, "0")}`, name, durationDays, approval, status: "configured" })),
+  approvals: [
+    { code: "APR-TPL-001", name: "Design Concept Approval", trigger: "Milestone Reached", mode: "sequential", approvers: ["Project Manager", "Lead Designer", "Client"], slaBusinessDays: 2, status: "active" },
+    { code: "APR-TPL-002", name: "BOQ Approval", trigger: "BOQ Submitted", mode: "sequential", approvers: ["Project Manager", "Client"], slaBusinessDays: 1, status: "active" },
+    { code: "APR-TPL-003", name: "Material Approval", trigger: "Material Selected", mode: "sequential", approvers: ["Client"], slaBusinessDays: 2, status: "active" },
+  ],
+  rules: [
+    { code: "RUL-018", name: "High Value Project Approval", trigger: { event: "Project Created", evaluate: "immediately" }, conditions: { all: [{ field: "estimatedProjectValue", operator: "greaterThan", value: 1000000 }] }, actions: [{ type: "requestApproval", approvalCode: "APR-TPL-002" }], priority: "critical", status: "active" },
+    { code: "RUL-023", name: "Low Margin Alert", trigger: { event: "Margin Changed", evaluate: "everyTime" }, conditions: { all: [{ field: "marginPercent", operator: "lessThan", value: 15 }] }, actions: [{ type: "sendNotification", role: "Project Manager" }], priority: "high", status: "active" },
+  ],
+};
+const premiumDocuments = [
+  ["BOQ v7 Final — Kohinoor L4.pdf", "BOQ", true], ["Floor Plan — Level 4.dwg", "Drawing", true],
+  ["Material Cost Matrix Aug 2024.xlsx", "Costing", false], ["Client Proposal FINAL.pdf", "Proposal", true],
+  ["Vendor Quotes — Stone World.xlsx", "Vendor", false], ["Site Progress Photos — Aug.jpg", "Site", false],
+].map(([name, category, required], index) => ({ id: `DOC-TPL-${String(index + 1).padStart(3, "0")}`, name, category, required }));
+
+const templateFixtures = [
+  ["e1000000-0000-4000-8000-000000000001", "TEM-RES-2938", "Premium 3BHK Residential", "Residential", "3BHK", "active", 3, 42, premiumStructure, premiumCosting, premiumWorkflow, premiumDocuments],
+  ["e1000000-0000-4000-8000-000000000002", "TEM-RES-2100", "2BHK Residential", "Residential", "2BHK", "active", 2, 38, { areas: premiumStructure.areas.slice(0, 6) }, { ...premiumCosting, sectionCount: 14, itemCount: 142, sections: premiumCosting.sections.slice(0, 14) }, premiumWorkflow, premiumDocuments.slice(0, 4)],
+  ["e1000000-0000-4000-8000-000000000003", "TEM-RES-1800", "1BHK Residential", "Residential", "1BHK", "active", 1, 21, { areas: premiumStructure.areas.slice(0, 4) }, { ...premiumCosting, sectionCount: 10, itemCount: 96, sections: premiumCosting.sections.slice(0, 10) }, premiumWorkflow, premiumDocuments.slice(0, 3)],
+  ["e1000000-0000-4000-8000-000000000004", "TEM-VIL-2400", "Luxury Villa", "Villa", "Villa", "draft", 2, 31, { areas: [...premiumStructure.areas, ...premiumStructure.areas.slice(0, 4).map((area) => ({ ...area, code: `${area.code}-U`, name: `${area.name} Upper` }))] }, { ...premiumCosting, sectionCount: 24, itemCount: 248 }, premiumWorkflow, premiumDocuments],
+  ["e1000000-0000-4000-8000-000000000005", "TEM-COM-2000", "Office Interior", "Commercial", "Office", "draft", 2, 42, premiumStructure, { ...premiumCosting, sectionCount: 20, itemCount: 220 }, premiumWorkflow, premiumDocuments],
+  ["e1000000-0000-4000-8000-000000000006", "TEM-RTL-1600", "Retail Store", "Retail", "Store", "draft", 1, 18, { areas: premiumStructure.areas.slice(0, 6) }, { ...premiumCosting, sectionCount: 16, itemCount: 165 }, premiumWorkflow, premiumDocuments.slice(0, 4)],
+  ["e1000000-0000-4000-8000-000000000007", "TEM-HOS-1500", "Restaurant", "Hospitality", "Restaurant", "needs_review", 1, 22, { areas: premiumStructure.areas.slice(0, 7) }, { ...premiumCosting, sectionCount: 18, itemCount: 190 }, premiumWorkflow, premiumDocuments.slice(0, 5)],
+  ["e1000000-0000-4000-8000-000000000008", "TEM-HOS-1700", "Hotel Room Package", "Hospitality", "Hotel", "draft", 1, 16, { areas: premiumStructure.areas.slice(0, 6) }, { ...premiumCosting, sectionCount: 12, itemCount: 128 }, premiumWorkflow, premiumDocuments.slice(0, 4)],
+].map(([id, template_code, name, business_type, project_type, status, current_version, use_count, structure, costing_boq, workflow, documents]) => ({
+  id, template_code, workspace_id: WORKSPACE_ID, name,
+  description: `Ready-to-use ${name} template with project structure, BOQ, workflow, approvals, rules, and document requirements.`,
+  business_type, project_type, team: "Demo Design Team", region: "India", visibility: "workspace",
+  tags: [business_type, project_type, "Demo"], status, current_version, structure, costing_boq, workflow, documents,
+  use_count, last_used_at: use_count ? now : null, published_at: status === "active" ? now : null,
+  created_by: userId, updated_by: userId,
+}));
+await upsert("project_templates", templateFixtures);
+
+const premiumSnapshot = {
+  templateId: templateFixtures[0].id, templateCode: templateFixtures[0].template_code,
+  version: templateFixtures[0].current_version, name: templateFixtures[0].name,
+  businessType: templateFixtures[0].business_type, projectType: templateFixtures[0].project_type,
+  structure: premiumStructure, costingBoq: premiumCosting, workflow: premiumWorkflow, documents: premiumDocuments,
+};
+await upsert("project_template_versions", [1, 2, 3].map((version) => ({
+  id: `e2000000-0000-4000-8000-00000000000${version}`,
+  workspace_id: WORKSPACE_ID, template_id: templateFixtures[0].id, version,
+  snapshot: { ...premiumSnapshot, version }, change_note: ["Initial residential template", "Added approval workflows", "Updated costing and document requirements"][version - 1],
+  created_by: userId,
+})));
+
+await upsert("project_template_usage", projects.slice(0, 3).map((project, index) => ({
+  id: `e3000000-0000-4000-8000-00000000000${index + 1}`,
+  workspace_id: WORKSPACE_ID, template_id: templateFixtures[0].id, template_version: 3,
+  snapshot: premiumSnapshot, project_id: project.id, used_by: userId,
+})));
+assertResult("link demo projects to template", await admin.from("projects").update({
+  source_template_id: templateFixtures[0].id, source_template_version: 3,
+}).in("id", projects.slice(0, 3).map((project) => project.id)));
+
 await upsert("project_rooms", [
   { id: "d2000000-0000-4000-8000-000000000001", workspace_id: WORKSPACE_ID, project_id: projects[0].id, name: "Master Bedroom", room_type: "Bedroom", length: 14, width: 12, height: 10, unit: "ft", sort_order: 1, created_by: userId },
   { id: "d2000000-0000-4000-8000-000000000002", workspace_id: WORKSPACE_ID, project_id: projects[0].id, name: "Living Room", room_type: "Living Room", length: 22, width: 18, height: 10, unit: "ft", sort_order: 2, created_by: userId },
@@ -188,7 +283,7 @@ await upsert("notifications", [{
 }]);
 
 const counts = {};
-for (const table of ["projects", "boqs", "boq_items", "proposals", "invoices", "notifications"]) {
+for (const table of ["projects", "project_templates", "project_template_versions", "project_template_usage", "boqs", "boq_items", "proposals", "invoices", "notifications"]) {
   const result = await admin.from(table).select("id", { count: "exact", head: true }).eq("workspace_id", WORKSPACE_ID);
   assertResult(`verify ${table}`, result);
   counts[table] = result.count;
