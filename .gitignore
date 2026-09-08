@@ -2,3 +2,14 @@ node_modules
 .next
 .env*
 !.env.example
+
+# Build / generated files
+*.tsbuildinfo
+
+# Temporary / backup files
+*.bak
+*.stackdump
+
+# Local Supabase files
+supabase/.branches/
+supabase/.temp/

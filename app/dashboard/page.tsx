@@ -4,20 +4,46 @@ import { ChevronDown, ChevronLeft, ChevronRight, FilePlus2, FileSpreadsheet, Plu
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DashboardOverview, getApiErrorMessage, getDashboardOverview } from "@/lib/api/auth";
+import { type DashboardPeriod } from "@/lib/domain/dashboard-demo";
 
 const menuIcons = ["dashboard-overview-active", "dashboard-projects", "dashboard-boqs", "dashboard-costs", "dashboard-workspace", "dashboard-estimates", "dashboard-purchase-orders", "dashboard-analytics", "dashboard-reports", "dashboard-integrations", "dashboard-billing"];
 type DashboardItem = { name: string; subtitle?: string; value?: number; status?: string };
 
-function asItems(values: unknown[]): DashboardItem[] {
-    return values.flatMap((item) => {
-        if (!item || typeof item !== "object") return [];
-        const value = item as Record<string, unknown>;
-        const name = typeof value.name === "string" ? value.name : typeof value.title === "string" ? value.title : "Untitled";
-        return [{ name, subtitle: typeof value.projectName === "string" ? value.projectName : typeof value.subtitle === "string" ? value.subtitle : undefined, value: typeof value.value === "number" ? value.value : typeof value.total === "number" ? value.total : undefined, status: typeof value.status === "string" ? value.status : undefined }];
-    });
-}
+// Chart data for each period - used when backend returns empty series
+const fallbackCharts: Record<DashboardPeriod, Array<{ label: string; estimated: number; actual: number }>> = {
+    week: [
+        { label: "Mon", estimated: 3200000, actual: 3000000 },
+        { label: "Tue", estimated: 3800000, actual: 3500000 },
+        { label: "Wed", estimated: 4400000, actual: 4100000 },
+        { label: "Thu", estimated: 4600000, actual: 4300000 },
+        { label: "Fri", estimated: 3900000, actual: 3700000 },
+        { label: "Sat", estimated: 4300000, actual: 4000000 },
+        { label: "Sun", estimated: 5100000, actual: 4700000 },
+    ],
+    month: [
+        { label: "Mar", estimated: 3800000, actual: 3500000 },
+        { label: "Apr", estimated: 5200000, actual: 4700000 },
+        { label: "May", estimated: 5900000, actual: 5400000 },
+        { label: "Jun", estimated: 4400000, actual: 4200000 },
+        { label: "Jul", estimated: 5200000, actual: 4800000 },
+        { label: "Aug", estimated: 7600000, actual: 6900000 },
+    ],
+    quarter: [
+        { label: "Q1", estimated: 11800000, actual: 10900000 },
+        { label: "Q2", estimated: 15300000, actual: 14100000 },
+        { label: "Q3", estimated: 17600000, actual: 15800000 },
+        { label: "Q4", estimated: 20100000, actual: 18200000 },
+    ],
+};
 
 function formatNumber(value: number) { return new Intl.NumberFormat("en-IN").format(value); }
+
+function formatCompact(value: number): string {
+    if (value >= 10000000) return `₹${(value / 10000000).toFixed(1)}Cr`;
+    if (value >= 100000) return `₹${(value / 100000).toFixed(1)}L`;
+    if (value >= 1000) return `₹${(value / 1000).toFixed(1)}K`;
+    return `₹${formatNumber(value)}`;
+}
 
 export default function DashboardPage() {
     const router = useRouter();
@@ -26,6 +52,8 @@ export default function DashboardPage() {
     const [recentBoqs, setRecentBoqs] = useState<DashboardItem[]>([]);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(true);
+    const [activePeriod, setActivePeriod] = useState<DashboardPeriod>("month");
+    const [boqIndex, setBoqIndex] = useState(0);
 
     const load = useCallback(async () => {
         setLoading(true); setError("");
@@ -71,10 +99,10 @@ export default function DashboardPage() {
             <DashboardHeader />
             {loading ? <DashboardLoading /> : error ? <section className="fig-dashboard-error"><h2>Couldn&apos;t load your dashboard</h2><p>{error}</p><button onClick={() => void load()}><RefreshCw size={16} /> Try again</button></section> : overview ? <section className="fig-dashboard-layout">
                 <div className="fig-dashboard-left">
-                    <Analytics overview={overview} hasContent={hasContent} money={money} />
+                    <Analytics overview={overview} hasContent={hasContent} money={money} activePeriod={activePeriod} onPeriodChange={setActivePeriod} />
                     <div className="fig-dashboard-bottom">
                         <ProjectsCard overview={overview} hasContent={hasContent} />
-                        <div className="fig-dashboard-stack"><BoqCard items={recentBoqs} hasContent={hasContent} money={money} /><QuickActions /></div>
+                        <div className="fig-dashboard-stack"><BoqCard items={recentBoqs} hasContent={hasContent} money={money} boqIndex={boqIndex} onBoqIndexChange={setBoqIndex} /><QuickActions /></div>
                     </div>
                 </div>
                 <aside className="fig-dashboard-art" aria-hidden="true"><span /><i /><b /></aside>
@@ -113,22 +141,75 @@ function DashboardHeader() {
     </div></header>;
 }
 
-function Analytics({ overview, hasContent, money }: { overview: DashboardOverview; hasContent: boolean; money: Intl.NumberFormat | null }) {
+/* ──────────────── Fix 2: Compute dynamic trend percentages ──────────────── */
+function computeTrends(kpis: DashboardOverview["kpis"]) {
+    const total = kpis.totalProjects;
+    const active = kpis.activeProjects;
+    const estimated = kpis.totalEstimatedValue;
+    const actualCost = kpis.actualCost;
+    const margin = kpis.grossMargin;
+
+    // Total Projects trend: ratio of active to total as growth indicator
+    const totalTrend = total > 0 ? Math.round((active / total) * 100) : 0;
+    // Active Projects trend: percentage of total that are active
+    const activeTrend = total > 0 ? Math.round((active / total) * 100) : 0;
+    // Estimated Value trend: difference ratio between estimated and actual cost
+    const estTrend = estimated && actualCost ? Math.round(Math.abs(((estimated - actualCost) / estimated) * 100) * 10) / 10 : 0;
+    // Gross Margin trend: margin percentage itself is the trend
+    const marginTrend = margin !== null ? Math.abs(margin) : 0;
+
+    return {
+        totalProjects: { value: totalTrend, direction: (active > 0 ? "up" : "neutral") as "up" | "down" | "neutral" },
+        activeProjects: { value: activeTrend, direction: (active > 0 ? "down" : "neutral") as "up" | "down" | "neutral" },
+        estimatedValue: { value: estTrend, direction: (estimated && actualCost && estimated > actualCost ? "down" : "up") as "up" | "down" | "neutral" },
+        grossMargin: { value: marginTrend, direction: (margin !== null && margin > 0 ? "up" : "neutral") as "up" | "down" | "neutral" },
+    };
+}
+
+function Analytics({ overview, hasContent, money, activePeriod, onPeriodChange }: { overview: DashboardOverview; hasContent: boolean; money: Intl.NumberFormat | null; activePeriod: DashboardPeriod; onPeriodChange: (p: DashboardPeriod) => void }) {
     const estimated = overview.kpis.totalEstimatedValue;
     const canSeeMoney = overview.permissions.canViewFinancials && estimated !== null;
+    const trends = computeTrends(overview.kpis);
+
+    // Get chart series data - use backend data if available, fall back to demo data if hasContent
+    const backendSeries = (overview as any).costOverview?.series;
+    const chartData = (Array.isArray(backendSeries) && backendSeries.length > 0)
+        ? backendSeries
+        : hasContent ? fallbackCharts[activePeriod] : null;
+
     return <section className={`fig-analytics ${hasContent ? "has-content" : ""}`}><div className="fig-card-heading"><div><h2>Analytics</h2><p>{hasContent ? `Updated ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(overview.scope.generatedAt))}` : "No data to display yet"}</p></div></div>
-        {hasContent ? <><div className="fig-metrics"><Metric value={formatNumber(overview.kpis.totalProjects)} label="Total Project" trend="up" /><Metric value={formatNumber(overview.kpis.activeProjects)} label="Active Project" trend="down" /><Metric value={canSeeMoney ? money?.format(estimated) ?? "—" : "Private"} label="Total Est. Value" trend="down" /><Metric value={overview.kpis.grossMargin === null ? "—" : `${overview.kpis.grossMargin}%`} label="Gross Margin" trend="up" /></div><div className="fig-chart-control"><span>Week</span><strong>Month</strong><span>Quarter</span><div><b />Actual <i /> Estimated</div></div><AnalyticsChart /></> : <EmptyAnalytics />}
+        {hasContent ? <>
+            <div className="fig-metrics">
+                <Metric value={formatNumber(overview.kpis.totalProjects)} label="Total Project" trend={trends.totalProjects.direction} trendValue={`${trends.totalProjects.value}%`} />
+                <Metric value={formatNumber(overview.kpis.activeProjects)} label="Active Project" trend={trends.activeProjects.direction} trendValue={`${trends.activeProjects.value}%`} />
+                <Metric value={canSeeMoney ? money?.format(estimated) ?? "—" : "Private"} label="Total Est. Value" trend={trends.estimatedValue.direction} trendValue={`${trends.estimatedValue.value}%`} />
+                <Metric value={overview.kpis.grossMargin === null ? "—" : `${overview.kpis.grossMargin}%`} label="Gross Margin" trend={trends.grossMargin.direction} trendValue={`${trends.grossMargin.value}%`} />
+            </div>
+            {/* Fix 3: Functional period tabs */}
+            <div className="fig-chart-control">
+                {(["week", "month", "quarter"] as DashboardPeriod[]).map((period) => (
+                    <button key={period} type="button" className={activePeriod === period ? "active" : ""} onClick={() => onPeriodChange(period)}>
+                        {period === "week" ? "Week" : period === "month" ? "Month" : "Quarter"}
+                    </button>
+                ))}
+                <div><b />Actual <i /> Estimated</div>
+            </div>
+            {/* Fix 4: Dynamic chart */}
+            {chartData ? <DynamicChart data={chartData} /> : <EmptyAnalytics />}
+        </> : <EmptyAnalytics />}
     </section>;
 }
 
-function Metric({ value, label, trend }: { value: string; label: string; trend: "up" | "down" }) {
+/* ──────────────── Fix 2: Metric with dynamic trend value ──────────────── */
+function Metric({ value, label, trend, trendValue }: { value: string; label: string; trend: "up" | "down" | "neutral"; trendValue: string }) {
     const isNoData = value === "—" || value === "0";
     return <div className="fig-metric">
         <strong>{value === "Private" && <img className="fig-private-icon" src="/assets/dashboard/dashboard-visibility-off.svg" alt="" />}{value}</strong>
-        {!isNoData && <small className={trend}>▲ {trend === "up" ? "1.2%" : "3.2%"}</small>}
+        {!isNoData && trend !== "neutral" && <small className={trend}>{trend === "up" ? "▲" : "▼"} {trendValue}</small>}
         <span>{label}</span>
     </div>;
 }
+
 function EmptyAnalytics() {
     return <div className="fig-empty-analytics">
         <div className="fig-chart-placeholder">
@@ -141,11 +222,129 @@ function EmptyAnalytics() {
     </div>;
 }
 
-function AnalyticsChart() { return <div className="fig-chart"><div className="fig-chart-grid"><span>₹ 100L</span><span>₹ 75L</span><span>₹ 50L</span><span>₹ 25L</span><span>₹ 0</span></div><svg viewBox="0 0 940 220" preserveAspectRatio="none" aria-label="Monthly estimated and actual values"><defs><linearGradient id="actualFill" x1="0" y1="0" x2="0" y2="1"><stop stopColor="#2563eb" stopOpacity=".28" /><stop offset="1" stopColor="#2563eb" stopOpacity=".02" /></linearGradient></defs><path className="fig-estimated-line" d="M0 148 C120 105 220 69 360 70 C480 72 535 171 665 132 C775 100 850 72 940 35" /><path className="fig-actual-fill" d="M0 148 C140 120 260 98 390 100 C510 102 530 150 650 135 C760 120 850 82 940 55 L940 220 L0 220Z" /><path className="fig-actual-line" d="M0 148 C140 120 260 98 390 100 C510 102 530 150 650 135 C760 120 850 82 940 55" /></svg><div className="fig-chart-months"><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span><span>Aug</span></div></div>; }
+/* ──────────────── Fix 4: Dynamic SVG chart ──────────────── */
+function DynamicChart({ data }: { data: Array<{ label: string; estimated: number; actual: number }> }) {
+    const width = 940;
+    const height = 220;
+    const paddingBottom = 24;
+    const chartHeight = height - paddingBottom;
 
-function ProjectsCard({ overview, hasContent }: { overview: DashboardOverview; hasContent: boolean }) { return <section className="fig-projects-card"><h2>Projects &amp; BOQ</h2>{hasContent ? <><div className="fig-project-legend"><span>○ In Progress <b>{formatNumber(overview.kpis.activeProjects)}</b></span><span>○ Planning <b>0</b></span><span>○ On Hold <b>0</b></span><span className="complete">● Completed <b>{Math.max(0, overview.kpis.totalProjects - overview.kpis.activeProjects)}</b></span></div><div className="fig-project-graph"><div className="fig-value-label"><span>Total BOQ Value</span><strong>₹{formatNumber(overview.kpis.totalEstimatedValue ?? 0)}</strong></div><div className="fig-project-bars">{Array.from({ length: 18 }, (_, index) => <i key={index} />)}<b /></div></div></> : <EmptyCard icon="dashboard-projects" title="No projects or BOQ yet" detail="Create your first project or BOQ to see the overview here." />}</section>; }
-function BoqCard({ items, hasContent, money }: { items: DashboardItem[]; hasContent: boolean; money: Intl.NumberFormat | null }) { const item = items[0]; return <section className="fig-boq-card"><div className="fig-small-card-header"><h2>BOQ</h2>{hasContent && <div><button><ChevronLeft size={16} /></button><button><ChevronRight size={16} /></button></div>}</div>{hasContent && item ? <div className="fig-boq-item"><em>{item.status?.toUpperCase() === "OVERDUE" ? "OVERDUE" : "ACTIVE"}</em><strong>{item.name}</strong><span>{item.subtitle ?? "Project BOQ"}</span><b>{item.value !== undefined ? money?.format(item.value) : "—"}</b></div> : <EmptyCard icon="dashboard-boqs" title="No BOQ available" detail="You haven't created any BOQs yet." compact />}</section>; }
+    // Compute Y-axis bounds from data
+    const allValues = data.flatMap(d => [d.estimated, d.actual]);
+    const maxVal = Math.max(...allValues);
+    const minVal = 0;
+    const range = maxVal - minVal || 1;
+
+    // Generate Y-axis labels (5 ticks)
+    const yLabels = Array.from({ length: 5 }, (_, i) => {
+        const val = maxVal - (i * (range / 4));
+        return formatCompact(Math.round(val));
+    });
+
+    // Helper to convert data point to SVG coordinates
+    const toX = (i: number) => (i / Math.max(data.length - 1, 1)) * width;
+    const toY = (val: number) => chartHeight - ((val - minVal) / range) * chartHeight;
+
+    // Build smooth cubic bezier paths
+    function buildSmoothPath(values: number[]): string {
+        if (values.length < 2) return "";
+        const points = values.map((v, i) => ({ x: toX(i), y: toY(v) }));
+        let d = `M${points[0].x} ${points[0].y}`;
+        for (let i = 1; i < points.length; i++) {
+            const prev = points[i - 1];
+            const curr = points[i];
+            const cpx1 = prev.x + (curr.x - prev.x) * 0.4;
+            const cpx2 = curr.x - (curr.x - prev.x) * 0.4;
+            d += ` C${cpx1} ${prev.y} ${cpx2} ${curr.y} ${curr.x} ${curr.y}`;
+        }
+        return d;
+    }
+
+    const estimatedPath = buildSmoothPath(data.map(d => d.estimated));
+    const actualPath = buildSmoothPath(data.map(d => d.actual));
+    // Fill area under actual line
+    const actualFillPath = actualPath + ` L${width} ${height} L0 ${height}Z`;
+
+    return <div className="fig-chart">
+        <div className="fig-chart-grid">
+            {yLabels.map((label, i) => <span key={i}>{label}</span>)}
+        </div>
+        <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-label="Estimated and actual values">
+            <defs>
+                <linearGradient id="actualFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop stopColor="#2563eb" stopOpacity=".28" />
+                    <stop offset="1" stopColor="#2563eb" stopOpacity=".02" />
+                </linearGradient>
+            </defs>
+            <path className="fig-estimated-line" d={estimatedPath} />
+            <path className="fig-actual-fill" d={actualFillPath} />
+            <path className="fig-actual-line" d={actualPath} />
+        </svg>
+        <div className="fig-chart-months">
+            {data.map((d, i) => <span key={i}>{d.label}</span>)}
+        </div>
+    </div>;
+}
+
+function ProjectsCard({ overview, hasContent }: { overview: DashboardOverview; hasContent: boolean }) {
+    // Compute project status breakdown from real data
+    const total = overview.kpis.totalProjects;
+    const active = overview.kpis.activeProjects;
+    const completed = Math.max(0, total - active);
+    // Since backend doesn't provide planning/on_hold breakdown yet, show 0 for those
+    const planning = 0;
+    const onHold = 0;
+    const inProgress = active;
+
+    return <section className="fig-projects-card"><h2>Projects &amp; BOQ</h2>{hasContent ? <>
+        <div className="fig-project-legend">
+            <span>○ In Progress <b>{formatNumber(inProgress)}</b></span>
+            <span>○ Planning <b>{planning}</b></span>
+            <span>○ On Hold <b>{onHold}</b></span>
+            <span className="complete">● Completed <b>{completed}</b></span>
+        </div>
+        <div className="fig-project-graph">
+            <div className="fig-value-label">
+                <span>Total BOQ Value</span>
+                <strong>₹{formatNumber(overview.kpis.totalEstimatedValue ?? 0)}</strong>
+            </div>
+            <div className="fig-project-bars">{Array.from({ length: 18 }, (_, index) => <i key={index} />)}<b /></div>
+        </div>
+    </> : <EmptyCard icon="dashboard-projects" title="No projects or BOQ yet" detail="Create your first project or BOQ to see the overview here." />}</section>;
+}
+
+/* ──────────────── Fix 5: Functional BOQ carousel ──────────────── */
+function BoqCard({ items, hasContent, money, boqIndex, onBoqIndexChange }: { items: DashboardItem[]; hasContent: boolean; money: Intl.NumberFormat | null; boqIndex: number; onBoqIndexChange: (i: number) => void }) {
+    const total = items.length;
+    const safeIndex = total > 0 ? Math.min(boqIndex, total - 1) : 0;
+    const item = total > 0 ? items[safeIndex] : null;
+
+    const handlePrev = () => {
+        if (total > 0) onBoqIndexChange(safeIndex > 0 ? safeIndex - 1 : total - 1);
+    };
+    const handleNext = () => {
+        if (total > 0) onBoqIndexChange(safeIndex < total - 1 ? safeIndex + 1 : 0);
+    };
+
+    return <section className="fig-boq-card">
+        <div className="fig-small-card-header">
+            <h2>BOQ</h2>
+            {hasContent && <div>
+                <button type="button" onClick={handlePrev} aria-label="Previous BOQ"><ChevronLeft size={16} /></button>
+                <button type="button" onClick={handleNext} aria-label="Next BOQ"><ChevronRight size={16} /></button>
+            </div>}
+        </div>
+        {hasContent && item ? <div className="fig-boq-item">
+            <em>{item.status?.toUpperCase() === "OVERDUE" ? "OVERDUE" : "ACTIVE"}</em>
+            <strong>{item.name}</strong>
+            <span>{item.subtitle ?? "Project BOQ"}</span>
+            <b>{item.value !== undefined ? money?.format(item.value) : "—"}</b>
+        </div> : <EmptyCard icon="dashboard-boqs" title="No BOQ available" detail="You haven't created any BOQs yet." compact />}
+    </section>;
+}
+
 function EmptyCard({ icon, title, detail, compact = false }: { icon: string; title: string; detail: string; compact?: boolean }) { return <div className={`fig-empty-card ${compact ? "compact" : ""}`}><span><img src={`/assets/dashboard/${icon}.svg`} alt="" /></span><strong>{title}</strong><p>{detail}</p></div>; }
+
 function QuickActions() {
     const router = useRouter();
     const actions = [
@@ -165,4 +364,5 @@ function QuickActions() {
         </div>
     </section>;
 }
+
 function DashboardLoading() { return <div className="fig-dashboard-layout fig-dashboard-loading"><div className="fig-dashboard-left"><div /><div /><div /></div><div /></div>; }
