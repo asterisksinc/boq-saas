@@ -448,12 +448,27 @@ function Create({ screen, setScreen, onClose, onCreated }: { screen: string; set
             <div className="rdp-grid-2">
               <div className="rdp-input-group">
                 <label>Room Name <em>*</em></label>
-                <input value={rooms[activeRoomIndex]?.name || ""} readOnly />
+                <input 
+                  value={rooms[activeRoomIndex]?.name || ""} 
+                  onChange={e => setRooms(rs => rs.map((r, x) => x === activeRoomIndex ? { ...r, name: e.target.value } : r))}
+                  placeholder="ex. Master Bedroom" 
+                />
               </div>
               <div className="rdp-input-group">
                 <label>Room Type <em>*</em></label>
-                <select value={rooms[activeRoomIndex]?.roomType || ""} readOnly>
-                  <option value={rooms[activeRoomIndex]?.roomType}>{rooms[activeRoomIndex]?.roomType || "Select"}</option>
+                <select 
+                  value={rooms[activeRoomIndex]?.roomType || ""} 
+                  onChange={e => setRooms(rs => rs.map((r, x) => x === activeRoomIndex ? { ...r, roomType: e.target.value } : r))}
+                >
+                  <option value="" disabled>Select type</option>
+                  <option value="Master Bedroom">Master Bedroom</option>
+                  <option value="Bedroom">Bedroom</option>
+                  <option value="Living Room">Living Room</option>
+                  <option value="Dining Room">Dining Room</option>
+                  <option value="Kitchen">Kitchen</option>
+                  <option value="Study Room">Study Room</option>
+                  <option value="Guest Bedroom">Guest Bedroom</option>
+                  <option value="Bathroom">Bathroom</option>
                 </select>
               </div>
             </div>
