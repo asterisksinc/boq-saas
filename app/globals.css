@@ -1,4 +1,4 @@
-﻿:root {
+:root {
     --ink: #1f2d3d;
     --body: #6b7280;
     --blue: #2563eb;
@@ -4433,8 +4433,14 @@ input {
     background: rgba(37, 99, 235, .08);
 }
 
-.fig-dashboard-menu button.is-current {
+.fig-dashboard-menu button.is-current,
+.fig-dashboard-tools button.is-current {
     background: #2563eb;
+}
+
+.fig-dashboard-menu button.is-current:hover,
+.fig-dashboard-tools button.is-current:hover {
+    background: #1d4ed8;
 }
 
 .fig-dashboard-menu button img,
@@ -4443,8 +4449,9 @@ input {
     height: 20px;
 }
 
-.fig-dashboard-menu button.is-current img {
-    filter: brightness(0) invert1;
+.fig-dashboard-menu button.is-current img,
+.fig-dashboard-tools button.is-current img {
+    filter: brightness(0) invert(1);
 }
 
 .fig-dashboard-tools {

@@ -34,32 +34,7 @@ type DocumentItem = {
     sizeBytes: number;
     updatedAt: string;
 };
-const menuIcons = [
-    "dashboard-overview-active",
-    "dashboard-projects",
-    "dashboard-boqs",
-    "dashboard-costs",
-    "dashboard-workspace",
-    "dashboard-estimates",
-    "dashboard-billing",
-    "dashboard-analytics",
-    "dashboard-reports",
-    "dashboard-integrations",
-    "dashboard-billing",
-];
-const menuRoutes = [
-    "/dashboard",
-    "/projects",
-    "/boqs",
-    "/costs",
-    "/workspace",
-    "/proposals",
-    "/invoices",
-    "/analytics",
-    "/documents",
-    "/integrations",
-    "/billing",
-];
+import DashboardRail from "@/components/DashboardRail";
 
 async function apiJson<T>(url: string, init?: RequestInit) {
     const response = await fetch(url, {
@@ -134,7 +109,7 @@ export default function DocumentsPage() {
     return (
         <main className="fig-dashboard documents-page">
             <div className="fig-dashboard-glow" />
-            <DocumentsRail />
+            <DashboardRail />
             <div className="fig-dashboard-main">
                 <header className="fig-dashboard-header">
                     <h1>Documents</h1>
@@ -316,39 +291,6 @@ export default function DocumentsPage() {
                 )}
             </div>
         </main>
-    );
-}
-function DocumentsRail() {
-    const router = useRouter();
-    return (
-        <aside className="fig-dashboard-rail" aria-label="Dashboard navigation">
-            <div className="fig-dashboard-logo">
-                <span>
-                    <img src="/assets/boq-logo-small.svg" alt="BOQ" />
-                </span>
-            </div>
-            <nav className="fig-dashboard-menu">
-                {menuIcons.map((icon, index) => (
-                    <button
-                        key={`${icon}-${index}`}
-                        className={index === 8 ? "is-current" : ""}
-                        type="button"
-                        aria-label={`Navigation item ${index + 1}`}
-                        onClick={() => router.push(menuRoutes[index])}
-                    >
-                        <img src={`/assets/dashboard/${icon}.svg`} alt="" />
-                    </button>
-                ))}
-            </nav>
-            <div className="fig-dashboard-tools">
-                <button type="button" aria-label="Help">
-                    <img src="/assets/dashboard/dashboard-help.svg" alt="" />
-                </button>
-                <button type="button" aria-label="Settings">
-                    <img src="/assets/dashboard/dashboard-settings.svg" alt="" />
-                </button>
-            </div>
-        </aside>
     );
 }
 function FolderList({

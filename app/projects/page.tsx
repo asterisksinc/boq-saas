@@ -6,8 +6,7 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "re
 type Project = { id: string; projectCode?: string | null; name: string; clientName: string; clientContact?: string | null; projectType: string; status: string; location?: string | null; description?: string | null; areaSqft?: number | null; projectValue?: number | null; approvedBudget?: number | null; startDate?: string | null; targetCompletionDate?: string | null; progress?: number | null; imageUrl?: string | null };
 type Form = { name: string; clientName: string; clientContact: string; projectType: string; status: string; location: string; description: string; areaSqft: string; projectValue: string; startDate: string; targetCompletionDate: string };
 const blank: Form = { name: "", clientName: "", clientContact: "", projectType: "", status: "planning", location: "", description: "", areaSqft: "", projectValue: "", startDate: "", targetCompletionDate: "" };
-const links = ["/dashboard", "/projects", "/boqs", "/costs", "/workspace", "/proposals", "/invoices", "/analytics", "/documents", "/integrations", "/billing"];
-const icons = ["dashboard-overview-active", "dashboard-projects", "dashboard-boqs", "dashboard-costs", "dashboard-workspace", "dashboard-estimates", "dashboard-purchase-orders", "dashboard-analytics", "dashboard-reports", "dashboard-integrations", "dashboard-billing"];
+import DashboardRail from "@/components/DashboardRail";
 const message = (x: unknown, fallback: string) => (x as { error?: { message?: string }; message?: string })?.error?.message || (x as { message?: string })?.message || fallback;
 const money = (n?: number | null) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n || 0);
 const date = (x?: string | null) => x ? new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(new Date(`${x}T00:00:00`)) : "—";
@@ -29,15 +28,7 @@ export default function ProjectsPage() {
 
   return <main className="fig-dashboard boq-dashboard project-ui">
     <div className="fig-dashboard-glow" />
-    {/* Fix 7: Sidebar with Help & Settings visible */}
-    <aside className="fig-dashboard-rail">
-      <div className="fig-dashboard-logo"><span><img src="/assets/boq-logo-small.svg" alt="BOQ" /></span></div>
-      <nav className="fig-dashboard-menu">{links.map((path, i) => <button key={path} className={i === 1 ? "is-current" : ""} onClick={() => location.assign(path)}><img src={`/assets/dashboard/${icons[i]}.svg`} alt="" /></button>)}</nav>
-      <div className="fig-dashboard-tools">
-        <button type="button" aria-label="Help" onClick={() => location.assign("/help")}><img src="/assets/dashboard/dashboard-help.svg" alt="" /></button>
-        <button type="button" aria-label="Settings" onClick={() => location.assign("/settings")}><img src="/assets/dashboard/dashboard-settings.svg" alt="" /></button>
-      </div>
-    </aside>
+    <DashboardRail />
     <div className="fig-dashboard-main">
       {/* Fix 1: Notification bell SVG + Fix 4: Search bar matching dashboard */}
       <header className="fig-dashboard-header">

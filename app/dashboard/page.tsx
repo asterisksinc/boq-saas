@@ -3,10 +3,10 @@
 import { ChevronDown, ChevronLeft, ChevronRight, FilePlus2, FileSpreadsheet, Plus, RefreshCw, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import DashboardRail from "@/components/DashboardRail";
 import { DashboardOverview, getApiErrorMessage, getDashboardOverview } from "@/lib/api/auth";
 import { type DashboardPeriod } from "@/lib/domain/dashboard-demo";
 
-const menuIcons = ["dashboard-overview-active", "dashboard-projects", "dashboard-boqs", "dashboard-costs", "dashboard-workspace", "dashboard-estimates", "dashboard-purchase-orders", "dashboard-analytics", "dashboard-reports", "dashboard-integrations", "dashboard-billing"];
 type DashboardItem = { name: string; subtitle?: string; value?: number; status?: string };
 
 // Chart data for each period - used when backend returns empty series
@@ -111,26 +111,6 @@ export default function DashboardPage() {
     </main>;
 }
 
-function DashboardRail() {
-    const router = useRouter();
-    const menuRoutes = ["/dashboard", "/projects", "/boqs", "/costs", "/workspace", "/proposals", "/invoices", "/analytics", "/documents", "/integrations", "/billing"];
-
-    return <aside className="fig-dashboard-rail" aria-label="Dashboard navigation">
-        <div className="fig-dashboard-logo"><span><img src="/assets/boq-logo-small.svg" alt="BOQ" /></span></div>
-        <nav className="fig-dashboard-menu">{menuIcons.map((icon, index) => (
-            <button
-                key={icon}
-                className={index === 0 ? "is-current" : ""}
-                type="button"
-                aria-label={`Navigation item ${index + 1}`}
-                onClick={() => router.push(menuRoutes[index] || "/dashboard")}
-            >
-                <img src={`/assets/dashboard/${icon}.svg`} alt="" />
-            </button>
-        ))}</nav>
-        <div className="fig-dashboard-tools"><button type="button" aria-label="Help"><img src="/assets/dashboard/dashboard-help.svg" alt="" /></button><button type="button" aria-label="Settings"><img src="/assets/dashboard/dashboard-settings.svg" alt="" /></button></div>
-    </aside>;
-}
 
 function DashboardHeader() {
     const router = useRouter();

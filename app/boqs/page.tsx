@@ -17,6 +17,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { getApiErrorMessage, parseApiResponse } from "@/lib/api/auth";
 import { BoqStatusUi, mapBoqListItem, type BoqListItem } from "@/lib/domain/boq-data";
+import DashboardRail from "@/components/DashboardRail";
 
 type CreateMode = "blank" | "template";
 
@@ -27,34 +28,6 @@ interface BoqApiPage<T> {
     total: number;
     hasMore: boolean;
 }
-
-const menuRoutes = [
-    "/dashboard",
-    "/projects",
-    "/boqs",
-    "/costs",
-    "/workspace",
-    "/proposals",
-    "/invoices",
-    "/analytics",
-    "/documents",
-    "/integrations",
-    "/billing",
-];
-
-const menuIcons = [
-    "dashboard-overview-active",
-    "dashboard-projects",
-    "dashboard-boqs",
-    "dashboard-costs",
-    "dashboard-workspace",
-    "dashboard-estimates",
-    "dashboard-purchase-orders",
-    "dashboard-analytics",
-    "dashboard-reports",
-    "dashboard-integrations",
-    "dashboard-billing",
-];
 
 // Templates are loaded dynamically from the API
 
@@ -159,36 +132,7 @@ export default function BoqsPage() {
         <main className="fig-dashboard boq-dashboard">
             <div className="fig-dashboard-glow" />
 
-            <aside className="fig-dashboard-rail" aria-label="Dashboard navigation">
-                <div className="fig-dashboard-logo">
-                    <span>
-                        <img src="/assets/boq-logo-small.svg" alt="BOQ" />
-                    </span>
-                </div>
-
-                <nav className="fig-dashboard-menu">
-                    {menuRoutes.map((route, index) => (
-                        <button
-                            key={route}
-                            type="button"
-                            className={index === 2 ? "is-current" : ""}
-                            aria-label={`Navigate to ${route}`}
-                            onClick={() => window.location.assign(route)}
-                        >
-                            <img src={`/assets/dashboard/${menuIcons[index]}.svg`} alt="" />
-                        </button>
-                    ))}
-                </nav>
-
-                <div className="fig-dashboard-tools">
-                    <button type="button" aria-label="Help">
-                        <img src="/assets/dashboard/dashboard-help.svg" alt="" />
-                    </button>
-                    <button type="button" aria-label="Settings">
-                        <img src="/assets/dashboard/dashboard-settings.svg" alt="" />
-                    </button>
-                </div>
-            </aside>
+            <DashboardRail />
 
             <div className="fig-dashboard-main">
                 <header className="fig-dashboard-header">

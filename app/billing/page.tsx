@@ -40,22 +40,7 @@ import {
     SubscriptionInvoice,
     PaymentMethod,
 } from "@/lib/api/auth";
-
-const navRoutes = ["/dashboard", "/projects", "/boqs", "/costs", "/workspace", "/proposals", "/invoices", "/analytics", "/documents", "/integrations", "/billing", "/activities"];
-const navIcons = [
-    "dashboard-overview-active",
-    "dashboard-projects",
-    "dashboard-boqs",
-    "dashboard-costs",
-    "dashboard-workspace",
-    "dashboard-estimates",
-    "dashboard-purchase-orders",
-    "dashboard-analytics",
-    "dashboard-reports",
-    "dashboard-integrations",
-    "dashboard-billing",
-    "dashboard-activities-active",
-];
+import DashboardRail from "@/components/DashboardRail";
 
 const planOrder = ["starter", "professional", "business", "enterprise"];
 const planIcons: Record<string, React.ReactNode> = {
@@ -221,20 +206,7 @@ export default function BillingPage() {
     return (
         <main className="fig-dashboard boq-dashboard billing-page">
             <div className="fig-dashboard-glow" />
-            <aside className="fig-dashboard-rail" aria-label="Dashboard navigation">
-                <div className="fig-dashboard-logo"><span><img src="/assets/boq-logo-small.svg" alt="BOQ" /></span></div>
-                <nav className="fig-dashboard-menu">
-                    {navRoutes.map((route, index) => (
-                        <button key={route} type="button" className={index === 11 ? "is-current" : ""} aria-label={`Navigate to ${route}`} onClick={() => window.location.assign(route)}>
-                            <img src={`/assets/dashboard/${navIcons[index]}.svg`} alt="" />
-                        </button>
-                    ))}
-                </nav>
-                <div className="fig-dashboard-tools">
-                    <button type="button" aria-label="Help"><img src="/assets/dashboard/dashboard-help.svg" alt="" /></button>
-                    <button type="button" aria-label="Settings"><img src="/assets/dashboard/dashboard-settings.svg" alt="" /></button>
-                </div>
-            </aside>
+            <DashboardRail />
 
             <div className="fig-dashboard-main">
                 <header className="fig-dashboard-header">
@@ -312,7 +284,7 @@ function BillingSkeleton() {
     return (
         <main className="fig-dashboard boq-dashboard billing-page">
             <div className="fig-dashboard-glow" />
-            <aside className="fig-dashboard-rail"><div className="fig-dashboard-logo"><span><img src="/assets/boq-logo-small.svg" alt="BOQ" /></span></div><nav className="fig-dashboard-menu">{navIcons.map((icon, i) => <button key={icon} className={i === 11 ? "is-current" : ""}><img src={`/assets/dashboard/${icon}.svg`} alt="" /></button>)}</nav></aside>
+            <DashboardRail />
             <div className="fig-dashboard-main"><header className="fig-dashboard-header"><h1>Billing</h1></header>
                 <section className="billing-content">
                     <div className="billing-grid">

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus, ChevronDown } from "lucide-react";
+import DashboardRail from "@/components/DashboardRail";
 import { getApiErrorMessage, parseApiResponse } from "@/lib/api/auth";
 
 interface ProposalListItem {
@@ -127,7 +128,7 @@ export default function ProposalsPage() {
     return (
         <main className="fig-dashboard">
             <div className="fig-dashboard-glow" />
-            <ProposalsRail />
+            <DashboardRail />
             <div className="fig-dashboard-main">
                 <ProposalsHeader onNewClick={() => setShowNewModal(true)} />
                 <div className="fig-dashboard-container">
@@ -273,16 +274,6 @@ export default function ProposalsPage() {
     );
 }
 
-function ProposalsRail() {
-    const router = useRouter();
-    const menuIcons = ["dashboard-overview-active", "dashboard-projects", "dashboard-boqs", "dashboard-costs", "dashboard-workspace", "dashboard-estimates", "dashboard-purchase-orders", "dashboard-analytics", "dashboard-reports", "dashboard-integrations", "dashboard-billing"];
-    const menuRoutes = ["/dashboard", "/projects", "/boqs", "/costs", "/workspace", "/proposals", "/invoices", "/analytics", "/documents", "/integrations", "/billing"];
-    return <aside className="fig-dashboard-rail" aria-label="Dashboard navigation">
-        <div className="fig-dashboard-logo"><span><img src="/assets/boq-logo-small.svg" alt="BOQ" /></span></div>
-        <nav className="fig-dashboard-menu">{menuIcons.map((icon, index) => <button key={icon} className={index === 5 ? "is-current" : ""} type="button" aria-label={`Navigation item ${index + 1}`} onClick={() => router.push(menuRoutes[index])}><img src={`/assets/dashboard/${icon}.svg`} alt="" /></button>)}</nav>
-        <div className="fig-dashboard-tools"><button type="button" aria-label="Help"><img src="/assets/dashboard/dashboard-help.svg" alt="" /></button><button type="button" aria-label="Settings"><img src="/assets/dashboard/dashboard-settings.svg" alt="" /></button></div>
-    </aside>;
-}
 
 function ProposalsHeader({ onNewClick }: { onNewClick: () => void }) {
     return <header className="fig-dashboard-header"><h1>Proposals</h1><div className="fig-dashboard-header-actions">
