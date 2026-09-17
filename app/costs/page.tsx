@@ -19,6 +19,10 @@ type MainTab = "Library" | "Categories" | "Analysis" | "Scenarios" | "Margins" |
 
 export default function CostsPage() {
     const [activeTab, setActiveTab] = useState<MainTab>("Library");
+    const [isAddOpen, setIsAddOpen] = useState(false);
+    const [isNewCategoryOpen, setIsNewCategoryOpen] = useState(false);
+    const [categorySearch, setCategorySearch] = useState("");
+    const [isCategoryDetailActive, setIsCategoryDetailActive] = useState(false);
 
     const tabs: MainTab[] = ["Library", "Categories", "Analysis", "Scenarios", "Margins", "Settings"];
 
@@ -113,8 +117,35 @@ export default function CostsPage() {
                                 <button style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", width: "40px", cursor: "pointer" }}>
                                     <SlidersHorizontal size={16} color="#4b5563" />
                                 </button>
-                                <button style={{ display: "flex", alignItems: "center", gap: "8px", background: "#2563eb", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "8px", fontWeight: 500, cursor: "pointer" }}>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsAddOpen(true)}
+                                    style={{ display: "flex", alignItems: "center", gap: "8px", background: "#2563eb", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "8px", fontWeight: 500, cursor: "pointer" }}
+                                >
                                     <Plus size={16} /> New Item
+                                </button>
+                            </div>
+                        )}
+                        {activeTab === "Categories" && !isCategoryDetailActive && (
+                            <div style={{ display: "flex", gap: "12px" }}>
+                                <label style={{ display: "flex", alignItems: "center", background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "0 12px" }}>
+                                    <Search size={16} color="#6b7280" />
+                                    <input
+                                        placeholder="Search category by name..."
+                                        value={categorySearch}
+                                        onChange={(e) => setCategorySearch(e.target.value)}
+                                        style={{ border: "none", outline: "none", padding: "8px", fontSize: "14px", width: "200px" }}
+                                    />
+                                </label>
+                                <button style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", width: "40px", cursor: "pointer" }}>
+                                    <SlidersHorizontal size={16} color="#4b5563" />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsNewCategoryOpen(true)}
+                                    style={{ display: "flex", alignItems: "center", gap: "8px", background: "#2563eb", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "8px", fontWeight: 500, cursor: "pointer" }}
+                                >
+                                    <Plus size={16} /> New Category
                                 </button>
                             </div>
                         )}
@@ -129,11 +160,18 @@ export default function CostsPage() {
 
                     {/* Main Content Area */}
                     <div className="costing-content-area" style={{ background: "transparent", minHeight: "500px" }}>
-                        {activeTab === "Library" && <LibraryTab />}
-                        {activeTab === "Categories" && <CategoriesTab />}
+                        {activeTab === "Library" && <LibraryTab isAddOpen={isAddOpen} setIsAddOpen={setIsAddOpen} />}
+                        {activeTab === "Categories" && (
+                            <CategoriesTab
+                                searchQuery={categorySearch}
+                                isNewCategoryOpen={isNewCategoryOpen}
+                                setIsNewCategoryOpen={setIsNewCategoryOpen}
+                                onDetailViewChange={setIsCategoryDetailActive}
+                            />
+                        )}
                         {activeTab === "Analysis" && <AnalysisTab />}
                         {activeTab === "Scenarios" && <ScenariosTab />}
-                        {activeTab === "Margins" && <MarginsTab />}
+                        {activeTab === "Margins" && <MarginsTab onNavigateTab={setActiveTab} />}
                         {activeTab === "Settings" && <SettingsTab />}
                     </div>
                 </section>

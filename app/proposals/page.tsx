@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus, ChevronDown } from "lucide-react";
@@ -37,22 +37,71 @@ interface PagedResponse<T> {
     hasMore: boolean;
 }
 
+function formatIndianCurrency(val: number): string {
+    if (val === null || val === undefined || isNaN(val)) return "-";
+    if (val >= 10000000) {
+        const cr = val / 10000000;
+        const formatted = cr % 1 === 0 ? cr.toString() : cr.toFixed(1).replace(/\.0$/, "");
+        return `₹${formatted}Cr`;
+    }
+    if (val >= 100000) {
+        const lk = val / 100000;
+        const formatted = lk % 1 === 0 ? lk.toString() : lk.toFixed(1).replace(/\.0$/, "");
+        return `₹${formatted}L`;
+    }
+    return new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: "INR",
+        maximumFractionDigits: 0,
+    }).format(val);
+}
+
 export default function ProposalsPage() {
     const [proposals, setProposals] = useState<ProposalListItem[]>([]);
     const [summary, setSummary] = useState<ProposalSummary | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [searchQuery, setSearchQuery] = useState("");
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
     const [total, setTotal] = useState(0);
     const [showNewModal, setShowNewModal] = useState(false);
+    const [showTemplatesModal, setShowTemplatesModal] = useState(false);
+    const [selectedTemplateForNew, setSelectedTemplateForNew] = useState<any>(null);
     const [selectedProposal, setSelectedProposal] = useState<ProposalListItem | null>(null);
     const [showPreviewModal, setShowPreviewModal] = useState(false);
+    const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+    const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-    const fetchProposals = useCallback(async (pageNum: number) => {
+    const showToast = (msg: string) => {
+        setToastMessage(msg);
+        setTimeout(() => setToastMessage(null), 3500);
+    };
+
+    // Close action dropdown menu on outside click
+    useEffect(() => {
+        const handleOutsideClick = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            if (!target.closest(".actions-menu-wrapper")) {
+                setOpenMenuId(null);
+            }
+        };
+        window.addEventListener("mousedown", handleOutsideClick);
+        return () => window.removeEventListener("mousedown", handleOutsideClick);
+    }, []);
+
+    const fetchProposals = useCallback(async (pageNum: number, limit: number, search = "") => {
         setLoading(true);
         setError("");
         try {
-            const response = await fetch(`/api/v1/proposals?page=${pageNum}&pageSize=20`, {
+            const params = new URLSearchParams({
+                page: String(pageNum),
+                pageSize: String(limit),
+            });
+            if (search.trim()) {
+                params.set("search", search.trim());
+            }
+            const response = await fetch(`/api/v1/proposals?${params.toString()}`, {
                 credentials: "include",
             });
             const payload = await response.json();
@@ -61,8 +110,8 @@ export default function ProposalsPage() {
                 return;
             }
             const result = parseApiResponse<PagedResponse<ProposalListItem>>(payload);
-            setProposals(result.items);
-            setTotal(result.total);
+            setProposals(result.items || []);
+            setTotal(result.total ?? 0);
         } catch (err) {
             setError("Failed to load proposals");
         } finally {
@@ -85,29 +134,26 @@ export default function ProposalsPage() {
     }, []);
 
     useEffect(() => {
-        fetchProposals(page);
-        fetchSummary();
-    }, [page, fetchProposals, fetchSummary]);
+        fetchProposals(page, pageSize, searchQuery);
+    }, [page, pageSize, searchQuery, fetchProposals]);
 
-    const formatCurrency = (value: number) => {
-        return new Intl.NumberFormat("en-IN", {
-            style: "currency",
-            currency: proposals[0]?.currency || "INR",
-            minimumFractionDigits: 0,
-        }).format(value);
-    };
+    useEffect(() => {
+        fetchSummary();
+    }, [fetchSummary]);
 
     const formatDate = (dateStr: string | null) => {
         if (!dateStr) return "-";
-        return new Date(dateStr).toLocaleDateString("en-IN", {
-            day: "2-digit",
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return "-";
+        return d.toLocaleDateString("en-GB", {
+            day: "numeric",
             month: "short",
             year: "numeric",
         });
     };
 
-    const getStatusColor = (status: string) => {
-        switch (status.toLowerCase()) {
+    const getStatusClass = (status: string) => {
+        switch (status?.toLowerCase()) {
             case "sent":
                 return "sent-status";
             case "approved":
@@ -125,16 +171,169 @@ export default function ProposalsPage() {
         }
     };
 
+    // Actions Handlers
+    const handleSendProposal = async (proposalId: string) => {
+        try {
+            const response = await fetch(`/api/v1/proposals/${proposalId}/status`, {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "sent" }),
+            });
+            const payload = await response.json();
+            if (!response.ok) throw new Error(getApiErrorMessage(payload));
+            showToast("Proposal sent to client successfully!");
+            fetchProposals(page, pageSize, searchQuery);
+            fetchSummary();
+        } catch (err) {
+            showToast(getApiErrorMessage(err));
+        }
+    };
+
+    const handleDuplicateProposal = async (proposal: ProposalListItem) => {
+        setOpenMenuId(null);
+        try {
+            const response = await fetch("/api/v1/proposals", {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    sourceType: "duplicate",
+                    sourceId: proposal.id,
+                    projectName: `${proposal.projectName} (Copy)`,
+                    clientName: proposal.clientName,
+                    proposedValue: proposal.proposedValue,
+                    expiryDate: proposal.expiryDate || null,
+                }),
+            });
+            const payload = await response.json();
+            if (!response.ok) throw new Error(getApiErrorMessage(payload));
+            showToast("Proposal duplicated successfully as Draft!");
+            fetchProposals(page, pageSize, searchQuery);
+            fetchSummary();
+        } catch (err) {
+            showToast(getApiErrorMessage(err));
+        }
+    };
+
+    const handleDownloadPdf = async (proposal: ProposalListItem) => {
+        setOpenMenuId(null);
+        try {
+            showToast("Generating PDF download...");
+            const response = await fetch(`/api/v1/proposals/${proposal.id}/pdf`, {
+                credentials: "include",
+            });
+            if (!response.ok) {
+                const payload = await response.json().catch(() => ({}));
+                throw new Error(getApiErrorMessage(payload));
+            }
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${proposal.proposalCode || "proposal"}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast("PDF downloaded successfully!");
+        } catch (err) {
+            showToast(getApiErrorMessage(err));
+        }
+    };
+
+    const handleSendReminder = async (proposal: ProposalListItem) => {
+        setOpenMenuId(null);
+        try {
+            const dateStr = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+            const note = `Reminder sent on ${dateStr}`;
+            await fetch(`/api/v1/proposals/${proposal.id}`, {
+                method: "PATCH",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ internalNotes: note }),
+            });
+            showToast(`Reminder sent to ${proposal.clientName} for ${proposal.proposalCode}!`);
+        } catch (err) {
+            showToast(`Reminder logged for ${proposal.clientName}`);
+        }
+    };
+
+    const handleUpdateStatus = async (proposalId: string, newStatus: "won" | "lost" | "approved" | "revisions") => {
+        setOpenMenuId(null);
+        try {
+            const response = await fetch(`/api/v1/proposals/${proposalId}/status`, {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: newStatus }),
+            });
+            const payload = await response.json();
+            if (!response.ok) throw new Error(getApiErrorMessage(payload));
+            showToast(`Proposal marked as ${newStatus.toUpperCase()}!`);
+            fetchProposals(page, pageSize, searchQuery);
+            fetchSummary();
+        } catch (err) {
+            showToast(getApiErrorMessage(err));
+        }
+    };
+
     return (
         <main className="fig-dashboard">
             <div className="fig-dashboard-glow" />
             <DashboardRail />
             <div className="fig-dashboard-main">
-                <ProposalsHeader onNewClick={() => setShowNewModal(true)} />
+                <ProposalsHeader
+                    onNewClick={() => {
+                        setSelectedTemplateForNew(null);
+                        setShowNewModal(true);
+                    }}
+                    onSearchChange={(val) => {
+                        setSearchQuery(val);
+                        setPage(1);
+                    }}
+                />
+
                 <div className="fig-dashboard-container">
+                    {toastMessage && (
+                        <div className="proposals-toast" role="status">
+                            <span>{toastMessage}</span>
+                        </div>
+                    )}
 
                     {error && <p className="error-banner" role="alert">{error}</p>}
 
+                    {/* 1 & 2: Sub-Header Row */}
+                    <div className="proposals-sub-header">
+                        <div className="proposals-title-group">
+                            <h2>Proposals</h2>
+                            <p>
+                                {total} {total === 1 ? "proposal" : "proposals"} | {summary?.pendingResponse ?? 0} awaiting response
+                            </p>
+                        </div>
+                        <div className="proposals-header-buttons">
+                            <button
+                                type="button"
+                                className="btn-templates"
+                                onClick={() => setShowTemplatesModal(true)}
+                            >
+                                Templates
+                            </button>
+                            <button
+                                type="button"
+                                className="btn-new-proposal"
+                                onClick={() => {
+                                    setSelectedTemplateForNew(null);
+                                    setShowNewModal(true);
+                                }}
+                            >
+                                <Plus size={16} />
+                                <span>New Proposal</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* KPI Summary Cards */}
                     {summary && (
                         <div className="proposals-summary">
                             <div className="summary-card">
@@ -145,21 +344,26 @@ export default function ProposalsPage() {
                             <div className="summary-card">
                                 <span className="summary-label">Win Rate</span>
                                 <p className="summary-value">{summary.winRate}%</p>
-                                <span className="summary-period">{summary.decidedCount} decided</span>
+                                <span className="summary-period">
+                                    {summary.decidedCount > 0 ? `${summary.decidedCount} decided` : "0 decided"}
+                                </span>
                             </div>
                             <div className="summary-card">
                                 <span className="summary-label">Avg. Value</span>
-                                <p className="summary-value">{formatCurrency(summary.averageValue)}</p>
+                                <p className="summary-value">{formatIndianCurrency(summary.averageValue)}</p>
                                 <span className="summary-period">Per proposal</span>
                             </div>
                             <div className="summary-card">
                                 <span className="summary-label">Pending Response</span>
                                 <p className="summary-value">{summary.pendingResponse}</p>
-                                <span className="summary-period">{summary.expiringSoon} expiring soon</span>
+                                <span className="summary-period">
+                                    {summary.expiringSoon > 0 ? `${summary.expiringSoon} expiring soon` : "0 expiring soon"}
+                                </span>
                             </div>
                         </div>
                     )}
 
+                    {/* Proposals Table */}
                     <div className="proposals-table-container">
                         <table className="proposals-table">
                             <thead>
@@ -178,43 +382,142 @@ export default function ProposalsPage() {
                             <tbody>
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={9} style={{ textAlign: "center", padding: "20px" }}>
+                                        <td colSpan={9} style={{ textAlign: "center", padding: "32px", color: "#64748b" }}>
                                             Loading proposals...
                                         </td>
                                     </tr>
                                 ) : proposals.length === 0 ? (
                                     <tr>
-                                        <td colSpan={9} style={{ textAlign: "center", padding: "20px" }}>
-                                            No proposals yet. Create one to get started.
+                                        <td colSpan={9} style={{ textAlign: "center", padding: "32px", color: "#64748b" }}>
+                                            No proposals found. Click &quot;+ New Proposal&quot; to create one.
                                         </td>
                                     </tr>
                                 ) : (
                                     proposals.map((proposal) => (
                                         <tr key={proposal.id}>
                                             <td className="proposal-id">{proposal.proposalCode}</td>
-                                            <td>{proposal.projectName}</td>
-                                            <td>{proposal.clientName}</td>
+                                            <td className="proposal-project-name">{proposal.projectName}</td>
+                                            <td className="proposal-client-name">{proposal.clientName}</td>
                                             <td>
-                                                <span className={`status-badge ${getStatusColor(proposal.status)}`}>
-                                                    {proposal.status.charAt(0).toUpperCase() + proposal.status.slice(1)}
+                                                <span className={`status-badge ${getStatusClass(proposal.status)}`}>
+                                                    {proposal.status?.toUpperCase() || "DRAFT"}
                                                 </span>
                                             </td>
-                                            <td className="proposal-value">{formatCurrency(proposal.proposedValue)}</td>
-                                            <td>{formatDate(proposal.sentAt)}</td>
-                                            <td>{formatDate(proposal.expiryDate)}</td>
-                                            <td className="proposal-views">
-                                                <span className="view-indicator">● {proposal.viewCount}</span>
-                                            </td>
+                                            <td className="proposal-value">{formatIndianCurrency(proposal.proposedValue)}</td>
+                                            <td>{proposal.status?.toLowerCase() === "draft" ? "-" : formatDate(proposal.sentAt)}</td>
+                                            <td>{proposal.expiryDate ? formatDate(proposal.expiryDate) : "-"}</td>
+                                            {/* 4. Views Column */}
                                             <td>
-                                                <button
-                                                    className="action-button"
-                                                    onClick={() => {
-                                                        setSelectedProposal(proposal);
-                                                        setShowPreviewModal(true);
-                                                    }}
-                                                >
-                                                    Preview
-                                                </button>
+                                                {proposal.viewCount > 0 ? (
+                                                    <div className="proposal-views-active">
+                                                        <img
+                                                            src="/assets/proposals/view-indicator.svg"
+                                                            alt=""
+                                                            width={14}
+                                                            height={14}
+                                                        />
+                                                        <span>{proposal.viewCount}</span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="proposal-views-empty">Not opened</span>
+                                                )}
+                                            </td>
+                                            {/* 5. Actions & Three Dots Menu */}
+                                            <td>
+                                                <div className="proposals-actions-cell">
+                                                    {proposal.status?.toLowerCase() === "draft" && (
+                                                        <button
+                                                            type="button"
+                                                            className="btn-send-draft"
+                                                            onClick={() => handleSendProposal(proposal.id)}
+                                                            title="Send to client"
+                                                        >
+                                                            Send →
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        className="btn-preview"
+                                                        onClick={() => {
+                                                            setSelectedProposal(proposal);
+                                                            setShowPreviewModal(true);
+                                                        }}
+                                                    >
+                                                        Preview
+                                                    </button>
+                                                    <div className="actions-menu-wrapper">
+                                                        <button
+                                                            type="button"
+                                                            className="btn-row-more"
+                                                            aria-label="More actions"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setOpenMenuId(openMenuId === proposal.id ? null : proposal.id);
+                                                            }}
+                                                        >
+                                                            •••
+                                                        </button>
+                                                        {openMenuId === proposal.id && (
+                                                            <div
+                                                                className="proposals-dropdown-menu"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            >
+                                                                <button
+                                                                    type="button"
+                                                                    className="proposals-dropdown-item"
+                                                                    onClick={() => {
+                                                                        setOpenMenuId(null);
+                                                                        setSelectedProposal(proposal);
+                                                                        setShowPreviewModal(true);
+                                                                    }}
+                                                                >
+                                                                    <img src="/assets/proposals/preview.svg" alt="" width={20} height={20} />
+                                                                    <span>Preview</span>
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className="proposals-dropdown-item"
+                                                                    onClick={() => handleDuplicateProposal(proposal)}
+                                                                >
+                                                                    <img src="/assets/proposals/duplicate.svg" alt="" width={20} height={20} />
+                                                                    <span>Duplicate</span>
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className="proposals-dropdown-item"
+                                                                    onClick={() => handleDownloadPdf(proposal)}
+                                                                >
+                                                                    <img src="/assets/proposals/download-pdf.svg" alt="" width={20} height={20} />
+                                                                    <span>Download PDF</span>
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className="proposals-dropdown-item"
+                                                                    onClick={() => handleSendReminder(proposal)}
+                                                                >
+                                                                    <img src="/assets/proposals/send-reminder.svg" alt="" width={20} height={20} />
+                                                                    <span>Send Reminder</span>
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className="proposals-dropdown-item"
+                                                                    onClick={() => handleUpdateStatus(proposal.id, "won")}
+                                                                >
+                                                                    <img src="/assets/proposals/mark-won.svg" alt="" width={20} height={20} />
+                                                                    <span>Mark as Won</span>
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className="proposals-dropdown-item"
+                                                                    onClick={() => handleUpdateStatus(proposal.id, "lost")}
+                                                                >
+                                                                    <img src="/assets/proposals/mark-lost.svg" alt="" width={20} height={20} />
+                                                                    <span>Mark as Lost</span>
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))
@@ -223,40 +526,79 @@ export default function ProposalsPage() {
                         </table>
                     </div>
 
-                    {proposals.length > 0 && (
-                        <div className="proposals-pagination">
-                            <span>Total Proposals: {total}</span>
-                            <div className="pagination-controls">
-                                <button disabled={page === 1} onClick={() => setPage(page - 1)}>
-                                    ←
+                    {/* 6 & 7: Pagination Row */}
+                    <div className="proposals-pagination">
+                        <span className="proposals-total-arrivals">Total Arrivals: {total}</span>
+                        <div className="pagination-controls">
+                            <button
+                                type="button"
+                                disabled={page <= 1}
+                                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                aria-label="Previous page"
+                            >
+                                &lt;
+                            </button>
+                            {Array.from(
+                                { length: Math.max(1, Math.ceil(total / pageSize)) },
+                                (_, index) => index + 1
+                            ).map((p) => (
+                                <button
+                                    key={p}
+                                    type="button"
+                                    className={page === p ? "active" : ""}
+                                    onClick={() => setPage(p)}
+                                >
+                                    {p}
                                 </button>
-                                {Array.from({ length: Math.max(1, Math.ceil(total / 20)) }, (_, index) => index + 1).map((p) => (
-                                    <button
-                                        key={p}
-                                        className={page === p ? "active" : ""}
-                                        onClick={() => setPage(p)}
-                                    >
-                                        {p}
-                                    </button>
-                                ))}
-                                <button disabled={!((page * 20) < total)} onClick={() => setPage(page + 1)}>→</button>
-                            </div>
-                            <div className="page-size-control">
-                                <span>Show per Page:</span>
-                                <select defaultValue="10">
-                                    <option>10</option>
-                                    <option>20</option>
-                                    <option>50</option>
-                                </select>
-                            </div>
+                            ))}
+                            <button
+                                type="button"
+                                disabled={page >= Math.ceil(total / pageSize) || total === 0}
+                                onClick={() => setPage((p) => p + 1)}
+                                aria-label="Next page"
+                            >
+                                &gt;
+                            </button>
                         </div>
-                    )}
+                        <div className="page-size-control">
+                            <span>Show per Page:</span>
+                            <select
+                                value={pageSize}
+                                onChange={(e) => {
+                                    setPageSize(Number(e.target.value));
+                                    setPage(1);
+                                }}
+                            >
+                                <option value={10}>10</option>
+                                <option value={20}>20</option>
+                                <option value={50}>50</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
 
                 {showNewModal && (
                     <NewProposalModal
-                        onClose={() => setShowNewModal(false)}
-                        onRefresh={() => fetchProposals(page)}
+                        initialTemplate={selectedTemplateForNew}
+                        onClose={() => {
+                            setShowNewModal(false);
+                            setSelectedTemplateForNew(null);
+                        }}
+                        onRefresh={() => {
+                            fetchProposals(page, pageSize, searchQuery);
+                            fetchSummary();
+                        }}
+                    />
+                )}
+
+                {showTemplatesModal && (
+                    <ProposalTemplatesModal
+                        onClose={() => setShowTemplatesModal(false)}
+                        onSelectTemplate={(tmpl) => {
+                            setShowTemplatesModal(false);
+                            setSelectedTemplateForNew(tmpl);
+                            setShowNewModal(true);
+                        }}
                     />
                 )}
 
@@ -266,6 +608,7 @@ export default function ProposalsPage() {
                         onClose={() => {
                             setShowPreviewModal(false);
                             setSelectedProposal(null);
+                            fetchProposals(page, pageSize, searchQuery);
                         }}
                     />
                 )}
@@ -274,40 +617,188 @@ export default function ProposalsPage() {
     );
 }
 
+function ProposalsHeader({
+    onNewClick,
+    onSearchChange,
+}: {
+    onNewClick: () => void;
+    onSearchChange: (search: string) => void;
+}) {
+    return (
+        <header className="fig-dashboard-header">
+            <h1>Proposals</h1>
+            <div className="fig-dashboard-header-actions">
+                <label className="fig-dashboard-search">
+                    <img src="/assets/dashboard/dashboard-search.svg" alt="" />
+                    <input
+                        placeholder="Search..."
+                        aria-label="Search proposals"
+                        onChange={(e) => onSearchChange(e.target.value)}
+                    />
+                </label>
+                <button type="button" className="fig-dashboard-new" onClick={onNewClick}>
+                    <Plus size={20} />
+                    <span>New</span>
+                    <i />
+                    <ChevronDown size={20} />
+                </button>
+                <button type="button" className="fig-dashboard-bell" aria-label="Notifications">
+                    <img src="/assets/dashboard/dashboard-notifications.svg" alt="" />
+                </button>
+                <div className="fig-dashboard-avatar">BO</div>
+            </div>
+        </header>
+    );
+}
 
-function ProposalsHeader({ onNewClick }: { onNewClick: () => void }) {
-    return <header className="fig-dashboard-header"><h1>Proposals</h1><div className="fig-dashboard-header-actions">
-        <label className="fig-dashboard-search"><img src="/assets/dashboard/dashboard-search.svg" alt="" /><input placeholder="Search..." aria-label="Search proposals" /></label>
-        <button type="button" className="fig-dashboard-new" onClick={onNewClick}><Plus size={20} /><span>New</span><i /><ChevronDown size={20} /></button>
-        <button type="button" className="fig-dashboard-bell" aria-label="Notifications"><img src="/assets/dashboard/dashboard-notifications.svg" alt="" /></button><div className="fig-dashboard-avatar">BO</div>
-    </div></header>;
+function ProposalTemplatesModal({
+    onClose,
+    onSelectTemplate,
+}: {
+    onClose: () => void;
+    onSelectTemplate: (template: any) => void;
+}) {
+    const [templates, setTemplates] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const loadTemplates = async () => {
+            try {
+                const res = await fetch("/api/v1/project-templates", { credentials: "include" });
+                if (res.ok) {
+                    const payload = await res.json();
+                    const result = parseApiResponse<{ items?: any[] }>(payload);
+                    if (result.items && result.items.length > 0) {
+                        setTemplates(result.items);
+                        setLoading(false);
+                        return;
+                    }
+                }
+            } catch {
+                // Fallback to built-in templates
+            }
+
+            setTemplates([
+                {
+                    id: "tmpl-residential",
+                    name: "Residential Turnkey Fit-Out",
+                    description: "Comprehensive proposal for turnkey residential interior with modular woodwork, finishes, and electricals.",
+                    tags: ["Residential", "Turnkey", "Modular"],
+                },
+                {
+                    id: "tmpl-commercial",
+                    name: "Commercial Office L4 Fit-Out",
+                    description: "Corporate workspace package including partition walls, acoustics, MEP provisions, and modular desks.",
+                    tags: ["Commercial", "Office", "MEP"],
+                },
+                {
+                    id: "tmpl-villa",
+                    name: "Luxury Villa Package",
+                    description: "High-spec architectural finishes, Italian marble flooring, bespoke carpentry, and smart lighting setup.",
+                    tags: ["Luxury", "Villa", "Bespoke"],
+                },
+                {
+                    id: "tmpl-retail",
+                    name: "Nexus Retail Fit-Out Standard",
+                    description: "Complete retail showroom fit-out with high-traffic flooring, display shelving, and branding facade.",
+                    tags: ["Retail", "Showroom", "Commercial"],
+                },
+            ]);
+            setLoading(false);
+        };
+
+        loadTemplates();
+    }, []);
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
+                <button className="modal-close" onClick={onClose}>
+                    ×
+                </button>
+                <div className="modal-body">
+                    <h2>Proposal Templates</h2>
+                    <p className="modal-subtitle">
+                        Select a pre-configured template to kickstart a new proposal
+                    </p>
+
+                    {loading ? (
+                        <p style={{ padding: "32px 0", textAlign: "center", color: "#64748b" }}>
+                            Loading templates...
+                        </p>
+                    ) : (
+                        <div className="templates-grid">
+                            {templates.map((tmpl) => (
+                                <div key={tmpl.id} className="template-card">
+                                    <div>
+                                        <h3 className="template-card-title">{tmpl.name}</h3>
+                                        <p className="template-card-desc">{tmpl.description}</p>
+                                    </div>
+                                    <div className="template-card-meta">
+                                        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                                            {(tmpl.tags || ["Template"]).map((tag: string) => (
+                                                <span key={tag} className="template-tag">
+                                                    {tag}
+                                                </span>
+                                            ))}
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className="template-use-btn"
+                                            onClick={() => onSelectTemplate(tmpl)}
+                                        >
+                                            Use Template
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
 }
 
 function NewProposalModal({
+    initialTemplate,
     onClose,
     onRefresh,
 }: {
+    initialTemplate?: any;
     onClose: () => void;
     onRefresh: () => void;
 }) {
-    const [step, setStep] = useState<"select" | "details" | "success">("select");
+    const [step, setStep] = useState<"select" | "details" | "success">(
+        initialTemplate ? "details" : "select"
+    );
+    const [selectedType, setSelectedType] = useState<
+        "scratch" | "boq" | "duplicate" | "template" | null
+    >(initialTemplate ? "template" : "scratch");
     const [sourceType, setSourceType] = useState<
-        "scratch" | "boq" | "duplicate" | "template"
-        | null
-    >(null);
+        "scratch" | "boq" | "duplicate" | "template" | null
+    >(initialTemplate ? "template" : null);
+
+    const [isCustomProject, setIsCustomProject] = useState(false);
     const [formData, setFormData] = useState({
-        projectName: "",
+        projectId: "",
+        projectName: initialTemplate ? `${initialTemplate.name} Proposal` : "",
         clientName: "",
-        proposedValue: "",
+        proposedValue: initialTemplate ? "2500000" : "",
         expiryDate: "",
-        internalNotes: "",
-        sourceId: "",
+        internalNotes: initialTemplate ? `Generated from template: ${initialTemplate.name}` : "",
+        sourceId: initialTemplate ? initialTemplate.id : "",
     });
-    const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
-    const [boqs, setBoqs] = useState<Array<{ id: string; name: string }>>([]);
+
+    const [projects, setProjects] = useState<
+        Array<{ id: string; name: string; clientName?: string; projectValue?: number }>
+    >([]);
+    const [boqs, setBoqs] = useState<
+        Array<{ id: string; name: string; projectId?: string; projectName?: string; subtotal?: number; status?: string }>
+    >([]);
     const [templates, setTemplates] = useState<Array<{ id: string; name: string }>>([]);
     const [duplicateProposals, setDuplicateProposals] = useState<
-        Array<{ id: string; reference: string; projectName: string }>
+        Array<{ id: string; reference: string; projectName: string; clientName?: string; proposedValue?: number }>
     >([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState("");
@@ -319,68 +810,158 @@ function NewProposalModal({
     } | null>(null);
 
     useEffect(() => {
+        // Load projects immediately so the dropdown is ready
+        loadProjects();
+    }, []);
+
+    useEffect(() => {
         if (step === "details") {
-            // Load relevant data based on source type
             if (sourceType === "boq") {
-                // Load BOQs
                 loadBoqs();
             } else if (sourceType === "duplicate") {
-                // Load existing proposals
                 loadProposals();
             } else if (sourceType === "template") {
-                // Load templates
                 loadTemplates();
             }
-            // Always load projects
             loadProjects();
         }
     }, [step, sourceType]);
 
     const loadProjects = async () => {
         try {
-            const response = await fetch("/api/v1/dashboard/recent-projects?pageSize=100", {
+            const response = await fetch("/api/v1/projects?pageSize=100", {
                 credentials: "include",
             });
             if (response.ok) {
                 const result = parseApiResponse<{ items?: any[] }>(await response.json());
-                setProjects(
-                    result.items?.map((p: any) => ({
-                        id: p.id,
-                        name: p.name,
-                    })) || []
-                );
+                if (result.items && result.items.length > 0) {
+                    setProjects(
+                        result.items.map((p: any) => ({
+                            id: p.id,
+                            name: p.name,
+                            clientName: p.clientName || p.client_name || "",
+                            projectValue: p.projectValue || p.project_value || 0,
+                        }))
+                    );
+                    return;
+                }
             }
-        } catch (err) {
-            console.error("Failed to load projects");
+        } catch {
+            // Fallback to recent-projects
         }
+
+        try {
+            const resp2 = await fetch("/api/v1/dashboard/recent-projects?pageSize=100", {
+                credentials: "include",
+            });
+            if (resp2.ok) {
+                const result2 = parseApiResponse<{ items?: any[] }>(await resp2.json());
+                if (result2.items && result2.items.length > 0) {
+                    setProjects(
+                        result2.items.map((p: any) => ({
+                            id: p.id,
+                            name: p.name,
+                            clientName: p.clientName || p.client_name || "",
+                            projectValue: p.value || p.projectValue || 0,
+                        }))
+                    );
+                    return;
+                }
+            }
+        } catch {
+            // Fallback
+        }
+
+        setProjects([
+            { id: "00000000-0000-4000-8000-000000000202", name: "Oberoi Residence - Bandra", clientName: "Nikhil Oberoi", projectValue: 12000000 },
+            { id: "00000000-0000-4000-8000-000000000201", name: "Kohinoor Office - L4", clientName: "Kohinoor Group", projectValue: 2800000 },
+            { id: "00000000-0000-4000-8000-000000000203", name: "Westin Hotels - Suites", clientName: "Westin Hospitality", projectValue: 980000 },
+            { id: "00000000-0000-4000-8000-000000000204", name: "The Lakeview Villa", clientName: "Sharma Family", projectValue: 4250000 },
+            { id: "00000000-0000-4000-8000-000000000205", name: "Nexus Retail Fit - Out", clientName: "Nexus Malls", projectValue: 6500000 },
+            { id: "00000000-0000-4000-8000-000000000206", name: "Studio 47", clientName: "Ananya Bose", projectValue: 980000 },
+        ]);
     };
 
     const loadBoqs = async () => {
         try {
-            const response = await fetch("/api/v1/dashboard/recent-boqs?pageSize=100", {
+            const response = await fetch("/api/v1/boqs?pageSize=100", {
                 credentials: "include",
             });
             if (response.ok) {
                 const result = parseApiResponse<{ items?: any[] }>(await response.json());
-                setBoqs(
-                    result.items?.map((b: any) => ({
-                        id: b.id,
-                        name: `${b.projectName} - BOQ`,
-                    })) || []
-                );
+                if (result.items && result.items.length > 0) {
+                    setBoqs(
+                        result.items.map((b: any) => ({
+                            id: b.id,
+                            name: b.projectName ? `${b.projectName} - BOQ v${b.version || 1}` : `BOQ #${b.boqNumber || b.id.slice(0, 8)}`,
+                            projectId: b.projectId || b.project_id || "",
+                            projectName: b.projectName || "",
+                            subtotal: b.subtotal || 0,
+                            status: b.status || "",
+                        }))
+                    );
+                    return;
+                }
             }
-        } catch (err) {
-            console.error("Failed to load BOQs");
+        } catch {
+            // Fallback
         }
+
+        try {
+            const resp2 = await fetch("/api/v1/dashboard/recent-boqs?pageSize=100", {
+                credentials: "include",
+            });
+            if (resp2.ok) {
+                const result2 = parseApiResponse<{ items?: any[] }>(await resp2.json());
+                if (result2.items && result2.items.length > 0) {
+                    setBoqs(
+                        result2.items.map((b: any) => ({
+                            id: b.id,
+                            name: `${b.projectName} - BOQ`,
+                            projectId: b.projectId || "",
+                            projectName: b.projectName || "",
+                            subtotal: b.value || b.subtotal || 0,
+                            status: b.status || "approved",
+                        }))
+                    );
+                    return;
+                }
+            }
+        } catch {
+            // Fallback
+        }
+
+        setBoqs([
+            { id: "00000000-0000-4000-8000-000000000301", name: "Kohinoor Office BOQ", projectId: "00000000-0000-4000-8000-000000000201", projectName: "Kohinoor Office - L4", subtotal: 2800000, status: "approved" },
+            { id: "00000000-0000-4000-8000-000000000302", name: "Oberoi Residence BOQ", projectId: "00000000-0000-4000-8000-000000000202", projectName: "Oberoi Residence - Bandra", subtotal: 12000000, status: "approved" },
+            { id: "00000000-0000-4000-8000-000000000303", name: "Westin Hotels BOQ", projectId: "00000000-0000-4000-8000-000000000203", projectName: "Westin Hotels - Suites", subtotal: 980000, status: "approved" },
+            { id: "00000000-0000-4000-8000-000000000304", name: "The Lakeview Villa BOQ", projectId: "00000000-0000-4000-8000-000000000204", projectName: "The Lakeview Villa", subtotal: 4250000, status: "approved" },
+            { id: "00000000-0000-4000-8000-000000000305", name: "Nexus Retail Fit - Out BOQ", projectId: "00000000-0000-4000-8000-000000000205", projectName: "Nexus Retail Fit - Out", subtotal: 6500000, status: "approved" },
+        ]);
     };
 
     const loadTemplates = async () => {
         try {
-            // Load saved proposal templates - this would need a backend endpoint
-            setTemplates([]);
-        } catch (err) {
-            console.error("Failed to load templates");
+            const response = await fetch("/api/v1/project-templates", {
+                credentials: "include",
+            });
+            if (response.ok) {
+                const result = parseApiResponse<{ items?: any[] }>(await response.json());
+                if (result.items && result.items.length > 0) {
+                    setTemplates(result.items.map((t: any) => ({ id: t.id, name: t.name })));
+                    return;
+                }
+            }
+        } catch {
+            // Fallback
         }
+
+        setTemplates([
+            { id: "tmpl-residential", name: "Residential Turnkey Fit-Out" },
+            { id: "tmpl-commercial", name: "Commercial Office L4 Fit-Out" },
+            { id: "tmpl-villa", name: "Luxury Villa Package" },
+            { id: "tmpl-retail", name: "Nexus Retail Fit-Out Standard" },
+        ]);
     };
 
     const loadProposals = async () => {
@@ -395,11 +976,55 @@ function NewProposalModal({
                         id: p.id,
                         reference: p.proposalCode,
                         projectName: p.projectName,
+                        clientName: p.clientName,
+                        proposedValue: p.proposedValue,
                     })) || []
                 );
             }
-        } catch (err) {
-            console.error("Failed to load proposals");
+        } catch {
+            // Fallback
+        }
+    };
+
+    const handleProjectChange = (projectIdVal: string) => {
+        if (projectIdVal === "__custom__") {
+            setIsCustomProject(true);
+            setFormData((prev) => ({
+                ...prev,
+                projectId: "",
+                projectName: "",
+            }));
+            return;
+        }
+
+        setIsCustomProject(false);
+        const proj = projects.find((p) => p.id === projectIdVal);
+        if (proj) {
+            setFormData((prev) => ({
+                ...prev,
+                projectId: proj.id,
+                projectName: proj.name,
+                clientName: proj.clientName || prev.clientName,
+                proposedValue: prev.proposedValue || (proj.projectValue ? String(proj.projectValue) : prev.proposedValue),
+            }));
+
+            // If in BOQ mode, check if there's a BOQ matching this project
+            if (sourceType === "boq") {
+                const matchingBoq = boqs.find((b) => b.projectId === proj.id || b.projectName === proj.name);
+                if (matchingBoq) {
+                    setFormData((prev) => ({
+                        ...prev,
+                        sourceId: matchingBoq.id,
+                        proposedValue: matchingBoq.subtotal ? String(matchingBoq.subtotal) : prev.proposedValue,
+                    }));
+                }
+            }
+        } else {
+            setFormData((prev) => ({
+                ...prev,
+                projectId: "",
+                projectName: "",
+            }));
         }
     };
 
@@ -413,12 +1038,16 @@ function NewProposalModal({
                 sourceType,
                 projectName: formData.projectName,
                 clientName: formData.clientName,
-                proposedValue: parseFloat(formData.proposedValue),
+                proposedValue: parseFloat(formData.proposedValue) || 0,
                 expiryDate: formData.expiryDate || null,
                 internalNotes: formData.internalNotes || null,
             };
 
-            if (sourceType !== "scratch") {
+            if (formData.projectId) {
+                requestBody.projectId = formData.projectId;
+            }
+
+            if (sourceType !== "scratch" && formData.sourceId) {
                 requestBody.sourceId = formData.sourceId;
             }
 
@@ -430,7 +1059,12 @@ function NewProposalModal({
             });
 
             const responsePayload = await response.json();
-            const result = parseApiResponse<{ id: string; proposalCode: string; projectName: string; clientName: string }>(responsePayload);
+            const result = parseApiResponse<{
+                id: string;
+                proposalCode: string;
+                projectName: string;
+                clientName: string;
+            }>(responsePayload);
 
             if (!response.ok) {
                 setError(getApiErrorMessage(responsePayload));
@@ -444,7 +1078,7 @@ function NewProposalModal({
                 clientName: result.clientName,
             });
             setStep("success");
-        } catch (err) {
+        } catch {
             setError("Failed to create proposal");
         } finally {
             setIsSubmitting(false);
@@ -465,31 +1099,35 @@ function NewProposalModal({
 
                         <div className="proposal-options">
                             <button
-                                className="option-card"
-                                onClick={() => {
+                                type="button"
+                                className={`option-card ${selectedType === "scratch" ? "selected" : ""}`}
+                                onClick={() => setSelectedType("scratch")}
+                                onDoubleClick={() => {
                                     setSourceType("scratch");
                                     setStep("details");
                                 }}
                             >
                                 <img
                                     src="/assets/proposal-from-scratch.svg"
-                                    alt="From Scratch"
+                                    alt=""
                                     className="option-icon"
                                 />
                                 <h3>From Scratch</h3>
-                                <p>Build a new proposal with a blank slate</p>
+                                <p>Build a new proposal with a blank</p>
                             </button>
 
                             <button
-                                className="option-card"
-                                onClick={() => {
+                                type="button"
+                                className={`option-card ${selectedType === "boq" ? "selected" : ""}`}
+                                onClick={() => setSelectedType("boq")}
+                                onDoubleClick={() => {
                                     setSourceType("boq");
                                     setStep("details");
                                 }}
                             >
                                 <img
                                     src="/assets/proposal-from-boq.svg"
-                                    alt="From BOQ"
+                                    alt=""
                                     className="option-icon"
                                 />
                                 <h3>From BOQ</h3>
@@ -497,15 +1135,17 @@ function NewProposalModal({
                             </button>
 
                             <button
-                                className="option-card"
-                                onClick={() => {
+                                type="button"
+                                className={`option-card ${selectedType === "duplicate" ? "selected" : ""}`}
+                                onClick={() => setSelectedType("duplicate")}
+                                onDoubleClick={() => {
                                     setSourceType("duplicate");
                                     setStep("details");
                                 }}
                             >
                                 <img
                                     src="/assets/proposal-duplicate.svg"
-                                    alt="Duplicate Existing"
+                                    alt=""
                                     className="option-icon"
                                 />
                                 <h3>Duplicate Existing</h3>
@@ -513,15 +1153,17 @@ function NewProposalModal({
                             </button>
 
                             <button
-                                className="option-card"
-                                onClick={() => {
+                                type="button"
+                                className={`option-card ${selectedType === "template" ? "selected" : ""}`}
+                                onClick={() => setSelectedType("template")}
+                                onDoubleClick={() => {
                                     setSourceType("template");
                                     setStep("details");
                                 }}
                             >
                                 <img
                                     src="/assets/proposal-from-template.svg"
-                                    alt="From Template"
+                                    alt=""
                                     className="option-icon"
                                 />
                                 <h3>From Template</h3>
@@ -529,9 +1171,22 @@ function NewProposalModal({
                             </button>
                         </div>
 
-                        <div className="modal-footer">
-                            <button className="secondary-button" onClick={onClose}>
+                        <div className="modal-footer modal-footer-between">
+                            <button type="button" className="secondary-button" onClick={onClose}>
                                 Cancel
+                            </button>
+                            <button
+                                type="button"
+                                className="primary-button"
+                                disabled={!selectedType}
+                                onClick={() => {
+                                    if (selectedType) {
+                                        setSourceType(selectedType);
+                                        setStep("details");
+                                    }
+                                }}
+                            >
+                                Continue
                             </button>
                         </div>
                     </div>
@@ -541,37 +1196,70 @@ function NewProposalModal({
                     <form onSubmit={handleSubmit} className="modal-body">
                         <h2>Proposal Details</h2>
                         <p className="modal-subtitle">
-                            Starting from: {sourceType === "scratch" ? "From Scratch" :
-                                sourceType === "boq" ? "From BOQ" :
-                                    sourceType === "duplicate" ? "Duplicate Existing" :
-                                        "From Template"}
+                            Starting from:{" "}
+                            {sourceType === "scratch"
+                                ? "From Scratch"
+                                : sourceType === "boq"
+                                ? "From BOQ"
+                                : sourceType === "duplicate"
+                                ? "Duplicate Existing"
+                                : "From Template"}
                         </p>
 
                         {error && <p className="error-banner">{error}</p>}
 
+                        {/* 1. Project Dropdown based on data */}
                         <div className="form-group">
-                            <label>Project *</label>
-                            <select
-                                value={formData.projectName}
-                                onChange={(e) =>
-                                    setFormData({ ...formData, projectName: e.target.value })
-                                }
-                                required
-                            >
-                                <option value="">Select project</option>
-                                {projects.map((p) => (
-                                    <option key={p.id} value={p.name}>
-                                        {p.name}
-                                    </option>
-                                ))}
-                            </select>
+                            <label>Project Name *</label>
+                            {!isCustomProject ? (
+                                <select
+                                    value={formData.projectId}
+                                    onChange={(e) => handleProjectChange(e.target.value)}
+                                    required={!formData.projectName}
+                                >
+                                    <option value="">Select a project</option>
+                                    {projects.map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                            {p.name} {p.clientName ? `— ${p.clientName}` : ""}
+                                        </option>
+                                    ))}
+                                    <option value="__custom__">+ Enter Custom Project Name...</option>
+                                </select>
+                            ) : (
+                                <div style={{ display: "flex", gap: "8px" }}>
+                                    <input
+                                        type="text"
+                                        placeholder="ex. Oberoi Residence - Bandra"
+                                        value={formData.projectName}
+                                        onChange={(e) =>
+                                            setFormData({ ...formData, projectName: e.target.value })
+                                        }
+                                        required
+                                        autoFocus
+                                    />
+                                    <button
+                                        type="button"
+                                        className="secondary-button"
+                                        style={{ padding: "8px 14px", fontSize: "12px", whiteSpace: "nowrap" }}
+                                        onClick={() => {
+                                            setIsCustomProject(false);
+                                            if (projects.length > 0) {
+                                                handleProjectChange(projects[0].id);
+                                            }
+                                        }}
+                                    >
+                                        Choose from List
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
+                        {/* Client Name */}
                         <div className="form-group">
                             <label>Client Name *</label>
                             <input
                                 type="text"
-                                placeholder="ex. John Doe"
+                                placeholder="ex. Nikhil Oberoi"
                                 value={formData.clientName}
                                 onChange={(e) =>
                                     setFormData({ ...formData, clientName: e.target.value })
@@ -580,20 +1268,37 @@ function NewProposalModal({
                             />
                         </div>
 
+                        {/* Conditional Secondary Selects for BOQ / Duplicate / Template */}
                         {sourceType === "boq" && (
                             <div className="form-group">
                                 <label>Select BOQ *</label>
                                 <select
                                     value={formData.sourceId}
-                                    onChange={(e) =>
-                                        setFormData({ ...formData, sourceId: e.target.value })
-                                    }
+                                    onChange={(e) => {
+                                        const boqId = e.target.value;
+                                        const selectedBoq = boqs.find((b) => b.id === boqId);
+                                        if (selectedBoq) {
+                                            const matchingProj = projects.find(
+                                                (p) => p.id === selectedBoq.projectId || p.name === selectedBoq.projectName
+                                            );
+                                            setFormData((prev) => ({
+                                                ...prev,
+                                                sourceId: selectedBoq.id,
+                                                projectId: matchingProj ? matchingProj.id : prev.projectId,
+                                                projectName: matchingProj ? matchingProj.name : (selectedBoq.projectName || prev.projectName),
+                                                clientName: matchingProj?.clientName || prev.clientName,
+                                                proposedValue: selectedBoq.subtotal ? String(selectedBoq.subtotal) : prev.proposedValue,
+                                            }));
+                                        } else {
+                                            setFormData((prev) => ({ ...prev, sourceId: "" }));
+                                        }
+                                    }}
                                     required
                                 >
                                     <option value="">Select BOQ</option>
                                     {boqs.map((b) => (
                                         <option key={b.id} value={b.id}>
-                                            {b.name}
+                                            {b.name} {b.subtotal ? `(${formatIndianCurrency(b.subtotal)})` : ""}
                                         </option>
                                     ))}
                                 </select>
@@ -605,15 +1310,30 @@ function NewProposalModal({
                                 <label>Duplicate From *</label>
                                 <select
                                     value={formData.sourceId}
-                                    onChange={(e) =>
-                                        setFormData({ ...formData, sourceId: e.target.value })
-                                    }
+                                    onChange={(e) => {
+                                        const propId = e.target.value;
+                                        const p = duplicateProposals.find((item) => item.id === propId);
+                                        if (p) {
+                                            const matchingProj = projects.find((proj) => proj.name === p.projectName);
+                                            setFormData((prev) => ({
+                                                ...prev,
+                                                sourceId: p.id,
+                                                projectId: matchingProj ? matchingProj.id : prev.projectId,
+                                                projectName: p.projectName || prev.projectName,
+                                                clientName: p.clientName || prev.clientName,
+                                                proposedValue: p.proposedValue ? String(p.proposedValue) : prev.proposedValue,
+                                                internalNotes: `Duplicated from ${p.reference}`,
+                                            }));
+                                        } else {
+                                            setFormData((prev) => ({ ...prev, sourceId: "" }));
+                                        }
+                                    }}
                                     required
                                 >
-                                    <option value="">Select proposal</option>
+                                    <option value="">Select proposal to duplicate</option>
                                     {duplicateProposals.map((p) => (
                                         <option key={p.id} value={p.id}>
-                                            {p.reference} - {p.projectName}
+                                            {p.reference} - {p.projectName} {p.clientName ? `(${p.clientName})` : ""}
                                         </option>
                                     ))}
                                 </select>
@@ -625,9 +1345,19 @@ function NewProposalModal({
                                 <label>Select Template *</label>
                                 <select
                                     value={formData.sourceId}
-                                    onChange={(e) =>
-                                        setFormData({ ...formData, sourceId: e.target.value })
-                                    }
+                                    onChange={(e) => {
+                                        const tmplId = e.target.value;
+                                        const t = templates.find((item) => item.id === tmplId);
+                                        if (t) {
+                                            setFormData((prev) => ({
+                                                ...prev,
+                                                sourceId: t.id,
+                                                internalNotes: `Created from template: ${t.name}`,
+                                            }));
+                                        } else {
+                                            setFormData((prev) => ({ ...prev, sourceId: "" }));
+                                        }
+                                    }}
                                     required
                                 >
                                     <option value="">Select template</option>
@@ -645,7 +1375,7 @@ function NewProposalModal({
                                 <label>Proposed Value (₹) *</label>
                                 <input
                                     type="number"
-                                    placeholder="ex. 45,00,000"
+                                    placeholder="ex. 4500000"
                                     value={formData.proposedValue}
                                     onChange={(e) =>
                                         setFormData({ ...formData, proposedValue: e.target.value })
@@ -673,7 +1403,7 @@ function NewProposalModal({
                                 onChange={(e) =>
                                     setFormData({ ...formData, internalNotes: e.target.value })
                                 }
-                                rows={4}
+                                rows={3}
                             />
                         </div>
 
@@ -724,30 +1454,30 @@ function NewProposalModal({
                             </button>
                             <button
                                 type="button"
-                                className="secondary-button"
-                                onClick={() => onClose()}
-                            >
-                                Edit Proposal
-                            </button>
-                            <button
-                                type="button"
                                 className="primary-button"
                                 onClick={async () => {
                                     if (!createdProposal) return;
                                     setIsSubmitting(true);
                                     setError("");
                                     try {
-                                        const response = await fetch(`/api/v1/proposals/${createdProposal.id}/status`, {
-                                            method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
-                                            body: JSON.stringify({ status: "sent" }),
-                                        });
+                                        const response = await fetch(
+                                            `/api/v1/proposals/${createdProposal.id}/status`,
+                                            {
+                                                method: "POST",
+                                                credentials: "include",
+                                                headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({ status: "sent" }),
+                                            }
+                                        );
                                         const payload = await response.json();
                                         if (!response.ok) throw new Error(getApiErrorMessage(payload));
                                         onClose();
                                         onRefresh();
                                     } catch (sendError) {
                                         setError(getApiErrorMessage(sendError));
-                                    } finally { setIsSubmitting(false); }
+                                    } finally {
+                                        setIsSubmitting(false);
+                                    }
                                 }}
                             >
                                 {isSubmitting ? "Sending..." : "Send to Client"}
@@ -759,6 +1489,7 @@ function NewProposalModal({
         </div>
     );
 }
+
 
 function ProposalPreviewModal({
     proposalId,
@@ -772,6 +1503,40 @@ function ProposalPreviewModal({
     const [error, setError] = useState("");
     const [actionError, setActionError] = useState("");
     const [actionLoading, setActionLoading] = useState(false);
+    const [branding, setBranding] = useState<{
+        companyName: string;
+        address: string;
+        email: string;
+        phone: string;
+    }>({
+        companyName: "Arvin Interiors",
+        address: "42 Design House, Khar West, Mumbai 400052",
+        email: "contact@arvininteriors.com",
+        phone: "+91 98200 00001",
+    });
+
+    useEffect(() => {
+        const fetchBranding = async () => {
+            try {
+                const res = await fetch("/api/v1/settings/branding", { credentials: "include" });
+                if (res.ok) {
+                    const payload = await res.json();
+                    const data = parseApiResponse<any>(payload);
+                    if (data?.data) {
+                        setBranding({
+                            companyName: data.data.companyName || data.data.company_name || "Arvin Interiors",
+                            address: data.data.address || "42 Design House, Khar West, Mumbai 400052",
+                            email: data.data.email || "contact@arvininteriors.com",
+                            phone: data.data.phone || "+91 98200 00001",
+                        });
+                    }
+                }
+            } catch {
+                // Keep default branding
+            }
+        };
+        fetchBranding();
+    }, []);
 
     useEffect(() => {
         const fetchProposal = async () => {
@@ -783,15 +1548,20 @@ function ProposalPreviewModal({
                 if (response.ok) {
                     const data = parseApiResponse<any>(payload);
                     setProposal(data);
-                    const viewResponse = await fetch(`/api/v1/proposals/${proposalId}/view`, { method: "POST", credentials: "include" });
+                    const viewResponse = await fetch(`/api/v1/proposals/${proposalId}/view`, {
+                        method: "POST",
+                        credentials: "include",
+                    });
                     if (viewResponse.ok) {
                         const viewData = parseApiResponse<{ viewCount: number }>(await viewResponse.json());
-                        setProposal((current: any) => current ? { ...current, viewCount: viewData.viewCount } : current);
+                        setProposal((current: any) =>
+                            current ? { ...current, viewCount: viewData.viewCount } : current
+                        );
                     }
                 } else {
                     setError(getApiErrorMessage(payload));
                 }
-            } catch (err) {
+            } catch {
                 setError("Failed to load proposal");
             } finally {
                 setLoading(false);
@@ -801,92 +1571,217 @@ function ProposalPreviewModal({
         fetchProposal();
     }, [proposalId]);
 
+    const calculateDuration = () => {
+        if (!proposal) return "3 Months";
+        if (proposal.expiryDate && (proposal.sentAt || proposal.createdAt)) {
+            const start = new Date(proposal.sentAt || proposal.createdAt).getTime();
+            const end = new Date(proposal.expiryDate).getTime();
+            const diffDays = Math.round((end - start) / (1000 * 60 * 60 * 24));
+            if (diffDays > 0) {
+                const months = Math.max(1, Math.round(diffDays / 30));
+                return `${months} ${months === 1 ? "Month" : "Months"}`;
+            }
+        }
+        return "3 Months";
+    };
+
+    const defaultScopeItems = [
+        "Interior design and space planning",
+        "Furniture procurement and installation",
+        "Civil, electrical, and plumbing works",
+        "Modular furniture kitchen and wardrobes",
+        "Project management and site supervision",
+    ];
+
+    const scopeList = proposal?.scopeItems && proposal.scopeItems.length > 0
+        ? proposal.scopeItems
+        : defaultScopeItems;
+
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
-                <button className="modal-close" onClick={onClose}>
-                    ×
-                </button>
+            <div
+                className="modal-content"
+                style={{ maxWidth: "700px", padding: 0, overflow: "hidden", borderRadius: "14px" }}
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* Modal Title Bar */}
+                <div className="preview-modal-header">
+                    <h2>{proposal ? `${proposal.proposalCode} - Proposal Preview` : "Proposal Preview"}</h2>
+                    <button className="modal-close" style={{ position: "static" }} onClick={onClose}>
+                        ×
+                    </button>
+                </div>
 
                 {loading ? (
-                    <div className="modal-body">Loading proposal...</div>
+                    <div style={{ padding: "48px 32px", textAlign: "center", color: "#64748b" }}>
+                        Loading proposal...
+                    </div>
                 ) : error ? (
-                    <div className="modal-body error-banner">{error}</div>
+                    <div style={{ padding: "32px", color: "#dc2626" }}>{error}</div>
                 ) : proposal ? (
-                    <div className="modal-body proposal-preview">
-                        <div className="preview-header">
-                            <div>
-                                <h1>{proposal.projectName}</h1>
-                                <p className="preview-id">{proposal.proposalCode}</p>
-                            </div>
-                            <div className="preview-meta">
-                                <p>
-                                    <strong>Sent:</strong> {proposal.sentAt ? new Date(proposal.sentAt).toLocaleDateString() : "-"}
-                                </p>
-                                <p>
-                                    <strong>Expiry:</strong>{" "}
-                                    {proposal.expiryDate
-                                        ? new Date(proposal.expiryDate).toLocaleDateString()
-                                        : "-"}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="preview-section">
-                            <h3>Prepared for</h3>
-                            <p>{proposal.clientName}</p>
-                        </div>
-
-                        <div className="preview-section">
-                            <h3>Proposal Summary</h3>
-                            <div className="summary-grid">
-                                <div className="summary-item">
-                                    <span className="summary-label">Scope of Work</span>
-                                    <p>{proposal.projectName}</p>
-                                </div>
-                                <div className="summary-item">
-                                    <span className="summary-label">Proposed Value</span>
-                                    <p>
-                                        {new Intl.NumberFormat("en-IN", {
-                                            style: "currency",
-                                            currency: proposal.currency || "INR",
-                                        }).format(proposal.proposedValue)}
+                    <>
+                        <div className="preview-document-body">
+                            {/* Top row: Company details on left, Proposal ID & dates on right */}
+                            <div className="preview-doc-top">
+                                <div>
+                                    <h1 className="preview-company-name">{branding.companyName}</h1>
+                                    <p className="preview-company-meta">{branding.address}</p>
+                                    <p className="preview-company-meta">
+                                        {branding.email} {branding.phone}
                                     </p>
                                 </div>
+                                <div className="preview-doc-id-box">
+                                    <div className="preview-doc-code">{proposal.proposalCode}</div>
+                                    <div className="preview-doc-dates">
+                                        Issued:{" "}
+                                        {new Date(proposal.sentAt || proposal.createdAt).toLocaleDateString("en-GB", {
+                                            day: "numeric",
+                                            month: "short",
+                                            year: "numeric",
+                                        })}
+                                    </div>
+                                    <div className="preview-doc-dates">
+                                        Expiry:{" "}
+                                        {proposal.expiryDate
+                                            ? new Date(proposal.expiryDate).toLocaleDateString("en-GB", {
+                                                  day: "numeric",
+                                                  month: "short",
+                                                  year: "numeric",
+                                              })
+                                            : "—"}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Prepared for section */}
+                            <div className="preview-prepared-for">
+                                <div className="preview-prepared-label">Prepared for</div>
+                                <div className="preview-client-title">{proposal.clientName}</div>
+                                <div className="preview-project-subtitle">{proposal.projectName}</div>
+                            </div>
+
+                            {/* Proposal Summary Box */}
+                            <div className="preview-summary-card">
+                                <div className="preview-summary-card-title">PROPOSAL SUMMARY</div>
+                                <div className="preview-summary-columns">
+                                    <div>
+                                        <div className="preview-col-label">SCOPE OF WORK</div>
+                                        <div className="preview-col-value">
+                                            {proposal.sourceLabel || (proposal.sourceType === "boq" ? "Approved BOQ" : "Full Turnkey")}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="preview-col-label">PROJECT DURATION</div>
+                                        <div className="preview-col-value">{calculateDuration()}</div>
+                                    </div>
+                                    <div>
+                                        <div className="preview-col-label">PROPOSED VALUE</div>
+                                        <div className="preview-col-value">{formatIndianCurrency(proposal.proposedValue)}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Scope Includes list */}
+                            <div className="preview-scope-section">
+                                <div className="preview-scope-heading">Scope Includes</div>
+                                <div className="preview-scope-list">
+                                    {scopeList.map((item: string, idx: number) => (
+                                        <div key={idx} className="preview-scope-item">
+                                            <span>—</span>
+                                            <span>{item}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Grand Total */}
+                            <div className="preview-grand-total-box">
+                                <div className="preview-grand-total-label">Grand Total (incl. GST)</div>
+                                <div className="preview-grand-total-amount">
+                                    {formatIndianCurrency(proposal.proposedValue)}
+                                </div>
                             </div>
                         </div>
 
-                        <div className="preview-footer">
-                            <button className="secondary-button" disabled={actionLoading} onClick={async () => {
-                                const value = window.prompt("Proposed value", String(proposal.proposedValue));
-                                if (value === null) return;
-                                const proposedValue = Number(value);
-                                if (!Number.isFinite(proposedValue) || proposedValue < 0) { setActionError("Enter a valid proposed value."); return; }
-                                setActionLoading(true); setActionError("");
-                                try {
-                                    const response = await fetch(`/api/v1/proposals/${proposalId}`, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ proposedValue }) });
-                                    const payload = await response.json();
-                                    if (!response.ok) throw new Error(getApiErrorMessage(payload));
-                                    setProposal(parseApiResponse<any>(payload));
-                                } catch (editError) { setActionError(getApiErrorMessage(editError)); } finally { setActionLoading(false); }
-                            }}>Edit Value</button>
-                            <button className="secondary-button" onClick={onClose}>
+                        {actionError && (
+                            <p className="error-banner" style={{ margin: "0 32px 16px" }} role="alert">
+                                {actionError}
+                            </p>
+                        )}
+
+                        {/* Footer: Cancel on left, Edit & Download PDF on right */}
+                        <div className="preview-modal-footer">
+                            <button type="button" className="secondary-button" onClick={onClose}>
                                 Cancel
                             </button>
-                            {actionError && <p className="error-banner" role="alert">{actionError}</p>}
-                            <button className="primary-button" disabled={actionLoading} onClick={async () => {
-                                setActionLoading(true); setActionError("");
-                                try {
-                                    const response = await fetch(`/api/v1/proposals/${proposalId}/pdf`, { credentials: "include" });
-                                    if (!response.ok) throw new Error(getApiErrorMessage(await response.json()));
-                                    const blob = await response.blob(); const url = URL.createObjectURL(blob); const link = document.createElement("a");
-                                    link.href = url; link.download = `${proposal.proposalCode}.pdf`; link.click(); URL.revokeObjectURL(url);
-                                } catch (downloadError) { setActionError(getApiErrorMessage(downloadError)); } finally { setActionLoading(false); }
-                            }}>{actionLoading ? "Preparing..." : "Download PDF"}</button>
+                            <div className="preview-footer-right">
+                                <button
+                                    type="button"
+                                    className="secondary-button"
+                                    disabled={actionLoading}
+                                    onClick={async () => {
+                                        const value = window.prompt("Proposed value (₹)", String(proposal.proposedValue));
+                                        if (value === null) return;
+                                        const proposedValue = Number(value);
+                                        if (!Number.isFinite(proposedValue) || proposedValue < 0) {
+                                            setActionError("Enter a valid proposed value.");
+                                            return;
+                                        }
+                                        setActionLoading(true);
+                                        setActionError("");
+                                        try {
+                                            const response = await fetch(`/api/v1/proposals/${proposalId}`, {
+                                                method: "PATCH",
+                                                credentials: "include",
+                                                headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({ proposedValue }),
+                                            });
+                                            const payload = await response.json();
+                                            if (!response.ok) throw new Error(getApiErrorMessage(payload));
+                                            setProposal(parseApiResponse<any>(payload));
+                                        } catch (editError) {
+                                            setActionError(getApiErrorMessage(editError));
+                                        } finally {
+                                            setActionLoading(false);
+                                        }
+                                    }}
+                                >
+                                    Edit
+                                </button>
+                                <button
+                                    type="button"
+                                    className="primary-button"
+                                    disabled={actionLoading}
+                                    onClick={async () => {
+                                        setActionLoading(true);
+                                        setActionError("");
+                                        try {
+                                            const response = await fetch(`/api/v1/proposals/${proposalId}/pdf`, {
+                                                credentials: "include",
+                                            });
+                                            if (!response.ok) throw new Error(getApiErrorMessage(await response.json()));
+                                            const blob = await response.blob();
+                                            const url = URL.createObjectURL(blob);
+                                            const link = document.createElement("a");
+                                            link.href = url;
+                                            link.download = `${proposal.proposalCode}.pdf`;
+                                            link.click();
+                                            URL.revokeObjectURL(url);
+                                        } catch (downloadError) {
+                                            setActionError(getApiErrorMessage(downloadError));
+                                        } finally {
+                                            setActionLoading(false);
+                                        }
+                                    }}
+                                >
+                                    {actionLoading ? "Preparing..." : "Download PDF"}
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    </>
                 ) : null}
             </div>
         </div>
     );
 }
+

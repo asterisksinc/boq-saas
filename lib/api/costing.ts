@@ -45,18 +45,28 @@ export async function getCostingItems(params?: { page?: number; pageSize?: numbe
 export async function createCostingItem(input: {
     name: string;
     code?: string;
-    categoryId?: string;
-    unit?: string;
-    baseCost?: number;
-    sellingRate?: number;
-    preferredVendor?: string;
-    spec?: string;
+    categoryId: string;
+    unit: string;
+    baseCost: number;
+    sellingRate: number;
+    preferredVendor?: string | null;
+    spec?: string | null;
+    description?: string | null;
     rateStatus?: string;
-    imageUrl?: string;
+    imageUrl?: string | null;
 }): Promise<CostingItemBackend> {
     return fetchApi<CostingItemBackend>("/api/v1/costing/items", {
         method: "POST",
         body: JSON.stringify(input),
+    });
+}
+
+export async function uploadCostingImage(file: File): Promise<{ url: string; storagePath?: string }> {
+    const formData = new FormData();
+    formData.append("file", file);
+    return fetchApi<{ url: string; storagePath?: string }>("/api/v1/costing/upload-image", {
+        method: "POST",
+        body: formData,
     });
 }
 

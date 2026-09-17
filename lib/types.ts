@@ -142,11 +142,19 @@ export interface CostingCategoryBackend {
   status?: string;
   items?: number;
   subCategories?: number;
+  parentName?: string | null;
 }
 
 export interface CostingCategoryDetail extends Omit<CostingCategoryBackend, 'items' | 'subCategories'> {
-  subCategories: CostingCategoryBackend[];
+  subCategories: (CostingCategoryBackend & { itemsCount?: number; usedInBoqs?: number; usedInProjects?: number; updated?: string })[];
   items: CostingItemBackend[];
+  itemsList?: CostingItemBackend[];
+  usedInBoqs?: number;
+  usedInProjects?: number;
+  boqList?: Array<{ id: string; boqNumber: string; projectId: string }>;
+  projectList?: Array<{ id: string; name: string; projectCode?: string | null }>;
+  subCategoriesCount?: number;
+  activityLog?: Array<{ id: string; action: string; details: string; by: string; date: string }>;
 }
 
 export interface CostingItemBackend {
@@ -171,11 +179,15 @@ export interface CostingItemBackend {
   // Frontend-friendly aliases (may be populated by API or frontend mapping)
   status?: string;
   category?: string;
+  categoryName?: string | null;
   baseCost?: number;
   sellingRate?: number;
-  margin?: number;
+  margin?: string | number;
   vendor?: string;
+  preferredVendor?: string | null;
   rateStatus?: string;
+  imageUrl?: string | null;
+  description?: string | null;
   updatedAt?: string;
 }
 
@@ -218,8 +230,36 @@ export interface CostingScenario {
   scenarioMargin?: number | null;
 }
 
+export interface VarianceCategory {
+  id: string;
+  category: string;
+  name?: string;
+  code?: string;
+  budget: number;
+  actual: number;
+  committed: number;
+  forecast: number;
+  variance: number;
+  utilization: number;
+  status: "ON TRACK" | "AT RISK" | "OVER BUDGET" | "UNDER BUDGET";
+  itemCount?: number;
+  quoteCount?: number;
+}
+
+export interface EnrichedVendorQuote extends VendorQuote {
+  itemName?: string;
+  itemCode?: string;
+  categoryName?: string;
+  baseCost?: number;
+  sellingRate?: number;
+  variance?: number;
+  savings?: number;
+}
+
 export interface CostingAnalysisResponse {
   currency: string;
+  projectName?: string;
+  projectsList?: Array<{ id: string; name: string; approvedBudget?: number; projectValue?: number; status?: string }>;
   summary: {
     totalBudget: number;
     actualCost: number;
@@ -228,8 +268,54 @@ export interface CostingAnalysisResponse {
     variance: number;
   };
   items: CostingItemBackend[];
-  vendorQuotes: VendorQuote[];
-  varianceByCategory: unknown[];
+  vendorQuotes: EnrichedVendorQuote[];
+  varianceByCategory: VarianceCategory[];
+  costOverview?: {
+    baseCost: number;
+    markupAmount: number;
+    markupPercent: number;
+    taxAmount: number;
+    taxPercent: number;
+    clientPrice: number;
+  };
+}
+
+export interface MarginImpactDriver {
+  id: string;
+  driver: string;
+  impactOnMargin: number;
+  vsLastMonth: number;
+  affectedItems: number;
+  primaryImpact: string;
+}
+
+export interface MarginTrendPoint {
+  month: string;
+  current: number;
+  target: number;
+}
+
+export interface MarginCategory {
+  id: string;
+  name: string;
+  marginPercent: number;
+  vsLastMonth?: number;
+  itemCount?: number;
+}
+
+export interface LowMarginItem extends CostingItemBackend {
+  marginPercent: number;
+  brand?: string;
+  unitLabel?: string;
+  severity?: "CRITICAL" | "ACTIVE" | "WARNING";
+}
+
+export interface MarginInsight {
+  id: string;
+  icon: "info" | "trending" | "percent" | "flag";
+  text: string;
+  actionText: string;
+  actionType?: string;
 }
 
 export interface MarginAnalysisResponse {
@@ -237,10 +323,15 @@ export interface MarginAnalysisResponse {
   targetMargin: number;
   currentMargin: number;
   marginDifference: number;
-  lowMarginItems: Array<CostingItemBackend & { marginPercent: number }>;
-  byCategory: Array<{ id: string; name: string; marginPercent: number }>;
-  impactDrivers: unknown[];
-  trend: unknown[];
+  currentMarginDelta?: number;
+  marginDifferenceDelta?: number;
+  lowMarginCount?: number;
+  avgLowMargin?: number;
+  lowMarginItems: LowMarginItem[];
+  byCategory: MarginCategory[];
+  impactDrivers: MarginImpactDriver[];
+  trend: MarginTrendPoint[];
+  insights?: MarginInsight[];
 }
 
 export interface CostingSettingsResponse {

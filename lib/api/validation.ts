@@ -314,7 +314,7 @@ export const supportTicketSchema = z.object({
 export const supportTicketPatchSchema = z.object({ status: z.enum(["open", "in_progress", "waiting_on_user", "resolved", "closed"]) }).strict();
 
 export const costingCategorySchema = z.object({
-  name: z.string().trim().min(1).max(120), code: z.string().trim().min(1).max(40).regex(/^[A-Za-z0-9-]+$/),
+  name: z.string().trim().min(1).max(120), code: z.string().trim().min(1).max(40).regex(/^[A-Za-z0-9-]+$/).optional(),
   parentId: z.string().uuid().nullable().optional(), defaultUnit: z.string().trim().min(1).max(40),
   defaultTaxPercent: percent.default(18), defaultMarkupPercent: percent.default(0), defaultWastePercent: percent.default(0),
   transportIncluded: z.boolean().default(false), labourIncluded: z.boolean().default(false), description: z.string().trim().max(2000).nullable().optional(),
@@ -322,10 +322,17 @@ export const costingCategorySchema = z.object({
 export const costingCategoryPatchSchema = costingCategorySchema.partial().strict().refine((value) => Object.keys(value).length > 0, "At least one field is required.");
 
 export const costingItemSchema = z.object({
-  name: z.string().trim().min(1).max(200), code: z.string().trim().min(1).max(60).regex(/^[A-Za-z0-9-]+$/),
-  categoryId: z.string().uuid(), unit: z.string().trim().min(1).max(40), baseCost: money, sellingRate: money,
-  preferredVendor: z.string().trim().max(160).nullable().optional(), spec: z.string().trim().max(1000).nullable().optional(),
-  rateStatus: z.enum(["draft", "active", "expired"]).default("draft"), imageUrl: z.string().url().max(2048).nullable().optional(),
+  name: z.string().trim().min(1).max(200),
+  code: z.string().trim().min(1).max(60).regex(/^[A-Za-z0-9-]+$/).optional(),
+  categoryId: z.string().uuid(),
+  unit: z.string().trim().min(1).max(40),
+  baseCost: money,
+  sellingRate: money,
+  preferredVendor: z.string().trim().max(160).nullable().optional(),
+  spec: z.string().trim().max(2000).nullable().optional(),
+  description: z.string().trim().max(2000).nullable().optional(),
+  rateStatus: z.enum(["draft", "active", "expired"]).default("draft"),
+  imageUrl: z.string().max(200000).nullable().optional(),
 }).strict();
 export const costingItemPatchSchema = costingItemSchema.partial().strict().refine((value) => Object.keys(value).length > 0, "At least one field is required.");
 
