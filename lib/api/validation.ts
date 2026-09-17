@@ -203,6 +203,7 @@ export const boqCreateSchema = z.object({
 });
 
 export const boqPatchSchema = z.object({
+  projectId: z.string().uuid().optional(),
   version: z.string().trim().min(1).max(40).optional(),
   assignedTo: z.string().uuid().nullable().optional(),
   markupPercent: percent.optional(), taxPercent: percent.optional(),

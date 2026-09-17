@@ -5530,8 +5530,6 @@ input {
     width: 100%;
     border-collapse: collapse;
     min-width: 960px;
-    border-radius: 16px;
-    overflow: hidden;
 }
 
 .boq-dashboard-table thead th {
@@ -5603,39 +5601,110 @@ input {
     color: #15803d;
 }
 
+.boq-status-pill.archived {
+    background: rgba(100, 116, 139, 0.15);
+    color: #475569;
+}
+
+.boq-cell-dropdown-anchor {
+    position: relative;
+    display: inline-block;
+}
+
+.boq-dropdown-menu {
+    position: absolute;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+    z-index: 100;
+    padding: 6px 0;
+    min-width: 160px;
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+.boq-dropdown-menu button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    text-align: left;
+    padding: 8px 16px;
+    background: transparent;
+    border: none;
+    font-size: 13px;
+    color: #334155;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.boq-dropdown-menu button:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
 .boq-footer-row {
     margin-top: 18px;
     color: #475569;
     font-size: 0.92rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
     flex-wrap: wrap;
+}
+
+.boq-footer-total {
+    font-size: 0.92rem;
+    color: #475569;
+    min-width: 90px;
 }
 
 .boq-pagination {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
-    margin-left: auto;
+    margin: 0 auto;
 }
 
 .boq-pagination button {
-    width: 30px;
-    height: 30px;
+    width: 32px;
+    height: 32px;
     border-radius: 8px;
     border: 1px solid rgba(148, 163, 184, 0.26);
     background: rgba(255, 255, 255, 0.7);
     color: #334155;
     cursor: pointer;
+    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+}
+
+.boq-pagination button:hover:not(:disabled):not(.active) {
+    background: rgba(255, 255, 255, 1);
+    border-color: #94a3b8;
 }
 
 .boq-pagination button.active {
     background: #2563eb;
     border-color: #2563eb;
     color: #fff;
+    font-weight: 600;
+}
+
+.boq-pagination button:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
 }
 
 .boq-page-size {
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: 10px;
 }
 
@@ -5705,126 +5774,296 @@ input {
 }
 
 .boq-panel-toolbar {
-    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
     flex-wrap: wrap;
 }
 
-.boq-search-field {
-    position: relative;
+.boq-toolbar-left {
     display: flex;
     align-items: center;
     gap: 8px;
-    background: rgba(255, 255, 255, 0.7);
-    border: 1px solid rgba(148, 163, 184, 0.26);
-    border-radius: 12px;
-    padding: 0.55rem 0.9rem;
-    min-width: 220px;
-    flex: 1 1 260px;
 }
 
-.boq-search-field input {
+.boq-room-count-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #0f172a;
+    letter-spacing: -0.01em;
+}
+
+.boq-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.boq-toolbar-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0 12px;
+    height: 40px;
+    width: 220px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.boq-toolbar-search input {
     border: none;
     background: transparent;
     width: 100%;
-    color: #0f172a;
     outline: none;
+    font-size: 0.88rem;
+    color: #0f172a;
 }
 
-.boq-search-field input::placeholder {
-    color: #64748b;
+.boq-toolbar-search input::placeholder {
+    color: #94a3b8;
+}
+
+.boq-btn-outline {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0 16px;
+    height: 40px;
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: #1e293b;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.boq-btn-outline:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+.boq-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: #2563eb;
+    border: 1px solid #2563eb;
+    border-radius: 8px;
+    padding: 0 18px;
+    height: 40px;
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: #ffffff;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(37, 99, 235, 0.12);
+    transition: background 0.15s ease;
+    white-space: nowrap;
+}
+
+.boq-btn-primary:hover {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
 }
 
 .boq-table-card {
-    background: rgba(255, 255, 255, 0.35);
-    border: 1px solid rgba(148, 163, 184, 0.18);
-    border-radius: 16px;
-    overflow: hidden;
-}
-
-.boq-table-heading {
-    font-size: 1.15rem;
-    font-weight: 700;
-    padding: 1rem 1rem 0.85rem;
-    color: #0f172a;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: visible;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
 .boq-room-table {
     width: 100%;
     border-collapse: collapse;
-    min-width: 720px;
 }
 
 .boq-room-table thead th {
-    background: rgba(214, 224, 244, 0.9);
+    background: #f1f5f9;
     color: #475569;
-    font-size: 0.73rem;
-    letter-spacing: 0.08em;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    padding: 12px 10px;
+    padding: 12px 14px;
     text-align: left;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+    border-bottom: 1px solid #e2e8f0;
+    white-space: nowrap;
+}
+
+.boq-room-table tbody tr {
+    border-bottom: 1px solid #f1f5f9;
+    transition: background 0.15s ease;
+}
+
+.boq-room-table tbody tr:hover {
+    background: #f8fafc;
 }
 
 .boq-room-table tbody td {
-    padding: 13px 10px;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+    padding: 14px 14px;
     color: #0f172a;
-    background: rgba(255, 255, 255, 0.2);
     font-size: 0.88rem;
+    vertical-align: middle;
+}
+
+.boq-room-name {
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.boq-room-spec {
+    color: #64748b;
+    font-size: 0.85rem;
+}
+
+.boq-room-unit {
+    color: #64748b;
+}
+
+.boq-room-amount {
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.boq-room-desc {
+    color: #64748b;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.85rem;
+}
+
+.boq-dots-button {
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.boq-dots-button:hover {
+    background: #e2e8f0;
+    color: #0f172a;
 }
 
 .boq-summary-panel {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 12px;
+}
+
+.boq-summary-heading {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #475467;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
 }
 
 .boq-summary-card {
-    background: rgba(255, 255, 255, 0.36);
-    border: 1px solid rgba(148, 163, 184, 0.18);
-    border-radius: 16px;
-    padding: 16px 18px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 18px 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
 .boq-summary-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
-    color: #334155;
-    font-size: 0.98rem;
-    padding: 10px 0;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+    padding: 7px 0;
+    font-size: 0.88rem;
+    color: #64748b;
+}
+
+.boq-summary-row strong {
+    font-weight: 600;
+    color: #0f172a;
+    font-size: 0.92rem;
+}
+
+.boq-summary-divider {
+    border-top: 1px solid #f1f5f9;
+    margin: 8px 0;
 }
 
 .boq-summary-row.total {
-    border-bottom: none;
     color: #0f172a;
+    font-size: 1rem;
     font-weight: 700;
-    font-size: 1.08rem;
+    padding-top: 6px;
 }
 
-.boq-summary-metric {
-    background: rgba(255, 255, 255, 0.36);
-    border: 1px solid rgba(148, 163, 184, 0.18);
-    border-radius: 14px;
-    padding: 16px 18px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    color: #334155;
-    font-weight: 600;
-}
-
-.boq-summary-metric strong {
+.boq-summary-row.total strong {
+    font-size: 1.15rem;
+    font-weight: 700;
     color: #0f172a;
-    font-size: 1.4rem;
 }
 
-.boq-submit-button {
+.boq-metric-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.boq-metric-card-label {
+    color: #64748b;
+    font-size: 0.82rem;
+    font-weight: 500;
+}
+
+.boq-metric-card-value {
+    color: #0f172a;
+    font-size: 1.7rem;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.boq-generate-proposal-btn {
     width: 100%;
-    margin-top: 8px;
+    background: #2563eb;
+    color: #ffffff;
+    border: none;
+    border-radius: 10px;
+    padding: 13px 20px;
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 4px;
+}
+
+.boq-generate-proposal-btn:hover {
+    background: #1d4ed8;
 }
 
 .boq-modal-backdrop {
@@ -5838,13 +6077,16 @@ input {
 
 .boq-create-modal,
 .boq-template-modal,
-.boq-details-modal {
-    width: min(680px, calc(100vw - 34px));
-    background: rgba(255, 255, 255, 0.94);
-    border-radius: 22px;
+.boq-details-modal,
+.boq-items-modal {
+    width: min(780px, calc(100vw - 34px));
+    max-height: 88vh;
+    overflow-y: auto;
+    background: rgba(255, 255, 255, 0.98);
+    border-radius: 20px;
     border: 1px solid rgba(148, 163, 184, 0.2);
     box-shadow: 0 28px 70px rgba(15, 23, 42, 0.18);
-    padding: 22px 22px 18px;
+    padding: 24px;
 }
 
 .boq-create-header {
@@ -6475,8 +6717,11 @@ input {
     margin-top: 18px;
     border: 1px solid rgba(148, 163, 184, 0.18);
     border-radius: 16px;
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: visible;
     background: rgba(255, 255, 255, 0.8);
+    position: relative;
+    padding-bottom: 24px;
 }
 
 .boq-table {

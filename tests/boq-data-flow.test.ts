@@ -5,7 +5,9 @@ describe("BOQ data flow mapping", () => {
     it("normalizes backend status values into the UI contract", () => {
         expect(normalizeBoqStatus("draft")).toBe("DRAFT");
         expect(normalizeBoqStatus("in_review")).toBe("IN REVIEW");
+        expect(normalizeBoqStatus("pending approval")).toBe("IN REVIEW");
         expect(normalizeBoqStatus("approved")).toBe("APPROVED");
+        expect(normalizeBoqStatus("archived")).toBe("ARCHIVED");
     });
 
     it("maps paged API data to the BOQ list shape used by the page", () => {
@@ -25,9 +27,27 @@ describe("BOQ data flow mapping", () => {
         });
 
         expect(item.id).toBe("b1");
+        expect(item.projectId).toBe("p1");
+        expect(item.projectName).toBe("Oberoi Residence");
         expect(item.status).toBe("IN REVIEW");
         expect(item.estimatedValue).toBe(1540000);
         expect(item.assignedTo).toBe("Riya Sharma");
         expect(item.date).toMatch(/Sep|Sep 2026/);
+    });
+
+    it("gracefully falls back when project name or assignee name is omitted", () => {
+        const item = mapBoqListItem({
+            id: "b2",
+            boqNumber: "BOQ-0072",
+            projectId: "p2",
+            assignedTo: "55555555-5555-4555-8555-555555555555",
+        });
+
+        expect(item.projectName).toBe("Untitled project");
+        expect(item.assignedTo).toBe("Unassigned");
+        expect(item.status).toBe("DRAFT");
+        expect(item.rooms).toBe(0);
+        expect(item.items).toBe(0);
+        expect(item.estimatedValue).toBe(0);
     });
 });

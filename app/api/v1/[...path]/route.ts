@@ -1143,14 +1143,39 @@ async function deleteDocument(supabase: SupabaseClient, id: string, documentId: 
 const boqSelect = "id,project_id,boq_number,version,assigned_to,source_method,source_template_id,status,markup_percent,tax_percent,created_by,created_at,updated_at";
 const num = (value: unknown) => Number(value ?? 0);
 
-function boqDto(row: Record<string, unknown>, roomCount = 0, itemCount = 0, subtotal = 0) {
+function boqDto(
+  row: Record<string, unknown>,
+  roomCount = 0,
+  itemCount = 0,
+  subtotal = 0,
+  projectName: string | null = null,
+  assignedToName: string | null = null
+) {
   const markup = Math.round(subtotal * num(row.markup_percent)) / 100;
   const tax = Math.round((subtotal + markup) * num(row.tax_percent)) / 100;
-  return { id: row.id, projectId: row.project_id, boqNumber: row.boq_number, version: row.version,
-    assignedTo: row.assigned_to, method: row.source_method, templateId: row.source_template_id, status: row.status,
-    markupPercent: num(row.markup_percent), taxPercent: num(row.tax_percent), roomCount, itemCount, subtotal,
-    markupAmount: markup, taxAmount: tax, grandTotal: subtotal + markup + tax,
-    createdBy: row.created_by, createdAt: row.created_at, updatedAt: row.updated_at };
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    projectName: projectName ?? (typeof row.projectName === "string" ? row.projectName : null),
+    boqNumber: row.boq_number,
+    version: row.version,
+    assignedTo: row.assigned_to,
+    assignedToName: assignedToName ?? (typeof row.assignedToName === "string" ? row.assignedToName : null),
+    method: row.source_method,
+    templateId: row.source_template_id,
+    status: row.status,
+    markupPercent: num(row.markup_percent),
+    taxPercent: num(row.tax_percent),
+    roomCount,
+    itemCount,
+    subtotal,
+    markupAmount: markup,
+    taxAmount: tax,
+    grandTotal: subtotal + markup + tax,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 async function boqStats(supabase: SupabaseClient, workspaceId: string, boqIds: string[]) {
@@ -1175,31 +1200,80 @@ async function listBoqs(request: NextRequest, supabase: SupabaseClient, id: stri
   if (status && ["draft","in_review","approved"].includes(status)) query = query.eq("status", status);
   if (projectId) query = query.eq("project_id", projectId);
   if (search) query = query.or(`boq_number.ilike.%${search}%,version.ilike.%${search}%`);
-  const result = await query; if (result.error) return fail("INTERNAL_ERROR", "BOQs could not be loaded.", 500, id);
-  const rows = (result.data ?? []) as Record<string, unknown>[]; const stats = await boqStats(supabase, scoped.access.workspaceId, rows.map((r) => String(r.id)));
+
+  const [result, pendingResult] = await Promise.all([
+    query,
+    supabase.from("boqs").select("id", { count: "exact", head: true })
+      .eq("workspace_id", scoped.access.workspaceId)
+      .is("archived_at", null)
+      .eq("status", "in_review"),
+  ]);
+  if (result.error) return fail("INTERNAL_ERROR", "BOQs could not be loaded.", 500, id);
+  const rows = (result.data ?? []) as Record<string, unknown>[];
+  const boqIds = rows.map((r) => String(r.id));
+  const stats = await boqStats(supabase, scoped.access.workspaceId, boqIds);
+
+  const projectIds = Array.from(new Set(rows.map((r) => String(r.project_id)).filter(Boolean)));
+  const userIds = Array.from(new Set(rows.map((r) => String(r.assigned_to)).filter((u) => Boolean(u) && u !== "null" && u !== "undefined")));
+
+  const [projectsRes, profilesRes] = await Promise.all([
+    projectIds.length ? supabase.from("projects").select("id, name").in("id", projectIds) : Promise.resolve({ data: [] }),
+    userIds.length ? supabase.from("user_profiles").select("user_id, display_name").in("user_id", userIds) : Promise.resolve({ data: [] }),
+  ]);
+
+  const projectsMap = new Map<string, string>();
+  for (const p of (projectsRes.data ?? []) as Array<{ id: string; name: string }>) {
+    projectsMap.set(p.id, p.name);
+  }
+
+  const profilesMap = new Map<string, string>();
+  for (const u of (profilesRes.data ?? []) as Array<{ user_id: string; display_name: string }>) {
+    profilesMap.set(u.user_id, u.display_name);
+  }
+
   const total = result.count ?? 0;
-  return ok({ items: rows.map((row) => { const s = stats.get(String(row.id))!; return boqDto(row, s.rooms, s.items, s.subtotal); }), page, pageSize, total, hasMore: to + 1 < total }, 200, id);
+  const pendingApprovals = pendingResult.count ?? 0;
+
+  return ok({
+    items: rows.map((row) => {
+      const s = stats.get(String(row.id))!;
+      const projName = row.project_id ? projectsMap.get(String(row.project_id)) ?? null : null;
+      const userName = row.assigned_to ? profilesMap.get(String(row.assigned_to)) ?? null : null;
+      return boqDto(row, s.rooms, s.items, s.subtotal, projName, userName);
+    }),
+    page,
+    pageSize,
+    total,
+    hasMore: to + 1 < total,
+    pendingApprovals,
+  }, 200, id);
 }
 
 async function createBoq(request: Request, supabase: SupabaseClient, id: string) {
   const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
   const input = await parsed(request, boqCreateSchema, id); if (input.response) return input.response;
-  const project = await supabase.from("projects").select("id").eq("workspace_id", scoped.access.workspaceId).eq("id", input.data.projectId).is("archived_at", null).maybeSingle();
+  const project = await supabase.from("projects").select("id, name, assigned_designer_id").eq("workspace_id", scoped.access.workspaceId).eq("id", input.data.projectId).is("archived_at", null).maybeSingle();
   if (!project.data) return fail("NOT_FOUND", "Project was not found.", 404, id);
   const template = input.data.method === "template" && input.data.templateId
     ? await supabase.from("boq_templates").select("snapshot,use_count").eq("workspace_id", scoped.access.workspaceId).eq("id", input.data.templateId).maybeSingle()
     : null;
   if (template && !template.data) return fail("NOT_FOUND", "BOQ template was not found.", 404, id);
+
+  const assignedTo = input.data.assignedTo || project.data.assigned_designer_id || scoped.access.userId;
+
   const inserted = await supabase.from("boqs").insert({ workspace_id: scoped.access.workspaceId, project_id: input.data.projectId,
-    boq_number: input.data.boqNumber, version: input.data.version, assigned_to: input.data.assignedTo,
+    boq_number: input.data.boqNumber, version: input.data.version, assigned_to: assignedTo,
     source_method: input.data.method, source_template_id: input.data.templateId, markup_percent: input.data.markupPercent,
     tax_percent: input.data.taxPercent, created_by: scoped.access.userId, updated_by: scoped.access.userId }).select(boqSelect).single();
   if (inserted.error) return fail(inserted.error.code === "23505" ? "CONFLICT" : "VALIDATION_ERROR", inserted.error.code === "23505" ? "This BOQ number and version already exist." : "BOQ could not be created.", inserted.error.code === "23505" ? 409 : 400, id);
+
+  let initialRoomCount = 0;
   if (input.data.method === "template" && input.data.templateId) {
     if (template?.data && Array.isArray(template.data.snapshot)) {
       for (const sourceRoom of template.data.snapshot as Array<Record<string, unknown>>) {
         const room = await supabase.from("boq_rooms").insert({ workspace_id: scoped.access.workspaceId, boq_id: inserted.data.id, name: sourceRoom.name, description: sourceRoom.description }).select("id").single();
         if (!room.data) continue;
+        initialRoomCount++;
         for (const sourceCategory of (sourceRoom.categories as Array<Record<string, unknown>> | undefined) ?? []) {
           const category = await supabase.from("boq_categories").insert({ workspace_id: scoped.access.workspaceId, boq_id: inserted.data.id, room_id: room.data.id, name: sourceCategory.name, description: sourceCategory.description }).select("id").single();
           if (!category.data) continue;
@@ -1209,8 +1283,24 @@ async function createBoq(request: Request, supabase: SupabaseClient, id: string)
       }
       await supabase.from("boq_templates").update({ use_count: num(template.data.use_count) + 1 }).eq("id", input.data.templateId);
     }
+  } else if (input.data.method === "blank") {
+    const projectRooms = await supabase.from("project_rooms").select("name, notes, sort_order").eq("project_id", input.data.projectId).eq("workspace_id", scoped.access.workspaceId).order("sort_order");
+    if (projectRooms.data?.length) {
+      for (const pr of projectRooms.data) {
+        await supabase.from("boq_rooms").insert({ workspace_id: scoped.access.workspaceId, boq_id: inserted.data.id, name: pr.name, description: pr.notes, sort_order: pr.sort_order });
+        initialRoomCount++;
+      }
+    }
   }
-  await audit(supabase, "boq.created", id); return ok(boqDto(inserted.data as Record<string, unknown>), 201, id);
+
+  let assignedToName: string | null = null;
+  if (assignedTo) {
+    const prof = await supabase.from("user_profiles").select("display_name").eq("user_id", assignedTo).maybeSingle();
+    assignedToName = prof.data?.display_name ?? null;
+  }
+
+  await audit(supabase, "boq.created", id);
+  return ok(boqDto(inserted.data as Record<string, unknown>, initialRoomCount, 0, 0, project.data.name, assignedToName), 201, id);
 }
 
 async function getBoq(supabase: SupabaseClient, id: string, boqId: string) {
@@ -1223,19 +1313,46 @@ async function getBoq(supabase: SupabaseClient, id: string, boqId: string) {
   ]);
   if (boq.error || rooms.error || categories.error || items.error) return fail("INTERNAL_ERROR", "BOQ could not be loaded.", 500, id);
   if (!boq.data) return fail("NOT_FOUND", "BOQ was not found.", 404, id);
+
+  const [projectRes, profileRes] = await Promise.all([
+    boq.data.project_id ? supabase.from("projects").select("name").eq("id", boq.data.project_id).maybeSingle() : Promise.resolve({ data: null }),
+    boq.data.assigned_to ? supabase.from("user_profiles").select("display_name").eq("user_id", boq.data.assigned_to).maybeSingle() : Promise.resolve({ data: null }),
+  ]);
+
   const itemRows = items.data ?? []; const subtotal = itemRows.reduce((sum, row) => sum + num(row.amount), 0);
-  return ok({ ...boqDto(boq.data as Record<string, unknown>, rooms.data?.length ?? 0, itemRows.length, subtotal), rooms: (rooms.data ?? []).map((room) => ({ ...room,
-    categories: (categories.data ?? []).filter((cat) => cat.room_id === room.id).map((category) => ({ ...category, items: itemRows.filter((item) => item.category_id === category.id) })) })) }, 200, id);
+  return ok({
+    ...boqDto(
+      boq.data as Record<string, unknown>,
+      rooms.data?.length ?? 0,
+      itemRows.length,
+      subtotal,
+      projectRes.data?.name ?? null,
+      profileRes.data?.display_name ?? null
+    ),
+    rooms: (rooms.data ?? []).map((room) => ({
+      ...room,
+      categories: (categories.data ?? []).filter((cat) => cat.room_id === room.id).map((category) => ({
+        ...category,
+        items: itemRows.filter((item) => item.category_id === category.id),
+      })),
+    })),
+  }, 200, id);
 }
 
 async function updateBoq(request: Request, supabase: SupabaseClient, id: string, boqId: string) {
   const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
   const input = await parsed(request, boqPatchSchema, id); if (input.response) return input.response;
-  const map: Record<string,string> = { version: "version", assignedTo: "assigned_to", markupPercent: "markup_percent", taxPercent: "tax_percent" };
+  const map: Record<string,string> = { projectId: "project_id", version: "version", assignedTo: "assigned_to", markupPercent: "markup_percent", taxPercent: "tax_percent" };
   const values = Object.fromEntries(Object.entries(input.data).map(([k,v]) => [map[k],v])); values.updated_by = scoped.access.userId;
   const result = await supabase.from("boqs").update(values).eq("workspace_id", scoped.access.workspaceId).eq("id", boqId).is("archived_at", null).select(boqSelect).maybeSingle();
   if (result.error) return fail("VALIDATION_ERROR", "BOQ could not be updated.", 400, id);
-  return result.data ? ok(boqDto(result.data as Record<string, unknown>), 200, id) : fail("NOT_FOUND", "BOQ was not found.", 404, id);
+  if (!result.data) return fail("NOT_FOUND", "BOQ was not found.", 404, id);
+
+  const [projectRes, profileRes] = await Promise.all([
+    result.data.project_id ? supabase.from("projects").select("name").eq("id", result.data.project_id).maybeSingle() : Promise.resolve({ data: null }),
+    result.data.assigned_to ? supabase.from("user_profiles").select("display_name").eq("user_id", result.data.assigned_to).maybeSingle() : Promise.resolve({ data: null }),
+  ]);
+  return ok(boqDto(result.data as Record<string, unknown>, 0, 0, 0, projectRes.data?.name ?? null, profileRes.data?.display_name ?? null), 200, id);
 }
 
 async function setBoqStatus(request: Request, supabase: SupabaseClient, id: string, boqId: string) {
@@ -1245,7 +1362,13 @@ async function setBoqStatus(request: Request, supabase: SupabaseClient, id: stri
   const result = await supabase.from("boqs").update({ status: input.data.status, archived_at: input.data.status === "archived" ? new Date().toISOString() : null, updated_by: scoped.access.userId })
     .eq("workspace_id", scoped.access.workspaceId).eq("id", boqId).is("archived_at", null).select(boqSelect).maybeSingle();
   if (result.error) return fail("VALIDATION_ERROR", "BOQ status could not be changed.", 400, id);
-  return result.data ? ok(boqDto(result.data as Record<string, unknown>), 200, id) : fail("NOT_FOUND", "BOQ was not found.", 404, id);
+  if (!result.data) return fail("NOT_FOUND", "BOQ was not found.", 404, id);
+
+  const [projectRes, profileRes] = await Promise.all([
+    result.data.project_id ? supabase.from("projects").select("name").eq("id", result.data.project_id).maybeSingle() : Promise.resolve({ data: null }),
+    result.data.assigned_to ? supabase.from("user_profiles").select("display_name").eq("user_id", result.data.assigned_to).maybeSingle() : Promise.resolve({ data: null }),
+  ]);
+  return ok(boqDto(result.data as Record<string, unknown>, 0, 0, 0, projectRes.data?.name ?? null, profileRes.data?.display_name ?? null), 200, id);
 }
 
 async function duplicateBoq(supabase: SupabaseClient, id: string, boqId: string) {
@@ -1265,7 +1388,128 @@ async function duplicateBoq(supabase: SupabaseClient, id: string, boqId: string)
       if (copiedItems.length) await supabase.from("boq_items").insert(copiedItems);
     }
   }
-  return ok(boqDto(created.data as Record<string, unknown>), 201, id);
+  return ok(boqDto(created.data as Record<string, unknown>, (source.rooms as unknown[])?.length ?? 0, num(source.itemCount), num(source.subtotal), String(source.projectName ?? ""), String(source.assignedToName ?? "")), 201, id);
+}
+
+function basicBoqPdf(boq: Record<string, any>) {
+  const lines: string[] = [
+    `${boq.boqNumber || "BOQ"} - Bill of Quantities`,
+    `Project: ${boq.projectName || "Standard Project"} | Version: ${boq.version || "v1"}`,
+    `Status: ${String(boq.status || "draft").toUpperCase()}`,
+    `Generated: ${new Date().toLocaleDateString()}`,
+    "",
+    "ROOMS & ITEMS BREAKDOWN",
+    "--------------------------------------------------------------------------------",
+  ];
+  const rooms = (boq.rooms as Array<Record<string, any>>) || [];
+  let itemCounter = 0;
+  for (const r of rooms) {
+    lines.push(`[Room] ${r.name}`);
+    for (const c of ((r.categories as Array<Record<string, any>>) || [])) {
+      for (const it of ((c.items as Array<Record<string, any>>) || [])) {
+        itemCounter++;
+        lines.push(`  - ${it.name} (${it.quantity} ${it.unit} @ INR ${Number(it.rate).toFixed(2)}) = INR ${Number(it.amount).toFixed(2)}`);
+      }
+    }
+  }
+  if (itemCounter === 0) {
+    lines.push("  (No items added yet)");
+  }
+  lines.push("--------------------------------------------------------------------------------");
+  lines.push(`Subtotal: INR ${Number(boq.subtotal || 0).toFixed(2)}`);
+  if (boq.markupPercent > 0 || boq.markupAmount > 0) {
+    lines.push(`Markup (${boq.markupPercent || 0}%): INR ${Number(boq.markupAmount || 0).toFixed(2)}`);
+  }
+  if (boq.taxPercent > 0 || boq.taxAmount > 0) {
+    lines.push(`Tax / GST (${boq.taxPercent || 0}%): INR ${Number(boq.taxAmount || 0).toFixed(2)}`);
+  }
+  lines.push(`Grand Total: INR ${Number(boq.grandTotal || boq.subtotal || 0).toFixed(2)}`);
+
+  const commands = lines.slice(0, 32).map((line, index) => `BT /F1 ${index === 0 ? 17 : 10} Tf 40 ${770 - index * 22} Td (${pdfEscape(line).slice(0, 115)}) Tj ET`).join("\n");
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    `<< /Length ${Buffer.byteLength(commands, "ascii")} >>\nstream\n${commands}\nendstream`,
+  ];
+  let output = "%PDF-1.4\n";
+  const offsets = [0];
+  objects.forEach((object, index) => { offsets.push(Buffer.byteLength(output, "ascii")); output += `${index + 1} 0 obj\n${object}\nendobj\n`; });
+  const xref = Buffer.byteLength(output, "ascii");
+  output += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.slice(1).map((offset) => `${String(offset).padStart(10, "0")} 00000 n `).join("\n")}\n`;
+  output += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return new Uint8Array(Buffer.from(output, "ascii"));
+}
+
+async function boqPdf(supabase: SupabaseClient, id: string, boqId: string) {
+  const detailResponse = await getBoq(supabase, id, boqId);
+  if (!detailResponse.ok) return detailResponse;
+  const payload = await detailResponse.json();
+  const boq = payload.data as Record<string, any>;
+  return new Response(basicBoqPdf(boq), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="${pdfEscape(boq.boqNumber || "BOQ")}.pdf"`,
+      "Cache-Control": "private, no-store",
+      "X-Request-Id": id,
+    },
+  });
+}
+
+async function boqExcel(supabase: SupabaseClient, id: string, boqId: string) {
+  const detailResponse = await getBoq(supabase, id, boqId);
+  if (!detailResponse.ok) return detailResponse;
+  const payload = await detailResponse.json();
+  const boq = payload.data as Record<string, any>;
+  const rows: Array<Record<string, unknown>> = [];
+  let rowIdx = 1;
+  for (const r of (boq.rooms as Array<Record<string, any>>) || []) {
+    for (const c of (r.categories as Array<Record<string, any>>) || []) {
+      for (const it of (c.items as Array<Record<string, any>>) || []) {
+        rows.push({
+          "#": rowIdx++,
+          "Room": r.name,
+          "Category": c.name,
+          "Item": it.name,
+          "Description": it.description || "",
+          "Unit": it.unit,
+          "Quantity": it.quantity,
+          "Rate (INR)": it.rate,
+          "Amount (INR)": it.amount,
+        });
+      }
+    }
+  }
+  if (rows.length === 0) {
+    for (const r of (boq.rooms as Array<Record<string, any>>) || []) {
+      rows.push({
+        "#": rowIdx++,
+        "Room": r.name,
+        "Category": "General",
+        "Item": "-",
+        "Description": "",
+        "Unit": "-",
+        "Quantity": 0,
+        "Rate (INR)": 0,
+        "Amount (INR)": 0,
+      });
+    }
+  }
+  const worksheet = XLSX.utils.json_to_sheet(rows.length ? rows : [{ "BOQ Number": boq.boqNumber, "Status": boq.status, "Grand Total": boq.grandTotal }]);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "BOQ Items");
+  const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+  return new Response(buffer, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="${pdfEscape(boq.boqNumber || "BOQ")}.xlsx"`,
+      "Cache-Control": "private, no-store",
+      "X-Request-Id": id,
+    },
+  });
 }
 
 async function boqTemplates(request: NextRequest, supabase: SupabaseClient, id: string) {
@@ -2011,6 +2255,10 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (boqStatusMatch && request.method === "POST") return setBoqStatus(request, supabase, id, boqStatusMatch[1]);
   const boqDuplicateMatch = route.match(/^boqs\/([0-9a-f-]{36})\/duplicate$/i);
   if (boqDuplicateMatch && request.method === "POST") return duplicateBoq(supabase, id, boqDuplicateMatch[1]);
+  const boqPdfMatch = route.match(/^boqs\/([0-9a-f-]{36})\/pdf$/i);
+  if (boqPdfMatch && request.method === "GET") return boqPdf(supabase, id, boqPdfMatch[1]);
+  const boqExcelMatch = route.match(/^boqs\/([0-9a-f-]{36})\/excel$/i);
+  if (boqExcelMatch && request.method === "GET") return boqExcel(supabase, id, boqExcelMatch[1]);
   const boqRoomsMatch = route.match(/^boqs\/([0-9a-f-]{36})\/rooms$/i);
   if (boqRoomsMatch && request.method === "POST") return boqChild(request, supabase, id, boqRoomsMatch[1], "room");
   const boqRoomMatch = route.match(/^boqs\/([0-9a-f-]{36})\/rooms\/([0-9a-f-]{36})$/i);
