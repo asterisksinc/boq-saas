@@ -117,6 +117,59 @@ export interface BoqTemplate {
   updated_at: string;
 }
 
+// ── Project Templates ───────────────────────────────────────────────────────
+
+export type TemplateSection = Record<string, unknown>;
+
+export interface TemplateComposition {
+  rooms: number;
+  boqSections: number;
+  items: number;
+  stages: number;
+  tasks: number;
+  milestones: number;
+  approvals: number;
+  rules: number;
+  documents: number;
+}
+
+export interface ProjectTemplate {
+  id: string;
+  templateCode: string;
+  name: string;
+  description: string | null;
+  businessType: string;
+  projectType: string;
+  team: string | null;
+  region: string | null;
+  visibility: string;
+  imageUrl: string | null;
+  tags: string[];
+  status: string;
+  version: number;
+  useCount: number;
+  lastUsedAt: string | null;
+  publishedAt: string | null;
+  createdBy: string;
+  updatedBy: string;
+  createdAt: string;
+  updatedAt: string;
+  composition: TemplateComposition;
+  structure?: TemplateSection;
+  costingBoq?: TemplateSection;
+  workflow?: TemplateSection;
+  documents?: TemplateSection[];
+}
+
+export interface ProjectTemplateOverview {
+  total: number;
+  active: number;
+  draft: number;
+  needsReview: number;
+  byType: Record<string, number>;
+  recentlyUsed: ProjectTemplate[];
+}
+
 // ── Costing ─────────────────────────────────────────────────────────────────
 
 export interface CostingCategoryBackend {

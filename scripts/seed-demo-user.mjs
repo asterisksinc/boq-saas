@@ -201,6 +201,238 @@ const templateFixtures = [
 }));
 await upsert("project_templates", templateFixtures);
 
+const boqTemplateSeedFixtures = [
+  {
+    id: "e4000000-0000-4000-8000-000000000001",
+    workspace_id: WORKSPACE_ID,
+    name: "Premium 3BHK Interior BOQ",
+    description: "Reusable BOQ Structure for premium 3BHK residential Interior Projects",
+    tags: ["Residential", "Interior", "INTERIOR", "active", "v3.2"],
+    use_count: 42,
+    snapshot: {
+      metadata: {
+        templateCode: "BOQ-RES-0184",
+        category: "INTERIOR",
+        projectType: "Residential",
+        status: "ACTIVE",
+        version: "v3.2",
+        usedIn: "12 Templates",
+        sections: 18,
+        items: 186,
+        costMapping: 98,
+        indicativeBaseCost: "₹28.60L",
+        baseCostAmount: 2860000,
+        readiness: 94,
+      },
+      rooms: [
+        {
+          name: "Living Room",
+          itemsCount: 18,
+          cost: "₹1.28L",
+          categories: [
+            { name: "Furniture", itemsCount: 8, cost: "₹0.82L", items: [
+              { code: "LIV-FUR-001", name: "3-Seater Sofa", description: "Hardwood frame with fabric upholstery", unit: "Nos", quantity: 1, rateBasis: "Current Library Rate", rate: 42000, wastePercent: 0, taxPercent: 18, amount: 49560 },
+              { code: "LIV-FUR-002", name: "Coffee Table", description: "Teak veneer with brass inlay", unit: "Nos", quantity: 1, rateBasis: "Current Library Rate", rate: 18500, wastePercent: 0, taxPercent: 18, amount: 21830 },
+            ] },
+            { name: "Lighting", itemsCount: 6, cost: "₹0.26L", items: [] },
+            { name: "Painting", itemsCount: 4, cost: "₹0.20L", items: [] },
+          ]
+        },
+        {
+          name: "Master Bedroom",
+          itemsCount: 18,
+          cost: "₹4.82L",
+          categories: [
+            {
+              name: "Furniture",
+              itemsCount: 10,
+              cost: "₹4.82L",
+              items: [
+                { code: "FUR-001", name: "Full Height Wardrobe", description: "19mm BWP ply, laminate finish", unit: "Sq.ft", quantity: 72, rateBasis: "Current Library Rate", rate: 2875, wastePercent: 5, taxPercent: 18, amount: 221184 },
+                { code: "FUR-002", name: "Kind Size Bed", description: "Upholstered headboard", unit: "Nos", quantity: 1, rateBasis: "Current Library Rate", rate: 45800, wastePercent: 0, taxPercent: 18, amount: 54044 },
+                { code: "FUR-003", name: "Side Table", description: "600mm W, laminate finish", unit: "Nos", quantity: 2, rateBasis: "Current Library Rate", rate: 6250, wastePercent: 5, taxPercent: 18, amount: 13781 },
+                { code: "FUR-004", name: "Dressing Table", description: "With mirror and drawers", unit: "Nos", quantity: 1, rateBasis: "Current Library Rate", rate: 24500, wastePercent: 5, taxPercent: 18, amount: 28322 },
+                { code: "FUR-005", name: "Study Table", description: "Laminate top with storage", unit: "Nos", quantity: 1, rateBasis: "Current Library Rate", rate: 18750, wastePercent: 5, taxPercent: 18, amount: 22125 },
+                { code: "FUR-006", name: "TV Unit", description: "Floating unit, laminate finish", unit: "Sq.ft", quantity: 18, rateBasis: "Current Library Rate", rate: 2650, wastePercent: 5, taxPercent: 18, amount: 53106 },
+                { code: "FUR-007", name: "Chest of Drawers", description: "4 drawer unit", unit: "Nos", quantity: 1, rateBasis: "Current Library Rate", rate: 16500, wastePercent: 5, taxPercent: 18, amount: 19470 },
+                { code: "FUR-008", name: "Mirror with Frame", description: "900mm x 1200mm", unit: "Nos", quantity: 1, rateBasis: "Current Library Rate", rate: 7250, wastePercent: 0, taxPercent: 18, amount: 8555 },
+              ]
+            },
+            { name: "Painting", itemsCount: 6, cost: "₹0.68L", items: [] },
+            { name: "Electrical", itemsCount: 4, cost: "₹0.42L", items: [] },
+          ]
+        },
+        { name: "Dining", itemsCount: 2, cost: "₹0.74L", categories: [] },
+        { name: "Kitchen", itemsCount: 5, cost: "₹3.26L", categories: [] },
+        { name: "Bedroom 02", itemsCount: 16, cost: "₹3.98L", categories: [] },
+        { name: "Bedroom 03", itemsCount: 16, cost: "₹3.84L", categories: [] },
+        { name: "Bathrooms", itemsCount: 22, cost: "₹12.98L", categories: [] },
+        { name: "Electrical", itemsCount: 28, cost: "₹2.46L", categories: [] },
+        { name: "Flooring", itemsCount: 8, cost: "₹1.64L", categories: [] },
+        { name: "False Ceiling", itemsCount: 6, cost: "₹1.12L", categories: [] },
+      ]
+    },
+    created_by: userId
+  },
+  {
+    id: "e4000000-0000-4000-8000-000000000002",
+    workspace_id: WORKSPACE_ID,
+    name: "Premium Kitchen BOQ",
+    description: "Modular kitchen BOQ template with European hardware and acrylic shutters",
+    tags: ["Residential", "Kitchen", "KITCHEN", "active", "v2.4"],
+    use_count: 28,
+    snapshot: {
+      metadata: {
+        templateCode: "BOQ-INT-0096",
+        category: "KITCHEN",
+        projectType: "Residential",
+        status: "ACTIVE",
+        version: "v2.4",
+        usedIn: "7 Templates",
+        sections: 8,
+        items: 48,
+        costMapping: 100,
+        indicativeBaseCost: "₹8.40L",
+        baseCostAmount: 840000,
+        readiness: 98,
+      },
+      rooms: []
+    },
+    created_by: userId
+  },
+  {
+    id: "e4000000-0000-4000-8000-000000000003",
+    workspace_id: WORKSPACE_ID,
+    name: "Electrical Package BOQ",
+    description: "Complete residential electrical conduits, wiring, DBs, and automation package",
+    tags: ["Residential", "Electrical", "ELECTRICAL", "active", "v4.1"],
+    use_count: 56,
+    snapshot: {
+      metadata: {
+        templateCode: "BOQ-ELE-0122",
+        category: "ELECTRICAL",
+        projectType: "Residential",
+        status: "ACTIVE",
+        version: "v4.1",
+        usedIn: "15 Templates",
+        sections: 6,
+        items: 72,
+        costMapping: 94,
+        indicativeBaseCost: "₹6.80L",
+        baseCostAmount: 680000,
+        readiness: 96,
+      },
+      rooms: []
+    },
+    created_by: userId
+  },
+  {
+    id: "e4000000-0000-4000-8000-000000000004",
+    workspace_id: WORKSPACE_ID,
+    name: "Flooring BOQ",
+    description: "Italian marble, vitrified tiles, and wooden flooring template",
+    tags: ["Residential", "Flooring", "draft", "v1.6"],
+    use_count: 14,
+    snapshot: {
+      metadata: {
+        templateCode: "BOQ-PLM-0044",
+        category: "Flooring",
+        projectType: "Residential",
+        status: "DRAFT",
+        version: "v1.6",
+        usedIn: "9 Templates",
+        sections: 7,
+        items: 54,
+        costMapping: 87,
+        indicativeBaseCost: "₹14.20L",
+        baseCostAmount: 1420000,
+        readiness: 88,
+      },
+      rooms: []
+    },
+    created_by: userId
+  },
+  {
+    id: "e4000000-0000-4000-8000-000000000005",
+    workspace_id: WORKSPACE_ID,
+    name: "Plumbing BOQ",
+    description: "Sanitaryware, CP fittings, drainage, and water supply package",
+    tags: ["Residential", "Plumbing", "active", "v2.0"],
+    use_count: 22,
+    snapshot: {
+      metadata: {
+        templateCode: "BOQ-PLM-0044",
+        category: "Plumbing",
+        projectType: "Residential",
+        status: "ACTIVE",
+        version: "v2.0",
+        usedIn: "6 Templates",
+        sections: 5,
+        items: 63,
+        costMapping: 100,
+        indicativeBaseCost: "₹7.50L",
+        baseCostAmount: 750000,
+        readiness: 95,
+      },
+      rooms: []
+    },
+    created_by: userId
+  },
+  {
+    id: "e4000000-0000-4000-8000-000000000006",
+    workspace_id: WORKSPACE_ID,
+    name: "Painting BOQ",
+    description: "Internal and external painting with putty, primer, and royal lustre coats",
+    tags: ["Residential", "Painting", "draft", "v3.2"],
+    use_count: 18,
+    snapshot: {
+      metadata: {
+        templateCode: "BOQ-PNT-0063",
+        category: "Painting",
+        projectType: "Residential",
+        status: "DRAFT",
+        version: "v3.2",
+        usedIn: "12 Templates",
+        sections: 4,
+        items: 29,
+        costMapping: 54,
+        indicativeBaseCost: "₹3.90L",
+        baseCostAmount: 390000,
+        readiness: 72,
+      },
+      rooms: []
+    },
+    created_by: userId
+  },
+  {
+    id: "e4000000-0000-4000-8000-000000000007",
+    workspace_id: WORKSPACE_ID,
+    name: "Commercial Office Fit-Out BOQ",
+    description: "Turnkey office interior fit-out BOQ including workstations, glass partitions, and acoustics",
+    tags: ["Commercial", "Fit-Out", "Commercial", "active", "v3.0"],
+    use_count: 36,
+    snapshot: {
+      metadata: {
+        templateCode: "BOQ-COM-0032",
+        category: "Commercial",
+        projectType: "Commercial",
+        status: "ACTIVE",
+        version: "v3.0",
+        usedIn: "8 Templates",
+        sections: 22,
+        items: 231,
+        costMapping: 96,
+        indicativeBaseCost: "₹45.00L",
+        baseCostAmount: 4500000,
+        readiness: 96,
+      },
+      rooms: []
+    },
+    created_by: userId
+  }
+];
+await upsert("boq_templates", boqTemplateSeedFixtures);
+
 const premiumSnapshot = {
   templateId: templateFixtures[0].id, templateCode: templateFixtures[0].template_code,
   version: templateFixtures[0].current_version, name: templateFixtures[0].name,

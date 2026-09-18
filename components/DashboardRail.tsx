@@ -17,7 +17,7 @@ const navItems: NavItem[] = [
     { route: "/projects", icon: "dashboard-projects", label: "Projects" },
     { route: "/boqs", icon: "dashboard-boqs", label: "Bill of Quantities" },
     { route: "/costs", icon: "dashboard-costs", label: "Costing" },
-    { route: "/workspace", icon: "dashboard-workspace", label: "Workspace" },
+    { route: "/templates", icon: "dashboard-templates", label: "Templates" },
     { route: "/proposals", icon: "dashboard-estimates", label: "Proposals" },
     { route: "/invoices", icon: "dashboard-purchase-orders", label: "Invoices" },
     { route: "/analytics", icon: "dashboard-analytics", label: "Analytics" },

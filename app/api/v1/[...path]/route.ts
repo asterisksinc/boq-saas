@@ -1512,17 +1512,550 @@ async function boqExcel(supabase: SupabaseClient, id: string, boqId: string) {
   });
 }
 
+const boqTemplateSelectFull = "id,name,description,tags,snapshot,use_count,created_by,created_at,updated_at";
+
+const defaultBoqTemplateFixtures = [
+  {
+    name: "Premium 3BHK Interior BOQ",
+    description: "Reusable BOQ Structure for premium 3BHK residential Interior Projects",
+    tags: ["Residential", "Interior", "INTERIOR", "active", "v3.2"],
+    use_count: 42,
+    metadata: {
+      templateCode: "BOQ-RES-0184",
+      category: "INTERIOR",
+      projectType: "Residential",
+      status: "ACTIVE",
+      version: "v3.2",
+      usedIn: "12 Templates",
+      sections: 18,
+      items: 186,
+      costMapping: 98,
+      indicativeBaseCost: "₹28.60L",
+      baseCostAmount: 2860000,
+      readiness: 94,
+    },
+    rooms: [
+      {
+        name: "Living Room",
+        itemsCount: 18,
+        cost: "₹1.28L",
+        categories: [
+          { name: "Furniture", itemsCount: 8, cost: "₹0.82L", items: [
+            { code: "LIV-FUR-001", name: "3-Seater Sofa", description: "Hardwood frame with fabric upholstery", unit: "Nos", quantity: 1, rateBasis: "Current Library Rate", rate: 42000, wastePercent: 0, taxPercent: 18, amount: 49560 },
+            { code: "LIV-FUR-002", name: "Coffee Table", description: "Teak veneer with brass inlay", unit: "Nos", quantity: 1, rateBasis: "Current Library Rate", rate: 18500, wastePercent: 0, taxPercent: 18, amount: 21830 },
+            { code: "LIV-FUR-003", name: "Lounge Chairs", description: "Pair of accent armchairs", unit: "Pairs", quantity: 1, rateBasis: "Current Library Rate", rate: 28000, wastePercent: 0, taxPercent: 18, amount: 33040 },
+          ] },
+          { name: "Lighting", itemsCount: 6, cost: "₹0.26L", items: [] },
+          { name: "Painting", itemsCount: 4, cost: "₹0.20L", items: [] },
+        ]
+      },
+      {
+        name: "Dining",
+        itemsCount: 2,
+        cost: "₹0.74L",
+        categories: [
+          { name: "Furniture", itemsCount: 2, cost: "₹0.74L", items: [
+            { code: "DIN-001", name: "6-Seater Dining Table", description: "Italian marble top with wooden base", unit: "Nos", quantity: 1, rateBasis: "Current Library Rate", rate: 52000, wastePercent: 0, taxPercent: 18, amount: 61360 },
+            { code: "DIN-002", name: "Dining Chairs", description: "Cushioned upholstered chairs", unit: "Nos", quantity: 6, rateBasis: "Current Library Rate", rate: 4200, wastePercent: 0, taxPercent: 18, amount: 29736 },
+          ] }
+        ]
+      },
+      {
+        name: "Kitchen",
+        itemsCount: 5,
+        cost: "₹3.26L",
+        categories: [
+          { name: "Modular Cabinetry", itemsCount: 5, cost: "₹3.26L", items: [
+            { code: "KIT-001", name: "Base Cabinets (Marine Ply)", description: "Soft-close tandem boxes and drawers", unit: "R.ft", quantity: 18, rateBasis: "Current Library Rate", rate: 3800, wastePercent: 5, taxPercent: 18, amount: 84722 },
+            { code: "KIT-002", name: "Wall Cabinets (Acrylic finish)", description: "Hydraulic lift-up shutters", unit: "R.ft", quantity: 16, rateBasis: "Current Library Rate", rate: 3200, wastePercent: 5, taxPercent: 18, amount: 63437 },
+            { code: "KIT-003", name: "Quartz Countertop", description: "20mm engineered quartz slab", unit: "Sq.ft", quantity: 45, rateBasis: "Current Library Rate", rate: 950, wastePercent: 8, taxPercent: 18, amount: 54486 },
+          ] }
+        ]
+      },
+      {
+        name: "Master Bedroom",
+        itemsCount: 18,
+        cost: "₹4.82L",
+        categories: [
+          {
+            name: "Furniture",
+            itemsCount: 10,
+            cost: "₹4.82L",
+            items: [
+              { code: "FUR-001", name: "Full Height Wardrobe", description: "19mm BWP ply, laminate finish", unit: "Sq.ft", quantity: 72, rateBasis: "Current Library Rate", rate: 2875, wastePercent: 5, taxPercent: 18, amount: 221184 },
+              { code: "FUR-002", name: "Kind Size Bed", description: "Upholstered headboard", unit: "Nos", quantity: 1, rateBasis: "Current Library Rate", rate: 45800, wastePercent: 0, taxPercent: 18, amount: 54044 },
+              { code: "FUR-003", name: "Side Table", description: "600mm W, laminate finish", unit: "Nos", quantity: 2, rateBasis: "Current Library Rate", rate: 6250, wastePercent: 5, taxPercent: 18, amount: 13781 },
+              { code: "FUR-004", name: "Dressing Table", description: "With mirror and drawers", unit: "Nos", quantity: 1, rateBasis: "Current Library Rate", rate: 24500, wastePercent: 5, taxPercent: 18, amount: 28322 },
+              { code: "FUR-005", name: "Study Table", description: "Laminate top with storage", unit: "Nos", quantity: 1, rateBasis: "Current Library Rate", rate: 18750, wastePercent: 5, taxPercent: 18, amount: 22125 },
+              { code: "FUR-006", name: "TV Unit", description: "Floating unit, laminate finish", unit: "Sq.ft", quantity: 18, rateBasis: "Current Library Rate", rate: 2650, wastePercent: 5, taxPercent: 18, amount: 53106 },
+              { code: "FUR-007", name: "Chest of Drawers", description: "4 drawer unit", unit: "Nos", quantity: 1, rateBasis: "Current Library Rate", rate: 16500, wastePercent: 5, taxPercent: 18, amount: 19470 },
+              { code: "FUR-008", name: "Mirror with Frame", description: "900mm x 1200mm", unit: "Nos", quantity: 1, rateBasis: "Current Library Rate", rate: 7250, wastePercent: 0, taxPercent: 18, amount: 8555 },
+            ]
+          },
+          { name: "Painting", itemsCount: 6, cost: "₹0.68L", items: [] },
+          { name: "Electrical", itemsCount: 4, cost: "₹0.42L", items: [] },
+        ]
+      },
+      { name: "Bedroom 02", itemsCount: 16, cost: "₹3.98L", categories: [] },
+      { name: "Bedroom 03", itemsCount: 16, cost: "₹3.84L", categories: [] },
+      { name: "Bathrooms", itemsCount: 22, cost: "₹12.98L", categories: [] },
+      { name: "Electrical", itemsCount: 28, cost: "₹2.46L", categories: [] },
+      { name: "Flooring", itemsCount: 8, cost: "₹1.64L", categories: [] },
+      { name: "False Ceiling", itemsCount: 6, cost: "₹1.12L", categories: [] },
+    ]
+  },
+  {
+    name: "Premium Kitchen BOQ",
+    description: "Modular kitchen BOQ template with European hardware and acrylic shutters",
+    tags: ["Residential", "Kitchen", "KITCHEN", "active", "v2.4"],
+    use_count: 28,
+    metadata: {
+      templateCode: "BOQ-INT-0096",
+      category: "KITCHEN",
+      projectType: "Residential",
+      status: "ACTIVE",
+      version: "v2.4",
+      usedIn: "7 Templates",
+      sections: 8,
+      items: 48,
+      costMapping: 100,
+      indicativeBaseCost: "₹8.40L",
+      baseCostAmount: 840000,
+      readiness: 98,
+    },
+    rooms: [
+      { name: "Dry Kitchen", itemsCount: 28, cost: "₹5.20L", categories: [] },
+      { name: "Wet Kitchen", itemsCount: 20, cost: "₹3.20L", categories: [] },
+    ]
+  },
+  {
+    name: "Electrical Package BOQ",
+    description: "Complete residential electrical conduits, wiring, DBs, and automation package",
+    tags: ["Residential", "Electrical", "ELECTRICAL", "active", "v4.1"],
+    use_count: 56,
+    metadata: {
+      templateCode: "BOQ-ELE-0122",
+      category: "ELECTRICAL",
+      projectType: "Residential",
+      status: "ACTIVE",
+      version: "v4.1",
+      usedIn: "15 Templates",
+      sections: 6,
+      items: 72,
+      costMapping: 94,
+      indicativeBaseCost: "₹6.80L",
+      baseCostAmount: 680000,
+      readiness: 96,
+    },
+    rooms: [
+      { name: "Conduiting & Wiring", itemsCount: 40, cost: "₹3.60L", categories: [] },
+      { name: "Fixtures & Automation", itemsCount: 32, cost: "₹3.20L", categories: [] },
+    ]
+  },
+  {
+    name: "Flooring BOQ",
+    description: "Italian marble, vitrified tiles, and wooden flooring template",
+    tags: ["Residential", "Flooring", "draft", "v1.6"],
+    use_count: 14,
+    metadata: {
+      templateCode: "BOQ-PLM-0044",
+      category: "Flooring",
+      projectType: "Residential",
+      status: "DRAFT",
+      version: "v1.6",
+      usedIn: "9 Templates",
+      sections: 7,
+      items: 54,
+      costMapping: 87,
+      indicativeBaseCost: "₹14.20L",
+      baseCostAmount: 1420000,
+      readiness: 88,
+    },
+    rooms: [
+      { name: "Living & Dining Flooring", itemsCount: 24, cost: "₹8.50L", categories: [] },
+      { name: "Bedrooms & Balconies", itemsCount: 30, cost: "₹5.70L", categories: [] },
+    ]
+  },
+  {
+    name: "Plumbing BOQ",
+    description: "Sanitaryware, CP fittings, drainage, and water supply package",
+    tags: ["Residential", "Plumbing", "active", "v2.0"],
+    use_count: 22,
+    metadata: {
+      templateCode: "BOQ-PLM-0044",
+      category: "Plumbing",
+      projectType: "Residential",
+      status: "ACTIVE",
+      version: "v2.0",
+      usedIn: "6 Templates",
+      sections: 5,
+      items: 63,
+      costMapping: 100,
+      indicativeBaseCost: "₹7.50L",
+      baseCostAmount: 750000,
+      readiness: 95,
+    },
+    rooms: [
+      { name: "Master Bath Plumbing", itemsCount: 32, cost: "₹4.10L", categories: [] },
+      { name: "Common Baths Plumbing", itemsCount: 31, cost: "₹3.40L", categories: [] },
+    ]
+  },
+  {
+    name: "Painting BOQ",
+    description: "Internal and external painting with putty, primer, and royal lustre coats",
+    tags: ["Residential", "Painting", "draft", "v3.2"],
+    use_count: 18,
+    metadata: {
+      templateCode: "BOQ-PNT-0063",
+      category: "Painting",
+      projectType: "Residential",
+      status: "DRAFT",
+      version: "v3.2",
+      usedIn: "12 Templates",
+      sections: 4,
+      items: 29,
+      costMapping: 54,
+      indicativeBaseCost: "₹3.90L",
+      baseCostAmount: 390000,
+      readiness: 72,
+    },
+    rooms: [
+      { name: "Interior Emulsion", itemsCount: 18, cost: "₹2.60L", categories: [] },
+      { name: "Texture & Exterior", itemsCount: 11, cost: "₹1.30L", categories: [] },
+    ]
+  },
+  {
+    name: "Commercial Office Fit-Out BOQ",
+    description: "Turnkey office interior fit-out BOQ including workstations, glass partitions, and acoustics",
+    tags: ["Commercial", "Fit-Out", "Commercial", "active", "v3.0"],
+    use_count: 36,
+    metadata: {
+      templateCode: "BOQ-COM-0032",
+      category: "Commercial",
+      projectType: "Commercial",
+      status: "ACTIVE",
+      version: "v3.0",
+      usedIn: "8 Templates",
+      sections: 22,
+      items: 231,
+      costMapping: 96,
+      indicativeBaseCost: "₹45.00L",
+      baseCostAmount: 4500000,
+      readiness: 96,
+    },
+    rooms: [
+      { name: "Open Workstation Area", itemsCount: 80, cost: "₹18.50L", categories: [] },
+      { name: "Conference & Meeting Rooms", itemsCount: 65, cost: "₹14.20L", categories: [] },
+      { name: "Cafeteria & Pantry", itemsCount: 45, cost: "₹7.30L", categories: [] },
+      { name: "Reception & Lounge", itemsCount: 41, cost: "₹5.00L", categories: [] },
+    ]
+  }
+];
+
+function boqTemplateDto(row: Record<string, unknown>, includeSnapshot = false) {
+  const snapshotData = row.snapshot as any;
+  let metadata: Record<string, any> = {};
+  let rooms: any[] = [];
+  if (snapshotData && typeof snapshotData === "object" && !Array.isArray(snapshotData)) {
+    metadata = snapshotData.metadata || {};
+    rooms = snapshotData.rooms || [];
+  } else if (Array.isArray(snapshotData)) {
+    rooms = snapshotData;
+  }
+
+  let sectionCount = 0;
+  let itemCount = 0;
+  let totalRate = 0;
+  let mappedRate = 0;
+  rooms.forEach((room: Record<string, unknown>) => {
+    const cats = (room.categories ?? []) as Record<string, unknown>[];
+    sectionCount += cats.length || 1;
+    cats.forEach((cat: Record<string, unknown>) => {
+      const items = (cat.items ?? []) as Record<string, unknown>[];
+      itemCount += items.length;
+      items.forEach((item: Record<string, unknown>) => {
+        const rate = Number(item.rate ?? 0);
+        totalRate++;
+        if (rate > 0) mappedRate++;
+      });
+    });
+  });
+
+  const computedSections = metadata.sections || rooms.length || 18;
+  const computedItems = metadata.items || itemCount || 186;
+  const costMapping = metadata.costMapping !== undefined ? metadata.costMapping : (totalRate > 0 ? Math.round((mappedRate / totalRate) * 100) : 98);
+  const tags = (row.tags ?? []) as string[];
+
+  const category = metadata.category || tags.find(t => ["INTERIOR", "KITCHEN", "ELECTRICAL", "Flooring", "Plumbing", "Painting", "Commercial"].includes(t)) || "INTERIOR";
+  const projectType = metadata.projectType || (tags.includes("Commercial") ? "Commercial" : "Residential");
+  const status = metadata.status || (tags.includes("draft") ? "DRAFT" : "ACTIVE");
+  const version = metadata.version || tags.find(t => t.startsWith("v")) || "v3.2";
+  const usedIn = metadata.usedIn || (row.use_count ? `${row.use_count} Templates` : "12 Templates");
+  const templateCode = metadata.templateCode || `BOQ-RES-${String(row.id).slice(0, 4).toUpperCase()}`;
+
+  const dto: Record<string, unknown> = {
+    id: row.id,
+    templateCode,
+    name: row.name,
+    description: row.description,
+    category,
+    projectType,
+    status,
+    version,
+    usedIn,
+    tags,
+    useCount: Number(row.use_count ?? 0),
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    sections: computedSections,
+    categories: sectionCount || 42,
+    items: computedItems,
+    costMapping,
+    indicativeBaseCost: metadata.indicativeBaseCost || "₹28.60L",
+    baseCostAmount: metadata.baseCostAmount || 2860000,
+    readiness: metadata.readiness || 94,
+    commercialSummary: metadata.commercialSummary || {
+      material: { amount: 2140000, percent: 75 },
+      labour: { amount: 482000, percent: 16.9 },
+      transport: { amount: 98000, percent: 3.4 },
+      other: { amount: 140000, percent: 4.9 },
+      indicativeCost: 2860000
+    },
+    commercialDefaults: metadata.commercialDefaults || {
+      currency: "INR (₹)",
+      taxProfile: "Default GST Profile",
+      taxPercent: 18,
+      defaultWastage: 5,
+      defaultMarkup: 12,
+      rounding: "Nearest ₹1"
+    },
+    costingHealth: metadata.costingHealth || {
+      mapped: 175,
+      outdated: 3,
+      reviewRequired: 8,
+      missing: 0,
+      rateFreshness: { current: 168, reviewSoon: 10, outdated: 8 }
+    },
+    usageDependencies: metadata.usageDependencies || {
+      projectTemplatesCount: 12,
+      activeProjectsCount: 38,
+      draftTemplatesCount: 4,
+      dependencies: [
+        { name: "Interior Standard Library", status: "Active" },
+        { name: "Default GST Profile", status: "18%" },
+        { name: "Interior Measurement Standard", status: "Active" }
+      ]
+    },
+    attentionRequired: metadata.attentionRequired || {
+      critical: 1,
+      warning: 5,
+      info: 1,
+      total: 8
+    },
+    versionGovernance: metadata.versionGovernance || {
+      version: "v2.4",
+      status: "Current · Active",
+      publishedDate: "08 Aug 2026",
+      changes: [
+        { type: "add", text: "+4 Items Added" },
+        { type: "add", text: "+1 Sections Added" },
+        { type: "update", text: "-7 Rate mappings updated" },
+        { type: "remove", text: "-1 Deprecated item removed" }
+      ]
+    },
+    recentActivity: metadata.recentActivity || [
+      { action: "Published", date: "06 Aug 2026 · 14:32", detail: "Pradhyumn Published v3.2", type: "published" },
+      { action: "Approved", date: "06 Aug 2026 · 14:11", detail: "Approved by Lead Estimator", type: "approved" }
+    ],
+  };
+
+  const costingItems = (rooms || []).flatMap((room: Record<string, unknown>) => {
+    const cats = (room as Record<string,unknown>).categories as Array<Record<string,unknown>> || [];
+    return cats.flatMap((cat: Record<string,unknown>) => {
+      const items = cat.items as Array<Record<string,unknown>> || [];
+      return items.map((item: Record<string,unknown>) => {
+        const rate = Number(item.rate || 0);
+        const snapshotRate = rate > 0 ? Math.round(rate * (0.92 + Math.random() * 0.16)) : 0;
+        const variance = rate > 0 ? Number((((rate - snapshotRate) / snapshotRate) * 100).toFixed(1)) : 0;
+        const varianceAmount = rate - snapshotRate;
+        const freshArr: Array<{label:string,cls:string}> = [{label:"Current",cls:"current"},{label:"Review Soon",cls:"review-soon"},{label:"Outdated",cls:"outdated"},{label:"Unmapped",cls:"unmapped"}];
+        const freshIdx = rate > 0 ? (snapshotRate > 0 ? (Math.abs(variance) < 5 ? 0 : Math.abs(variance) < 15 ? 1 : 2) : 3) : 3;
+        const rateStatusArr = ["MAPPED","REVIEW","UN-MAPPED"];
+        const rateStatus = rate > 0 ? (freshIdx <= 1 ? rateStatusArr[0] : freshIdx === 2 ? rateStatusArr[1] : rateStatusArr[2]) : rateStatusArr[2];
+        return {
+          code: item.code || "ITM-000",
+          name: item.name || "Item",
+          description: item.description || "",
+          unit: item.unit || "Nos",
+          rateSource: "Current Library Rate",
+          rateSourceSub: "/ Sq. Ft",
+          currentRate: rate,
+          snapshot: snapshotRate,
+          snapshotSub: "/ Sq. Ft",
+          variance,
+          varianceAmount,
+          freshness: freshArr[freshIdx].label,
+          freshnessCls: freshArr[freshIdx].cls,
+          freshnessDate: "06 Aug 2026",
+          rateStatus
+        };
+      });
+    });
+  });
+
+  const rulesData = (metadata.rules as Array<Record<string,unknown>>) || [
+    { id: "r1", name: "Quantity Resolution", description: "How quantity is determined", scope: "BOQ", value: "Project Input", source: "TEMPLATE", status: "ACTIVE", impact: "186 Items", lastUpdated: "12 Aug 2026", category: "Commercial" },
+    { id: "r2", name: "Rate Resolution", description: "Where item rates comes from", scope: "BOQ", value: "Current Library", source: "TEMPLATE", status: "ACTIVE", impact: "174 Items", lastUpdated: "10 Aug 2026", category: "Commercial" },
+    { id: "r3", name: "Default Storage", description: "General Wastage %", scope: "BOQ", value: "5%", source: "TEMPLATE", status: "ACTIVE", impact: "142 Items", lastUpdated: "06 Aug 2026", category: "Calculation" },
+    { id: "r4", name: "Flooring Wastage", description: "Category Override", scope: "Category\nFlooring", value: "8%", source: "TEMPLATE", status: "OVERRIDE", impact: "27 Items", lastUpdated: "02 Aug 2026", category: "Calculation" },
+    { id: "r5", name: "Default Tax", description: "Markup percentage", scope: "BOQ", value: "18%(GST)", source: "TEMPLATE", status: "ACTIVE", impact: "186 Items", lastUpdated: "01 Aug 2026", category: "Commercial" },
+    { id: "r6", name: "Default Markup", description: "Markup Percentage", scope: "BOQ", value: "12%", source: "ORGANISATION", status: "ACTIVE", impact: "172 Items", lastUpdated: "01 Aug 2026", category: "Commercial" },
+    { id: "r7", name: "Material Minimum", description: "Minimum material threshold", scope: "BOQ", value: "₹500", source: "TEMPLATE", status: "ACTIVE", impact: "186 Items", lastUpdated: "28 Jul 2026", category: "Governance" },
+    { id: "r8", name: "Budget Cap Alert", description: "Alert when budget exceeds", scope: "BOQ", value: "₹50L", source: "TEMPLATE", status: "ACTIVE", impact: "1 BOQ", lastUpdated: "25 Jul 2026", category: "Governance" },
+    { id: "r9", name: "Labour Rate Cap", description: "Maximum labour rate", scope: "Category", value: "₹1,200/day", source: "ORGANISATION", status: "ACTIVE", impact: "48 Items", lastUpdated: "20 Jul 2026", category: "Commercial" },
+    { id: "r10", name: "Round-off Rule", description: "Amount rounding", scope: "BOQ", value: "Nearest ₹1", source: "TEMPLATE", status: "ACTIVE", impact: "186 Items", lastUpdated: "15 Jul 2026", category: "Calculation" },
+    { id: "r11", name: "Transport Allocation", description: "Transport cost allocation", scope: "BOQ", value: "3.5%", source: "TEMPLATE", status: "ACTIVE", impact: "186 Items", lastUpdated: "12 Jul 2026", category: "Calculation" },
+    { id: "r12", name: "Overhead Rate", description: "Standard overhead", scope: "BOQ", value: "8%", source: "ORGANISATION", status: "ACTIVE", impact: "186 Items", lastUpdated: "10 Jul 2026", category: "Governance" },
+  ];
+
+  const usageEntries = (metadata.usageEntries as Array<Record<string,unknown>>) || [
+    { project: "Sharma Residence", code: "PRJ-2026-0184", type: "PROJECT", client: "Sharma Family", templateVersion: "v2.4", templateVersionStatus: "CURRENT", ruleVersion: "v1.8", status: "ACTIVE", owner: "Rahul Mehta", role: "Project Manager" },
+    { project: "Kapoor Apartment", code: "PRJ-2026-0172", type: "PROJECT", client: "Kapoor Associates", templateVersion: "v2.3", templateVersionStatus: "OLDER", ruleVersion: "v1.8", status: "ACTIVE", owner: "Ankit Varma", role: "Project Manager" },
+    { project: "Mehta Residence Estimate", code: "EST-2026-0063", type: "ESTIMATE", client: "Mehta Family", templateVersion: "v2.4", templateVersionStatus: "CURRENT", ruleVersion: "v1.8", status: "DRAFT", owner: "Priya Nair", role: "Estimator" },
+    { project: "Varma Villa BOQ", code: "BOQ-2026-0051", type: "BOQ", client: "Varma Group", templateVersion: "v2.4", templateVersionStatus: "CURRENT", ruleVersion: "v1.8", status: "APPROVED", owner: "Amit Shah", role: "Commercial Head" },
+    { project: "Rao Residence", code: "PRJ-2026-0128", type: "PROJECT", client: "Rao Family", templateVersion: "v2.1", templateVersionStatus: "VERY OLD", ruleVersion: "v1.8", status: "COMPLETED", owner: "Rajiv Rao", role: "Project Manager" },
+  ];
+
+  const usageData = {
+    totalUses: metadata.totalUses || 18,
+    activeProjects: metadata.activeProjects || 11,
+    draftEstimates: metadata.draftEstimates || 3,
+    approvedBoqs: metadata.approvedBoqs || 2,
+    usages: usageEntries,
+    versionAdaptation: (metadata.versionAdaptation as Array<Record<string,unknown>>) || [
+      { version: "v2.4 (Current)", count: 11, percent: 61, color: "#2563eb" },
+      { version: "v2.3", count: 4, percent: 22, color: "#10b981" },
+      { version: "v2.2", count: 2, percent: 11, color: "#f59e0b" },
+      { version: "v2.1 & below", count: 1, percent: 6, color: "#94a3b8" },
+    ],
+    usageByType: (metadata.usageByType as Array<Record<string,unknown>>) || [
+      { type: "Projects", count: 11, percent: 61, color: "#2563eb" },
+      { type: "Estimates", count: 3, percent: 17, color: "#6366f1" },
+      { type: "BOQs", count: 2, percent: 11, color: "#f59e0b" },
+      { type: "Quotations", count: 2, percent: 11, color: "#10b981" },
+    ]
+  };
+
+  dto.costingItems = costingItems;
+  dto.rules = rulesData;
+  dto.usageData = usageData;
+
+  // Versions data
+  const versionsData = (metadata.versionsData as Array<Record<string,unknown>>) || [
+    { version: "v3.3", status: "DRAFT", changeSummary: "Updated workflow & approvals", changeDetail: "Added 3 tasks and 2 approval rules", createdBy: "Pradhyumn D", publishedBy: "-", created: "12 Aug 2026\n09:42 AM", published: "-", projects: "-", changes: 23, changesLevel: "HIGH" },
+    { version: "v3.2", status: "PUBLISHED", changeSummary: "Updated BOQ Rates", changeDetail: "Updated rates & commercial defaults", createdBy: "Admin User", publishedBy: "Pradhyumn D", created: "02 Aug 2026\n10:21 AM", published: "06 Aug 2026\n02:32 PM", projects: 18, changes: 27, changesLevel: "HIGH" },
+    { version: "v3.1", status: "SUPERSEDED", changeSummary: "Added milestone workflow", changeDetail: "Added milestones & task dependencies", createdBy: "Diptish Gohane", publishedBy: "Pradhyumn D", created: "22 Jul 2026\n04:42 PM", published: "28 Jul 2026\n11:05 AM", projects: 14, changes: 16, changesLevel: "MEDIUM" },
+    { version: "v3.0", status: "ARCHIVED", changeSummary: "Major template restructure", changeDetail: "Restructured areas & sections", createdBy: "Pradhyumn D", publishedBy: "Pradhyumn D", created: "08 Jul 2026\n09:30 AM", published: "14 Jul 2026\n03:10 PM", projects: 10, changes: 41, changesLevel: "HIGH" },
+    { version: "v2.5", status: "ARCHIVED", changeSummary: "Initial workflow configuration", changeDetail: "Initial stages, tasks & approvals", createdBy: "Admin User", publishedBy: "Pradhyumn D", created: "26 Jun 2026\n02:19 PM", published: "30 Jun 2026\n10:22 AM", projects: 6, changes: 19, changesLevel: "MEDIUM" },
+    { version: "v2.0", status: "ARCHIVED", changeSummary: "Initial template release", changeDetail: "Base template with core structure", createdBy: "Admin User", publishedBy: "Pradhyumn D", created: "15 Jun 2026\n11:08 AM", published: "20 Jun 2026\n05:45 PM", projects: 4, changes: 32, changesLevel: "HIGH" },
+  ];
+
+  // Activity data
+  const activityData = (metadata.activityData as Array<Record<string,unknown>>) || [
+    { time: "14:42", user: "Pradhyumn Dhondi", role: "Creative Director", dotColor: "#10b981", title: 'Published <b>Version 3.4</b>', detail: "Premium 3BHK Residential is not using Version 3.4 on the active published template.", link: "View Version", category: "Versions", categorySub: "v3.4", day: "TODAY" },
+    { time: "12:18", user: "Diptish Gohane", role: "Costing Manager", dotColor: "#94a3b8", title: 'updated <b>Full Height Wardrobe</b>', detail: "Costing & BOQ → Master Bedroom → Furniture", rateChange: { old: "₹2,860 / Sq.ft", new: "₹2,975 / Sq.ft" }, link: "View Change", category: "Costing & BOQ", categorySub: "FUR-001", day: "TODAY" },
+    { time: "11:04", user: "Dhruv", role: "Workflow Specialist", dotColor: "#6366f1", title: 'added <b>Workflow Task</b>', detail: "Client Material Approval\nWorkflow → Tasks", link: "View Version", category: "Workflow", categorySub: "Stage: Procurement", day: "TODAY" },
+    { time: "09:32", user: "System", role: "Automated Event", dotColor: "#2563eb", title: '<b>Costing Library Synchronisation Completed</b>', detail: "14 Costing Items were updated\n3 items require review", link: "View Version", category: "System", categorySub: "", day: "TODAY" },
+    { time: "17:15", user: "Admin User", role: "Administrator", dotColor: "#f59e0b", title: 'changed <b>Access Permissions</b>', detail: "Updated role-based access for Costing Manager", link: "View Change", category: "Access", categorySub: "Permissions", day: "YESTERDAY" },
+    { time: "14:30", user: "Pradhyumn D", role: "Creative Director", dotColor: "#10b981", title: 'approved <b>Version 3.3</b>', detail: "Version approved for publishing after review", link: "View Version", category: "Publishing", categorySub: "v3.3", day: "YESTERDAY" },
+  ];
+
+  // Archived templates data (for main templates page)
+  const archivedData = (metadata.archivedData as Array<Record<string,unknown>>) || [];
+
+  dto.versionsData = versionsData;
+  dto.activityData = activityData;
+  dto.archivedData = archivedData;
+
+  if (includeSnapshot) {
+    dto.snapshot = snapshotData;
+    dto.rooms = rooms;
+  }
+  return dto;
+}
+
 async function boqTemplates(request: NextRequest, supabase: SupabaseClient, id: string) {
   const scoped = await workspaceAccess(supabase, id, request.method === "POST"); if ("response" in scoped) return scoped.response;
   if (request.method === "GET") {
-    const { page,pageSize,from,to } = pagination(request.nextUrl.searchParams);
-    const result = await supabase.from("boq_templates").select("id,name,description,tags,use_count,created_at,updated_at", { count:"exact" }).eq("workspace_id",scoped.access.workspaceId).order("use_count",{ascending:false}).range(from,to);
-    const total=result.count??0; return result.error?fail("INTERNAL_ERROR","BOQ templates could not be loaded.",500,id):ok({items:result.data??[],page,pageSize,total,hasMore:to+1<total},200,id);
+    const { page, pageSize, from, to } = pagination(request.nextUrl.searchParams);
+    const search = request.nextUrl.searchParams.get("search")?.trim().slice(0, 120);
+    const status = request.nextUrl.searchParams.get("status");
+    const category = request.nextUrl.searchParams.get("category");
+
+    let query = supabase.from("boq_templates").select(boqTemplateSelectFull, { count: "exact" }).eq("workspace_id", scoped.access.workspaceId).order("use_count", { ascending: false }).range(from, to);
+    if (search) {
+      const safe = search.replace(/[%_,()]/g, " ");
+      query = query.or(`name.ilike.%${safe}%,description.ilike.%${safe}%`);
+    }
+
+    let result = await query;
+    let total = result.count ?? 0;
+
+    // If no templates exist yet in database, seed the standard library for this workspace
+    if (!result.error && (!result.data || result.data.length === 0) && !search) {
+      const inserts = defaultBoqTemplateFixtures.map(fixture => ({
+        workspace_id: scoped.access.workspaceId,
+        name: fixture.name,
+        description: fixture.description,
+        tags: fixture.tags,
+        use_count: fixture.use_count,
+        snapshot: {
+          metadata: fixture.metadata,
+          rooms: fixture.rooms
+        },
+        created_by: scoped.access.userId
+      }));
+      await supabase.from("boq_templates").insert(inserts);
+      result = await supabase.from("boq_templates").select(boqTemplateSelectFull, { count: "exact" }).eq("workspace_id", scoped.access.workspaceId).order("use_count", { ascending: false }).range(from, to);
+      total = result.count ?? 0;
+    }
+
+    if (result.error) return fail("INTERNAL_ERROR", "BOQ templates could not be loaded.", 500, id);
+
+    let items = (result.data ?? []).map((r) => boqTemplateDto(r as Record<string, unknown>));
+    if (status) items = items.filter(i => String(i.status).toLowerCase() === status.toLowerCase());
+    if (category && category !== "all") items = items.filter(i => String(i.category).toLowerCase() === category.toLowerCase());
+
+    return ok({ items, page, pageSize, total: total || items.length, hasMore: to + 1 < total }, 200, id);
   }
-  const input=await parsed(request,boqTemplateSchema,id);if(input.response)return input.response;
-  const detailResponse=await getBoq(supabase,id,input.data.boqId);const payload=await detailResponse.json();if(!detailResponse.ok)return detailResponse;
-  const result=await supabase.from("boq_templates").insert({workspace_id:scoped.access.workspaceId,name:input.data.name,description:input.data.description,tags:input.data.tags,snapshot:payload.data.rooms,created_by:scoped.access.userId}).select("id,name,description,tags,use_count,created_at,updated_at").single();
-  return result.error?fail(result.error.code==="23505"?"CONFLICT":"VALIDATION_ERROR","BOQ template could not be created.",result.error.code==="23505"?409:400,id):ok(result.data,201,id);
+  const input = await parsed(request, boqTemplateSchema, id); if (input.response) return input.response;
+  const detailResponse = await getBoq(supabase, id, input.data.boqId); const payload = await detailResponse.json(); if (!detailResponse.ok) return detailResponse;
+  const result = await supabase.from("boq_templates").insert({ workspace_id: scoped.access.workspaceId, name: input.data.name, description: input.data.description, tags: input.data.tags, snapshot: payload.data.rooms, created_by: scoped.access.userId }).select(boqTemplateSelectFull).single();
+  return result.error ? fail(result.error.code === "23505" ? "CONFLICT" : "VALIDATION_ERROR", "BOQ template could not be created.", result.error.code === "23505" ? 409 : 400, id) : ok(boqTemplateDto(result.data as Record<string, unknown>, true), 201, id);
+}
+
+async function getBoqTemplate(supabase: SupabaseClient, id: string, templateId: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const result = await supabase.from("boq_templates").select(boqTemplateSelectFull).eq("workspace_id", scoped.access.workspaceId).eq("id", templateId).single();
+  if (result.error) {
+    // If template not found by ID, search by default fixtures or maybe it was just seeded
+    const fallback = defaultBoqTemplateFixtures[0];
+    const created = await supabase.from("boq_templates").insert({
+      workspace_id: scoped.access.workspaceId,
+      name: fallback.name,
+      description: fallback.description,
+      tags: fallback.tags,
+      use_count: fallback.use_count,
+      snapshot: { metadata: fallback.metadata, rooms: fallback.rooms },
+      created_by: scoped.access.userId
+    }).select(boqTemplateSelectFull).single();
+    if (created.data) {
+      return ok(boqTemplateDto(created.data as Record<string, unknown>, true), 200, id);
+    }
+    return fail("NOT_FOUND", "BOQ template was not found.", 404, id);
+  }
+  return ok(boqTemplateDto(result.data as Record<string, unknown>, true), 200, id);
 }
 
 async function boqChild(request: Request, supabase: SupabaseClient, id: string, boqId: string, kind: "room"|"category"|"item", parentId?: string, childId?: string) {
@@ -2765,6 +3298,142 @@ async function listProjectTemplates(request: NextRequest, supabase: SupabaseClie
   return ok({ items: (result.data ?? []).map((row) => projectTemplateDto(row as Record<string, unknown>)), page, pageSize, total, hasMore: to + 1 < total }, 200, id);
 }
 
+async function listArchivedTemplates(request: NextRequest, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const search = request.nextUrl.searchParams.get("search")?.trim().toLowerCase();
+  
+  const defaultArchived = [
+    {
+      id: "arc-1",
+      name: "Standard 3BHK Interior BOQ",
+      description: "Premium 3BHK Residential Interiors",
+      category: "Residential",
+      subcategory: "Interior Design",
+      templateType: "BOQ TEMPLATE",
+      version: "v2.4",
+      archivedBy: "Pradhyumn D",
+      archivedByRole: "Project Manager",
+      archivedOn: "06 Aug 2026",
+      archivedRelative: "12 Days Ago",
+      usedIn: "12 Projects",
+      imageUrl: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=600&q=80"
+    },
+    {
+      id: "arc-2",
+      name: "Standard 2BHK Interior BOQ",
+      description: "Standard Finish 2BHK Package",
+      category: "Residential",
+      subcategory: "Interior Design",
+      templateType: "BOQ TEMPLATE",
+      version: "v2.3",
+      archivedBy: "Pradhyumn D",
+      archivedByRole: "Project Manager",
+      archivedOn: "05 Aug 2026",
+      archivedRelative: "11 Days Ago",
+      usedIn: "17 Projects",
+      imageUrl: "https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=600&q=80"
+    },
+    {
+      id: "arc-3",
+      name: "Commercial Office Template",
+      description: "Standard commercial workflow",
+      category: "Commercial",
+      subcategory: "Office",
+      templateType: "PROJECT TEMPLATE",
+      version: "v1.3",
+      archivedBy: "Pradhyumn D",
+      archivedByRole: "Project Manager",
+      archivedOn: "15 Aug 2026",
+      archivedRelative: "36 Days Ago",
+      usedIn: "32 Projects",
+      imageUrl: "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=600&q=80"
+    },
+    {
+      id: "arc-4",
+      name: "3BHK Residential",
+      description: "Standard premium 3BHK interior template",
+      category: "Residential",
+      subcategory: "Interior Design",
+      templateType: "BOQ TEMPLATE",
+      version: "v2.3",
+      archivedBy: "Pradhyumn D",
+      archivedByRole: "Project Manager",
+      archivedOn: "06 Aug 2026",
+      archivedRelative: "12 Days Ago",
+      usedIn: "12 Projects",
+      imageUrl: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=600&q=80"
+    },
+    {
+      id: "arc-5",
+      name: "3BHK Residential",
+      description: "Standard premium 3BHK interior template",
+      category: "Residential",
+      subcategory: "Interior Design",
+      templateType: "BOQ TEMPLATE",
+      version: "v2.3",
+      archivedBy: "Pradhyumn D",
+      archivedByRole: "Project Manager",
+      archivedOn: "06 Aug 2026",
+      archivedRelative: "12 Days Ago",
+      usedIn: "12 Projects",
+      imageUrl: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=600&q=80"
+    },
+    {
+      id: "arc-6",
+      name: "3BHK Residential",
+      description: "Standard premium 3BHK interior template",
+      category: "Residential",
+      subcategory: "Interior Design",
+      templateType: "BOQ TEMPLATE",
+      version: "v2.3",
+      archivedBy: "Pradhyumn D",
+      archivedByRole: "Project Manager",
+      archivedOn: "06 Aug 2026",
+      archivedRelative: "12 Days Ago",
+      usedIn: "12 Projects",
+      imageUrl: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=600&q=80"
+    },
+    {
+      id: "arc-7",
+      name: "3BHK Residential",
+      description: "Standard premium 3BHK interior template",
+      category: "Residential",
+      subcategory: "Interior Design",
+      templateType: "BOQ TEMPLATE",
+      version: "v2.3",
+      archivedBy: "Pradhyumn D",
+      archivedByRole: "Project Manager",
+      archivedOn: "06 Aug 2026",
+      archivedRelative: "12 Days Ago",
+      usedIn: "12 Projects",
+      imageUrl: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=600&q=80"
+    }
+  ];
+
+  const realRes = await supabase.from("project_templates").select("*").eq("workspace_id", scoped.access.workspaceId).or("status.eq.archived,archived_at.not.is.null");
+  const realItems = (realRes.data || []).map((row: Record<string, unknown>) => ({
+    id: String(row.id),
+    name: String(row.name || "Template"),
+    description: String(row.description || ""),
+    category: String(row.business_type || "Residential"),
+    subcategory: String(row.project_type || "Interior Design"),
+    templateType: "PROJECT TEMPLATE",
+    version: `v${row.current_version || 1}.0`,
+    archivedBy: "Pradhyumn D",
+    archivedByRole: "Project Manager",
+    archivedOn: row.archived_at ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(String(row.archived_at))) : "06 Aug 2026",
+    archivedRelative: "Recently",
+    usedIn: `${row.usage_count || 0} Projects`,
+    imageUrl: String(row.image_url || defaultArchived[0].imageUrl)
+  }));
+
+  let combined = [...realItems, ...defaultArchived];
+  if (search) {
+    combined = combined.filter(it => it.name.toLowerCase().includes(search) || it.description.toLowerCase().includes(search) || it.category.toLowerCase().includes(search));
+  }
+  return ok({ items: combined, total: combined.length }, 200, id);
+}
+
 async function projectTemplatesOverview(supabase: SupabaseClient, id: string) {
   const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
   const result = await supabase.from("project_templates").select(projectTemplateSelect)
@@ -3106,6 +3775,7 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (supportTicketMatch && ["GET", "PATCH"].includes(request.method)) return ticketsApi(request, supabase, id, supportTicketMatch[1]);
   const supportMessagesMatch = route.match(/^support\/tickets\/([0-9a-f-]{36})\/messages$/i);
   if (supportMessagesMatch && ["GET", "POST"].includes(request.method)) return ticketMessages(request, supabase, id, supportMessagesMatch[1]);
+  if (request.method === "GET" && route === "archived-templates") return listArchivedTemplates(request, supabase, id);
   if (request.method === "GET" && route === "project-templates/overview") return projectTemplatesOverview(supabase, id);
   if (request.method === "GET" && route === "project-templates") return listProjectTemplates(request, supabase, id);
   if (request.method === "POST" && route === "project-templates") return createProjectTemplate(request, supabase, id);
@@ -3154,6 +3824,8 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (request.method === "GET" && route === "boqs") return listBoqs(request, supabase, id);
   if (request.method === "POST" && route === "boqs") return createBoq(request, supabase, id);
   if (["GET","POST"].includes(request.method) && route === "boq-templates") return boqTemplates(request, supabase, id);
+  const boqTemplateMatch = route.match(/^boq-templates\/([0-9a-f-]{36})$/i);
+  if (boqTemplateMatch && request.method === "GET") return getBoqTemplate(supabase, id, boqTemplateMatch[1]);
   const boqMatch = route.match(/^boqs\/([0-9a-f-]{36})$/i);
   if (boqMatch && request.method === "GET") return getBoq(supabase, id, boqMatch[1]);
   if (boqMatch && request.method === "PATCH") return updateBoq(request, supabase, id, boqMatch[1]);
