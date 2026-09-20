@@ -18498,6 +18498,15 @@ input {
     letter-spacing: -.02em;
 }
 
+.rvyo-page .legal-body h3 {
+    margin: 30px 0 14px;
+    color: #030303;
+    font-size: 21px;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: 0;
+}
+
 .rvyo-page .legal-grid-band {
     height: 104px !important;
     border-bottom: 1px solid var(--home-line);
@@ -18515,6 +18524,10 @@ input {
 
     .rvyo-page .legal-body h2 {
         font-size: 28px;
+    }
+
+    .rvyo-page .legal-body h3 {
+        font-size: 19px;
     }
 }
 
