@@ -3691,23 +3691,61 @@ async function stagesApi(request: NextRequest, supabase: SupabaseClient, id: str
   const result=await query.select().single(); return result.error?fail("VALIDATION_ERROR","Stage could not be saved.",400,id):ok(result.data,stageId?200:201,id);
 }
 
+function taskDto(row: Record<string, any>) {
+  const p = row.projects as { project_code?: string; name?: string } | undefined;
+  const s = row.activity_stages as { name?: string; color?: string } | undefined;
+  return {
+    ...row,
+    projectId: row.project_id,
+    stageId: row.stage_id,
+    assignedTo: row.assigned_to ?? null,
+    ownerId: row.owner_id ?? null,
+    dueDate: row.due_date ?? null,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    project: p ? { name: p.name, projectCode: p.project_code } : undefined,
+    stage: s ? { name: s.name, color: s.color } : undefined,
+  };
+}
+
+function approvalDto(row: Record<string, any>) {
+  const p = row.projects as { project_code?: string; name?: string } | undefined;
+  const s = row.activity_stages as { name?: string; color?: string } | undefined;
+  return {
+    ...row,
+    projectId: row.project_id,
+    stageId: row.stage_id,
+    approverId: row.approver_id ?? null,
+    approverName: row.approver_name ?? null,
+    dueDate: row.due_date,
+    requestedBy: row.requested_by,
+    requestedAt: row.requested_at,
+    decidedAt: row.decided_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    project: p ? { name: p.name, projectCode: p.project_code } : undefined,
+    stage: s ? { name: s.name, color: s.color } : undefined,
+  };
+}
+
 async function verifyActivityParents(supabase: SupabaseClient,wid:string,projectId:string,stageId:string){const [p,s]=await Promise.all([supabase.from("projects").select("id").eq("workspace_id",wid).eq("id",projectId).maybeSingle(),supabase.from("activity_stages").select("id").eq("workspace_id",wid).eq("id",stageId).maybeSingle()]);return Boolean(p.data&&s.data);}
 async function tasksApi(request: NextRequest,supabase:SupabaseClient,id:string,taskId?:string){
   const scoped=await workspaceAccess(supabase,id,request.method!=="GET");if("response"in scoped)return scoped.response;const wid=scoped.access.workspaceId;
-  if(request.method==="GET"){let q=supabase.from("activity_tasks").select("*,projects(project_code,name),activity_stages(name,color)").eq("workspace_id",wid).order("updated_at",{ascending:false});if(taskId)q=q.eq("id",taskId);const r=taskId?await q.single():await q;return r.error?fail(taskId?"NOT_FOUND":"INTERNAL_ERROR","Task(s) could not be loaded.",taskId?404:500,id):ok(taskId?r.data:{items:r.data??[]},200,id);}
+  if(request.method==="GET"){let q=supabase.from("activity_tasks").select("*,projects(project_code,name),activity_stages!activity_tasks_stage_id_fkey(name,color)").eq("workspace_id",wid).order("updated_at",{ascending:false});if(taskId)q=q.eq("id",taskId);const r=taskId?await q.single():await q;return r.error?fail(taskId?"NOT_FOUND":"INTERNAL_ERROR","Task(s) could not be loaded.",taskId?404:500,id):ok(taskId?taskDto(r.data):{items:(r.data??[]).map(taskDto)},200,id);}
   const input=await parsed(request,taskId?activityTaskPatchSchema:activityTaskSchema,id);if(input.response)return input.response;const v=input.data as Record<string,unknown>;
   if(!taskId&&!await verifyActivityParents(supabase,wid,String(v.projectId),String(v.stageId)))return fail("VALIDATION_ERROR","projectId and stageId must belong to this workspace.",400,id);
   const values={...(v.name!==undefined?{name:v.name}:{}),...(v.stageId!==undefined?{stage_id:v.stageId}:{}),...(v.description!==undefined?{description:v.description}:{}),...(v.assignedTo!==undefined?{assigned_to:v.assignedTo}:{}),...(v.ownerId!==undefined?{owner_id:v.ownerId}:{}),...(v.dueDate!==undefined?{due_date:v.dueDate}:{}),...(v.priority!==undefined?{priority:v.priority}:{}),...(v.status!==undefined?{status:v.status}:{}),...(v.attachments!==undefined?{attachments:v.attachments}:{})};
-  const q=taskId?supabase.from("activity_tasks").update(values).eq("workspace_id",wid).eq("id",taskId):supabase.from("activity_tasks").insert({workspace_id:wid,project_id:v.projectId,created_by:scoped.access.userId,...values});const r=await q.select().single();return r.error?fail("VALIDATION_ERROR","Task could not be saved.",400,id):ok(r.data,taskId?200:201,id);
+  const q=taskId?supabase.from("activity_tasks").update(values).eq("workspace_id",wid).eq("id",taskId):supabase.from("activity_tasks").insert({workspace_id:wid,project_id:v.projectId,created_by:scoped.access.userId,...values});const r=await q.select("*,projects(project_code,name),activity_stages!activity_tasks_stage_id_fkey(name,color)").single();return r.error?fail("VALIDATION_ERROR","Task could not be saved.",400,id):ok(taskDto(r.data),taskId?200:201,id);
 }
 
 async function approvalsApi(request:NextRequest,supabase:SupabaseClient,id:string,approvalId?:string){
   const scoped=await workspaceAccess(supabase,id,request.method!=="GET");if("response"in scoped)return scoped.response;const wid=scoped.access.workspaceId;
-  if(request.method==="GET"){let q=supabase.from("activity_approvals").select("*,projects(project_code,name),activity_stages(name,color)").eq("workspace_id",wid).order("updated_at",{ascending:false});if(approvalId)q=q.eq("id",approvalId);const r=approvalId?await q.single():await q;return r.error?fail(approvalId?"NOT_FOUND":"INTERNAL_ERROR","Approval(s) could not be loaded.",approvalId?404:500,id):ok(approvalId?r.data:{items:r.data??[]},200,id);}
+  if(request.method==="GET"){let q=supabase.from("activity_approvals").select("*,projects(project_code,name),activity_stages!activity_approvals_stage_id_fkey(name,color)").eq("workspace_id",wid).order("updated_at",{ascending:false});if(approvalId)q=q.eq("id",approvalId);const r=approvalId?await q.single():await q;return r.error?fail(approvalId?"NOT_FOUND":"INTERNAL_ERROR","Approval(s) could not be loaded.",approvalId?404:500,id):ok(approvalId?approvalDto(r.data):{items:(r.data??[]).map(approvalDto)},200,id);}
   const input=await parsed(request,approvalId?activityApprovalPatchSchema:activityApprovalSchema,id);if(input.response)return input.response;const v=input.data as Record<string,unknown>;
   if(!approvalId&&!await verifyActivityParents(supabase,wid,String(v.projectId),String(v.stageId)))return fail("VALIDATION_ERROR","projectId and stageId must belong to this workspace.",400,id);
   const values={...(v.name!==undefined?{name:v.name}:{}),...(v.stageId!==undefined?{stage_id:v.stageId}:{}),...(v.description!==undefined?{description:v.description}:{}),...(v.approverId!==undefined?{approver_id:v.approverId}:{}),...(v.approverName!==undefined?{approver_name:v.approverName}:{}),...(v.dueDate!==undefined?{due_date:v.dueDate}:{}),...(v.status!==undefined?{status:v.status}:{}),...(v.attachments!==undefined?{attachments:v.attachments}:{})};
-  const q=approvalId?supabase.from("activity_approvals").update(values).eq("workspace_id",wid).eq("id",approvalId):supabase.from("activity_approvals").insert({workspace_id:wid,project_id:v.projectId,requested_by:scoped.access.userId,requested_at:v.status==="draft"?null:new Date().toISOString(),...values});const r=await q.select().single();return r.error?fail("VALIDATION_ERROR","Approval could not be saved.",400,id):ok(r.data,approvalId?200:201,id);
+  const q=approvalId?supabase.from("activity_approvals").update(values).eq("workspace_id",wid).eq("id",approvalId):supabase.from("activity_approvals").insert({workspace_id:wid,project_id:v.projectId,requested_by:scoped.access.userId,requested_at:v.status==="draft"?null:new Date().toISOString(),...values});const r=await q.select("*,projects(project_code,name),activity_stages!activity_approvals_stage_id_fkey(name,color)").single();return r.error?fail("VALIDATION_ERROR","Approval could not be saved.",400,id):ok(approvalDto(r.data),approvalId?200:201,id);
 }
 
 async function approvalDecision(request:Request,supabase:SupabaseClient,id:string,approvalId:string){const scoped=await workspaceAccess(supabase,id,true);if("response"in scoped)return scoped.response;const input=await parsed(request,approvalDecisionSchema,id);if(input.response)return input.response;const r=await supabase.from("activity_approvals").update({status:input.data.decision,decided_at:new Date().toISOString()}).eq("workspace_id",scoped.access.workspaceId).eq("id",approvalId).select().single();if(r.error)return fail("NOT_FOUND","Approval was not found.",404,id);if(input.data.comment)await supabase.from("activity_comments").insert({workspace_id:scoped.access.workspaceId,entity_type:"approval",entity_id:approvalId,body:input.data.comment,author_id:scoped.access.userId});return ok(r.data,200,id);}
