@@ -1249,6 +1249,12 @@ async function listBoqs(request: NextRequest, supabase: SupabaseClient, id: stri
   }, 200, id);
 }
 
+async function nextBoqIdentity(supabase: SupabaseClient, workspaceId: string, offset = 1) {
+  const result = await supabase.from("boqs").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId);
+  const sequence = String((result.count ?? 0) + offset).padStart(4, "0");
+  return { boqNumber: `BOQ-${sequence}`, version: "v1" };
+}
+
 async function createBoq(request: Request, supabase: SupabaseClient, id: string) {
   const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
   const input = await parsed(request, boqCreateSchema, id); if (input.response) return input.response;
@@ -1261,11 +1267,16 @@ async function createBoq(request: Request, supabase: SupabaseClient, id: string)
 
   const assignedTo = input.data.assignedTo || project.data.assigned_designer_id || scoped.access.userId;
 
-  const inserted = await supabase.from("boqs").insert({ workspace_id: scoped.access.workspaceId, project_id: input.data.projectId,
-    boq_number: input.data.boqNumber, version: input.data.version, assigned_to: assignedTo,
-    source_method: input.data.method, source_template_id: input.data.templateId, markup_percent: input.data.markupPercent,
-    tax_percent: input.data.taxPercent, created_by: scoped.access.userId, updated_by: scoped.access.userId }).select(boqSelect).single();
-  if (inserted.error) return fail(inserted.error.code === "23505" ? "CONFLICT" : "VALIDATION_ERROR", inserted.error.code === "23505" ? "This BOQ number and version already exist." : "BOQ could not be created.", inserted.error.code === "23505" ? 409 : 400, id);
+  let inserted;
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    const identity = await nextBoqIdentity(supabase, scoped.access.workspaceId, attempt);
+    inserted = await supabase.from("boqs").insert({ workspace_id: scoped.access.workspaceId, project_id: input.data.projectId,
+      boq_number: identity.boqNumber, version: identity.version, assigned_to: assignedTo,
+      source_method: input.data.method, source_template_id: input.data.templateId, markup_percent: input.data.markupPercent,
+      tax_percent: input.data.taxPercent, created_by: scoped.access.userId, updated_by: scoped.access.userId }).select(boqSelect).single();
+    if (!inserted.error || inserted.error.code !== "23505") break;
+  }
+  if (!inserted || inserted.error) return fail(inserted?.error?.code === "23505" ? "CONFLICT" : "VALIDATION_ERROR", inserted?.error?.code === "23505" ? "A BOQ number could not be generated. Please retry." : "BOQ could not be created.", inserted?.error?.code === "23505" ? 409 : 400, id);
 
   let initialRoomCount = 0;
   if (input.data.method === "template" && input.data.templateId) {
@@ -1342,7 +1353,7 @@ async function getBoq(supabase: SupabaseClient, id: string, boqId: string) {
 async function updateBoq(request: Request, supabase: SupabaseClient, id: string, boqId: string) {
   const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
   const input = await parsed(request, boqPatchSchema, id); if (input.response) return input.response;
-  const map: Record<string,string> = { projectId: "project_id", version: "version", assignedTo: "assigned_to", markupPercent: "markup_percent", taxPercent: "tax_percent" };
+  const map: Record<string,string> = { projectId: "project_id", assignedTo: "assigned_to", markupPercent: "markup_percent", taxPercent: "tax_percent" };
   const values = Object.fromEntries(Object.entries(input.data).map(([k,v]) => [map[k],v])); values.updated_by = scoped.access.userId;
   const result = await supabase.from("boqs").update(values).eq("workspace_id", scoped.access.workspaceId).eq("id", boqId).is("archived_at", null).select(boqSelect).maybeSingle();
   if (result.error) return fail("VALIDATION_ERROR", "BOQ could not be updated.", 400, id);
@@ -3096,10 +3107,12 @@ async function listInvoices(request: NextRequest, supabase: SupabaseClient, id: 
   const { page, pageSize, from, to } = pagination(request.nextUrl.searchParams);
   const type = request.nextUrl.searchParams.get("type");
   const status = request.nextUrl.searchParams.get("status");
+  const projectId = request.nextUrl.searchParams.get("projectId");
   const search = request.nextUrl.searchParams.get("search")?.trim().slice(0, 120);
   let query = supabase.from("invoices").select(invoiceSelect, { count: "exact" }).eq("workspace_id", scoped.access.workspaceId)
     .is("archived_at", null).order("updated_at", { ascending: false }).range(from, to);
   if (type && ["invoice", "pro_forma", "quote"].includes(type)) query = query.eq("document_type", type);
+  if (projectId) query = query.eq("project_id", projectId);
   if (status === "overdue") query = query.in("status", ["pending", "sent", "partial"]).lt("due_date", new Date().toISOString().slice(0, 10));
   else if (status && ["draft", "pending", "sent", "accepted", "partial", "paid", "void"].includes(status)) query = query.eq("status", status);
   if (search) {

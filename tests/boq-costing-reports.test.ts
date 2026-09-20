@@ -6,10 +6,11 @@ import { permissionsFor } from "../lib/domain/permissions";
 const uuid = "11111111-1111-4111-8111-111111111111";
 
 describe("BOQ contracts", () => {
-  it("supports blank and template creation without tenant mass assignment", () => {
-    expect(boqCreateSchema.parse({ boqNumber: "BOQ-0071", projectId: uuid }).method).toBe("blank");
-    expect(() => boqCreateSchema.parse({ boqNumber: "BOQ-0072", projectId: uuid, method: "template" })).toThrow();
-    expect(() => boqCreateSchema.parse({ boqNumber: "BOQ-0073", projectId: uuid, workspaceId: uuid })).toThrow();
+  it("supports blank and template creation with server-owned identity", () => {
+    expect(boqCreateSchema.parse({ projectId: uuid }).method).toBe("blank");
+    expect(boqCreateSchema.parse({ boqNumber: "LEGACY-INPUT", version: "v99", projectId: uuid }).projectId).toBe(uuid);
+    expect(() => boqCreateSchema.parse({ projectId: uuid, method: "template" })).toThrow();
+    expect(() => boqCreateSchema.parse({ projectId: uuid, workspaceId: uuid })).toThrow();
   });
 
   it("validates server-calculated item inputs", () => {
@@ -45,6 +46,9 @@ describe("persistence routes and delivery artifacts", () => {
     expect(migration).toContain("amount numeric(18,2) generated always");
     expect(migration).toContain("enable row level security");
     expect(migration).toContain("public.is_workspace_member(workspace_id)");
+    expect(route).toContain("nextBoqIdentity");
+    expect(route).toContain("boq_number: identity.boqNumber");
+    expect(route).not.toContain('version: "version", assignedTo');
     expect(route).toContain('route === "reports/analytics"');
     expect(route).not.toContain('request.method === "POST" && route === "reports/analytics"');
   });

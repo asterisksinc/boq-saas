@@ -108,10 +108,22 @@
       "key": "projectTemplateId",
       "value": ""
     },
-    { "key": "activityStageId", "value": "f2000000-0000-4000-8000-000000000002" },
-    { "key": "activityTaskId", "value": "f2100000-0000-4000-8000-000000000001" },
-    { "key": "activityApprovalId", "value": "f2200000-0000-4000-8000-000000000001" },
-    { "key": "supportTicketId", "value": "f3200000-0000-4000-8000-000000000001" }
+    {
+      "key": "activityStageId",
+      "value": "f2000000-0000-4000-8000-000000000002"
+    },
+    {
+      "key": "activityTaskId",
+      "value": "f2100000-0000-4000-8000-000000000001"
+    },
+    {
+      "key": "activityApprovalId",
+      "value": "f2200000-0000-4000-8000-000000000001"
+    },
+    {
+      "key": "supportTicketId",
+      "value": "f3200000-0000-4000-8000-000000000001"
+    }
   ],
   "item": [
     {
@@ -1119,7 +1131,8 @@
               "name": "List Invoices",
               "request": {
                 "method": "GET",
-                "url": "{{baseUrl}}/api/v1/invoices?page=1&pageSize=10&search=Kohinoor"
+                "url": "{{baseUrl}}/api/v1/invoices?page=1&pageSize=10&search=Kohinoor&projectId={{projectId}}",
+                "description": "Lists invoices, quotes, and pro-formas. projectId is optional and powers project payment/invoice tabs."
               },
               "event": [
                 {
@@ -1558,9 +1571,10 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"boqNumber\": \"BOQ-0071\",\n  \"projectId\": \"{{projectId}}\",\n  \"version\": \"v1\",\n  \"method\": \"blank\",\n  \"markupPercent\": 18,\n  \"taxPercent\": 18\n}"
+              "raw": "{\n  \"projectId\": \"{{projectId}}\",\n  \"method\": \"blank\",\n  \"markupPercent\": 18,\n  \"taxPercent\": 18\n}"
             },
-            "url": "{{baseUrl}}/api/v1/boqs"
+            "url": "{{baseUrl}}/api/v1/boqs",
+            "description": "Creates a blank BOQ. The backend generates boqNumber and version (v1); do not send them from the UI."
           },
           "event": [
             {
@@ -1592,9 +1606,10 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"version\": \"v1.1\",\n  \"markupPercent\": 20\n}"
+              "raw": "{\n  \"markupPercent\": 20,\n  \"taxPercent\": 18\n}"
             },
-            "url": "{{baseUrl}}/api/v1/boqs/{{boqId}}"
+            "url": "{{baseUrl}}/api/v1/boqs/{{boqId}}",
+            "description": "Updates allowlisted BOQ fields. Version is server-owned and cannot be patched."
           }
         },
         {
@@ -2018,100 +2033,588 @@
       "name": "15 — Project Templates (User)",
       "description": "Authenticated workspace template APIs. Owner/admin/member can create, edit, publish, duplicate and use; viewer is read-only; archive is owner/admin only.",
       "item": [
-        { "name": "Template Overview", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/project-templates/overview" } },
-        { "name": "List Project Templates", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/project-templates?page={{page}}&pageSize={{pageSize}}&search=&status=&type=" } },
+        {
+          "name": "Template Overview",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/project-templates/overview"
+          }
+        },
+        {
+          "name": "List Project Templates",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/project-templates?page={{page}}&pageSize={{pageSize}}&search=&status=&type="
+          }
+        },
         {
           "name": "Create Project Template",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Premium 3BHK Residential\",\n  \"description\": \"Reusable residential project delivery template\",\n  \"businessType\": \"Residential\",\n  \"projectType\": \"3BHK\",\n  \"team\": \"Residential Design\",\n  \"region\": \"India\",\n  \"visibility\": \"workspace\",\n  \"tags\": [\"Premium\", \"3BHK\"],\n  \"structure\": { \"areas\": [] },\n  \"costingBoq\": { \"sections\": [], \"itemCount\": 0 },\n  \"workflow\": { \"stages\": [], \"tasks\": [], \"milestones\": [], \"approvals\": [], \"rules\": [] },\n  \"documents\": []\n}" },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Premium 3BHK Residential\",\n  \"description\": \"Reusable residential project delivery template\",\n  \"businessType\": \"Residential\",\n  \"projectType\": \"3BHK\",\n  \"team\": \"Residential Design\",\n  \"region\": \"India\",\n  \"visibility\": \"workspace\",\n  \"tags\": [\"Premium\", \"3BHK\"],\n  \"structure\": { \"areas\": [] },\n  \"costingBoq\": { \"sections\": [], \"itemCount\": 0 },\n  \"workflow\": { \"stages\": [], \"tasks\": [], \"milestones\": [], \"approvals\": [], \"rules\": [] },\n  \"documents\": []\n}"
+            },
             "url": "{{baseUrl}}/api/v1/project-templates"
           },
-          "event": [{ "listen": "test", "script": { "exec": ["const b = pm.response.json(); if (b.data?.id) pm.collectionVariables.set('projectTemplateId', b.data.id);"] } }]
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json(); if (b.data?.id) pm.collectionVariables.set('projectTemplateId', b.data.id);"
+                ]
+              }
+            }
+          ]
         },
-        { "name": "Get Template Detail", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}" } },
+        {
+          "name": "Get Template Detail",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}"
+          }
+        },
         {
           "name": "Update Template Metadata",
-          "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"description\": \"Updated reusable residential template\",\n  \"tags\": [\"Premium\", \"Residential\", \"3BHK\"]\n}" }, "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}" }
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Updated reusable residential template\",\n  \"tags\": [\"Premium\", \"Residential\", \"3BHK\"]\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}"
+          }
         },
         {
           "name": "Replace Structure",
-          "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"data\": {\n    \"areas\": [{ \"code\": \"BED-MST\", \"name\": \"Master Bedroom\", \"required\": true, \"boqSections\": [] }]\n  }\n}" }, "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/structure" }
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"areas\": [{ \"code\": \"BED-MST\", \"name\": \"Master Bedroom\", \"required\": true, \"boqSections\": [] }]\n  }\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/structure"
+          }
         },
         {
           "name": "Replace Costing & BOQ",
-          "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"data\": { \"sections\": [], \"itemCount\": 0, \"currency\": \"INR\" }\n}" }, "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/costing-boq" }
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": { \"sections\": [], \"itemCount\": 0, \"currency\": \"INR\" }\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/costing-boq"
+          }
         },
         {
           "name": "Replace Workflow",
-          "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"data\": { \"stages\": [], \"tasks\": [], \"milestones\": [], \"approvals\": [], \"rules\": [] }\n}" }, "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/workflow" }
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": { \"stages\": [], \"tasks\": [], \"milestones\": [], \"approvals\": [], \"rules\": [] }\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/workflow"
+          }
         },
         {
           "name": "Replace Template Documents",
-          "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"documents\": [{ \"name\": \"Client Brief\", \"category\": \"Brief\", \"required\": true }]\n}" }, "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/documents" }
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documents\": [{ \"name\": \"Client Brief\", \"category\": \"Brief\", \"required\": true }]\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/documents"
+          }
         },
         {
           "name": "Publish Template Version",
-          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{ \"changeNote\": \"Initial production version\" }" }, "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/publish" }
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"changeNote\": \"Initial production version\" }"
+            },
+            "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/publish"
+          }
         },
-        { "name": "List Template Versions", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/versions?page={{page}}&pageSize={{pageSize}}" } },
+        {
+          "name": "List Template Versions",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/versions?page={{page}}&pageSize={{pageSize}}"
+          }
+        },
         {
           "name": "Use Template to Create Project",
-          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"projectName\": \"Sharma Residence\",\n  \"clientName\": \"Sharma Group\",\n  \"location\": \"Hyderabad\",\n  \"startDate\": \"2026-09-15\",\n  \"targetCompletionDate\": \"2026-12-15\"\n}" }, "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/use" }
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"projectName\": \"Sharma Residence\",\n  \"clientName\": \"Sharma Group\",\n  \"location\": \"Hyderabad\",\n  \"startDate\": \"2026-09-15\",\n  \"targetCompletionDate\": \"2026-12-15\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/use"
+          }
         },
-        { "name": "List Template Usage", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/usage?page={{page}}&pageSize={{pageSize}}" } },
-        { "name": "Duplicate Template", "request": { "method": "POST", "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/duplicate" } },
-        { "name": "Archive Template (Owner/Admin)", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}" } }
+        {
+          "name": "List Template Usage",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/usage?page={{page}}&pageSize={{pageSize}}"
+          }
+        },
+        {
+          "name": "Duplicate Template",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}/duplicate"
+          }
+        },
+        {
+          "name": "Archive Template (Owner/Admin)",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/v1/project-templates/{{projectTemplateId}}"
+          }
+        }
       ]
     },
     {
       "name": "16 — Billing & Settings (User)",
       "description": "Workspace members can read billing/settings. Billing and organization-wide setting changes require owner/admin. Provider mode is internal until a payment provider is connected.",
       "item": [
-        { "name": "Billing Overview", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/billing/overview" } },
-        { "name": "Preview Business Upgrade", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/billing/plans/preview?plan=business" } },
-        { "name": "Update Billing Contact", "request": { "method": "PATCH", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"email\": \"accounts@boq-demo.com\" }"}, "url": "{{baseUrl}}/api/v1/billing/contact" } },
-        { "name": "Update Payment Method", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"brand\": \"Visa\", \"last4\": \"4242\", \"expiryMonth\": 12, \"expiryYear\": 2028 }"}, "url": "{{baseUrl}}/api/v1/billing/payment-methods" } },
-        { "name": "Change Plan", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"planCode\": \"business\", \"billingFrequency\": \"monthly\" }"}, "url": "{{baseUrl}}/api/v1/billing/subscription/change" } },
-        { "name": "Cancel at Period End", "request": { "method": "POST", "url": "{{baseUrl}}/api/v1/billing/subscription/cancel" } },
-        { "name": "Reactivate Subscription", "request": { "method": "POST", "url": "{{baseUrl}}/api/v1/billing/subscription/reactivate" } },
-        { "name": "Retry Failed Payment", "request": { "method": "POST", "url": "{{baseUrl}}/api/v1/billing/subscription/retry-payment" } },
-        { "name": "Settings Overview", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/settings/overview" } },
-        { "name": "Get Notification Settings", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/settings/notifications" } },
-        { "name": "Update Notification Settings", "request": { "method": "PATCH", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"data\": { \"email\": true, \"tasks\": true, \"approvals\": true, \"billing\": true } }"}, "url": "{{baseUrl}}/api/v1/settings/notifications" } }
+        {
+          "name": "Billing Overview",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/billing/overview"
+          }
+        },
+        {
+          "name": "Preview Business Upgrade",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/billing/plans/preview?plan=business"
+          }
+        },
+        {
+          "name": "Update Billing Contact",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"email\": \"accounts@boq-demo.com\" }"
+            },
+            "url": "{{baseUrl}}/api/v1/billing/contact"
+          }
+        },
+        {
+          "name": "Update Payment Method",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"brand\": \"Visa\", \"last4\": \"4242\", \"expiryMonth\": 12, \"expiryYear\": 2028 }"
+            },
+            "url": "{{baseUrl}}/api/v1/billing/payment-methods"
+          }
+        },
+        {
+          "name": "Change Plan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"planCode\": \"business\", \"billingFrequency\": \"monthly\" }"
+            },
+            "url": "{{baseUrl}}/api/v1/billing/subscription/change"
+          }
+        },
+        {
+          "name": "Cancel at Period End",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/billing/subscription/cancel"
+          }
+        },
+        {
+          "name": "Reactivate Subscription",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/billing/subscription/reactivate"
+          }
+        },
+        {
+          "name": "Retry Failed Payment",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/billing/subscription/retry-payment"
+          }
+        },
+        {
+          "name": "Settings Overview",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/settings/overview"
+          }
+        },
+        {
+          "name": "Get Notification Settings",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/settings/notifications"
+          }
+        },
+        {
+          "name": "Update Notification Settings",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"data\": { \"email\": true, \"tasks\": true, \"approvals\": true, \"billing\": true } }"
+            },
+            "url": "{{baseUrl}}/api/v1/settings/notifications"
+          }
+        }
       ]
     },
     {
       "name": "17 — Activities (User)",
       "item": [
-        { "name": "Activity Summary", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/activities/summary" } },
-        { "name": "List Stages", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/activities/stages" } },
-        { "name": "Create Stage", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"name\": \"Site Execution\", \"color\": \"#DBEAFE\" }"}, "url": "{{baseUrl}}/api/v1/activities/stages" } },
-        { "name": "List Tasks", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/activities/tasks" } },
-        { "name": "Create Task", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"name\": \"Finalise Floor Plan\", \"projectId\": \"{{projectId}}\", \"stageId\": \"{{activityStageId}}\", \"description\": \"Review final layouts\", \"dueDate\": \"2026-09-10\", \"priority\": \"high\", \"status\": \"in_progress\" }"}, "url": "{{baseUrl}}/api/v1/activities/tasks" } },
-        { "name": "Get Task", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/activities/tasks/{{activityTaskId}}" } },
-        { "name": "Update Task", "request": { "method": "PATCH", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"status\": \"completed\" }"}, "url": "{{baseUrl}}/api/v1/activities/tasks/{{activityTaskId}}" } },
-        { "name": "Add Task Comment", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"body\": \"Floor plan reviewed.\" }"}, "url": "{{baseUrl}}/api/v1/activities/tasks/{{activityTaskId}}/comments" } },
-        { "name": "List Approvals", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/activities/approvals" } },
-        { "name": "Create Approval", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"name\": \"Design Concept Approval\", \"projectId\": \"{{projectId}}\", \"stageId\": \"{{activityStageId}}\", \"approverName\": \"Client\", \"dueDate\": \"2026-09-14\", \"status\": \"in_review\" }"}, "url": "{{baseUrl}}/api/v1/activities/approvals" } },
-        { "name": "Get Approval", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/activities/approvals/{{activityApprovalId}}" } },
-        { "name": "Approve", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"decision\": \"approved\", \"comment\": \"Approved for execution.\" }"}, "url": "{{baseUrl}}/api/v1/activities/approvals/{{activityApprovalId}}/decision" } },
-        { "name": "Approval Comments", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/activities/approvals/{{activityApprovalId}}/comments" } }
+        {
+          "name": "Activity Summary",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/activities/summary"
+          }
+        },
+        {
+          "name": "List Stages",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/activities/stages"
+          }
+        },
+        {
+          "name": "Create Stage",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"name\": \"Site Execution\", \"color\": \"#DBEAFE\" }"
+            },
+            "url": "{{baseUrl}}/api/v1/activities/stages"
+          }
+        },
+        {
+          "name": "List Tasks",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/activities/tasks"
+          }
+        },
+        {
+          "name": "Create Task",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"name\": \"Finalise Floor Plan\", \"projectId\": \"{{projectId}}\", \"stageId\": \"{{activityStageId}}\", \"description\": \"Review final layouts\", \"dueDate\": \"2026-09-10\", \"priority\": \"high\", \"status\": \"in_progress\" }"
+            },
+            "url": "{{baseUrl}}/api/v1/activities/tasks"
+          }
+        },
+        {
+          "name": "Get Task",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/activities/tasks/{{activityTaskId}}"
+          }
+        },
+        {
+          "name": "Update Task",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"status\": \"completed\" }"
+            },
+            "url": "{{baseUrl}}/api/v1/activities/tasks/{{activityTaskId}}"
+          }
+        },
+        {
+          "name": "Add Task Comment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"body\": \"Floor plan reviewed.\" }"
+            },
+            "url": "{{baseUrl}}/api/v1/activities/tasks/{{activityTaskId}}/comments"
+          }
+        },
+        {
+          "name": "List Approvals",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/activities/approvals"
+          }
+        },
+        {
+          "name": "Create Approval",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"name\": \"Design Concept Approval\", \"projectId\": \"{{projectId}}\", \"stageId\": \"{{activityStageId}}\", \"approverName\": \"Client\", \"dueDate\": \"2026-09-14\", \"status\": \"in_review\" }"
+            },
+            "url": "{{baseUrl}}/api/v1/activities/approvals"
+          }
+        },
+        {
+          "name": "Get Approval",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/activities/approvals/{{activityApprovalId}}"
+          }
+        },
+        {
+          "name": "Approve",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"decision\": \"approved\", \"comment\": \"Approved for execution.\" }"
+            },
+            "url": "{{baseUrl}}/api/v1/activities/approvals/{{activityApprovalId}}/decision"
+          }
+        },
+        {
+          "name": "Approval Comments",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/activities/approvals/{{activityApprovalId}}/comments"
+          }
+        }
       ]
     },
     {
       "name": "18 — Help & Support (User)",
       "item": [
-        { "name": "Help Centre", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/help" } },
-        { "name": "Search Help", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/help?search=excel" } },
-        { "name": "Get Article", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/help/articles/how-to-import-an-excel-boq" } },
-        { "name": "Article Helpful", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"helpful\": true }"}, "url": "{{baseUrl}}/api/v1/help/articles/how-to-import-an-excel-boq" } },
-        { "name": "List My Tickets", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/support/tickets" } },
-        { "name": "Raise Ticket", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"issueType\": \"BOQs\", \"subject\": \"Column mapping question\", \"description\": \"Need help with a custom material code.\", \"priority\": \"normal\" }"}, "url": "{{baseUrl}}/api/v1/support/tickets" } },
-        { "name": "Get Ticket", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/support/tickets/{{supportTicketId}}" } },
-        { "name": "Add Ticket Message", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"body\": \"Please share the supported columns.\" }"}, "url": "{{baseUrl}}/api/v1/support/tickets/{{supportTicketId}}/messages" } },
-        { "name": "Close Ticket", "request": { "method": "PATCH", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{ \"status\": \"closed\" }"}, "url": "{{baseUrl}}/api/v1/support/tickets/{{supportTicketId}}" } }
+        {
+          "name": "Help Centre",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/help"
+          }
+        },
+        {
+          "name": "Search Help",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/help?search=excel"
+          }
+        },
+        {
+          "name": "Get Article",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/help/articles/how-to-import-an-excel-boq"
+          }
+        },
+        {
+          "name": "Article Helpful",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"helpful\": true }"
+            },
+            "url": "{{baseUrl}}/api/v1/help/articles/how-to-import-an-excel-boq"
+          }
+        },
+        {
+          "name": "List My Tickets",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/support/tickets"
+          }
+        },
+        {
+          "name": "Raise Ticket",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"issueType\": \"BOQs\", \"subject\": \"Column mapping question\", \"description\": \"Need help with a custom material code.\", \"priority\": \"normal\" }"
+            },
+            "url": "{{baseUrl}}/api/v1/support/tickets"
+          }
+        },
+        {
+          "name": "Get Ticket",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/support/tickets/{{supportTicketId}}"
+          }
+        },
+        {
+          "name": "Add Ticket Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"body\": \"Please share the supported columns.\" }"
+            },
+            "url": "{{baseUrl}}/api/v1/support/tickets/{{supportTicketId}}/messages"
+          }
+        },
+        {
+          "name": "Close Ticket",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"status\": \"closed\" }"
+            },
+            "url": "{{baseUrl}}/api/v1/support/tickets/{{supportTicketId}}"
+          }
+        }
       ]
     }
   ]

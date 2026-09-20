@@ -190,9 +190,9 @@ const money = z.coerce.number().finite().min(0).max(999_999_999_999_999);
 const percent = z.coerce.number().finite().min(0).max(100);
 
 export const boqCreateSchema = z.object({
-  boqNumber: z.string().trim().min(1).max(80),
   projectId: z.string().uuid(),
-  version: z.string().trim().min(1).max(40).default("v1"),
+  boqNumber: z.string().trim().min(1).max(80).optional(),
+  version: z.string().trim().min(1).max(40).optional(),
   assignedTo: z.string().uuid().nullable().optional(),
   method: z.enum(["blank", "template"]).default("blank"),
   templateId: z.string().uuid().nullable().optional(),
@@ -204,7 +204,6 @@ export const boqCreateSchema = z.object({
 
 export const boqPatchSchema = z.object({
   projectId: z.string().uuid().optional(),
-  version: z.string().trim().min(1).max(40).optional(),
   assignedTo: z.string().uuid().nullable().optional(),
   markupPercent: percent.optional(), taxPercent: percent.optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, "At least one field is required.");
