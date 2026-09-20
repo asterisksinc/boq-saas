@@ -1,20 +1,18 @@
 "use client";
 
 import {
+    ChevronDown,
     Eye,
-    File,
-    Folder,
     Grid2X2,
     List,
-    MoreVertical,
+    MoreHorizontal,
     Plus,
-    Search,
     Trash2,
     Upload,
     X,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import DashboardRail from "@/components/DashboardRail";
 import { getApiErrorMessage, parseApiResponse } from "@/lib/api/auth";
 
 type FolderItem = {
@@ -25,6 +23,7 @@ type FolderItem = {
     sizeBytes: number;
     updatedAt: string;
 };
+
 type DocumentItem = {
     id: string;
     folderId: string;
@@ -34,7 +33,6 @@ type DocumentItem = {
     sizeBytes: number;
     updatedAt: string;
 };
-import DashboardRail from "@/components/DashboardRail";
 
 async function apiJson<T>(url: string, init?: RequestInit) {
     const response = await fetch(url, {
@@ -46,21 +44,43 @@ async function apiJson<T>(url: string, init?: RequestInit) {
     if (!response.ok) throw new Error(getApiErrorMessage(payload));
     return parseApiResponse<T>(payload);
 }
+
 function formatSize(bytes: number) {
-    if (!bytes) return "0 KB";
-    const units = ["B", "KB", "MB", "GB"];
-    const index = Math.min(
-        Math.floor(Math.log(bytes) / Math.log(1024)),
-        units.length - 1,
-    );
-    return `${(bytes / 1024 ** index).toFixed(index ? 1 : 0)} ${units[index]}`;
+    if (!bytes || bytes <= 0) return "0 KB";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
+
 function formatDate(value: string) {
-    return new Date(value).toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-    });
+    if (!value) return "—";
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return "—";
+    const day = d.getDate();
+    const month = d.toLocaleDateString("en-US", { month: "short" });
+    const year = d.getFullYear();
+    return `${day} ${month} ${year}`;
+}
+
+// Issue 4: Exact 40x40 SVG symbol specified by the user
+function FolderFileIcon({ className = "" }: { className?: string }) {
+    return (
+        <svg
+            width="40"
+            height="40"
+            viewBox="0 0 40 40"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            className={`documents-folder-svg ${className}`}
+        >
+            <rect width="40" height="40" rx="20" fill="#E4ECFB" />
+            <path
+                d="M12.5 27.5C12.0397 27.5 11.6666 27.1269 11.6666 26.6667V13.3333C11.6666 12.8731 12.0397 12.5 12.5 12.5H18.6785L20.3451 14.1667H26.6666C27.1269 14.1667 27.5 14.5398 27.5 15V17.5H25.8333V15.8333H19.6548L17.9881 14.1667H13.3333V24.165L14.5833 19.1667H28.75L26.8245 26.8687C26.7317 27.2397 26.3984 27.5 26.016 27.5H12.5ZM26.6153 20.8333H15.8846L14.6346 25.8333H25.3653L26.6153 20.8333Z"
+                fill="#2563EB"
+            />
+        </svg>
+    );
 }
 
 export default function DocumentsPage() {
@@ -75,10 +95,9 @@ export default function DocumentsPage() {
         "folder" | "upload" | "delete-folder" | "delete-document" | null
     >(null);
     const [menuId, setMenuId] = useState<string | null>(null);
-    const [targetDocument, setTargetDocument] = useState<DocumentItem | null>(
-        null,
-    );
+    const [targetDocument, setTargetDocument] = useState<DocumentItem | null>(null);
     const [targetFolder, setTargetFolder] = useState<FolderItem | null>(null);
+
     async function loadFolders() {
         setLoading(true);
         setError("");
@@ -92,37 +111,77 @@ export default function DocumentsPage() {
                     `/api/v1/documents?folderId=${activeFolder.id}&page=1&pageSize=100${search ? `&search=${encodeURIComponent(search)}` : ""}`,
                 );
                 setDocuments(docs.items);
-            } else setDocuments([]);
+            } else {
+                setDocuments([]);
+            }
         } catch (loadError) {
             setError(getApiErrorMessage(loadError));
         } finally {
             setLoading(false);
         }
     }
+
     useEffect(() => {
         void loadFolders();
     }, [activeFolder, search]);
+
+    // Close action popup when clicking anywhere outside
+    useEffect(() => {
+        const handleOutsideClick = () => setMenuId(null);
+        window.addEventListener("click", handleOutsideClick);
+        return () => window.removeEventListener("click", handleOutsideClick);
+    }, []);
+
     const goRoot = () => {
         setActiveFolder(null);
         setMenuId(null);
     };
+
+    // Client-side real-time filter across folder names
+    const filteredFolders = useMemo(() => {
+        if (!search.trim()) return folders;
+        const q = search.trim().toLowerCase();
+        return folders.filter((f) => f.name.toLowerCase().includes(q));
+    }, [folders, search]);
+
+    // Client-side real-time filter across document names & project names
+    const filteredDocuments = useMemo(() => {
+        if (!search.trim()) return documents;
+        const q = search.trim().toLowerCase();
+        return documents.filter(
+            (d) =>
+                d.name.toLowerCase().includes(q) ||
+                (d.projectName && d.projectName.toLowerCase().includes(q)),
+        );
+    }, [documents, search]);
+
     return (
         <main className="fig-dashboard documents-page">
             <div className="fig-dashboard-glow" />
             <DashboardRail />
             <div className="fig-dashboard-main">
+                {/* Issue 1: Header identical to dashboard header */}
                 <header className="fig-dashboard-header">
                     <h1>Documents</h1>
                     <div className="fig-dashboard-header-actions">
                         <label className="fig-dashboard-search">
-                            <Search size={17} />
-                            <input placeholder="Search..." aria-label="Search documents" />
+                            <img src="/assets/dashboard/dashboard-search.svg" alt="" />
+                            <input
+                                placeholder="Search..."
+                                aria-label="Search"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
                         </label>
-                        <button className="fig-dashboard-new" type="button" onClick={() => setModal("folder")}>
+                        <button
+                            className="fig-dashboard-new"
+                            type="button"
+                            onClick={() => setModal(activeFolder ? "upload" : "folder")}
+                        >
                             <Plus size={20} />
                             <span>New</span>
                             <i />
-                            <span>⌄</span>
+                            <ChevronDown size={20} />
                         </button>
                         <button
                             className="fig-dashboard-bell"
@@ -134,10 +193,12 @@ export default function DocumentsPage() {
                         <div className="fig-dashboard-avatar">BO</div>
                     </div>
                 </header>
+
                 <section className="documents-content">
-                    <div className="documents-toolbar">
-                        <label className="documents-search">
-                            <Search size={18} />
+                    {/* Issue 2: Secondary search bar matches dashboard search bar UI */}
+                    <div className="documents-toolbar-row">
+                        <label className="fig-dashboard-search documents-search-input">
+                            <img src="/assets/dashboard/dashboard-search.svg" alt="" />
                             <input
                                 value={search}
                                 onChange={(event) => setSearch(event.target.value)}
@@ -147,49 +208,57 @@ export default function DocumentsPage() {
                         </label>
                         <div className="documents-view-toggle">
                             <button
+                                type="button"
                                 className={view === "list" ? "active" : ""}
                                 onClick={() => setView("list")}
                                 aria-label="List view"
+                                title="List view"
                             >
-                                <List size={19} />
+                                <List size={18} />
                             </button>
                             <button
+                                type="button"
                                 className={view === "grid" ? "active" : ""}
                                 onClick={() => setView("grid")}
-                                aria-label="Card view"
+                                aria-label="Grid view"
+                                title="Grid view"
                             >
                                 <Grid2X2 size={18} />
                             </button>
                         </div>
                     </div>
-                    {activeFolder ? (
-                        <div className="documents-breadcrumb">
-                            <button onClick={goRoot}>All Folders</button>
-                            <span>›</span>
-                            <strong>{activeFolder.name}</strong>
+
+                    <div className="documents-subbar">
+                        {activeFolder ? (
+                            <div className="documents-breadcrumb">
+                                <button type="button" onClick={goRoot}>All Folders</button>
+                                <span>›</span>
+                                <strong>{activeFolder.name}</strong>
+                            </div>
+                        ) : (
+                            <h2 className="documents-section-title">All Folders</h2>
+                        )}
+                        <div className="documents-actions">
+                            <button
+                                type="button"
+                                className="documents-ghost"
+                                onClick={() => setModal("upload")}
+                            >
+                                Upload
+                            </button>
+                            <button
+                                type="button"
+                                className="documents-primary"
+                                onClick={() => setModal("folder")}
+                            >
+                                <Plus size={16} /> New Folder
+                            </button>
                         </div>
-                    ) : (
-                        <h2>All Folders</h2>
-                    )}
-                    <div className="documents-actions">
-                        <button
-                            className="documents-ghost"
-                            onClick={() => setModal("upload")}
-                        >
-                            <Upload size={16} /> Upload
-                        </button>
-                        <button
-                            className="documents-primary"
-                            onClick={() => setModal("folder")}
-                        >
-                            <Plus size={16} /> New Folder
-                        </button>
                     </div>
+
                     {activeFolder && (
                         <div className="folder-banner">
-                            <span>
-                                <Folder size={22} />
-                            </span>
+                            <FolderFileIcon />
                             <div>
                                 <strong>{activeFolder.name}</strong>
                                 <small>
@@ -200,17 +269,22 @@ export default function DocumentsPage() {
                             <time>Last Modified - {formatDate(activeFolder.updatedAt)}</time>
                         </div>
                     )}
+
                     {error && (
                         <div className="documents-error" role="alert">
-                            {error}
-                            <button onClick={() => void loadFolders()}>Try again</button>
+                            <span>{error}</span>
+                            <button type="button" onClick={() => void loadFolders()}>Try again</button>
                         </div>
                     )}
+
                     {loading ? (
-                        <div className="documents-loading" />
+                        <div className="documents-loading-card">
+                            <div className="documents-spinner" />
+                            <p>Loading documents…</p>
+                        </div>
                     ) : activeFolder ? (
                         <DocumentList
-                            documents={documents}
+                            documents={filteredDocuments}
                             view={view}
                             onMenu={(id) => setMenuId(menuId === id ? null : id)}
                             menuId={menuId}
@@ -219,10 +293,11 @@ export default function DocumentsPage() {
                                 setModal("delete-document");
                                 setMenuId(null);
                             }}
+                            onUpload={() => setModal("upload")}
                         />
                     ) : (
                         <FolderList
-                            folders={folders}
+                            folders={filteredFolders}
                             view={view}
                             onOpen={setActiveFolder}
                             onMenu={(id) => setMenuId(menuId === id ? null : id)}
@@ -232,9 +307,11 @@ export default function DocumentsPage() {
                                 setModal("delete-folder");
                                 setMenuId(null);
                             }}
+                            onCreateFolder={() => setModal("folder")}
                         />
                     )}
                 </section>
+
                 {modal === "folder" && (
                     <FolderModal
                         onClose={() => setModal(null)}
@@ -261,6 +338,7 @@ export default function DocumentsPage() {
                         title="Delete Folder?"
                         description={`This will permanently delete “${targetFolder.name}” including all files inside this folder. This action cannot be undone.`}
                         label={targetFolder.name}
+                        info={`${targetFolder.itemCount} items | ${formatSize(targetFolder.sizeBytes)}`}
                         onClose={() => setModal(null)}
                         onDelete={async () => {
                             await apiJson(`/api/v1/document-folders/${targetFolder.id}`, {
@@ -279,6 +357,7 @@ export default function DocumentsPage() {
                         title="Delete File?"
                         description={`This file will be permanently deleted from “${targetDocument.name}”. This action cannot be undone.`}
                         label={targetDocument.name}
+                        info={`${targetDocument.projectName || "General"} | ${formatSize(targetDocument.sizeBytes)}`}
                         onClose={() => setModal(null)}
                         onDelete={async () => {
                             await apiJson(`/api/v1/documents/${targetDocument.id}`, {
@@ -293,6 +372,8 @@ export default function DocumentsPage() {
         </main>
     );
 }
+
+// Issue 3: Table columns and headers aligned in same CSS grid columns
 function FolderList({
     folders,
     view,
@@ -300,6 +381,7 @@ function FolderList({
     onMenu,
     menuId,
     onDelete,
+    onCreateFolder,
 }: {
     folders: FolderItem[];
     view: "list" | "grid";
@@ -307,61 +389,168 @@ function FolderList({
     onMenu: (id: string) => void;
     menuId: string | null;
     onDelete: (folder: FolderItem) => void;
+    onCreateFolder: () => void;
 }) {
-    return (
-        <div className={`folder-list ${view}`}>
-            {folders.map((folder) => (
-                <article
-                    className="folder-card"
-                    key={folder.id}
-                    onDoubleClick={() => onOpen(folder)}
-                >
-                    <button className="folder-open" onClick={() => onOpen(folder)}>
-                        <Folder size={21} />
-                    </button>
-                    <div className="folder-name">
-                        <strong>{folder.name}</strong>
-                        <small>{folder.itemCount} items</small>
-                    </div>
-                    <span className="folder-size">{formatSize(folder.sizeBytes)}</span>
-                    <time>{formatDate(folder.updatedAt)}</time>
-                    <button
-                        className="document-menu-button"
-                        onClick={(event) => {
-                            event.stopPropagation();
-                            onMenu(folder.id);
-                        }}
-                        aria-label={`Actions for ${folder.name}`}
+    if (folders.length === 0) {
+        return (
+            <div className="documents-empty-state">
+                <FolderFileIcon />
+                <h3>No folders found</h3>
+                <p>Get started by creating your first folder.</p>
+                <button type="button" className="documents-primary" onClick={onCreateFolder}>
+                    <Plus size={16} /> New Folder
+                </button>
+            </div>
+        );
+    }
+
+    if (view === "grid") {
+        return (
+            <div className="folder-grid-view">
+                {folders.map((folder) => (
+                    <article
+                        className="folder-grid-card"
+                        key={folder.id}
+                        onDoubleClick={() => onOpen(folder)}
                     >
-                        <MoreVertical size={18} />
-                    </button>
-                    {menuId === folder.id && (
-                        <div className="document-menu">
-                            <button onClick={() => onOpen(folder)}>
-                                <Eye size={17} /> Open Folder
+                        <div className="folder-grid-card-top">
+                            <button
+                                type="button"
+                                className="folder-icon-btn"
+                                onClick={() => onOpen(folder)}
+                            >
+                                <FolderFileIcon />
                             </button>
-                            <button className="danger" onClick={() => onDelete(folder)}>
-                                <Trash2 size={17} /> Delete Folder
-                            </button>
+                            <div className="documents-col-action">
+                                <button
+                                    type="button"
+                                    className="document-menu-button"
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onMenu(folder.id);
+                                    }}
+                                    aria-label={`Actions for ${folder.name}`}
+                                >
+                                    <MoreHorizontal size={18} />
+                                </button>
+                                {menuId === folder.id && (
+                                    <div
+                                        className="document-menu"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <button type="button" onClick={() => onOpen(folder)}>
+                                            <Eye size={15} /> <span>Open Folder</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="danger"
+                                            onClick={() => onDelete(folder)}
+                                        >
+                                            <Trash2 size={15} /> <span>Delete Folder</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    )}
-                </article>
-            ))}
+                        <div className="folder-grid-info" onClick={() => onOpen(folder)}>
+                            <strong className="folder-grid-name">{folder.name}</strong>
+                            <span className="folder-grid-meta">{folder.itemCount} items</span>
+                            <div className="folder-grid-footer">
+                                <span>{formatSize(folder.sizeBytes)}</span>
+                                <time>{formatDate(folder.updatedAt)}</time>
+                            </div>
+                        </div>
+                    </article>
+                ))}
+            </div>
+        );
+    }
+
+    return (
+        <div className="documents-table-wrapper">
+            <div className="documents-table-card">
+                <div className="documents-table-header">
+                    <span className="th-name">NAME</span>
+                    <span className="th-items">ITEMS</span>
+                    <span className="th-size">SIZE</span>
+                    <span className="th-date">LAST MODIFIED</span>
+                    <span className="th-action"></span>
+                </div>
+                <div className="documents-table-body">
+                    {folders.map((folder) => (
+                        <div
+                            className="documents-table-row"
+                            key={folder.id}
+                            onDoubleClick={() => onOpen(folder)}
+                        >
+                            <div
+                                className="documents-col-name"
+                                onClick={() => onOpen(folder)}
+                            >
+                                <FolderFileIcon />
+                                <span className="documents-item-name">{folder.name}</span>
+                            </div>
+                            <div className="documents-col-items">
+                                {folder.itemCount} items
+                            </div>
+                            <div className="documents-col-size">
+                                {formatSize(folder.sizeBytes)}
+                            </div>
+                            <div className="documents-col-date">
+                                {formatDate(folder.updatedAt)}
+                            </div>
+                            <div className="documents-col-action">
+                                <button
+                                    type="button"
+                                    className="document-menu-button"
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onMenu(folder.id);
+                                    }}
+                                    aria-label={`Actions for ${folder.name}`}
+                                >
+                                    <MoreHorizontal size={18} />
+                                </button>
+                                {menuId === folder.id && (
+                                    <div
+                                        className="document-menu"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <button type="button" onClick={() => onOpen(folder)}>
+                                            <Eye size={15} /> <span>Open Folder</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="danger"
+                                            onClick={() => onDelete(folder)}
+                                        >
+                                            <Trash2 size={15} /> <span>Delete Folder</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
         </div>
     );
 }
+
 function DocumentList({
     documents,
     view,
     onMenu,
     menuId,
     onDelete,
+    onUpload,
 }: {
     documents: DocumentItem[];
     view: "list" | "grid";
     onMenu: (id: string) => void;
     menuId: string | null;
     onDelete: (document: DocumentItem) => void;
+    onUpload: () => void;
 }) {
     async function viewDocument(document: DocumentItem) {
         const result = await apiJson<{ url: string }>(
@@ -369,38 +558,149 @@ function DocumentList({
         );
         window.open(result.url, "_blank", "noopener,noreferrer");
     }
-    return (
-        <div className={`document-list ${view}`}>
-            {documents.map((document) => (
-                <article className="document-card" key={document.id}>
-                    <span className="document-file-icon">
-                        <File size={18} />
-                    </span>
-                    <div>
-                        <strong>{document.name}</strong>
-                        <small>{document.projectName || "General"}</small>
-                    </div>
-                    <span>{formatSize(document.sizeBytes)}</span>
-                    <time>{formatDate(document.updatedAt)}</time>
-                    <button
-                        className="document-menu-button"
-                        onClick={() => onMenu(document.id)}
-                        aria-label={`Actions for ${document.name}`}
+
+    if (documents.length === 0) {
+        return (
+            <div className="documents-empty-state">
+                <FolderFileIcon />
+                <h3>No files in this folder</h3>
+                <p>Upload documents or assets to organize them here.</p>
+                <button type="button" className="documents-primary" onClick={onUpload}>
+                    <Upload size={16} /> Upload Files
+                </button>
+            </div>
+        );
+    }
+
+    if (view === "grid") {
+        return (
+            <div className="folder-grid-view">
+                {documents.map((doc) => (
+                    <article
+                        className="folder-grid-card"
+                        key={doc.id}
+                        onDoubleClick={() => void viewDocument(doc)}
                     >
-                        <MoreVertical size={18} />
-                    </button>
-                    {menuId === document.id && (
-                        <div className="document-menu">
-                            <button onClick={() => void viewDocument(document)}>
-                                <Eye size={17} /> View
+                        <div className="folder-grid-card-top">
+                            <button
+                                type="button"
+                                className="folder-icon-btn"
+                                onClick={() => void viewDocument(doc)}
+                            >
+                                <FolderFileIcon />
                             </button>
-                            <button className="danger" onClick={() => onDelete(document)}>
-                                <Trash2 size={17} /> Delete
-                            </button>
+                            <div className="documents-col-action">
+                                <button
+                                    type="button"
+                                    className="document-menu-button"
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onMenu(doc.id);
+                                    }}
+                                    aria-label={`Actions for ${doc.name}`}
+                                >
+                                    <MoreHorizontal size={18} />
+                                </button>
+                                {menuId === doc.id && (
+                                    <div
+                                        className="document-menu"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <button type="button" onClick={() => void viewDocument(doc)}>
+                                            <Eye size={15} /> <span>View</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="danger"
+                                            onClick={() => onDelete(doc)}
+                                        >
+                                            <Trash2 size={15} /> <span>Delete</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    )}
-                </article>
-            ))}
+                        <div className="folder-grid-info" onClick={() => void viewDocument(doc)}>
+                            <strong className="folder-grid-name">{doc.name}</strong>
+                            <span className="folder-grid-meta">{doc.projectName || "General"}</span>
+                            <div className="folder-grid-footer">
+                                <span>{formatSize(doc.sizeBytes)}</span>
+                                <time>{formatDate(doc.updatedAt)}</time>
+                            </div>
+                        </div>
+                    </article>
+                ))}
+            </div>
+        );
+    }
+
+    return (
+        <div className="documents-table-wrapper">
+            <div className="documents-table-card">
+                <div className="documents-table-header">
+                    <span className="th-name">NAME</span>
+                    <span className="th-items">PROJECT</span>
+                    <span className="th-size">SIZE</span>
+                    <span className="th-date">LAST MODIFIED</span>
+                    <span className="th-action"></span>
+                </div>
+                <div className="documents-table-body">
+                    {documents.map((doc) => (
+                        <div
+                            className="documents-table-row"
+                            key={doc.id}
+                            onDoubleClick={() => void viewDocument(doc)}
+                        >
+                            <div
+                                className="documents-col-name"
+                                onClick={() => void viewDocument(doc)}
+                            >
+                                <FolderFileIcon />
+                                <span className="documents-item-name">{doc.name}</span>
+                            </div>
+                            <div className="documents-col-items">
+                                {doc.projectName || "General"}
+                            </div>
+                            <div className="documents-col-size">
+                                {formatSize(doc.sizeBytes)}
+                            </div>
+                            <div className="documents-col-date">
+                                {formatDate(doc.updatedAt)}
+                            </div>
+                            <div className="documents-col-action">
+                                <button
+                                    type="button"
+                                    className="document-menu-button"
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onMenu(doc.id);
+                                    }}
+                                    aria-label={`Actions for ${doc.name}`}
+                                >
+                                    <MoreHorizontal size={18} />
+                                </button>
+                                {menuId === doc.id && (
+                                    <div
+                                        className="document-menu"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <button type="button" onClick={() => void viewDocument(doc)}>
+                                            <Eye size={15} /> <span>View</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="danger"
+                                            onClick={() => onDelete(doc)}
+                                        >
+                                            <Trash2 size={15} /> <span>Delete</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
         </div>
     );
 }
@@ -536,18 +836,21 @@ function DeleteModal({
     title,
     description,
     label,
+    info,
     onClose,
     onDelete,
 }: {
     title: string;
     description: string;
     label: string;
+    info?: string;
     onClose: () => void;
     onDelete: () => Promise<void>;
 }) {
     const [checked, setChecked] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
+
     async function confirm() {
         setBusy(true);
         setError("");
@@ -559,37 +862,44 @@ function DeleteModal({
             setBusy(false);
         }
     }
+
     return (
-        <div className="document-modal-backdrop">
-            <div className="document-modal delete-modal">
+        <div className="document-modal-backdrop" onClick={onClose}>
+            <div className="document-modal delete-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="delete-icon">
-                    <Trash2 size={27} />
+                    <Trash2 size={24} />
                 </div>
                 <h2>{title}</h2>
                 <p>{description}</p>
                 {error && <p className="documents-error" role="alert">{error}</p>}
                 <div className="delete-target">
-                    <File size={18} />
-                    <strong>{label}</strong>
+                    <FolderFileIcon />
+                    <div className="delete-target-info">
+                        <strong>{label}</strong>
+                        {info && <small>{info}</small>}
+                    </div>
                 </div>
                 <label className="delete-check">
                     <input
                         type="checkbox"
                         checked={checked}
                         onChange={(event) => setChecked(event.target.checked)}
-                    />{" "}
-                    I understand this action cannot be undone
+                    />
+                    <span>I understand this action cannot be undone</span>
                 </label>
-                <footer>
-                    <button onClick={onClose}>No, Keep It</button>
+                <div className="delete-modal-actions">
+                    <button type="button" className="delete-cancel-btn" onClick={onClose}>
+                        No, Keep It.
+                    </button>
                     <button
-                        className="delete-confirm"
+                        type="button"
+                        className="delete-confirm-btn"
                         disabled={!checked || busy}
                         onClick={() => void confirm()}
                     >
                         {busy ? "Deleting..." : "Yes, Delete!"}
                     </button>
-                </footer>
+                </div>
             </div>
         </div>
     );
