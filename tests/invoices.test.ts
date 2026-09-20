@@ -38,6 +38,7 @@ describe("invoice request contracts", () => {
 
 describe("invoice persistence and authorization", () => {
   const migration = readFileSync("supabase/migrations/20260901150000_invoices.sql", "utf8");
+  const projectFilterMigration = readFileSync("supabase/migrations/20260920220000_invoice_project_filter_index.sql", "utf8");
   const route = readFileSync("app/api/v1/[...path]/route.ts", "utf8");
 
   it("uses fixed precision, server totals, workspace RLS, and atomic payment checks", () => {
@@ -46,6 +47,7 @@ describe("invoice persistence and authorization", () => {
     expect(migration).toContain("alter table public.invoices enable row level security");
     expect(migration).toContain("public.is_workspace_member(workspace_id)");
     expect(migration).toContain("payment exceeds outstanding amount");
+    expect(projectFilterMigration).toContain("invoices_workspace_project_updated_idx");
     expect(migration).toContain("public.set_invoice_status");
     expect(migration).toContain("public.archive_invoice");
     expect(migration).not.toContain("grant update (status");
@@ -63,6 +65,8 @@ describe("invoice persistence and authorization", () => {
     for (const fragment of ["route === \"invoices\"", "route === \"invoices/summary\"", "invoiceStatusMatch", "invoicePaymentMatch", "invoicePdfMatch", "archiveInvoice"]) {
       expect(route).toContain(fragment);
     }
+    expect(route).toContain("const projectId = request.nextUrl.searchParams.get(\"projectId\")");
+    expect(route).toContain("query = query.eq(\"project_id\", projectId)");
   });
 
   it("ships a parseable invoice Postman collection", () => {

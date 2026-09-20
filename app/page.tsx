@@ -1,9 +1,7 @@
 import { ArrowRight, BadgeCheck, Check, ChevronDown, Code2, Globe2, Star, Tag as TagIcon } from "lucide-react";
-import MobileNav from "./components/MobileNav";
+import { MarketingNav } from "@/components/MarketingChrome";
 
 const figma = "/figma/";
-
-const navItems = ["Home", "Product", "Features", "Pricing", "Solutions", "Insights", "Company"];
 
 const partnerLogos = [
   ["mark-a", "LOGOIPSUM"],
@@ -159,33 +157,20 @@ const footerSecondary = [
   ["Legal", ["Privacy Policy", "Terms of Service", "Cookie Policy", "Refund Policy", "Data Processing", "Security", "Acceptable Use Policy"]],
 ];
 
+const legalLinks: Record<string, string> = {
+  "Privacy Policy": "/privacy-policy",
+  "Terms of Service": "/terms-of-service",
+  "Cookie Policy": "/cookie-policy",
+  "Refund Policy": "/refund-policy",
+  "Data Processing": "/data-processing",
+  Security: "/security",
+  "Acceptable Use Policy": "/acceptable-use-policy",
+};
+
 export default function Home() {
   return (
     <main className="site home-page rvyo-page">
-      <header className="nav-shell home-nav">
-        <div className="nav-rail">
-          <a className="brand-placeholder rvyo-brand" href="/" aria-label="RVYO home">
-            <span className="rvyo-word">RVYO</span>
-            <span className="rvyo-mark" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-              <i />
-            </span>
-          </a>
-          <nav aria-label="Primary navigation">
-            {navItems.map((item) => (
-              <a href={item === "Home" ? "/" : item === "Pricing" ? "#pricing" : `#${item.toLowerCase()}`} key={item}>
-                {item}
-              </a>
-            ))}
-          </nav>
-          <a className="button blue nav-cta" href="/register">
-            Get Started
-          </a>
-          <MobileNav current="Home" />
-        </div>
-      </header>
+      <MarketingNav />
 
       <section className="home-hero rail">
         <Tag>RVYO is now live</Tag>
@@ -470,7 +455,7 @@ export default function Home() {
           <div className="footer-column footer-column-sub footer-legal">
             <h3>{footerSecondary[2][0] as string}</h3>
             {(footerSecondary[2][1] as string[]).map((item) => (
-              <a href="#" key={item}>
+              <a href={legalLinks[item]} key={item}>
                 {item}
               </a>
             ))}

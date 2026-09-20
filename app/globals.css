@@ -18406,6 +18406,118 @@ input {
     margin-bottom: 0 !important;
 }
 
+/* RVYO legal pages and final grid tuning */
+.rvyo-page .home-hero,
+.rvyo-page .legal-hero,
+.rvyo-page .legal-grid-band {
+    background-color: #f7f7f7;
+    background-image: linear-gradient(var(--home-line) 1px, transparent 1px), linear-gradient(90deg, var(--home-line) 1px, transparent 1px);
+    background-size: 18px 18px;
+}
+
+.rvyo-page .metrics,
+.rvyo-page .stage,
+.rvyo-page .purpose,
+.rvyo-page .pricing-intro,
+.rvyo-page .comparison,
+.rvyo-page .testimonials,
+.rvyo-page .faq {
+    background-image: none !important;
+}
+
+.rvyo-page .legal-hero {
+    min-height: 374px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 76px 24px 82px;
+    text-align: center;
+    border-bottom: 1px solid var(--home-line);
+}
+
+.rvyo-page .legal-hero .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    text-transform: uppercase;
+}
+
+.rvyo-page .legal-hero .tag svg {
+    width: 13px;
+    height: 13px;
+    color: var(--home-blue);
+}
+
+.rvyo-page .legal-hero h1 {
+    margin: 18px 0 0;
+    color: #030303;
+    font-size: clamp(42px, 5vw, 62px);
+    font-weight: 400;
+    line-height: 1.04;
+    letter-spacing: 0;
+}
+
+.rvyo-page .legal-hero p {
+    max-width: 550px;
+    margin: 14px 0 0;
+    color: #111;
+    font-size: 13px;
+    line-height: 1.35;
+}
+
+.rvyo-page .legal-body {
+    min-height: 1600px;
+    padding: 76px 40px 120px;
+    background: #f7f7f7;
+    border-bottom: 1px solid var(--home-line);
+}
+
+.rvyo-page .legal-body > * {
+    max-width: 980px;
+}
+
+.rvyo-page .legal-body p {
+    margin: 0 0 24px;
+    color: #111;
+    font-size: 14px;
+    line-height: 1.55;
+}
+
+.rvyo-page .legal-body .effective-date {
+    margin-bottom: 24px;
+    font-weight: 700;
+}
+
+.rvyo-page .legal-body h2 {
+    margin: 42px 0 18px;
+    color: #030303;
+    font-size: 34px;
+    font-weight: 400;
+    line-height: 1.08;
+    letter-spacing: -.02em;
+}
+
+.rvyo-page .legal-grid-band {
+    height: 104px !important;
+    border-bottom: 1px solid var(--home-line);
+}
+
+.legal-page .final-cta {
+    min-height: 560px;
+}
+
+@media (max-width: 620px) {
+    .rvyo-page .legal-body {
+        min-height: 0;
+        padding: 48px 20px 76px;
+    }
+
+    .rvyo-page .legal-body h2 {
+        font-size: 28px;
+    }
+}
+
 
 /* Proposal Preview Modal Styles (Figma design) */
 .preview-modal-header {

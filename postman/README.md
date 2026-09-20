@@ -51,11 +51,13 @@ collection variable (or choose a file in each request) before running
 preview/import.
 
 Folders 12-14 cover the new User APIs. Run folder 12 after Create Project so
-`projectId` is populated; it automatically stores the BOQ room/category/item
-IDs used by later requests. Folder 13 builds a costing category/item, adds and
-selects a vendor quote, then creates a scenario and loads cost/margin analysis.
-Folder 14 requires an owner/admin session because business-wide revenue,
-cost, margin, team, and client analytics are financially sensitive.
+`projectId` is populated; it automatically stores the generated BOQ ID plus the
+BOQ room/category/item IDs used by later requests. BOQ number and version are
+server-generated, so the create request intentionally sends only the selected
+project and commercial defaults. Folder 13 builds a costing category/item, adds
+and selects a vendor quote, then creates a scenario and loads cost/margin
+analysis. Folder 14 requires an owner/admin session because business-wide
+revenue, cost, margin, team, and client analytics are financially sensitive.
 
 Folder 15 covers the authenticated project-template flow. Run Create Project
 Template first so `projectTemplateId` is captured, replace the designer

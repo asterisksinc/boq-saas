@@ -773,6 +773,15 @@ const [summary, page] = await Promise.all([
 ]);
 ```
 
+When rendering the Payments tab inside a project workspace, keep the same invoice
+contract and add the project filter:
+
+```ts
+const projectInvoices = await api.get<Page<Invoice>>(
+  `/invoices?page=1&pageSize=10&type=invoice&projectId=${project.id}`,
+);
+```
+
 Create or save a draft with the same payload. Currency, line amounts, subtotal, GST, total, paid value, and outstanding value are server-owned:
 
 ```ts
@@ -803,6 +812,7 @@ const invoice = await api.post<Invoice>("/invoices", {
 ```
 
 - `GET /invoices/{id}` returns preview fields, items, payment history, stored status, and effective status. Effective `overdue` is derived from due date and outstanding balance.
+- `GET /invoices?projectId={projectId}` filters the list to invoices, quotes, and pro-formas linked to the selected project. Use this for project payment/invoice tabs instead of client-side filtering.
 - `PATCH /invoices/{id}` accepts an allowlisted subset and recalculates totals atomically. Paid/void invoices are locked.
 - `POST /invoices/{id}/status` supports `draft`, `pending`, `sent`, `accepted`, and `void`; void is owner/admin-only. “Send to Client” records sent state and timestamp until the communications module exists.
 - `POST /invoices/{id}/payments` records cash/bank/card/UPI/cheque/other payments. Overpayment is rejected and status becomes `partial` or `paid` transactionally.
@@ -883,9 +893,7 @@ Create a blank BOQ:
 
 ```ts
 await boqApi.create({
-  boqNumber: values.boqNumber,
   projectId: selectedProject.id,
-  version: values.version,
   assignedTo: selectedUser?.id ?? null,
   method: "blank",
   markupPercent: 18,
@@ -893,9 +901,12 @@ await boqApi.create({
 });
 ```
 
-For the template flow, first load `GET /boq-templates`, then send
-`method: "template"` and the selected `templateId`. Save an existing BOQ as a
-template with `POST /boq-templates` and `{ name, boqId, description?, tags? }`.
+The API generates `boqNumber` and `version` (`v1`) on create. Do not show them
+as editable creation inputs and do not patch `version` later. Legacy callers may
+still include those fields, but the backend treats BOQ identity as server-owned.
+For the template flow, first load `GET /boq-templates`, then send `method:
+"template"` and the selected `templateId`. Save an existing BOQ as a template
+with `POST /boq-templates` and `{ name, boqId, description?, tags? }`.
 
 The detail response contains `rooms[].categories[].items[]` and the summary
 fields `subtotal`, `markupAmount`, `taxAmount`, and `grandTotal`. Treat all four
