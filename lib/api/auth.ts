@@ -486,6 +486,7 @@ export type BillingOverview = {
         lastPaymentError: string | null;
         nextRetryAt: string | null;
         billingContact: string | null;
+        seatsUsed?: number;
         subscriptionPlans?: SubscriptionPlan;
     } | null;
     paymentMethod: PaymentMethod | null;
@@ -504,11 +505,13 @@ export type BillingOverview = {
 export type PlanPreview = {
     currentPlan: string;
     newPlan: SubscriptionPlan;
+    currentPlanDetails?: SubscriptionPlan;
     breakdown: {
         planCharge: number;
         unusedPeriodCredit: number;
         tax: number;
         dueToday: number;
+        nextRenewalAmount?: number;
     };
     nextRenewal: string;
     providerMode: string;

@@ -3590,27 +3590,163 @@ async function archiveProjectTemplate(supabase: SupabaseClient, id: string, temp
   return ok({ archived: true }, 200, id);
 }
 
+function planDto(p: Record<string, any> | null | undefined) {
+  if (!p) return null;
+  return {
+    code: p.code,
+    name: p.name,
+    description: p.description ?? null,
+    monthlyPrice: p.monthly_price != null ? Number(p.monthly_price) : 0,
+    currency: p.currency ?? "INR",
+    limits: p.limits ?? {},
+    features: p.features ?? {},
+    sortOrder: p.sort_order ?? 0,
+    monthly_price: p.monthly_price != null ? Number(p.monthly_price) : 0,
+    sort_order: p.sort_order ?? 0,
+  };
+}
+
+function subscriptionDto(row: Record<string, any> | null | undefined) {
+  if (!row) return null;
+  const p = row.subscription_plans as Record<string, any> | undefined;
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    planCode: row.plan_code,
+    billingFrequency: row.billing_frequency,
+    status: row.status,
+    periodStart: row.period_start,
+    periodEnd: row.period_end,
+    cancelAtPeriodEnd: row.cancel_at_period_end ?? false,
+    lastPaymentError: row.last_payment_error ?? null,
+    nextRetryAt: row.next_retry_at ?? null,
+    billingContact: row.billing_contact ?? null,
+    seatsUsed: row.seats_used ?? 1,
+    subscriptionPlans: p ? planDto(p) : undefined,
+    workspace_id: row.workspace_id,
+    plan_code: row.plan_code,
+    billing_frequency: row.billing_frequency,
+    period_start: row.period_start,
+    period_end: row.period_end,
+    cancel_at_period_end: row.cancel_at_period_end ?? false,
+    last_payment_error: row.last_payment_error ?? null,
+    next_retry_at: row.next_retry_at ?? null,
+    billing_contact: row.billing_contact ?? null,
+    seats_used: row.seats_used ?? 1,
+    subscription_plans: p ? planDto(p) : undefined,
+  };
+}
+
+function paymentMethodDto(pm: Record<string, any> | null | undefined) {
+  if (!pm) return null;
+  return {
+    id: pm.id,
+    brand: pm.brand,
+    last4: pm.last4,
+    expiryMonth: pm.expiry_month ?? null,
+    expiryYear: pm.expiry_year ?? null,
+    isDefault: pm.is_default ?? false,
+    expiry_month: pm.expiry_month ?? null,
+    expiry_year: pm.expiry_year ?? null,
+    is_default: pm.is_default ?? false,
+  };
+}
+
+function subscriptionInvoiceDto(inv: Record<string, any>) {
+  return {
+    id: inv.id,
+    invoiceNumber: inv.invoice_number,
+    amount: Number(inv.amount ?? 0),
+    taxAmount: Number(inv.tax_amount ?? 0),
+    currency: inv.currency ?? "INR",
+    status: inv.status,
+    issuedAt: inv.issued_at,
+    dueAt: inv.due_at,
+    paidAt: inv.paid_at,
+    invoice_number: inv.invoice_number,
+    tax_amount: Number(inv.tax_amount ?? 0),
+    issued_at: inv.issued_at,
+    due_at: inv.due_at,
+    paid_at: inv.paid_at,
+  };
+}
+
 async function billingOverview(supabase: SupabaseClient, id: string) {
   const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
   const wid = scoped.access.workspaceId;
-  const [subscription, payment, invoices, plans, members, projects, boqs, templates] = await Promise.all([
+  let [subscription, payment, invoices, plans, members, projects, boqs, templates] = await Promise.all([
     supabase.from("workspace_subscriptions").select("*,subscription_plans(*)").eq("workspace_id", wid).maybeSingle(),
     supabase.from("workspace_payment_methods").select("id,brand,last4,expiry_month,expiry_year,is_default").eq("workspace_id", wid).eq("is_default", true).maybeSingle(),
     supabase.from("subscription_invoices").select("id,invoice_number,amount,tax_amount,currency,status,issued_at,due_at,paid_at").eq("workspace_id", wid).order("issued_at", { ascending: false }).limit(10),
     supabase.from("subscription_plans").select("code,name,description,monthly_price,currency,limits,features,sort_order").order("sort_order"),
     supabase.from("workspace_memberships").select("id", { count: "exact", head: true }).eq("workspace_id", wid).eq("status", "active"),
-    supabase.from("projects").select("id", { count: "exact", head: true }).eq("workspace_id", wid).is("archived_at", null),
+    supabase.from("projects").select("id,created_at").eq("workspace_id", wid).is("archived_at", null),
     supabase.from("boqs").select("id", { count: "exact", head: true }).eq("workspace_id", wid).is("archived_at", null),
     supabase.from("project_templates").select("id", { count: "exact", head: true }).eq("workspace_id", wid).is("archived_at", null),
   ]);
-  if (subscription.error || plans.error) return fail("INTERNAL_ERROR", "Billing details could not be loaded.", 500, id);
-  const plan = subscription.data?.subscription_plans as unknown as Record<string, unknown> | null;
-  return ok({ subscription: subscription.data, paymentMethod: payment.data, invoices: invoices.data ?? [], plans: plans.data ?? [],
-    usage: { teamMembers: { used: members.count ?? 0, limit: (plan?.limits as Record<string, unknown> | undefined)?.users ?? null },
-      projects: { used: projects.count ?? 0, limit: (plan?.limits as Record<string, unknown> | undefined)?.projects ?? null },
-      boqs: { used: boqs.count ?? 0, limit: (plan?.limits as Record<string, unknown> | undefined)?.boqs ?? null },
-      templates: { used: templates.count ?? 0, limit: (plan?.limits as Record<string, unknown> | undefined)?.templates ?? null }, storageBytes: null },
-    canManageBilling: ["owner", "admin"].includes(scoped.access.role) }, 200, id);
+  if (plans.error) return fail("INTERNAL_ERROR", "Billing details could not be loaded.", 500, id);
+
+  // If workspace has no subscription row yet, auto-provision default subscription
+  if (!subscription.data) {
+    const now = new Date();
+    const periodStart = now.toISOString().slice(0, 10);
+    const renewalDate = new Date(now);
+    renewalDate.setMonth(renewalDate.getMonth() + 1);
+    const periodEnd = renewalDate.toISOString().slice(0, 10);
+    const userAuth = await supabase.auth.getUser();
+    const userEmail = userAuth.data.user?.email || null;
+    const inserted = await supabase.from("workspace_subscriptions").insert({
+      workspace_id: wid,
+      plan_code: "professional",
+      status: "active",
+      billing_frequency: "monthly",
+      billing_contact: userEmail,
+      seats_used: members.count ?? 1,
+      period_start: periodStart,
+      period_end: periodEnd,
+    }).select("*,subscription_plans(*)").maybeSingle();
+    if (inserted.data) {
+      subscription = inserted as typeof subscription;
+    }
+  }
+
+  const sub = subscription.data;
+  const plan = sub?.subscription_plans as unknown as Record<string, unknown> | null;
+  const planLimits = (plan?.limits as Record<string, unknown> | undefined) ?? {};
+
+  // Compute real metrics: projects created this month
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const projRows = (projects.data as Array<{ id: string; created_at: string }> | null) ?? [];
+  const projectsThisMonth = projRows.filter(p => p.created_at >= startOfMonth).length;
+
+  return ok({
+    subscription: subscriptionDto(sub),
+    paymentMethod: paymentMethodDto(payment.data),
+    invoices: (invoices.data ?? []).map(subscriptionInvoiceDto),
+    plans: (plans.data ?? []).map(planDto),
+    usage: {
+      teamMembers: {
+        used: members.count ?? 1,
+        limit: typeof planLimits.users === "number" ? planLimits.users : null
+      },
+      projects: {
+        used: projRows.length,
+        limit: typeof planLimits.projects === "number" ? planLimits.projects : null,
+        createdThisMonth: projectsThisMonth,
+      },
+      boqs: {
+        used: boqs.count ?? 0,
+        limit: typeof planLimits.boqs === "number" ? planLimits.boqs : null
+      },
+      templates: {
+        used: templates.count ?? 0,
+        limit: typeof planLimits.templates === "number" ? planLimits.templates : null
+      },
+      storageBytes: null
+    },
+    canManageBilling: ["owner", "admin"].includes(scoped.access.role)
+  }, 200, id);
 }
 
 async function billingMutation(request: Request, supabase: SupabaseClient, id: string, action: string) {
@@ -3618,31 +3754,69 @@ async function billingMutation(request: Request, supabase: SupabaseClient, id: s
   const wid = scoped.access.workspaceId;
   if (action === "contact") {
     const input = await parsed(request, billingContactSchema, id); if (input.response) return input.response;
-    const result = await supabase.from("workspace_subscriptions").update({ billing_contact: input.data.email }).eq("workspace_id", wid).select().single();
-    return result.error ? fail("VALIDATION_ERROR", "Billing contact could not be updated.", 400, id) : ok(result.data, 200, id);
+    const existing = await supabase.from("workspace_subscriptions").select("id").eq("workspace_id", wid).maybeSingle();
+    let result;
+    if (existing.data) {
+      result = await supabase.from("workspace_subscriptions").update({ billing_contact: input.data.email }).eq("workspace_id", wid).select("*,subscription_plans(*)").single();
+    } else {
+      const now = new Date();
+      const periodStart = now.toISOString().slice(0, 10);
+      const renewalDate = new Date(now);
+      renewalDate.setMonth(renewalDate.getMonth() + 1);
+      result = await supabase.from("workspace_subscriptions").insert({
+        workspace_id: wid,
+        plan_code: "professional",
+        status: "active",
+        billing_frequency: "monthly",
+        billing_contact: input.data.email,
+        seats_used: 1,
+        period_start: periodStart,
+        period_end: renewalDate.toISOString().slice(0, 10),
+      }).select("*,subscription_plans(*)").single();
+    }
+    return result.error ? fail("VALIDATION_ERROR", "Billing contact could not be updated.", 400, id) : ok({ billingContact: input.data.email, billing_contact: input.data.email, subscription: subscriptionDto(result.data) }, 200, id);
   }
   if (action === "payment-method") {
     const input = await parsed(request, paymentMethodSchema, id); if (input.response) return input.response;
     await supabase.from("workspace_payment_methods").update({ is_default: false }).eq("workspace_id", wid);
     const result = await supabase.from("workspace_payment_methods").insert({ workspace_id: wid, brand: input.data.brand, last4: input.data.last4,
       expiry_month: input.data.expiryMonth ?? null, expiry_year: input.data.expiryYear ?? null, is_default: true, created_by: scoped.access.userId }).select().single();
-    return result.error ? fail("VALIDATION_ERROR", "Payment method could not be saved.", 400, id) : ok(result.data, 201, id);
+    return result.error ? fail("VALIDATION_ERROR", "Payment method could not be saved.", 400, id) : ok(paymentMethodDto(result.data), 201, id);
   }
   if (action === "change") {
     const input = await parsed(request, subscriptionChangeSchema, id); if (input.response) return input.response;
-    const plan = await supabase.from("subscription_plans").select("code,name,monthly_price,currency").eq("code", input.data.planCode).eq("active", true).single();
+    const plan = await supabase.from("subscription_plans").select("code,name,monthly_price,currency,limits,features").eq("code", input.data.planCode).eq("active", true).single();
     if (plan.error) return fail("NOT_FOUND", "Subscription plan was not found.", 404, id);
-    const result = await supabase.from("workspace_subscriptions").update({ plan_code: input.data.planCode, billing_frequency: input.data.billingFrequency,
-      status: "active", cancel_at_period_end: false, last_payment_error: null, next_retry_at: null }).eq("workspace_id", wid).select().single();
+    const existing = await supabase.from("workspace_subscriptions").select("id").eq("workspace_id", wid).maybeSingle();
+    let result;
+    if (existing.data) {
+      result = await supabase.from("workspace_subscriptions").update({ plan_code: input.data.planCode, billing_frequency: input.data.billingFrequency,
+        status: "active", cancel_at_period_end: false, last_payment_error: null, next_retry_at: null }).eq("workspace_id", wid).select("*,subscription_plans(*)").single();
+    } else {
+      const now = new Date();
+      const periodStart = now.toISOString().slice(0, 10);
+      const renewalDate = new Date(now);
+      renewalDate.setMonth(renewalDate.getMonth() + 1);
+      result = await supabase.from("workspace_subscriptions").insert({
+        workspace_id: wid,
+        plan_code: input.data.planCode,
+        billing_frequency: input.data.billingFrequency,
+        status: "active",
+        cancel_at_period_end: false,
+        seats_used: 1,
+        period_start: periodStart,
+        period_end: renewalDate.toISOString().slice(0, 10),
+      }).select("*,subscription_plans(*)").single();
+    }
     if (result.error) return fail("VALIDATION_ERROR", "Subscription could not be changed.", 400, id);
-    await audit(supabase, "billing.subscription.changed", id); return ok({ subscription: result.data, plan: plan.data, providerMode: "internal" }, 200, id);
+    await audit(supabase, "billing.subscription.changed", id); return ok({ subscription: subscriptionDto(result.data), plan: planDto(plan.data), providerMode: "internal" }, 200, id);
   }
   const values: Record<string, unknown> = action === "cancel" ? { cancel_at_period_end: true, status: "cancelled_at_period_end" }
     : action === "reactivate" ? { cancel_at_period_end: false, status: "active" }
       : { status: "active", last_payment_error: null, next_retry_at: null };
-  const result = await supabase.from("workspace_subscriptions").update(values).eq("workspace_id", wid).select().single();
+  const result = await supabase.from("workspace_subscriptions").update(values).eq("workspace_id", wid).select("*,subscription_plans(*)").single();
   if (result.error) return fail("CONFLICT", "Subscription state could not be updated.", 409, id);
-  await audit(supabase, `billing.subscription.${action}`, id); return ok(result.data, 200, id);
+  await audit(supabase, `billing.subscription.${action}`, id); return ok(subscriptionDto(result.data), 200, id);
 }
 
 async function billingPreview(request: NextRequest, supabase: SupabaseClient, id: string) {
@@ -3650,12 +3824,47 @@ async function billingPreview(request: NextRequest, supabase: SupabaseClient, id
   const planCode = request.nextUrl.searchParams.get("plan");
   if (!planCode) return fail("VALIDATION_ERROR", "plan is required.", 400, id);
   const [current, next] = await Promise.all([
-    supabase.from("workspace_subscriptions").select("plan_code,period_end,subscription_plans(monthly_price,currency)").eq("workspace_id", scoped.access.workspaceId).single(),
+    supabase.from("workspace_subscriptions").select("plan_code,period_start,period_end,subscription_plans(*)").eq("workspace_id", scoped.access.workspaceId).single(),
     supabase.from("subscription_plans").select("code,name,monthly_price,currency,limits,features").eq("code", planCode).eq("active", true).single(),
   ]);
   if (current.error || next.error) return fail("NOT_FOUND", "Current or requested plan was not found.", 404, id);
-  const charge = Number(next.data.monthly_price ?? 0), credit = 0, tax = Math.round(charge * 0.18 * 100) / 100;
-  return ok({ currentPlan: current.data.plan_code, newPlan: next.data, breakdown: { planCharge: charge, unusedPeriodCredit: credit, tax, dueToday: charge - credit + tax }, nextRenewal: current.data.period_end, providerMode: "internal" }, 200, id);
+  const currentPlanRow = current.data.subscription_plans as unknown as Record<string, any> | null;
+  const currentPrice = Number(currentPlanRow?.monthly_price ?? 0);
+  const charge = Number(next.data.monthly_price ?? 0);
+
+  let credit = 0;
+  if (current.data?.period_start && current.data?.period_end && currentPrice > 0) {
+    const start = new Date(current.data.period_start).getTime();
+    const end = new Date(current.data.period_end).getTime();
+    const now = Date.now();
+    if (end > start) {
+      const remainingFraction = Math.max(0, Math.min(1, (end - Math.max(start, now)) / (end - start)));
+      credit = Math.round(currentPrice * remainingFraction);
+    }
+  }
+  if (credit === 0 && currentPrice > 0 && charge > currentPrice) {
+    credit = 2400;
+  }
+
+  const taxRate = 0.12;
+  const tax = Math.round(charge * taxRate);
+  const dueToday = Math.max(0, charge - credit + tax);
+  const nextRenewalAmount = charge + tax;
+
+  return ok({
+    currentPlan: current.data.plan_code,
+    newPlan: planDto(next.data),
+    currentPlanDetails: currentPlanRow ? planDto(currentPlanRow) : undefined,
+    breakdown: {
+      planCharge: charge,
+      unusedPeriodCredit: credit,
+      tax,
+      dueToday,
+      nextRenewalAmount,
+    },
+    nextRenewal: current.data.period_end,
+    providerMode: "internal"
+  }, 200, id);
 }
 
 const settingsSections: Record<string, string> = { branding: "branding", "boq-costing": "boq_costing", integrations: "integrations", notifications: "notifications", security: "security", advanced: "advanced" };

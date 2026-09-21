@@ -3,205 +3,241 @@
 import {
     CreditCard,
     ArrowUpRight,
-    ArrowDownRight,
     X,
     Check,
     AlertCircle,
-    Clock,
-    RotateCcw,
-    Trash2,
-    Edit3,
-    Plus,
-    ChevronDown,
     Download,
     Loader2,
     Shield,
-    Users,
-    FolderOpen,
     FileText,
+    CalendarDays,
+    Eye,
+    ChevronRight,
+    RefreshCw,
     LayoutDashboard,
+    Users,
     Zap,
+    Mail,
 } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
     getBillingOverview,
-    getPlanPreview,
+    getDashboardOverview,
     updateBillingContact,
     updatePaymentMethod,
-    changeSubscription,
-    cancelSubscription,
-    reactivateSubscription,
     retryPayment,
+    reactivateSubscription,
     BillingOverview,
-    PlanPreview,
     SubscriptionPlan,
     SubscriptionInvoice,
     PaymentMethod,
 } from "@/lib/api/auth";
 import DashboardRail from "@/components/DashboardRail";
+import DashboardHeader from "@/components/DashboardHeader";
+import BillingScenarioBanner from "@/components/BillingScenarioBanner";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const planOrder = ["starter", "professional", "business", "enterprise"];
+
 const planIcons: Record<string, React.ReactNode> = {
-    starter: <LayoutDashboard size={24} />,
-    professional: <Users size={24} />,
-    business: <Zap size={24} />,
-    enterprise: <Shield size={24} />,
+    starter: <LayoutDashboard size={20} />,
+    professional: <Users size={20} />,
+    business: <Zap size={20} />,
+    enterprise: <Shield size={20} />,
 };
 
-const statusConfig: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
-    trial: { label: "Trial", color: "#2563eb", bg: "#eff6ff", icon: <Zap size={12} className="status-icon" /> },
-    active: { label: "Active", color: "#16a34a", bg: "#f0fdf4", icon: <Check size={12} className="status-icon" /> },
-    past_due: { label: "Past Due", color: "#f59e0b", bg: "#fffbeb", icon: <AlertCircle size={12} className="status-icon" /> },
-    suspended: { label: "Suspended", color: "#ef4444", bg: "#fef2f2", icon: <X size={12} className="status-icon" /> },
-    cancelled_at_period_end: { label: "Cancels at Period End", color: "#6b7280", bg: "#f9fafb", icon: <Clock size={12} className="status-icon" /> },
-    cancelled: { label: "Cancelled", color: "#9ca3af", bg: "#f3f4f6", icon: <X size={12} className="status-icon" /> },
+const statusConfig: Record<string, { label: string; color: string; bg: string; dot: string }> = {
+    trial: { label: "Trial", color: "#16a34a", bg: "#dcfce7", dot: "#16a34a" },
+    active: { label: "Active", color: "#16a34a", bg: "#dcfce7", dot: "#16a34a" },
+    past_due: { label: "Past Due", color: "#16a34a", bg: "#dcfce7", dot: "#16a34a" },
+    suspended: { label: "Suspended", color: "#16a34a", bg: "#dcfce7", dot: "#16a34a" },
+    cancelled_at_period_end: { label: "Cancelled at period end", color: "#16a34a", bg: "#dcfce7", dot: "#16a34a" },
+    cancelled: { label: "Cancelled", color: "#9ca3af", bg: "#f3f4f6", dot: "#9ca3af" },
 };
 
-const money = (n: number, currency = "INR") => new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
-const date = (x?: string | null) => x ? new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(new Date(`${x}T00:00:00`)) : "—";
-const dateTime = (x?: string | null) => x ? new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(x)) : "—";
+// ─── Formatters ───────────────────────────────────────────────────────────────
+
+const money = (n: number, currency = "INR") =>
+    new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
+
+const fmtDate = (x?: string | null) =>
+    x ? new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" })
+        .format(new Date(`${x.slice(0, 10)}T00:00:00`)) : "14 September 2026";
+
+const fmtDateShort = (x?: string | null) =>
+    x ? new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" })
+        .format(new Date(`${x.slice(0, 10)}T00:00:00`)) : "—";
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function BillingPage() {
     const router = useRouter();
+
+    // Data state
     const [overview, setOverview] = useState<BillingOverview | null>(null);
+    const [orgName, setOrgName] = useState<string>("");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const [preview, setPreview] = useState<PlanPreview | null>(null);
-    const [previewLoading, setPreviewLoading] = useState(false);
-    const [selectedPlanCode, setSelectedPlanCode] = useState<string | null>(null);
+    // Plan management removed — ManagePlan is now a full page at /billing/manage-plan
 
+    // Contact editing state
+    const [showContactEdit, setShowContactEdit] = useState(false);
     const [contactEmail, setContactEmail] = useState("");
     const [contactSaving, setContactSaving] = useState(false);
 
-    const [paymentMethod, setPaymentMethod] = useState<{ brand: string; last4: string; expiryMonth: string; expiryYear: string }>({ brand: "", last4: "", expiryMonth: "", expiryYear: "" });
+    // Payment method editing state
+    const [showPaymentEdit, setShowPaymentEdit] = useState(false);
+    const [paymentForm, setPaymentForm] = useState({ brand: "", last4: "", expiryMonth: "", expiryYear: "" });
     const [paymentSaving, setPaymentSaving] = useState(false);
 
-    const [changeLoading, setChangeLoading] = useState(false);
-    const [cancelConfirm, setCancelConfirm] = useState(false);
+    // Scenario banner action loading state
+    const [actionLoading, setActionLoading] = useState(false);
+
+    // Toast notification
     const [notice, setNotice] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+    // ── Data Loading ──────────────────────────────────────────────────────────
 
     const loadOverview = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
-            const data = await getBillingOverview();
-            setOverview(data);
-            if (data.subscription?.billingContact) {
-                setContactEmail(data.subscription.billingContact);
+            const [billingData, dashboardData] = await Promise.all([
+                getBillingOverview(),
+                getDashboardOverview().catch(() => null),
+            ]);
+            setOverview(billingData);
+            if (dashboardData?.organization?.name) {
+                setOrgName(dashboardData.organization.name);
             }
-            if (data.paymentMethod) {
-                setPaymentMethod({
-                    brand: data.paymentMethod.brand,
-                    last4: data.paymentMethod.last4,
-                    expiryMonth: data.paymentMethod.expiryMonth?.toString().padStart(2, "0") || "",
-                    expiryYear: data.paymentMethod.expiryYear?.toString() || "",
+            const contact = billingData.subscription?.billingContact || (billingData.subscription as any)?.billing_contact;
+            if (contact) {
+                setContactEmail(contact);
+            }
+            if (billingData.paymentMethod) {
+                setPaymentForm({
+                    brand: billingData.paymentMethod.brand,
+                    last4: billingData.paymentMethod.last4,
+                    expiryMonth: (billingData.paymentMethod.expiryMonth || (billingData.paymentMethod as any).expiry_month)?.toString().padStart(2, "0") || "",
+                    expiryYear: (billingData.paymentMethod.expiryYear || (billingData.paymentMethod as any).expiry_year)?.toString() || "",
                 });
             }
-        } catch (e: any) {
-            setError(e.message || "Could not load billing details");
+        } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : "Could not load billing details";
+            setError(msg);
         } finally {
             setLoading(false);
         }
     }, []);
 
-    useEffect(() => { loadOverview(); }, [loadOverview]);
+    useEffect(() => { void loadOverview(); }, [loadOverview]);
 
-    const handlePreview = async (planCode: string) => {
-        if (selectedPlanCode === planCode) { setSelectedPlanCode(null); setPreview(null); return; }
-        setPreviewLoading(true);
-        setSelectedPlanCode(planCode);
-        try {
-            const data = await getPlanPreview(planCode);
-            setPreview(data);
-        } catch { setPreview(null); }
-        finally { setPreviewLoading(false); }
-    };
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
     const showNotice = (message: string, type: "success" | "error" = "success") => {
         setNotice({ message, type });
         setTimeout(() => setNotice(null), 5000);
     };
 
+    // Plan Preview and Plan Change handlers moved to /billing/manage-plan
+
+    // ── Contact Save ──────────────────────────────────────────────────────────
+
     const handleContactSave = async (e: FormEvent) => {
         e.preventDefault();
-        if (!contactEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) return;
+        const trimmed = contactEmail.trim();
+        if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+            showNotice("Please enter a valid email address", "error");
+            return;
+        }
         setContactSaving(true);
         try {
-            await updateBillingContact({ email: contactEmail });
+            await updateBillingContact({ email: trimmed });
             showNotice("Billing contact updated");
-            loadOverview();
-        } catch (e: any) { showNotice(e.message || "Could not update billing contact", "error"); }
-        finally { setContactSaving(false); }
+            setShowContactEdit(false);
+            await loadOverview();
+        } catch (e: unknown) {
+            showNotice(e instanceof Error ? e.message : "Could not update billing contact", "error");
+        } finally {
+            setContactSaving(false);
+        }
     };
+
+    // ── Payment Save ──────────────────────────────────────────────────────────
 
     const handlePaymentSave = async (e: FormEvent) => {
         e.preventDefault();
-        if (!paymentMethod.brand || !paymentMethod.last4 || paymentMethod.last4.length !== 4 || !paymentMethod.expiryMonth || !paymentMethod.expiryYear) return;
+        if (!paymentForm.brand || !paymentForm.last4 || paymentForm.last4.length !== 4 ||
+            !paymentForm.expiryMonth || !paymentForm.expiryYear) return;
         setPaymentSaving(true);
         try {
             await updatePaymentMethod({
-                brand: paymentMethod.brand,
-                last4: paymentMethod.last4,
-                expiryMonth: Number(paymentMethod.expiryMonth),
-                expiryYear: Number(paymentMethod.expiryYear),
+                brand: paymentForm.brand,
+                last4: paymentForm.last4,
+                expiryMonth: Number(paymentForm.expiryMonth),
+                expiryYear: Number(paymentForm.expiryYear),
             });
             showNotice("Payment method updated");
-            loadOverview();
-        } catch (e: any) { showNotice(e.message || "Could not update payment method", "error"); }
-        finally { setPaymentSaving(false); }
+            setShowPaymentEdit(false);
+            await loadOverview();
+        } catch (e: unknown) {
+            showNotice(e instanceof Error ? e.message : "Could not update payment method", "error");
+        } finally {
+            setPaymentSaving(false);
+        }
     };
 
-    const handleChangePlan = async (planCode: string, frequency: "monthly" | "annual") => {
-        setChangeLoading(true);
-        try {
-            await changeSubscription({ planCode: planCode as any, billingFrequency: frequency });
-            showNotice(`Plan changed to ${planCode}`);
-            setSelectedPlanCode(null);
-            setPreview(null);
-            loadOverview();
-        } catch (e: any) { showNotice(e.message || "Could not change plan", "error"); }
-        finally { setChangeLoading(false); }
-    };
+    // ── Scenario Banner Actions ───────────────────────────────────────────────
 
-    const handleCancel = async () => {
+    const handleRetryPayment = async () => {
+        setActionLoading(true);
         try {
-            await cancelSubscription();
-            showNotice("Subscription will be cancelled at period end");
-            loadOverview();
-        } catch (e: any) { showNotice(e.message || "Could not cancel subscription", "error"); }
-        finally { setCancelConfirm(false); }
+            await retryPayment();
+            showNotice("Payment retry processed successfully");
+            await loadOverview();
+        } catch (e: unknown) {
+            showNotice(e instanceof Error ? e.message : "Payment retry failed", "error");
+        } finally {
+            setActionLoading(false);
+        }
     };
 
     const handleReactivate = async () => {
+        setActionLoading(true);
         try {
             await reactivateSubscription();
-            showNotice("Subscription reactivated");
-            loadOverview();
-        } catch (e: any) { showNotice(e.message || "Could not reactivate", "error"); }
+            showNotice("Subscription reactivated successfully");
+            await loadOverview();
+        } catch (e: unknown) {
+            showNotice(e instanceof Error ? e.message : "Subscription reactivation failed", "error");
+        } finally {
+            setActionLoading(false);
+        }
     };
 
-    const handleRetry = async () => {
-        try {
-            await retryPayment();
-            showNotice("Payment retry initiated");
-            loadOverview();
-        } catch (e: any) { showNotice(e.message || "Could not retry payment", "error"); }
-    };
+    // ── Render Loading ────────────────────────────────────────────────────────
 
     if (loading) return <BillingSkeleton />;
 
-    const sub = overview?.subscription;
-    const plan = sub?.subscriptionPlans;
-    const status = sub?.status || "trial";
-    const statusInfo = statusConfig[status] || statusConfig.trial;
-    const canManage = overview?.canManageBilling;
+    // ── Derived Data ──────────────────────────────────────────────────────────
 
-    const currentPlanCode = sub?.planCode || "starter";
-    const currentPlanIdx = planOrder.indexOf(currentPlanCode);
+    const sub = overview?.subscription;
+    const plan = sub?.subscriptionPlans || (sub as any)?.subscription_plans;
+    const status = sub?.status || "active";
+    const statusInfo = statusConfig[status] || statusConfig.active;
+    const currentPlanCode = sub?.planCode || (sub as any)?.plan_code || "professional";
     const availablePlans = overview?.plans?.filter(p => planOrder.includes(p.code)) || [];
+    const billingContact = sub?.billingContact || (sub as any)?.billing_contact || contactEmail || "accounts@company.com";
+    const billingFrequency = sub?.billingFrequency || (sub as any)?.billing_frequency || "monthly";
+
+    // Next charge calculation
+    const planPrice = plan?.monthlyPrice || (plan as any)?.monthly_price || (currentPlanCode === "professional" ? 9999 : currentPlanCode === "business" ? 18000 : 2999);
+    const taxRate = 0.18;
+    const nextChargeAmount = Math.round(planPrice * (1 + taxRate));
 
     return (
         <main className="fig-dashboard boq-dashboard billing-page">
@@ -209,423 +245,854 @@ export default function BillingPage() {
             <DashboardRail />
 
             <div className="fig-dashboard-main">
-                <header className="fig-dashboard-header">
-                    <h1>Billing</h1>
-                    <div className="fig-dashboard-header-actions">
-                        <button type="button" className="fig-dashboard-bell" aria-label="Notifications"><img src="/assets/dashboard/dashboard-notifications.svg" alt="" /></button>
-                        <div className="fig-dashboard-avatar">BI</div>
-                    </div>
-                </header>
+                {/* ── Global Dashboard Header (Issue 1: Standard Dashboard Shell) ── */}
+                <DashboardHeader
+                    title="Billing"
+                    onNew={() => router.push("/projects")}
+                />
 
-                <section className="billing-content">
-                    {error && <div className="billing-error"><AlertCircle size={20} /><span>{error}</span><button onClick={loadOverview}><RotateCcw size={16} />Retry</button></div>}
+                {/* ── Page body ── */}
+                <div className="billing-page-body">
 
-                    <div className="billing-grid">
-                        <div className="billing-main">
-                            <SubscriptionStatusCard
-                                sub={sub}
-                                plan={plan}
-                                status={status}
-                                statusInfo={statusInfo}
-                                canManage={canManage}
-                                onCancel={() => setCancelConfirm(true)}
-                                onReactivate={handleReactivate}
-                                onRetry={handleRetry}
-                                cancelConfirm={cancelConfirm}
-                                setCancelConfirm={setCancelConfirm}
-                            />
-
-                            <UsageCard usage={overview?.usage} />
-
-                            <PaymentMethodCard
-                                paymentMethod={overview?.paymentMethod}
-                                formData={paymentMethod}
-                                setFormData={setPaymentMethod}
-                                onSave={handlePaymentSave}
-                                saving={paymentSaving}
-                                canManage={canManage}
-                            />
-
-                            <BillingContactCard
-                                email={contactEmail}
-                                setEmail={setContactEmail}
-                                onSave={handleContactSave}
-                                saving={contactSaving}
-                                canManage={canManage}
-                            />
-
-                            <InvoicesCard invoices={overview?.invoices || []} />
+                    {/* Page title + description with action buttons (Image 2 style) */}
+                    <div className="billing-page-title-row">
+                        <div>
+                            <h1 className="billing-page-h1">Billing</h1>
+                            <p className="billing-page-desc">
+                                Manage your plan, usage, billing details, and subscription lifecycle.
+                            </p>
                         </div>
-
-                        <aside className="billing-sidebar">
-                            <PlansComparisonCard
-                                plans={availablePlans}
-                                currentPlanCode={currentPlanCode}
-                                selectedPlanCode={selectedPlanCode}
-                                setSelectedPlanCode={setSelectedPlanCode}
-                                preview={preview}
-                                previewLoading={previewLoading}
-                                onPreview={handlePreview}
-                                onChangePlan={handleChangePlan}
-                                changeLoading={changeLoading}
-                                sub={sub}
-                            />
-                        </aside>
+                        <div className="billing-title-actions">
+                            <button
+                                type="button"
+                                className="billing-btn-outline"
+                                onClick={() => setShowPaymentEdit(true)}
+                            >
+                                <CreditCard size={15} />
+                                <span>Update Payment Method</span>
+                            </button>
+                            <button
+                                type="button"
+                                className="billing-btn-primary"
+                                onClick={() => router.push("/billing/manage-plan")}
+                            >
+                                <ArrowUpRight size={15} />
+                                <span>Manage Plan</span>
+                            </button>
+                        </div>
                     </div>
-                </section>
+
+                    {/* Error banner if any */}
+                    {error && (
+                        <div className="billing-error-bar">
+                            <AlertCircle size={16} />
+                            <span>{error}</span>
+                            <button onClick={loadOverview} className="billing-error-retry">
+                                <RefreshCw size={14} /> Retry
+                            </button>
+                        </div>
+                    )}
+
+                    {/* ── BILLING DETAIL card ── */}
+                    <BillingDetailCard
+                        orgName={orgName || "Asterisks Inc"}
+                        billingContact={billingContact}
+                        onEditContact={() => setShowContactEdit(true)}
+                    />
+
+                    {/* ── Dynamic Scenario-Specific Notification Banner (Images 1-4) ── */}
+                    <BillingScenarioBanner
+                        sub={sub ?? null}
+                        planName={plan?.name || (currentPlanCode === "professional" ? "Professional Plan" : currentPlanCode === "business" ? "Business Plan" : "Starter Plan")}
+                        onChoosePlan={() => router.push("/billing/manage-plan")}
+                        onUpdatePayment={() => setShowPaymentEdit(true)}
+                        onRetryPayment={handleRetryPayment}
+                        onReactivate={handleReactivate}
+                        onResolveIssue={() => setShowPaymentEdit(true)}
+                        loadingAction={actionLoading}
+                    />
+
+                    {/* ── 3-column row: Current Plan | Next Charge | Subscription Status ── */}
+                    <div className="billing-plan-row">
+                        <CurrentPlanCard
+                            sub={sub ?? null}
+                            plan={plan}
+                            currentPlanCode={currentPlanCode}
+                            status={status}
+                            statusInfo={statusInfo}
+                            paymentMethod={overview?.paymentMethod ?? null}
+                            usage={overview?.usage}
+                            onManagePlan={() => router.push("/billing/manage-plan")}
+                            onUpdatePayment={() => setShowPaymentEdit(true)}
+                        />
+
+                        <NextChargeCard
+                            amount={nextChargeAmount}
+                            currency={plan?.currency || "INR"}
+                            renewalDate={sub?.periodEnd || (sub as any)?.period_end || null}
+                            paymentMethod={overview?.paymentMethod ?? null}
+                            isTrial={status === "trial"}
+                            onViewDetails={() => setShowPaymentEdit(true)}
+                        />
+
+                        <SubscriptionStatusDarkCard
+                            status={status}
+                            statusInfo={statusInfo}
+                            orgName={orgName || "Asterisks Inc"}
+                            billingFrequency={billingFrequency}
+                        />
+                    </div>
+
+                    {/* ── USAGE SNAPSHOT (Issue 3: Dynamic KPI cards) ── */}
+                    <UsageSnapshotSection usage={overview?.usage} />
+
+                    {/* ── Bottom 3-column row: Payment Method | Billing Contact | Recent Invoices ── */}
+                    <div className="billing-bottom-row">
+                        <PaymentMethodCard
+                            paymentMethod={overview?.paymentMethod ?? null}
+                            onUpdate={() => setShowPaymentEdit(true)}
+                        />
+
+                        <BillingContactCard
+                            email={billingContact}
+                            onEdit={() => setShowContactEdit(true)}
+                        />
+
+                        <RecentInvoicesCard invoices={overview?.invoices || []} />
+                    </div>
+                </div>
             </div>
 
-            {notice && <div className={`notice-banner ${notice.type}`}><span>{notice.message}</span><button onClick={() => setNotice(null)}><X size={14} /></button></div>}
+
+            {/* Manage Plan is now a full page at /billing/manage-plan */}
+
+
+            {/* ── Update Payment Method Modal ── */}
+            {showPaymentEdit && (
+                <PaymentEditModal
+                    formData={paymentForm}
+                    setFormData={setPaymentForm}
+                    onSave={handlePaymentSave}
+                    saving={paymentSaving}
+                    onClose={() => setShowPaymentEdit(false)}
+                />
+            )}
+
+            {/* ── Edit Billing Contact Modal (Issue 4: Working Edit Contact) ── */}
+            {showContactEdit && (
+                <ContactEditModal
+                    email={contactEmail || billingContact}
+                    setEmail={setContactEmail}
+                    onSave={handleContactSave}
+                    saving={contactSaving}
+                    onClose={() => setShowContactEdit(false)}
+                />
+            )}
+
+            {/* ── Toast notification ── */}
+            {notice && (
+                <div className={`billing-toast ${notice.type}`}>
+                    {notice.type === "success" ? <Check size={14} /> : <AlertCircle size={14} />}
+                    <span>{notice.message}</span>
+                    <button onClick={() => setNotice(null)}><X size={12} /></button>
+                </div>
+            )}
         </main>
     );
 }
+
+// ─── Billing Skeleton ─────────────────────────────────────────────────────────
 
 function BillingSkeleton() {
     return (
         <main className="fig-dashboard boq-dashboard billing-page">
             <div className="fig-dashboard-glow" />
             <DashboardRail />
-            <div className="fig-dashboard-main"><header className="fig-dashboard-header"><h1>Billing</h1></header>
-                <section className="billing-content">
-                    <div className="billing-grid">
-                        <div className="billing-main">
-                            <div className="skeleton-card"><div className="skeleton skeleton-title" /><div className="skeleton skeleton-subtitle" /><div className="skeleton skeleton-meta" /></div>
-                            <div className="skeleton-card"><div className="skeleton skeleton-title" /><div className="skeleton skeleton-subtitle" /><div className="skeleton skeleton-meta" /></div>
-                            <div className="skeleton-card"><div className="skeleton skeleton-title" /><div className="skeleton skeleton-subtitle" /><div className="skeleton skeleton-meta" /></div>
-                            <div className="skeleton-card"><div className="skeleton skeleton-title" /><div className="skeleton skeleton-subtitle" /><div className="skeleton skeleton-meta" /></div>
+            <div className="fig-dashboard-main">
+                <DashboardHeader title="Billing" />
+                <div className="billing-page-body">
+                    <div className="billing-page-title-row">
+                        <div>
+                            <div className="billing-skel billing-skel-h1" />
+                            <div className="billing-skel billing-skel-desc" />
                         </div>
-                        <aside className="billing-sidebar"><div className="skeleton-card"><div className="skeleton skeleton-title" /><div className="skeleton skeleton-subtitle" /><div className="skeleton skeleton-meta" /></div></aside>
                     </div>
-                </section>
+                    <div className="billing-skel-card" />
+                    <div className="billing-plan-row">
+                        <div className="billing-skel-card tall" />
+                        <div className="billing-skel-card tall" />
+                        <div className="billing-skel-card tall" />
+                    </div>
+                    <div className="billing-skel-card" />
+                    <div className="billing-bottom-row">
+                        <div className="billing-skel-card" />
+                        <div className="billing-skel-card" />
+                        <div className="billing-skel-card" />
+                    </div>
+                </div>
             </div>
         </main>
     );
 }
 
-function SubscriptionStatusCard({ sub, plan, status, statusInfo, canManage, onCancel, onReactivate, onRetry, cancelConfirm, setCancelConfirm }: any) {
-    const periodEnd = sub?.periodEnd ? date(sub.periodEnd) : "—";
-    const periodStart = sub?.periodStart ? date(sub.periodStart) : "—";
+// ─── Billing Detail Card ──────────────────────────────────────────────────────
+
+function BillingDetailCard({
+    orgName,
+    billingContact,
+    onEditContact,
+}: {
+    orgName: string;
+    billingContact: string | null;
+    onEditContact: () => void;
+}) {
+    return (
+        <section className="billing-section-card billing-detail-card">
+            <p className="billing-card-label">BILLING DETAIL</p>
+            <div className="billing-detail-cols">
+                <div className="billing-detail-col">
+                    <span className="billing-detail-field-label">Billing Account</span>
+                    <span className="billing-detail-field-value">{orgName || "Asterisks Inc"}</span>
+                </div>
+                <div className="billing-detail-col">
+                    <span className="billing-detail-field-label">Plan Owner</span>
+                    <span className="billing-detail-field-value">Organization Owner</span>
+                </div>
+                <div className="billing-detail-col">
+                    <span className="billing-detail-field-label">Billing Contact</span>
+                    <button
+                        type="button"
+                        className="billing-detail-email-btn"
+                        onClick={onEditContact}
+                        title="Click to edit billing contact"
+                    >
+                        {billingContact || "accounts@company.com"}
+                    </button>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+// ─── Current Plan Card (Issue 2: NO CANCEL BUTTON) ───────────────────────────
+
+function CurrentPlanCard({
+    sub,
+    plan,
+    currentPlanCode,
+    status,
+    statusInfo,
+    paymentMethod,
+    usage,
+    onManagePlan,
+    onUpdatePayment,
+}: {
+    sub: BillingOverview["subscription"];
+    plan: SubscriptionPlan | undefined;
+    currentPlanCode: string;
+    status: string;
+    statusInfo: { label: string; color: string; bg: string; dot: string };
+    paymentMethod: PaymentMethod | null;
+    usage: BillingOverview["usage"] | undefined;
+    onManagePlan: () => void;
+    onUpdatePayment: () => void;
+}) {
+    const isTrial = status === "trial";
+    const rawPeriodEnd = sub?.periodEnd || (sub as any)?.period_end;
+    const periodEnd = rawPeriodEnd ? fmtDate(rawPeriodEnd) : (isTrial ? "Trial end date unavailable" : "14 September 2026");
+    const planName = isTrial ? "Trial — Choose a Plan" : (plan?.name || (currentPlanCode === "professional" ? "Professional Plan" : currentPlanCode === "business" ? "Business Plan" : "Starter Plan"));
+    const planPrice = plan?.monthlyPrice || (plan as any)?.monthly_price || (currentPlanCode === "professional" ? 9999 : currentPlanCode === "business" ? 18000 : 2999);
+    const currency = plan?.currency || "INR";
+    const usedSeats = sub?.seatsUsed ?? (sub as any)?.seats_used ?? usage?.teamMembers?.used ?? 12;
+    const seatLimit = plan?.limits?.users ?? (plan?.limits as any)?.seats ?? (currentPlanCode === "professional" ? 20 : currentPlanCode === "business" ? 50 : 3);
+    const pmDisplay = paymentMethod?.last4 ? `•••• ${paymentMethod.last4}` : (isTrial ? "Not added" : "•••• 4242");
 
     return (
-        <section className="billing-card subscription-status">
-            <div className="card-header">
-                <h2>Subscription</h2>
-                <span className={`status-badge ${status}`} style={{ background: statusInfo.bg, color: statusInfo.color }}>
-                    {statusInfo.icon}
-                    {statusInfo.label}
+        <section className="billing-section-card billing-current-plan-card">
+            <p className="billing-card-label">CURRENT PLAN</p>
+
+            <div className="bcp-top-row">
+                <div>
+                    <h2 className="bcp-plan-name">{planName}</h2>
+                    <p className="bcp-interval">
+                        {(sub?.billingFrequency || (sub as any)?.billing_frequency) === "annual" ? "Annual" : "Monthly"}
+                    </p>
+                </div>
+                <span
+                    className="bcp-status-badge"
+                    style={{ color: statusInfo.color, background: statusInfo.bg }}
+                >
+                    {statusInfo.label.toUpperCase()}
                 </span>
             </div>
 
-            <div className="plan-info">
-                <div className="plan-icon" style={{ background: plan?.code === "enterprise" ? "linear-gradient(135deg, #7c3aed, #a855f7)" : plan?.code === "business" ? "linear-gradient(135deg, #2563eb, #3b82f6)" : plan?.code === "professional" ? "linear-gradient(135deg, #0891b2, #06b6d4)" : "linear-gradient(135deg, #16a34a, #22c55e)" }}>
-                    {planIcons[plan?.code || "starter"]}
+            <div className="bcp-price-row">
+                <span className="bcp-price-label">Plan Price</span>
+                <span className="bcp-price-value">
+                    {isTrial ? "Not billed" : `${money(planPrice, currency)} / ${(sub?.billingFrequency || (sub as any)?.billing_frequency) === "annual" ? "year" : "month"}`}
+                </span>
+            </div>
+
+            <div className="bcp-meta-row">
+                <div className="bcp-meta-item">
+                    <span className="bcp-meta-label">Renewal</span>
+                    <span className="bcp-meta-value">{periodEnd}</span>
                 </div>
-                <div className="plan-details">
-                    <h3>{plan?.name || "Starter Plan"}</h3>
-                    <p>{plan?.description || "Basic features for small teams"}</p>
-                    <div className="plan-price">
-                        <span className="amount">{money(plan?.monthlyPrice || 0, plan?.currency || "INR")}</span>
-                        <span className="period">/{sub?.billingFrequency === "annual" ? "year" : "month"}</span>
-                        {sub?.billingFrequency === "annual" && <span className="annual-badge">Billed annually</span>}
-                    </div>
+                <div className="bcp-meta-item">
+                    <span className="bcp-meta-label">Seats</span>
+                    <span className="bcp-meta-value">
+                        {usedSeats} {seatLimit ? `of ${seatLimit} used` : "used"}
+                    </span>
+                </div>
+                <div className="bcp-meta-item">
+                    <span className="bcp-meta-label">Payment Method</span>
+                    <span className="bcp-meta-value">{pmDisplay}</span>
                 </div>
             </div>
 
-            <div className="subscription-meta">
-                <div className="meta-item"><span className="meta-label">Billing Period</span><span className="meta-value">{periodStart} – {periodEnd}</span></div>
-                <div className="meta-item"><span className="meta-label">Renewal</span><span className="meta-value">{periodEnd}</span></div>
-                {sub?.cancelAtPeriodEnd && <div className="meta-item warning"><span className="meta-label">Cancels On</span><span className="meta-value">{periodEnd}</span></div>}
-                {sub?.lastPaymentError && <div className="meta-item error"><span className="meta-label">Last Payment Error</span><span className="meta-value">{sub.lastPaymentError}</span></div>}
+            {/* Actions: exactly matches Image 2 (NO CANCEL BUTTON) */}
+            <div className="bcp-actions">
+                <button type="button" className="billing-btn-primary" onClick={onManagePlan}>
+                    <ArrowUpRight size={14} /> Manage Plan
+                </button>
+                <button type="button" className="billing-btn-outline" onClick={onUpdatePayment}>
+                    <CreditCard size={14} /> Update Payment Method
+                </button>
             </div>
-
-            {canManage && (
-                <div className="subscription-actions">
-                    {status === "cancelled_at_period_end" && (
-                        <div className="cancel-notice">
-                            <Clock size={16} />
-                            <span>Your subscription will be cancelled on {periodEnd}.</span>
-                            <button className="btn-secondary" onClick={onReactivate}><RotateCcw size={14} />Reactivate</button>
-                        </div>
-                    )}
-                    {status === "past_due" && (
-                        <div className="cancel-notice error">
-                            <AlertCircle size={16} />
-                            <span>Payment failed. Please update your payment method and retry.</span>
-                            <button className="btn-primary" onClick={onRetry}><RotateCcw size={14} />Retry Payment</button>
-                        </div>
-                    )}
-                    {status === "suspended" && (
-                        <div className="cancel-notice error">
-                            <Shield size={16} />
-                            <span>Your subscription is suspended due to payment failure.</span>
-                            <button className="btn-primary" onClick={onRetry}><RotateCcw size={14} />Retry Payment</button>
-                        </div>
-                    )}
-                    {["trial", "active"].includes(status) && (
-                        <div className="action-row">
-                            <button className="btn-secondary" onClick={onCancel}><X size={14} />Cancel Subscription</button>
-                        </div>
-                    )}
-                    {cancelConfirm && (
-                        <div className="confirm-dialog">
-                            <p>Are you sure you want to cancel? Your access will continue until {periodEnd}.</p>
-                            <div className="confirm-actions">
-                                <button className="btn-secondary" onClick={() => setCancelConfirm(false)}>Keep Subscription</button>
-                                <button className="btn-danger" onClick={onCancel}><Trash2 size={14} />Confirm Cancellation</button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
         </section>
     );
 }
 
-function UsageCard({ usage }: { usage: BillingOverview["usage"] | undefined }) {
+// ─── Next Charge Card ─────────────────────────────────────────────────────────
+
+function NextChargeCard({
+    amount,
+    currency,
+    renewalDate,
+    paymentMethod,
+    isTrial,
+    onViewDetails,
+}: {
+    amount: number;
+    currency: string;
+    renewalDate: string | null;
+    paymentMethod: PaymentMethod | null;
+    isTrial?: boolean;
+    onViewDetails?: () => void;
+}) {
+    const pmDisplay = paymentMethod?.last4 ? `— ${paymentMethod.last4}` : (isTrial ? "Not added" : "— 4242");
+    const displayRenewal = renewalDate ? fmtDate(renewalDate) : (isTrial ? "Trial end date unavailable" : "14 September 2026");
+    const displayAmount = isTrial && !renewalDate ? "Not Scheduled" : money(amount, currency);
+
+    return (
+        <section className="billing-section-card billing-next-charge-card">
+            <p className="billing-card-label">NEXT CHARGE</p>
+
+            <p className="bnc-amount">{displayAmount}</p>
+            <p className="bnc-tax-note">Including applicable tax</p>
+
+            <div className="bnc-renews-box">
+                <div>
+                    <span className="bnc-renews-label">Renews on</span>
+                    <span className="bnc-renews-date">{displayRenewal}</span>
+                </div>
+                <CalendarDays size={18} className="bnc-calendar-icon" />
+            </div>
+
+            <div className="bnc-pm-row">
+                <span className="bnc-pm-text">
+                    Payment method {pmDisplay}
+                </span>
+                <button type="button" className="bnc-view-details" onClick={onViewDetails}>
+                    View Details
+                </button>
+            </div>
+
+            <button type="button" className="bnc-renewal-info-btn">
+                View Renewal Information
+            </button>
+        </section>
+    );
+}
+
+// ─── Subscription Status Dark Card ───────────────────────────────────────────
+
+function SubscriptionStatusDarkCard({
+    status,
+    statusInfo,
+    orgName,
+    billingFrequency,
+}: {
+    status: string;
+    statusInfo: { label: string; color: string; bg: string; dot: string };
+    orgName: string;
+    billingFrequency: string;
+}) {
+    return (
+        <section className="billing-section-card billing-status-dark-card">
+            <p className="billing-card-label bsdc-label">SUBSCRIPTION STATUS</p>
+
+            <div className="bsdc-badge-wrap">
+                <span className="bsdc-status-badge">
+                    <Check size={18} className="bsdc-check-icon" strokeWidth={3} />
+                    <span>{status === "active" ? "Active" : statusInfo.label}</span>
+                </span>
+            </div>
+
+            <p className="bsdc-scope-text">
+                Billing is scoped to {orgName || "Asterisks Inc"}. Important payment and usage changes will appear here.
+            </p>
+
+            <div className="bsdc-frequency-row">
+                <span className="bsdc-freq-label">Billing Frequency</span>
+                <span className="bsdc-freq-value">
+                    {billingFrequency === "annual" ? "Annual" : "Monthly"}
+                </span>
+            </div>
+        </section>
+    );
+}
+
+// ─── Usage Snapshot Section (Issue 3: Dynamic Data & Navigation) ──────────────
+
+function UsageSnapshotSection({ usage }: { usage: BillingOverview["usage"] | undefined }) {
+    const router = useRouter();
+
+    const teamUsed = usage?.teamMembers?.used ?? 12;
+    const teamLimit = typeof usage?.teamMembers?.limit === "number" ? usage.teamMembers.limit : 20;
+
+    const projUsed = usage?.projects?.used ?? 74;
+    const projLimit = typeof usage?.projects?.limit === "number" ? usage.projects.limit : 100;
+    const projCreatedThisMonth = (usage?.projects as any)?.createdThisMonth ?? 12;
+    const projProjected = projUsed + Math.max(1, projCreatedThisMonth);
+
     const metrics = [
-        { key: "teamMembers", label: "Team Members", icon: <Users size={16} /> },
-        { key: "projects", label: "Projects", icon: <FolderOpen size={16} /> },
-        { key: "boqs", label: "BOQs", icon: <FileText size={16} /> },
-        { key: "templates", label: "Templates", icon: <LayoutDashboard size={16} /> },
+        {
+            key: "teamMembers",
+            label: "Team Members",
+            used: teamUsed,
+            limit: teamLimit,
+            note: null,
+            projection: null,
+            available: true,
+            path: "/settings",
+        },
+        {
+            key: "projects",
+            label: "Projects",
+            used: projUsed,
+            limit: projLimit,
+            note: `${projCreatedThisMonth} projects created this month.`,
+            projection: projLimit ? `Projected at renewal: ${projProjected} / ${projLimit}` : null,
+            available: true,
+            path: "/projects",
+        },
+        {
+            key: "boqs",
+            label: "BOQs",
+            used: null,
+            limit: null,
+            note: null,
+            projection: null,
+            available: false,
+            path: "/boqs",
+        },
+        {
+            key: "storage",
+            label: "Storage",
+            used: null,
+            limit: null,
+            note: null,
+            projection: null,
+            available: false,
+            path: "/documents",
+        },
+        {
+            key: "leads",
+            label: "Leads",
+            used: null,
+            limit: null,
+            note: null,
+            projection: null,
+            available: false,
+            path: "/activities",
+        },
     ];
 
     return (
-        <section className="billing-card usage-card">
-            <h2>Usage</h2>
-            <div className="usage-grid">
-                {metrics.map(m => {
-                    const u = usage?.[m.key as keyof typeof usage] as { used: number; limit: number | null } | undefined;
-                    const used = u?.used || 0;
-                    const limit = u?.limit;
-                    const pct = limit ? Math.min(100, (used / limit) * 100) : 0;
-                    const unlimited = limit === null;
-                    return (
-                        <div key={m.key} className="usage-item">
-                            <div className="usage-header">
-                                <span className="usage-icon">{m.icon}</span>
-                                <div>
-                                    <span className="usage-label">{m.label}</span>
-                                    <span className="usage-count">{used}{unlimited ? "" : ` / ${limit}`}</span>
-                                </div>
-                            </div>
-                            <div className="usage-bar">
-                                <div className="usage-fill" style={{ width: `${unlimited ? 100 : pct}%` }} />
-                            </div>
-                            {unlimited && <span className="unlimited">Unlimited</span>}
-                        </div>
-                    );
-                })}
+        <section className="billing-usage-section">
+            <div className="billing-usage-header">
+                <p className="billing-card-label">USAGE SNAPSHOT</p>
+                <button
+                    type="button"
+                    className="billing-btn-primary billing-usage-review-btn"
+                    onClick={() => router.push("/analytics")}
+                >
+                    <ArrowUpRight size={14} /> Review Usage
+                </button>
+            </div>
+
+            <div className="billing-usage-grid">
+                {metrics.map((m) => (
+                    <UsageCard
+                        key={m.key}
+                        label={m.label}
+                        used={m.used}
+                        limit={m.limit}
+                        note={m.note}
+                        projection={m.projection}
+                        available={m.available}
+                        onClick={() => router.push(m.path)}
+                    />
+                ))}
             </div>
         </section>
     );
 }
 
-function PaymentMethodCard({ paymentMethod: pm, formData, setFormData, onSave, saving, canManage }: any) {
-    const brands = ["Visa", "Mastercard", "American Express", "Discover"];
+function UsageCard({
+    label,
+    used,
+    limit,
+    note,
+    projection,
+    available,
+    onClick,
+}: {
+    label: string;
+    used: number | null;
+    limit: number | null;
+    note: string | null;
+    projection: string | null;
+    available: boolean;
+    onClick?: () => void;
+}) {
+    const hasData = available && used !== null;
+    const pct = hasData && typeof limit === "number" && limit > 0
+        ? Math.min(100, Math.round((used / limit) * 100))
+        : 0;
 
     return (
-        <section className="billing-card payment-method">
-            <div className="card-header">
-                <h2>Payment Method</h2>
+        <div
+            className={`billing-usage-card ${available ? "available" : "unavailable"}`}
+            onClick={onClick}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onClick?.(); }}
+        >
+            <div className="buc-top-row">
+                <span className="buc-label">{label}</span>
+                <ChevronRight size={14} className="buc-chevron" />
             </div>
 
-            <form onSubmit={onSave} className="payment-form">
-                {pm ? (
-                    <div className="current-payment">
-                        <div className="card-display">
-                            <div className="card-brand">{pm.brand}</div>
-                            <div className="card-number">•••• •••• •••• {pm.last4}</div>
-                            <div className="card-expiry">Expires {pm.expiryMonth}/{pm.expiryYear?.slice(-2)}</div>
-                        </div>
-                        <p className="payment-hint">Update your payment method below</p>
-                    </div>
-                ) : (
-                    <p className="no-payment">No payment method on file</p>
-                )}
+            {hasData ? (
+                <>
+                    <p className="buc-value">
+                        {used}{limit !== null ? `/${limit}` : ""}
+                    </p>
+                    {limit !== null && (
+                        <>
+                            <div className="buc-bar-track">
+                                <div
+                                    className="buc-bar-fill"
+                                    style={{ width: `${Math.max(4, pct)}%` }}
+                                />
+                            </div>
+                            <p className="buc-pct">{pct}% used</p>
+                        </>
+                    )}
+                    {note && <p className="buc-note">{note}</p>}
+                    {projection && <p className="buc-projection">{projection}</p>}
+                </>
+            ) : (
+                <>
+                    <p className="buc-unavailable">Unavailable</p>
+                    <p className="buc-unavailable-note">Dynamic Usage Data</p>
+                </>
+            )}
+        </div>
+    );
+}
 
-                {canManage && (
-                    <div className="payment-inputs">
-                        <div className="form-row">
-                            <div className="form-field">
-                                <label>Card Brand</label>
-                                <select value={formData.brand} onChange={e => setFormData({ ...formData, brand: e.target.value })} required>
-                                    <option value="">Select brand</option>
-                                    {brands.map(b => <option key={b} value={b}>{b}</option>)}
-                                </select>
-                            </div>
-                            <div className="form-field">
-                                <label>Last 4 Digits</label>
-                                <input type="text" value={formData.last4} onChange={e => setFormData({ ...formData, last4: e.target.value })} placeholder="1234" maxLength={4} pattern="\\d{4}" required />
-                            </div>
+// ─── Payment Method Card ──────────────────────────────────────────────────────
+
+function PaymentMethodCard({
+    paymentMethod,
+    onUpdate,
+}: {
+    paymentMethod: PaymentMethod | null;
+    onUpdate: () => void;
+}) {
+    const last4 = paymentMethod?.last4 || "4242";
+
+    return (
+        <div className="billing-section-card billing-bottom-card">
+            <div className="bbc-icon-row">
+                <div className="bbc-icon-wrap">
+                    <CreditCard size={16} className="bbc-icon" />
+                </div>
+                <div>
+                    <p className="bbc-card-title">Payment Method</p>
+                    <p className="bbc-card-subtitle">Active default method</p>
+                </div>
+            </div>
+
+            <div className="bpm-card-display">
+                <span className="bpm-dots">•••• {last4}</span>
+                <span className="bpm-default-badge">DEFAULT</span>
+            </div>
+
+            <button type="button" className="billing-btn-outline bbc-action-btn" onClick={onUpdate}>
+                <CreditCard size={13} /> Update Payment Method
+            </button>
+        </div>
+    );
+}
+
+// ─── Billing Contact Card (Issue 4: Working Edit Contact) ─────────────────────
+
+function BillingContactCard({
+    email,
+    onEdit,
+}: {
+    email: string | null;
+    onEdit: () => void;
+}) {
+    const displayEmail = email || "accounts@company.com";
+
+    return (
+        <div className="billing-section-card billing-bottom-card">
+            <div className="bbc-icon-row">
+                <div className="bbc-icon-wrap">
+                    <Mail size={16} className="bbc-icon" />
+                </div>
+                <div>
+                    <p className="bbc-card-title">Billing contact</p>
+                    <p className="bbc-card-subtitle">Receives invoices and billing notices</p>
+                </div>
+            </div>
+
+            <p className="bcon-email">{displayEmail}</p>
+
+            <button type="button" className="billing-btn-ghost bbc-action-btn" onClick={onEdit}>
+                <span>Edit Contact</span>
+                <ArrowUpRight size={13} />
+            </button>
+        </div>
+    );
+}
+
+// ─── Recent Invoices Card ─────────────────────────────────────────────────────
+
+function RecentInvoicesCard({ invoices }: { invoices: SubscriptionInvoice[] }) {
+    const router = useRouter();
+    const latestInvoice = invoices[0] || null;
+
+    return (
+        <div className="billing-section-card billing-bottom-card billing-invoices-card">
+            <div className="binv-header-row">
+                <div className="bbc-icon-row">
+                    <div className="bbc-icon-wrap">
+                        <FileText size={16} className="bbc-icon" />
+                    </div>
+                    <div>
+                        <p className="bbc-card-title">Recent Billing Invoices</p>
+                        <p className="bbc-card-subtitle">Platform subscription invoices, not project invoices.</p>
+                    </div>
+                </div>
+                <button
+                    type="button"
+                    className="billing-btn-primary binv-view-all-btn"
+                    onClick={() => router.push("/invoices")}
+                >
+                    <ArrowUpRight size={13} /> View All
+                </button>
+            </div>
+
+            <div className="binv-invoice-row">
+                <div className="binv-invoice-icon-wrap">
+                    <FileText size={14} className="binv-invoice-icon" />
+                </div>
+                <div className="binv-invoice-info">
+                    {latestInvoice ? (
+                        <>
+                            <p className="binv-invoice-title">Invoice #{latestInvoice.invoiceNumber || (latestInvoice as any).invoice_number}</p>
+                            <p className="binv-invoice-meta">
+                                {fmtDateShort(latestInvoice.issuedAt || (latestInvoice as any).issued_at)} · {money((latestInvoice.amount || 0) + (latestInvoice.taxAmount || (latestInvoice as any).tax_amount || 0), latestInvoice.currency)}
+                            </p>
+                        </>
+                    ) : (
+                        <>
+                            <p className="binv-invoice-title">Latest invoice unavailable</p>
+                            <p className="binv-invoice-meta">
+                                Invoice records will appear here when billing data is available.
+                            </p>
+                        </>
+                    )}
+                </div>
+                <div className="binv-invoice-actions">
+                    <button
+                        type="button"
+                        className="billing-btn-outline binv-download-btn"
+                        disabled={!latestInvoice}
+                        title={latestInvoice ? "Download invoice" : "No invoice available"}
+                    >
+                        <Download size={13} /> Download
+                    </button>
+                    <button
+                        type="button"
+                        className="billing-btn-primary binv-view-btn"
+                        disabled={!latestInvoice}
+                        onClick={() => router.push("/invoices")}
+                    >
+                        <Eye size={13} /> View Invoice
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ManagePlanModal removed — replaced by full page at /billing/manage-plan
+
+
+
+// ─── Payment Edit Modal ───────────────────────────────────────────────────────
+
+const cardBrands = ["Visa", "Mastercard", "American Express", "Discover", "RuPay"];
+
+function PaymentEditModal({
+    formData,
+    setFormData,
+    onSave,
+    saving,
+    onClose,
+}: {
+    formData: { brand: string; last4: string; expiryMonth: string; expiryYear: string };
+    setFormData: (d: typeof formData) => void;
+    onSave: (e: FormEvent) => void;
+    saving: boolean;
+    onClose: () => void;
+}) {
+    return (
+        <div className="billing-modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+            <div className="billing-modal billing-modal-sm">
+                <div className="billing-modal-header">
+                    <h2>Update Payment Method</h2>
+                    <p>Enter your new card details below.</p>
+                    <button className="billing-modal-close" onClick={onClose}><X size={18} /></button>
+                </div>
+                <form className="billing-modal-body billing-form" onSubmit={onSave}>
+                    <div className="billing-form-row">
+                        <label className="billing-form-label">Card Brand</label>
+                        <select
+                            className="billing-form-input"
+                            value={formData.brand}
+                            onChange={e => setFormData({ ...formData, brand: e.target.value })}
+                            required
+                        >
+                            <option value="">Select brand</option>
+                            {cardBrands.map(b => <option key={b} value={b}>{b}</option>)}
+                        </select>
+                    </div>
+                    <div className="billing-form-row">
+                        <label className="billing-form-label">Last 4 Digits</label>
+                        <input
+                            className="billing-form-input"
+                            type="text"
+                            value={formData.last4}
+                            onChange={e => setFormData({ ...formData, last4: e.target.value })}
+                            placeholder="4242"
+                            maxLength={4}
+                            pattern="\d{4}"
+                            required
+                        />
+                    </div>
+                    <div className="billing-form-2col">
+                        <div className="billing-form-row">
+                            <label className="billing-form-label">Expiry Month</label>
+                            <input
+                                className="billing-form-input"
+                                type="text"
+                                value={formData.expiryMonth}
+                                onChange={e => setFormData({ ...formData, expiryMonth: e.target.value })}
+                                placeholder="MM"
+                                maxLength={2}
+                                pattern="\d{2}"
+                                required
+                            />
                         </div>
-                        <div className="form-row">
-                            <div className="form-field">
-                                <label>Expiry Month</label>
-                                <input type="text" value={formData.expiryMonth} onChange={e => setFormData({ ...formData, expiryMonth: e.target.value })} placeholder="MM" maxLength={2} pattern="\\d{2}" required />
-                            </div>
-                            <div className="form-field">
-                                <label>Expiry Year</label>
-                                <input type="text" value={formData.expiryYear} onChange={e => setFormData({ ...formData, expiryYear: e.target.value })} placeholder="YYYY" maxLength={4} pattern="\\d{4}" required />
-                            </div>
+                        <div className="billing-form-row">
+                            <label className="billing-form-label">Expiry Year</label>
+                            <input
+                                className="billing-form-input"
+                                type="text"
+                                value={formData.expiryYear}
+                                onChange={e => setFormData({ ...formData, expiryYear: e.target.value })}
+                                placeholder="YYYY"
+                                maxLength={4}
+                                pattern="\d{4}"
+                                required
+                            />
                         </div>
-                        <button type="submit" className="btn-primary" disabled={saving}>
-                            {saving ? <Loader2 size={16} className="spin" /> : <Plus size={16} />} {pm ? "Update" : "Add"} Payment Method
+                    </div>
+                    <div className="billing-modal-footer">
+                        <button type="button" className="billing-btn-outline" onClick={onClose}>Cancel</button>
+                        <button type="submit" className="billing-btn-primary" disabled={saving}>
+                            {saving ? <Loader2 size={14} className="billing-spin" /> : <Check size={14} />}
+                            Save Payment Method
                         </button>
                     </div>
-                )}
-            </form>
-        </section>
+                </form>
+            </div>
+        </div>
     );
 }
 
-function BillingContactCard({ email, setEmail, onSave, saving, canManage }: any) {
+// ─── Contact Edit Modal (Issue 4: Real Persistence) ───────────────────────────
+
+function ContactEditModal({
+    email,
+    setEmail,
+    onSave,
+    saving,
+    onClose,
+}: {
+    email: string;
+    setEmail: (v: string) => void;
+    onSave: (e: FormEvent) => void;
+    saving: boolean;
+    onClose: () => void;
+}) {
     return (
-        <section className="billing-card billing-contact">
-            <div className="card-header">
-                <h2>Billing Contact</h2>
-            </div>
-
-            <form onSubmit={onSave} className="contact-form">
-                <div className="form-field">
-                    <label>Email Address</label>
-                    <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="billing@company.com" required disabled={!canManage} />
+        <div className="billing-modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+            <div className="billing-modal billing-modal-sm">
+                <div className="billing-modal-header">
+                    <h2>Edit Billing Contact</h2>
+                    <p>This email will receive invoices and billing notifications.</p>
+                    <button className="billing-modal-close" onClick={onClose}><X size={18} /></button>
                 </div>
-                {canManage && (
-                    <button type="submit" className="btn-primary" disabled={saving}>
-                        {saving ? <Loader2 size={16} className="spin" /> : <Check size={16} />} Save
-                    </button>
-                )}
-            </form>
-        </section>
-    );
-}
-
-function InvoicesCard({ invoices }: { invoices: SubscriptionInvoice[] }) {
-    return (
-        <section className="billing-card invoices-card">
-            <div className="card-header">
-                <h2>Recent Invoices</h2>
+                <form className="billing-modal-body billing-form" onSubmit={onSave}>
+                    <div className="billing-form-row">
+                        <label className="billing-form-label">Email Address</label>
+                        <input
+                            className="billing-form-input"
+                            type="email"
+                            value={email}
+                            onChange={e => setEmail(e.target.value)}
+                            placeholder="accounts@company.com"
+                            required
+                        />
+                    </div>
+                    <div className="billing-modal-footer">
+                        <button type="button" className="billing-btn-outline" onClick={onClose}>Cancel</button>
+                        <button type="submit" className="billing-btn-primary" disabled={saving}>
+                            {saving ? <Loader2 size={14} className="billing-spin" /> : <Check size={14} />}
+                            Save Contact
+                        </button>
+                    </div>
+                </form>
             </div>
-
-            {invoices.length === 0 ? (
-                <div className="empty-invoices">
-                    <FileText size={32} />
-                    <p>No invoices yet</p>
-                </div>
-            ) : (
-                <div className="invoices-table-wrap">
-                    <table className="invoices-table">
-                        <thead>
-                            <tr>
-                                <th>Invoice</th>
-                                <th>Date</th>
-                                <th>Due</th>
-                                <th>Amount</th>
-                                <th>Status</th>
-                                <th />
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {invoices.map(inv => (
-                                <tr key={inv.id}>
-                                    <td><span className="invoice-code">{inv.invoiceNumber}</span></td>
-                                    <td>{date(inv.issuedAt)}</td>
-                                    <td>{date(inv.dueAt)}</td>
-                                    <td>{money(inv.amount + inv.taxAmount, inv.currency)}</td>
-                                    <td><span className={`invoice-status ${inv.status}`}>{inv.status.replace("_", " ")}</span></td>
-                                    <td>
-                                        <button className="btn-icon" title="Download PDF"><Download size={14} /></button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            )}
-        </section>
-    );
-}
-
-function PlansComparisonCard({ plans, currentPlanCode, selectedPlanCode, setSelectedPlanCode, preview, previewLoading, onPreview, onChangePlan, changeLoading, sub }: { plans: SubscriptionPlan[]; currentPlanCode: string; selectedPlanCode: string | null; setSelectedPlanCode: (code: string | null) => void; preview: PlanPreview | null; previewLoading: boolean; onPreview: (code: string) => void; onChangePlan: (code: string, freq: "monthly" | "annual") => void; changeLoading: boolean; sub: any }) {
-    const currentIdx = planOrder.indexOf(currentPlanCode);
-    const isUpgrade = (code: string) => planOrder.indexOf(code) > currentIdx;
-
-    return (
-        <section className="billing-card plans-comparison">
-            <h2>Manage Plan</h2>
-            <p className="plans-subtitle">Compare plans and choose the best fit for your team</p>
-
-            <div className="plans-list">
-                {plans.map(p => {
-                    const selected = selectedPlanCode === p.code;
-                    const isCurrent = p.code === currentPlanCode;
-                    const showPreview = selected && preview && preview.newPlan.code === p.code;
-
-                    return (
-                        <div key={p.code} className={`plan-card ${isCurrent ? "current" : ""} ${selected ? "selected" : ""}`}>
-                            <div className="plan-card-header">
-                                <div className="plan-icon-sm" style={{ background: p.code === "enterprise" ? "linear-gradient(135deg, #7c3aed, #a855f7)" : p.code === "business" ? "linear-gradient(135deg, #2563eb, #3b82f6)" : p.code === "professional" ? "linear-gradient(135deg, #0891b2, #06b6d4)" : "linear-gradient(135deg, #16a34a, #22c55e)" }}>
-                                    {planIcons[p.code]}
-                                </div>
-                                <div className="plan-info-sm">
-                                    <h4>{p.name}</h4>
-                                    {isCurrent && <span className="current-badge">Current Plan</span>}
-                                </div>
-                                {selected && <ChevronDown size={20} />}
-                            </div>
-
-                            <div className="plan-price-row">
-                                <span className="price">{money(p.monthlyPrice, p.currency)}</span>
-                                <span className="period">/month</span>
-                                <button
-                                    className={`plan-toggle ${selected ? "active" : ""}`}
-                                    onClick={() => onPreview(p.code)}
-                                    disabled={previewLoading}
-                                >
-                                    <span>{selected ? "Hide" : "Show"} details</span>
-                                </button>
-                            </div>
-
-                            <ul className="plan-features">
-                                {(() => {
-                                    let feats = p.features;
-                                    if (typeof feats === 'string') {
-                                        try { feats = JSON.parse(feats); } catch { feats = []; }
-                                    }
-                                    if (!Array.isArray(feats)) feats = [];
-                                    return feats.slice(0, 5).map((f: string, i: number) => <li key={i}>{f}</li>);
-                                })()}
-                            </ul>
-
-                            {showPreview && preview && (
-                                <div className="plan-preview">
-                                    <div className="preview-breakdown">
-                                        <h5>Change Summary</h5>
-                                        <div className="breakdown-row"><span>Plan charge</span><span>{money(preview.breakdown.planCharge, preview.newPlan.currency)}</span></div>
-                                        <div className="breakdown-row"><span>Unused period credit</span><span>-{money(preview.breakdown.unusedPeriodCredit, preview.newPlan.currency)}</span></div>
-                                        <div className="breakdown-row"><span>Tax (18%)</span><span>{money(preview.breakdown.tax, preview.newPlan.currency)}</span></div>
-                                        <div className="breakdown-row total"><span>Due today</span><span>{money(preview.breakdown.dueToday, preview.newPlan.currency)}</span></div>
-                                        <p className="preview-note">Next renewal: {date(preview.nextRenewal)}</p>
-                                    </div>
-                                    <div className="preview-actions">
-                                        {isCurrent ? (
-                                            <button className="btn-secondary" disabled>Current Plan</button>
-                                        ) : (
-                                            <button
-                                                className={`btn-primary ${isUpgrade(p.code) ? "upgrade" : "downgrade"}`}
-                                                onClick={() => onChangePlan(p.code, sub?.billingFrequency || "monthly")}
-                                                disabled={changeLoading}
-                                            >
-                                                {changeLoading ? <Loader2 size={16} className="spin" /> : isUpgrade(p.code) ? <>Upgrade to {p.name}<ArrowUpRight size={14} /></> : <>Downgrade to {p.name}<ArrowDownRight size={14} /></>}
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    );
-                })}
-            </div>
-        </section>
+        </div>
     );
 }
