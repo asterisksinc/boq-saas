@@ -594,18 +594,35 @@ export type SettingsSection = {
 
 export type SettingsSectionInput = { data: Record<string, unknown> };
 
+export type HelpArticleContent = string | {
+    shortAnswer?: string;
+    sections?: Array<{
+        heading: string;
+        body?: string;
+        items?: string[];
+    }>;
+    [key: string]: unknown;
+};
+
 export type HelpArticle = {
     id: string;
     slug: string;
     title: string;
     summary: string | null;
-    content: string;
-    readMinutes: number;
-    helpfulYes: number;
-    helpfulNo: number;
-    popular: boolean;
-    updatedAt: string;
-    category: { slug: string; name: string } | null;
+    content?: HelpArticleContent;
+    readMinutes?: number;
+    read_minutes?: number;
+    helpfulYes?: number;
+    helpful_yes?: number;
+    helpfulNo?: number;
+    helpful_no?: number;
+    popular?: boolean;
+    updatedAt?: string;
+    updated_at?: string;
+    category?: { slug: string; name: string } | null;
+    help_categories?: { slug: string; name: string } | Array<{ slug: string; name: string }> | null;
+    categoryId?: string;
+    category_id?: string;
 };
 
 export type HelpCategory = {
@@ -613,7 +630,9 @@ export type HelpCategory = {
     slug: string;
     name: string;
     description: string | null;
-    sortOrder: number;
+    sortOrder?: number;
+    sort_order?: number;
+    active?: boolean;
 };
 
 export type HelpOverview = {
@@ -625,23 +644,34 @@ export type ArticleFeedbackInput = { helpful: boolean };
 
 export type SupportTicket = {
     id: string;
-    ticketNumber: string;
-    issueType: string;
+    ticketNumber?: string;
+    ticket_number?: string;
+    issueType?: string;
+    issue_type?: string;
     subject: string;
     description: string;
     priority: "low" | "normal" | "high" | "urgent";
     status: "draft" | "open" | "in_progress" | "waiting_on_user" | "resolved" | "closed";
-    createdBy: string;
-    createdAt: string;
-    updatedAt: string;
+    createdBy?: string;
+    created_by?: string;
+    createdAt?: string;
+    created_at?: string;
+    updatedAt?: string;
+    updated_at?: string;
+    workspaceId?: string;
+    workspace_id?: string;
 };
 
 export type SupportTicketMessage = {
     id: string;
     body: string;
-    attachments: Record<string, unknown>[];
-    authorId: string;
-    createdAt: string;
+    attachments?: Record<string, unknown>[];
+    authorId?: string;
+    author_id?: string;
+    createdAt?: string;
+    created_at?: string;
+    ticketId?: string;
+    ticket_id?: string;
 };
 
 export type SupportTicketInput = {
@@ -650,11 +680,98 @@ export type SupportTicketInput = {
     description: string;
     priority?: "low" | "normal" | "high" | "urgent";
     status?: "draft" | "open";
+    projectId?: string | null;
+    projectName?: string | null;
+    relatedRecord?: string | null;
+    browserDevice?: string | null;
+    businessImpact?: string | null;
+    attemptedAction?: string | null;
+    attachments?: Array<Record<string, unknown>>;
 };
 
-export type SupportTicketPatchInput = { status: "draft" | "open" | "in_progress" | "waiting_on_user" | "resolved" | "closed" };
+export type SupportTicketPatchInput = {
+    status?: "draft" | "open" | "in_progress" | "waiting_on_user" | "resolved" | "closed";
+    issueType?: string;
+    subject?: string;
+    description?: string;
+    priority?: "low" | "normal" | "high" | "urgent";
+    projectId?: string | null;
+    projectName?: string | null;
+    relatedRecord?: string | null;
+    browserDevice?: string | null;
+    businessImpact?: string | null;
+    attemptedAction?: string | null;
+    attachments?: Array<Record<string, unknown>>;
+};
 
 export type SupportTicketMessageInput = { body: string; attachments?: Record<string, unknown>[] };
+
+export type TicketMetadata = {
+    currentStep?: number;
+    attemptedAction?: string;
+    projectId?: string;
+    projectName?: string;
+    relatedRecord?: string;
+    browserDevice?: string;
+    businessImpact?: string;
+    attachments?: Array<{ id?: string; name: string; size: number; type: string; url?: string }>;
+};
+
+export function parseTicketMetadata(description: string): { cleanDescription: string; metadata: TicketMetadata } {
+    if (!description) return { cleanDescription: "", metadata: {} };
+    const metaRegex = /<!-- TICKET_METADATA:\s*([\s\S]*?)\s*-->/;
+    const match = description.match(metaRegex);
+    if (!match) {
+        return { cleanDescription: description, metadata: {} };
+    }
+    try {
+        const metadata = JSON.parse(match[1]) as TicketMetadata;
+        // Clean out the human-readable context block if present, or just remove metadata tag
+        let clean = description.replace(metaRegex, "").trim();
+        const contextSplit = clean.split("\n\n---\nContext & Details:");
+        if (contextSplit.length > 1) {
+            clean = contextSplit[0].trim();
+        }
+        return { cleanDescription: clean, metadata };
+    } catch {
+        return { cleanDescription: description, metadata: {} };
+    }
+}
+
+export function formatTicketDescription(
+    mainDescription: string,
+    metadata: TicketMetadata
+): string {
+    const lines: string[] = [mainDescription.trim()];
+    const details: string[] = [];
+
+    if (metadata.attemptedAction) {
+        details.push(`• What I was trying to do: ${metadata.attemptedAction.trim()}`);
+    }
+    if (metadata.projectName || metadata.projectId) {
+        details.push(`• Project: ${metadata.projectName || metadata.projectId}`);
+    }
+    if (metadata.relatedRecord) {
+        details.push(`• Related Record: ${metadata.relatedRecord.trim()}`);
+    }
+    if (metadata.browserDevice) {
+        details.push(`• Browser / Device: ${metadata.browserDevice.trim()}`);
+    }
+    if (metadata.businessImpact) {
+        details.push(`• Business Impact: ${metadata.businessImpact.trim()}`);
+    }
+    if (metadata.attachments && metadata.attachments.length > 0) {
+        details.push(`• Attachments: ${metadata.attachments.map((a) => a.name).join(", ")}`);
+    }
+
+    if (details.length > 0) {
+        lines.push("\n\n---\nContext & Details:\n" + details.join("\n"));
+    }
+
+    const metaJson = JSON.stringify(metadata);
+    lines.push(`\n\n<!-- TICKET_METADATA: ${metaJson} -->`);
+    return lines.join("");
+}
 
 export async function getSettingsOverview() {
     return request<SettingsOverview>("/api/v1/settings/overview");

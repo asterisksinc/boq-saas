@@ -23,6 +23,34 @@ describe("billing settings activity and support contracts", () => {
     expect(() => activityApprovalSchema.parse({ name: "Approve", projectId, stageId, dueDate: "2026-09-14" })).toThrow();
     expect(articleFeedbackSchema.parse({ helpful: true })).toEqual({ helpful: true });
   });
+
+  it("validates support ticket creation and patch schemas with wizard context fields", () => {
+    const validTicket = supportTicketSchema.parse({
+      issueType: "BOQs",
+      subject: "Export failing with 500",
+      description: "When clicking export on project 42",
+      priority: "high",
+      status: "open",
+      projectId,
+      projectName: "Villa Luxury",
+      relatedRecord: "BOQ #102",
+      browserDevice: "Chrome on Windows 11",
+      businessImpact: "Cannot meet tender deadline tomorrow",
+      attemptedAction: "Clicked Export XLSX",
+      attachments: [{ name: "error.png", size: 1024, type: "image/png" }],
+    });
+    expect(validTicket.priority).toBe("high");
+    expect(validTicket.status).toBe("open");
+    expect(validTicket.projectName).toBe("Villa Luxury");
+
+    const draftTicket = supportTicketSchema.parse({
+      issueType: "Account and Login",
+      subject: "Draft: Account and Login",
+      description: "Draft ticket in progress...",
+      status: "draft",
+    });
+    expect(draftTicket.status).toBe("draft");
+  });
 });
 
 describe("module persistence and delivery artifacts", () => {
@@ -48,5 +76,64 @@ describe("module persistence and delivery artifacts", () => {
     expect(guide).toContain("## Billing, Settings, Activities, and Help integration");
     expect(seed).toContain("demo@boq.com");
     expect(seed).toContain("activityApprovals");
+  });
+
+  it("encodes and restores ticket wizard draft metadata correctly", async () => {
+    const { formatTicketDescription, parseTicketMetadata } = await import("../lib/api/auth");
+    const meta = {
+      currentStep: 3,
+      attemptedAction: "Exporting BOQ to XLSX",
+      projectId: "d1000000-0000-4000-8000-000000000001",
+      projectName: "Downtown Highrise",
+      relatedRecord: "BOQ #99",
+      browserDevice: "Chrome on Windows 11",
+      businessImpact: "Client tender presentation is in 2 hours",
+      attachments: [{ name: "export_error.png", size: 45000, type: "image/png" }],
+    };
+
+    const formatted = formatTicketDescription("We are unable to export our BOQ.", meta);
+    expect(formatted).toContain("We are unable to export our BOQ.");
+    expect(formatted).toContain("Exporting BOQ to XLSX");
+    expect(formatted).toContain("Downtown Highrise");
+    expect(formatted).toContain("<!-- TICKET_METADATA:");
+
+    const parsed = parseTicketMetadata(formatted);
+    expect(parsed.cleanDescription).toBe("We are unable to export our BOQ.");
+    expect(parsed.metadata.currentStep).toBe(3);
+    expect(parsed.metadata.attemptedAction).toBe("Exporting BOQ to XLSX");
+    expect(parsed.metadata.projectName).toBe("Downtown Highrise");
+    expect(parsed.metadata.attachments?.[0].name).toBe("export_error.png");
+  });
+
+  it("implements the 7-step slide-over TicketWizardDrawer component and connects to help pages", () => {
+    const drawerCode = readFileSync("components/TicketWizardDrawer.tsx", "utf8");
+    const helpPageCode = readFileSync("app/help/page.tsx", "utf8");
+    const articlePageCode = readFileSync("app/help/[id]/page.tsx", "utf8");
+    const globalsCss = readFileSync("app/globals.css", "utf8");
+
+    // Drawer header and 7 steps
+    expect(drawerCode).toContain("Let's Get This Sorted.");
+    expect(drawerCode).toContain("Step 01 of 07");
+    expect(drawerCode).toContain("Step 02 of 07");
+    expect(drawerCode).toContain("Step 03 of 07");
+    expect(drawerCode).toContain("Step 04 of 07");
+    expect(drawerCode).toContain("Step 05 of 07");
+    expect(drawerCode).toContain("Step 06 of 07");
+    expect(drawerCode).toContain("Step 07 of 07");
+
+    // Drawer footer actions
+    expect(drawerCode).toContain("Save as Draft");
+    expect(drawerCode).toContain("Submit Ticket");
+    expect(drawerCode).toContain("Unsaved Changes");
+
+    // CSS classes
+    expect(globalsCss).toContain(".ticket-drawer-backdrop");
+    expect(globalsCss).toContain(".ticket-drawer");
+    expect(globalsCss).toContain(".ticket-category-grid");
+    expect(globalsCss).toContain(".ticket-dropzone");
+
+    // Pages mount the drawer
+    expect(helpPageCode).toContain("<TicketWizardDrawer");
+    expect(articlePageCode).toContain("<TicketWizardDrawer");
   });
 });

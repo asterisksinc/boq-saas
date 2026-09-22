@@ -307,10 +307,33 @@ export const activityCommentSchema = z.object({ body: z.string().trim().min(1).m
 
 export const articleFeedbackSchema = z.object({ helpful: z.boolean() }).strict();
 export const supportTicketSchema = z.object({
-  issueType: z.string().trim().min(1).max(80), subject: z.string().trim().min(1).max(200), description: z.string().trim().min(1).max(10000),
-  priority: z.enum(["low", "normal", "high", "urgent"]).default("normal"), status: z.enum(["draft", "open"]).default("open"),
+  issueType: z.string().trim().min(1).max(80),
+  subject: z.string().trim().min(1).max(200),
+  description: z.string().trim().min(1).max(15000),
+  priority: z.enum(["low", "normal", "high", "urgent"]).default("normal"),
+  status: z.enum(["draft", "open"]).default("open"),
+  projectId: z.string().uuid().nullable().optional(),
+  projectName: z.string().trim().max(200).nullable().optional(),
+  relatedRecord: z.string().trim().max(300).nullable().optional(),
+  browserDevice: z.string().trim().max(300).nullable().optional(),
+  businessImpact: z.string().trim().max(5000).nullable().optional(),
+  attemptedAction: z.string().trim().max(5000).nullable().optional(),
+  attachments: z.array(z.record(z.string(), z.unknown())).max(20).optional(),
 }).strict();
-export const supportTicketPatchSchema = z.object({ status: z.enum(["open", "in_progress", "waiting_on_user", "resolved", "closed"]) }).strict();
+export const supportTicketPatchSchema = z.object({
+  status: z.enum(["draft", "open", "in_progress", "waiting_on_user", "resolved", "closed"]).optional(),
+  issueType: z.string().trim().min(1).max(80).optional(),
+  subject: z.string().trim().min(1).max(200).optional(),
+  description: z.string().trim().min(1).max(15000).optional(),
+  priority: z.enum(["low", "normal", "high", "urgent"]).optional(),
+  projectId: z.string().uuid().nullable().optional(),
+  projectName: z.string().trim().max(200).nullable().optional(),
+  relatedRecord: z.string().trim().max(300).nullable().optional(),
+  browserDevice: z.string().trim().max(300).nullable().optional(),
+  businessImpact: z.string().trim().max(5000).nullable().optional(),
+  attemptedAction: z.string().trim().max(5000).nullable().optional(),
+  attachments: z.array(z.record(z.string(), z.unknown())).max(20).optional(),
+}).strict().refine((value) => Object.keys(value).length > 0, "At least one field is required.");
 
 export const costingCategorySchema = z.object({
   name: z.string().trim().min(1).max(120), code: z.string().trim().min(1).max(40).regex(/^[A-Za-z0-9-]+$/).optional(),
