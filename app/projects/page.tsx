@@ -18,6 +18,16 @@ export default function ProjectsPage() {
   const load = async () => { setLoading(true); try { const p = new URLSearchParams({ pageSize: "100" }); if (query) p.set("search", query); if (filter !== "all") p.set("status", filter); const r = await fetch(`/api/v1/projects?${p}`, { credentials: "include" }); const b = await r.json(); if (!r.ok) throw new Error(message(b, "Projects could not be loaded.")); setProjects(b.data?.items || []); } catch (e) { setNotice(e instanceof Error ? e.message : "Projects could not be loaded."); } finally { setLoading(false); } };
   useEffect(() => { const id = setTimeout(load, query ? 250 : 0); return () => clearTimeout(id); }, [query, filter]);
   useEffect(() => { const close = () => { setMenu(null); setFilterOpen(false); }; document.addEventListener("click", close); return () => document.removeEventListener("click", close); }, []);
+  useEffect(() => {
+    fetch("/api/v1/users/me/preferences", { credentials: "include" })
+      .then(r => r.json())
+      .then(b => {
+        const pv = b?.data?.projectView || b?.data?.project_view;
+        if (pv === "card") setView("grid");
+        else if (pv === "table") setView("list");
+      })
+      .catch(() => {});
+  }, []);
   const total = useMemo(() => projects.reduce((s, p) => s + (p.approvedBudget ?? p.projectValue ?? 0), 0), [projects]);
   const status = async (project: Project, next: string) => { const r = await fetch(`/api/v1/projects/${project.id}/status`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: next }) }); if (!r.ok) setNotice(message(await r.json(), "Project status could not be changed.")); else { setMenu(null); load(); } };
   const duplicate = async (project: Project) => { const r = await fetch(`/api/v1/projects/${project.id}/duplicate`, { method: "POST", credentials: "include" }); if (!r.ok) setNotice(message(await r.json(), "Project could not be duplicated.")); else { setMenu(null); setNotice("Project duplicated."); load(); } };

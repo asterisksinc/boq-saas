@@ -85,6 +85,10 @@ export const changePasswordSchema = z
 export const userPatchSchema = z
   .object({
     displayName: z.string().trim().min(1).max(120).nullable().optional(),
+    avatarUrl: z.string().trim().nullable().optional(),
+    jobTitle: z.string().trim().max(120).nullable().optional(),
+    department: z.string().trim().max(120).nullable().optional(),
+    phone: z.string().trim().max(40).nullable().optional(),
   })
   .strict();
 
@@ -92,6 +96,18 @@ export const preferencesPatchSchema = z
   .object({
     timezone: z.string().trim().min(1).max(80).optional(),
     locale: z.string().trim().min(2).max(20).optional(),
+    dateFormat: z.string().trim().min(1).max(40).optional(),
+    currencyDisplay: z.string().trim().min(1).max(40).optional(),
+    theme: z.enum(["light", "dark", "system"]).optional(),
+    density: z.enum(["comfortable", "compact"]).optional(),
+    landingPage: z.string().trim().min(1).max(80).optional(),
+    projectView: z.enum(["table", "card"]).optional(),
+    emailDigest: z.string().trim().min(1).max(40).optional(),
+    date_format: z.string().trim().min(1).max(40).optional(),
+    currency_display: z.string().trim().min(1).max(40).optional(),
+    landing_page: z.string().trim().min(1).max(80).optional(),
+    project_view: z.enum(["table", "card"]).optional(),
+    email_digest: z.string().trim().min(1).max(40).optional(),
   })
   .strict();
 

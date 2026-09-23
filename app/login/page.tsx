@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { AuthLayout } from "@/components/auth/AuthLayout";
-import { getApiErrorMessage, login } from "@/lib/api/auth";
+import { getApiErrorMessage, getUserPreferences, login } from "@/lib/api/auth";
 
 export default function LoginPage() {
     const router = useRouter();
@@ -23,7 +23,10 @@ export default function LoginPage() {
         try {
             const response = await login({ email: email.trim(), password });
             if (!response.otpRequired) {
-                router.push("/dashboard");
+                const userPref = await getUserPreferences().catch(() => null);
+                const landing = userPref?.landingPage || userPref?.landing_page || "dashboard";
+                const target = landing.startsWith("/") ? landing : `/${landing.toLowerCase()}`;
+                router.push(target);
                 return;
             }
 

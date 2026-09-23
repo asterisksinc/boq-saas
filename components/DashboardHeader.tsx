@@ -9,41 +9,72 @@ interface DashboardHeaderProps {
     title?: string;
     onNew?: () => void;
     onSearch?: (query: string) => void;
+    avatarUrl?: string | null;
+    userInitials?: string;
 }
 
 export default function DashboardHeader({
     title = "Overview",
     onNew,
     onSearch,
+    avatarUrl: propAvatarUrl,
+    userInitials: propUserInitials,
 }: DashboardHeaderProps) {
     const router = useRouter();
     const [searchValue, setSearchValue] = useState("");
-    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-    const [userInitials, setUserInitials] = useState("BO");
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(propAvatarUrl ?? null);
+    const [userInitials, setUserInitials] = useState(propUserInitials ?? "BO");
+
+    useEffect(() => {
+        if (propAvatarUrl !== undefined) {
+            setAvatarUrl(propAvatarUrl);
+        }
+        if (propUserInitials !== undefined) {
+            setUserInitials(propUserInitials);
+        }
+    }, [propAvatarUrl, propUserInitials]);
 
     useEffect(() => {
         let mounted = true;
-        getSettingsOverview()
-            .then(overview => {
-                if (!mounted) return;
-                if (overview?.profile?.avatarUrl) {
-                    setAvatarUrl(overview.profile.avatarUrl);
-                }
-                if (overview?.profile?.displayName) {
-                    const parts = overview.profile.displayName.trim().split(/\s+/);
-                    const inits = parts.length > 1
-                        ? (parts[0][0] + parts[1][0]).toUpperCase()
-                        : parts[0].slice(0, 2).toUpperCase();
-                    setUserInitials(inits);
-                }
-            })
-            .catch(() => {
-                // Fallback to default
-            });
+        const fetchOverview = () => {
+            getSettingsOverview()
+                .then(overview => {
+                    if (!mounted) return;
+                    if (overview?.profile?.avatarUrl !== undefined) {
+                        setAvatarUrl(overview.profile.avatarUrl);
+                    }
+                    if (overview?.profile?.displayName) {
+                        const parts = overview.profile.displayName.trim().split(/\s+/);
+                        const inits = parts.length > 1
+                            ? (parts[0][0] + parts[1][0]).toUpperCase()
+                            : parts[0].slice(0, 2).toUpperCase();
+                        setUserInitials(inits);
+                    }
+                })
+                .catch(() => {
+                    // Fallback to default
+                });
+        };
+
+        if (propAvatarUrl === undefined) {
+            fetchOverview();
+        }
+
+        const handleProfileUpdated = (e: Event) => {
+            const custom = e as CustomEvent<{ avatarUrl?: string | null }>;
+            if (custom.detail && custom.detail.avatarUrl !== undefined) {
+                setAvatarUrl(custom.detail.avatarUrl);
+            } else {
+                fetchOverview();
+            }
+        };
+
+        window.addEventListener("user-profile-updated", handleProfileUpdated);
         return () => {
             mounted = false;
+            window.removeEventListener("user-profile-updated", handleProfileUpdated);
         };
-    }, []);
+    }, [propAvatarUrl]);
 
     const handleNewClick = () => {
         if (onNew) {

@@ -579,12 +579,48 @@ export async function retryPayment() {
 }
 
 export type SettingsOverview = {
-    profile: { displayName: string | null; avatarUrl: string | null } | null;
+    profile: {
+        displayName: string | null;
+        avatarUrl: string | null;
+        jobTitle?: string | null;
+        department?: string | null;
+        phone?: string | null;
+        email?: string | null;
+        role?: string;
+        workspaceName?: string | null;
+    } | null;
+    preferences?: {
+        timezone?: string;
+        locale?: string;
+        dateFormat?: string;
+        currencyDisplay?: string;
+        theme?: "light" | "dark" | "system";
+        density?: "comfortable" | "compact";
+        landingPage?: string;
+        projectView?: "table" | "card";
+        emailDigest?: string;
+    } | null;
     role: string;
     completionPercent: number;
     usage: { projects: number; boqs: number; templates: number; storageBytes: number | null; aiCredits: number | null };
     settings: Record<string, unknown> | null;
-    recentChanges: Array<{ id: string; action: string; createdAt: string; actorUserId: string }>;
+    workspace?: {
+        id: string;
+        name: string;
+        currency?: string;
+        timezone?: string;
+        country?: string | null;
+        profile?: Record<string, unknown> | null;
+    } | null;
+    recentChanges: Array<{
+        id: string;
+        action: string;
+        createdAt: string;
+        actorUserId: string;
+        actorName?: string | null;
+        actorAvatarUrl?: string | null;
+        actorInitials?: string | null;
+    }>;
 };
 
 export type SettingsSection = {
@@ -771,6 +807,153 @@ export function formatTicketDescription(
     const metaJson = JSON.stringify(metadata);
     lines.push(`\n\n<!-- TICKET_METADATA: ${metaJson} -->`);
     return lines.join("");
+}
+
+export async function getUserProfile() {
+    return request<{
+        user: { id: string; email: string };
+        profile: {
+            display_name: string | null;
+            avatar_url: string | null;
+            job_title?: string | null;
+            department?: string | null;
+            phone?: string | null;
+        };
+        preferences?: {
+            timezone?: string;
+            locale?: string;
+            date_format?: string;
+            currency_display?: string;
+        };
+        workspace?: { id: string; name: string; profile?: Record<string, unknown> };
+        membership?: { role: string; status: string };
+    }>("/api/v1/users/me");
+}
+
+export async function updateUserProfile(input: {
+    displayName?: string | null;
+    avatarUrl?: string | null;
+    jobTitle?: string | null;
+    department?: string | null;
+    phone?: string | null;
+}) {
+    return request<{
+        user_id: string;
+        display_name: string | null;
+        avatar_url: string | null;
+        job_title?: string | null;
+        department?: string | null;
+        phone?: string | null;
+        updated_at: string;
+    }>("/api/v1/users/me", {
+        method: "PATCH",
+        body: JSON.stringify(input),
+    });
+}
+
+export type UserPreferences = {
+    timezone: string;
+    locale: string;
+    dateFormat?: string;
+    date_format?: string;
+    currencyDisplay?: string;
+    currency_display?: string;
+    theme?: "light" | "dark" | "system";
+    density?: "comfortable" | "compact";
+    landingPage?: string;
+    landing_page?: string;
+    projectView?: "table" | "card";
+    project_view?: "table" | "card";
+    emailDigest?: string;
+    email_digest?: string;
+    updated_at: string;
+};
+
+export type UserSessionInfo = {
+    id: string;
+    device: string;
+    location: string;
+    isCurrent: boolean;
+};
+
+export type UserProviderInfo = {
+    id: "google" | "microsoft";
+    name: string;
+    connected: boolean;
+};
+
+export type UserSecuritySettings = {
+    password: {
+        daysSinceChange: number | null;
+        display: string;
+    };
+    twoFactor: {
+        enabled: boolean;
+        display: string;
+    };
+    sessions: UserSessionInfo[];
+    providers: UserProviderInfo[];
+};
+
+export async function getUserPreferences() {
+    return request<UserPreferences>("/api/v1/users/me/preferences");
+}
+
+export async function updateUserPreferences(input: {
+    timezone?: string;
+    locale?: string;
+    dateFormat?: string;
+    currencyDisplay?: string;
+    theme?: "light" | "dark" | "system";
+    density?: "comfortable" | "compact";
+    landingPage?: string;
+    projectView?: "table" | "card";
+    emailDigest?: string;
+}) {
+    return request<UserPreferences>("/api/v1/users/me/preferences", {
+        method: "PATCH",
+        body: JSON.stringify(input),
+    });
+}
+
+export async function getSecuritySettings() {
+    return request<UserSecuritySettings>("/api/v1/users/me/security");
+}
+
+export async function revokeOtherSessions() {
+    return request<{ revoked: boolean }>("/api/v1/users/me/security/revoke-others", {
+        method: "POST",
+    });
+}
+
+export async function updateUserPassword(input: {
+    currentPassword: string;
+    newPassword: string;
+}) {
+    return request<{ passwordChanged: boolean }>("/api/v1/users/me/password", {
+        method: "PATCH",
+        body: JSON.stringify(input),
+    });
+}
+
+export async function uploadUserAvatar(file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await fetch("/api/v1/users/me/avatar", {
+        method: "POST",
+        body: formData,
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        throw new Error(getApiErrorMessage(payload));
+    }
+    return parseApiResponse<{ avatarUrl: string | null; profile: Record<string, unknown> }>(payload);
+}
+
+export async function deleteUserAvatar() {
+    return request<{ avatarUrl: null }>("/api/v1/users/me/avatar", {
+        method: "DELETE",
+    });
 }
 
 export async function getSettingsOverview() {
