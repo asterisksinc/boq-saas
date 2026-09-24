@@ -291,6 +291,50 @@ export const projectTemplatePublishSchema = z.object({
   changeNote: z.string().trim().max(500).nullable().optional(),
 }).strict();
 
+export const organizationPatchSchema = z
+  .object({
+    companyName: z.string().trim().min(1).max(160).optional(),
+    name: z.string().trim().min(1).max(160).optional(),
+    legalEntityName: z.string().trim().max(160).nullable().optional(),
+    website: z.string().url().max(2048).nullable().or(z.literal("")).optional(),
+    primaryEmail: z.string().email().nullable().or(z.literal("")).optional(),
+    businessEmail: z.string().email().nullable().or(z.literal("")).optional(),
+    phone: z.string().trim().max(40).nullable().optional(),
+    address: z.string().trim().max(500).nullable().optional(),
+    country: z.string().trim().max(80).nullable().optional(),
+    state: z.string().trim().max(80).nullable().optional(),
+    postalCode: z.string().trim().max(40).nullable().optional(),
+    currency: z.string().trim().regex(/^[A-Z]{3}$/).optional(),
+    timezone: z.string().trim().min(1).max(80).optional(),
+    fiscalYearStart: z.string().trim().max(40).optional(),
+    taxId: z.string().trim().max(80).nullable().optional(),
+
+    // Business Info fields
+    legalName: z.string().trim().max(160).nullable().optional(),
+    tradeName: z.string().trim().max(160).nullable().optional(),
+    businessType: z.string().trim().max(120).nullable().optional(),
+    registrationNumber: z.string().trim().max(100).nullable().optional(),
+    gstNumber: z.string().trim().max(50).nullable().optional(),
+    pan: z.string().trim().max(30).nullable().optional(),
+    bankName: z.string().trim().max(160).nullable().optional(),
+    accountNumber: z.string().trim().max(80).nullable().optional(),
+    ifscCode: z.string().trim().max(40).nullable().optional(),
+    paymentTerms: z.string().trim().max(100).nullable().optional(),
+
+    // GST & Tax fields
+    registeredUnderGst: z.boolean().optional(),
+    gstin: z.string().trim().max(50).nullable().optional(),
+    taxJurisdiction: z.string().trim().max(100).nullable().optional(),
+    taxRegime: z.string().trim().max(100).nullable().optional(),
+    cgstRate: z.coerce.number().finite().min(0).max(100).optional(),
+    sgstRate: z.coerce.number().finite().min(0).max(100).optional(),
+    igstRate: z.coerce.number().finite().min(0).max(100).optional(),
+    cessRate: z.coerce.number().finite().min(0).max(100).optional(),
+    taxDisplay: z.union([z.enum(["exclusive", "inclusive"]), z.string().trim().max(40), z.boolean()]).optional(),
+    reverseCharge: z.boolean().optional(),
+  })
+  .strict();
+
 export const settingsSectionSchema = z.object({ data: z.record(z.string(), z.unknown()) }).strict();
 export const billingContactSchema = z.object({ email: z.string().trim().email().max(254) }).strict();
 export const paymentMethodSchema = z.object({
@@ -772,7 +816,26 @@ export const paymentCreateSchema = z
       .nullable()
       .optional(),
   })
+export const locationCreateSchema = z
+  .object({
+    name: z.string().trim().min(1, "Location name is required").max(160),
+    city: z.string().trim().min(1, "City is required").max(100),
+    state: z.string().trim().min(1, "State is required").max(100),
+    address: z.string().trim().min(1, "Address is required").max(500),
+    isDefault: z.boolean().optional(),
+  })
   .strict();
+
+export const locationPatchSchema = z
+  .object({
+    name: z.string().trim().min(1, "Location name cannot be empty").max(160).optional(),
+    city: z.string().trim().min(1, "City cannot be empty").max(100).optional(),
+    state: z.string().trim().min(1, "State cannot be empty").max(100).optional(),
+    address: z.string().trim().min(1, "Address cannot be empty").max(500).optional(),
+    isDefault: z.boolean().optional(),
+  })
+  .strict()
+  .refine((data) => Object.keys(data).length > 0, "At least one field is required to update.");
 
 export function fieldErrors(error: z.ZodError) {
   const result: Record<string, string[]> = {};

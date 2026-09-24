@@ -971,6 +971,55 @@ export async function updateSettingsSection(section: string, input: SettingsSect
     });
 }
 
+export type OrganizationInput = {
+    companyName?: string;
+    name?: string;
+    legalEntityName?: string | null;
+    website?: string | null;
+    primaryEmail?: string | null;
+    businessEmail?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    country?: string | null;
+    state?: string | null;
+    postalCode?: string | null;
+    currency?: string;
+    timezone?: string;
+    fiscalYearStart?: string;
+    taxId?: string | null;
+
+    // Business Info
+    legalName?: string | null;
+    tradeName?: string | null;
+    businessType?: string | null;
+    registrationNumber?: string | null;
+    gstNumber?: string | null;
+    pan?: string | null;
+    bankName?: string | null;
+    accountNumber?: string | null;
+    ifscCode?: string | null;
+    paymentTerms?: string | null;
+
+    // GST & Tax
+    registeredUnderGst?: boolean;
+    gstin?: string | null;
+    taxJurisdiction?: string | null;
+    taxRegime?: string | null;
+    cgstRate?: number;
+    sgstRate?: number;
+    igstRate?: number;
+    cessRate?: number;
+    taxDisplay?: "exclusive" | "inclusive" | string | boolean;
+    reverseCharge?: boolean;
+};
+
+export async function updateOrganization(input: OrganizationInput) {
+    return request<{ success: boolean; message?: string }>("/api/v1/settings/organization", {
+        method: "PATCH",
+        body: JSON.stringify(input),
+    });
+}
+
 export async function getHelpOverview(search?: string) {
     const query = search ? `?search=${encodeURIComponent(search)}` : "";
     return request<HelpOverview>(`/api/v1/help${query}`);
@@ -1019,3 +1068,56 @@ export async function createSupportTicketMessage(ticketId: string, input: Suppor
         body: JSON.stringify(input),
     });
 }
+
+export type OrganizationLocation = {
+    id: string;
+    workspaceId: string;
+    name: string;
+    city: string;
+    state: string;
+    address: string;
+    isDefault: boolean;
+    createdAt?: string;
+    updatedAt?: string;
+};
+
+export type LocationCreateInput = {
+    name: string;
+    city: string;
+    state: string;
+    address: string;
+    isDefault?: boolean;
+};
+
+export type LocationPatchInput = Partial<LocationCreateInput>;
+
+export async function getOrganizationLocations() {
+    return request<{ items: OrganizationLocation[] }>("/api/v1/settings/organization/locations");
+}
+
+export async function createOrganizationLocation(input: LocationCreateInput) {
+    return request<OrganizationLocation>("/api/v1/settings/organization/locations", {
+        method: "POST",
+        body: JSON.stringify(input),
+    });
+}
+
+export async function updateOrganizationLocation(locationId: string, input: LocationPatchInput) {
+    return request<OrganizationLocation>(`/api/v1/settings/organization/locations/${locationId}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+    });
+}
+
+export async function setDefaultOrganizationLocation(locationId: string) {
+    return request<{ success: boolean; id: string }>(`/api/v1/settings/organization/locations/${locationId}/default`, {
+        method: "POST",
+    });
+}
+
+export async function archiveOrganizationLocation(locationId: string) {
+    return request<{ success: boolean; archived: boolean }>(`/api/v1/settings/organization/locations/${locationId}`, {
+        method: "DELETE",
+    });
+}
+

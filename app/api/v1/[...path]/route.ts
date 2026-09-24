@@ -65,6 +65,9 @@ import {
   projectTemplateDocumentsSchema,
   projectTemplateUseSchema,
   projectTemplatePublishSchema,
+  organizationPatchSchema,
+  locationCreateSchema,
+  locationPatchSchema,
   settingsSectionSchema,
   billingContactSchema,
   paymentMethodSchema,
@@ -624,7 +627,12 @@ async function onboarding(request: Request, supabase: SupabaseClient, id: string
   if (request.method === "GET") return ok((ctx.data as { onboarding?: unknown })?.onboarding ?? null, 200, id);
   const input = await parsed(request, onboardingPatchSchema, id); if (input.response) return input.response;
   const { data, error } = await supabase.rpc("update_onboarding", { p_patch: input.data });
-  if (error) return fail("VALIDATION_ERROR", "Onboarding state could not be updated.", 400, id);
+  if (error) {
+    if (error.message?.includes("forbidden")) {
+      return fail("FORBIDDEN", "Your workspace role cannot update organization settings.", 403, id);
+    }
+    return fail("VALIDATION_ERROR", error.message || "Onboarding state could not be updated.", 400, id);
+  }
   await audit(supabase, "onboarding.updated", id);
   return ok(data, 200, id);
 }
@@ -4291,6 +4299,467 @@ async function settingsApi(request: Request, supabase: SupabaseClient, id: strin
   await audit(supabase, `settings.${section}.updated`, id); return ok({ section, data: (result.data as unknown as Record<string, unknown>)[column] }, 200, id);
 }
 
+async function organizationSettingsApi(request: Request, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id, request.method === "PATCH", request.method === "PATCH");
+  if ("response" in scoped) return scoped.response;
+  const wid = scoped.access.workspaceId;
+
+  if (request.method === "GET") {
+    const [workspaceRow, workspaceProf, settings] = await Promise.all([
+      supabase.from("workspaces").select("id,name,currency,timezone,country").eq("id", wid).maybeSingle(),
+      supabase.from("workspace_profiles").select("*").eq("workspace_id", wid).maybeSingle(),
+      supabase.from("workspace_settings").select("branding,boq_costing").eq("workspace_id", wid).maybeSingle(),
+    ]);
+    const wp = (workspaceProf.data ?? {}) as Record<string, unknown>;
+    const w = (workspaceRow.data ?? {}) as Record<string, unknown>;
+    const boqCosting = (settings.data?.boq_costing ?? {}) as Record<string, unknown>;
+    const branding = (settings.data?.branding ?? {}) as Record<string, unknown>;
+    const businessInfo = ((boqCosting.businessInfo || boqCosting.business_info || {}) as Record<string, unknown>);
+    const taxInfo = ((boqCosting.taxInfo || boqCosting.tax_info || {}) as Record<string, unknown>);
+
+    return ok({
+      companyName: (w.name as string) || "",
+      legalEntityName: (branding.companyName as string) || (businessInfo.legalName as string) || (w.name as string) || "",
+      website: (wp.website as string) || "",
+      primaryEmail: (wp.business_email as string) || "",
+      phone: (wp.phone as string) || "",
+      address: (wp.address as string) || "",
+      country: (w.country as string) || "India",
+      state: (taxInfo.state as string) || (wp.state as string) || "Maharashtra",
+      postalCode: (wp.postal_code as string) || "",
+      currency: (w.currency as string) || "INR",
+      timezone: (w.timezone as string) || "Asia/Kolkata",
+      fiscalYearStart: (boqCosting.fiscalYearStart as string) || "April",
+      taxId: (wp.tax_id as string) || (businessInfo.gstNumber as string) || "",
+
+      // Business Info
+      legalName: (businessInfo.legalName as string) || (branding.companyName as string) || (w.name as string) || "",
+      tradeName: (businessInfo.tradeName as string) || (w.name as string) || "",
+      businessType: (businessInfo.businessType as string) || "Interior Design Studio",
+      registrationNumber: (businessInfo.registrationNumber as string) || "",
+      gstNumber: (businessInfo.gstNumber as string) || (wp.tax_id as string) || "",
+      pan: (businessInfo.pan as string) || "",
+      bankName: (businessInfo.bankName as string) || "",
+      accountNumber: (businessInfo.accountNumber as string) || "",
+      ifscCode: (businessInfo.ifscCode as string) || "",
+      paymentTerms: (businessInfo.paymentTerms as string) || (boqCosting.paymentTerms as string) || "Net 30",
+
+      // GST & Tax
+      registeredUnderGst: boqCosting.registeredUnderGst !== undefined ? Boolean(boqCosting.registeredUnderGst) : Boolean(wp.tax_id || businessInfo.gstNumber),
+      gstin: (taxInfo.gstin as string) || (businessInfo.gstNumber as string) || (wp.tax_id as string) || "",
+      taxJurisdiction: (taxInfo.taxJurisdiction as string) || (taxInfo.state as string) || (wp.state as string) || "Maharashtra",
+      taxRegime: (taxInfo.taxRegime as string) || (boqCosting.taxRegime as string) || "Regular",
+      cgstRate: typeof boqCosting.cgstRate === "number" ? boqCosting.cgstRate : 9,
+      sgstRate: typeof boqCosting.sgstRate === "number" ? boqCosting.sgstRate : 9,
+      igstRate: typeof boqCosting.igstRate === "number" ? boqCosting.igstRate : 18,
+      cessRate: typeof boqCosting.cessRate === "number" ? boqCosting.cessRate : 0,
+      taxDisplay: boqCosting.taxDisplay === "inclusive" || boqCosting.taxDisplay === false ? "inclusive" : "exclusive",
+      reverseCharge: boqCosting.reverseCharge !== undefined ? Boolean(boqCosting.reverseCharge) : true,
+    }, 200, id);
+  }
+
+  // PATCH: Admin/Owner only
+  const input = await parsed(request, organizationPatchSchema, id);
+  if (input.response) return input.response;
+
+  const patch = input.data;
+  const companyName = patch.companyName || patch.name || patch.tradeName;
+
+  // 1. Update workspaces table
+  const workspaceUpdates: Record<string, unknown> = {};
+  if (companyName) workspaceUpdates.name = companyName;
+  if (patch.currency) workspaceUpdates.currency = patch.currency;
+  if (patch.timezone) workspaceUpdates.timezone = patch.timezone;
+  if (patch.country !== undefined) workspaceUpdates.country = patch.country;
+
+  if (Object.keys(workspaceUpdates).length > 0) {
+    const wsRes = await supabase.from("workspaces").update(workspaceUpdates).eq("id", wid);
+    if (wsRes.error) return fail("VALIDATION_ERROR", wsRes.error.message || "Failed to update workspace.", 400, id);
+  }
+
+  // 2. Update/upsert workspace_profiles table
+  const profileUpdates: Record<string, unknown> = {};
+  if (patch.website !== undefined) profileUpdates.website = patch.website;
+  const email = patch.primaryEmail !== undefined ? patch.primaryEmail : patch.businessEmail;
+  if (email !== undefined) profileUpdates.business_email = email;
+  if (patch.phone !== undefined) profileUpdates.phone = patch.phone;
+  if (patch.address !== undefined) profileUpdates.address = patch.address;
+  if (patch.state !== undefined) profileUpdates.state = patch.state;
+  if (patch.postalCode !== undefined) profileUpdates.postal_code = patch.postalCode;
+  const taxIdToUpdate = patch.taxId ?? patch.gstNumber ?? patch.gstin;
+  if (taxIdToUpdate !== undefined) profileUpdates.tax_id = taxIdToUpdate;
+
+  if (Object.keys(profileUpdates).length > 0) {
+    const existing = await supabase.from("workspace_profiles").select("workspace_id").eq("workspace_id", wid).maybeSingle();
+    if (existing.data) {
+      const profRes = await supabase.from("workspace_profiles").update(profileUpdates).eq("workspace_id", wid);
+      if (profRes.error) return fail("VALIDATION_ERROR", profRes.error.message || "Failed to update workspace profile.", 400, id);
+    } else {
+      const profRes = await supabase.from("workspace_profiles").insert({ workspace_id: wid, ...profileUpdates });
+      if (profRes.error) return fail("VALIDATION_ERROR", profRes.error.message || "Failed to insert workspace profile.", 400, id);
+    }
+  }
+
+  // 3. Update workspace_settings (boq_costing & branding)
+  const existingSettings = await supabase.from("workspace_settings").select("branding,boq_costing").eq("workspace_id", wid).maybeSingle();
+  const currentBoqCosting = (existingSettings.data?.boq_costing ?? {}) as Record<string, unknown>;
+  const currentBranding = (existingSettings.data?.branding ?? {}) as Record<string, unknown>;
+  const currentBusinessInfo = ((currentBoqCosting.businessInfo || currentBoqCosting.business_info || {}) as Record<string, unknown>);
+  const currentTaxInfo = ((currentBoqCosting.taxInfo || currentBoqCosting.tax_info || {}) as Record<string, unknown>);
+
+  const updatedBusinessInfo = {
+    ...currentBusinessInfo,
+    ...(patch.legalName !== undefined ? { legalName: patch.legalName } : {}),
+    ...(patch.tradeName !== undefined ? { tradeName: patch.tradeName } : {}),
+    ...(patch.businessType !== undefined ? { businessType: patch.businessType } : {}),
+    ...(patch.registrationNumber !== undefined ? { registrationNumber: patch.registrationNumber } : {}),
+    ...(patch.gstNumber !== undefined ? { gstNumber: patch.gstNumber } : {}),
+    ...(patch.pan !== undefined ? { pan: patch.pan } : {}),
+    ...(patch.bankName !== undefined ? { bankName: patch.bankName } : {}),
+    ...(patch.accountNumber !== undefined ? { accountNumber: patch.accountNumber } : {}),
+    ...(patch.ifscCode !== undefined ? { ifscCode: patch.ifscCode } : {}),
+    ...(patch.paymentTerms !== undefined ? { paymentTerms: patch.paymentTerms } : {}),
+  };
+
+  const updatedTaxInfo = {
+    ...currentTaxInfo,
+    ...(patch.gstin !== undefined ? { gstin: patch.gstin } : {}),
+    ...(patch.taxJurisdiction !== undefined ? { taxJurisdiction: patch.taxJurisdiction, state: patch.taxJurisdiction } : {}),
+    ...(patch.state !== undefined ? { state: patch.state, taxJurisdiction: patch.state } : {}),
+    ...(patch.taxRegime !== undefined ? { taxRegime: patch.taxRegime } : {}),
+  };
+
+  const updatedBoqCosting: Record<string, unknown> = {
+    ...currentBoqCosting,
+    ...(patch.fiscalYearStart ? { fiscalYearStart: patch.fiscalYearStart } : {}),
+    ...(patch.paymentTerms ? { paymentTerms: patch.paymentTerms } : {}),
+    ...(patch.registeredUnderGst !== undefined ? { registeredUnderGst: patch.registeredUnderGst } : {}),
+    ...(patch.taxRegime !== undefined ? { taxRegime: patch.taxRegime } : {}),
+    ...(patch.cgstRate !== undefined ? { cgstRate: patch.cgstRate } : {}),
+    ...(patch.sgstRate !== undefined ? { sgstRate: patch.sgstRate } : {}),
+    ...(patch.igstRate !== undefined ? { igstRate: patch.igstRate } : {}),
+    ...(patch.cessRate !== undefined ? { cessRate: patch.cessRate } : {}),
+    ...(patch.taxDisplay !== undefined ? { taxDisplay: patch.taxDisplay === true || patch.taxDisplay === "exclusive" ? "exclusive" : "inclusive" } : {}),
+    ...(patch.reverseCharge !== undefined ? { reverseCharge: patch.reverseCharge } : {}),
+    businessInfo: updatedBusinessInfo,
+    business_info: updatedBusinessInfo,
+    taxInfo: updatedTaxInfo,
+    tax_info: updatedTaxInfo,
+  };
+
+  if (patch.igstRate !== undefined) {
+    updatedBoqCosting.defaultTaxPercent = patch.igstRate;
+  } else if (patch.cgstRate !== undefined && patch.sgstRate !== undefined) {
+    updatedBoqCosting.defaultTaxPercent = patch.cgstRate + patch.sgstRate;
+  }
+
+  const updatedBranding = {
+    ...currentBranding,
+    ...(patch.legalName ? { companyName: patch.legalName } : patch.legalEntityName ? { companyName: patch.legalEntityName } : {}),
+  };
+
+  const settingsUpdates = {
+    boq_costing: updatedBoqCosting,
+    branding: updatedBranding,
+    updated_by: scoped.access.userId,
+  };
+
+  if (existingSettings.data) {
+    await supabase.from("workspace_settings").update(settingsUpdates).eq("workspace_id", wid);
+  } else {
+    await supabase.from("workspace_settings").insert({ workspace_id: wid, ...settingsUpdates });
+  }
+
+  await audit(supabase, "settings.organization.updated", id);
+
+  return ok({ success: true, message: "Organization settings updated successfully." }, 200, id);
+}
+
+function locationDto(row: Record<string, unknown>) {
+  return {
+    id: String(row.id),
+    workspaceId: String(row.workspace_id || ""),
+    name: String(row.name || ""),
+    city: String(row.city || ""),
+    state: String(row.state || ""),
+    address: String(row.address || ""),
+    isDefault: Boolean(row.is_default),
+    createdAt: String(row.created_at || new Date().toISOString()),
+    updatedAt: String(row.updated_at || new Date().toISOString()),
+  };
+}
+
+async function organizationLocationsApi(request: Request, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id, request.method === "POST", request.method === "POST");
+  if ("response" in scoped) return scoped.response;
+  const wid = scoped.access.workspaceId;
+
+  if (request.method === "GET") {
+    const result = await supabase
+      .from("workspace_locations")
+      .select("id,workspace_id,name,city,state,address,is_default,created_at,updated_at")
+      .eq("workspace_id", wid)
+      .is("archived_at", null)
+      .order("is_default", { ascending: false })
+      .order("created_at", { ascending: true });
+
+    if (!result.error) {
+      return ok({ items: (result.data ?? []).map((r) => locationDto(r as Record<string, unknown>)) }, 200, id);
+    }
+
+    // Fallback: workspace_settings.advanced.locations
+    const wsSettings = await supabase.from("workspace_settings").select("advanced").eq("workspace_id", wid).maybeSingle();
+    const advanced = (wsSettings.data?.advanced ?? {}) as Record<string, unknown>;
+    const locList = (Array.isArray(advanced.locations) ? advanced.locations : []) as Record<string, unknown>[];
+    const active = locList.filter((l) => !l.archived_at);
+    active.sort((a, b) => (b.is_default ? 1 : 0) - (a.is_default ? 1 : 0));
+    return ok({ items: active.map((l) => locationDto({ ...l, workspace_id: wid })) }, 200, id);
+  }
+
+  if (request.method === "POST") {
+    const input = await parsed(request, locationCreateSchema, id);
+    if (input.response) return input.response;
+
+    let isDefault = Boolean(input.data.isDefault);
+    let tableExists = true;
+
+    const existingRows = await supabase
+      .from("workspace_locations")
+      .select("id,is_default")
+      .eq("workspace_id", wid)
+      .is("archived_at", null);
+
+    if (existingRows.error) {
+      tableExists = false;
+    } else {
+      const activeCount = existingRows.data?.length ?? 0;
+      if (activeCount === 0) {
+        isDefault = true;
+      }
+    }
+
+    if (tableExists) {
+      if (isDefault) {
+        await supabase
+          .from("workspace_locations")
+          .update({ is_default: false })
+          .eq("workspace_id", wid)
+          .is("archived_at", null);
+      }
+
+      const insertRes = await supabase
+        .from("workspace_locations")
+        .insert({
+          workspace_id: wid,
+          name: input.data.name,
+          city: input.data.city,
+          state: input.data.state,
+          address: input.data.address,
+          is_default: isDefault,
+          created_by: scoped.access.userId,
+        })
+        .select()
+        .single();
+
+      if (insertRes.error) {
+        return fail("VALIDATION_ERROR", insertRes.error.message || "Failed to create location.", 400, id);
+      }
+
+      await audit(supabase, "settings.organization.location_created", id);
+      return ok(locationDto(insertRes.data as Record<string, unknown>), 201, id);
+    }
+
+    // Fallback: workspace_settings.advanced.locations
+    const wsSettings = await supabase.from("workspace_settings").select("advanced").eq("workspace_id", wid).maybeSingle();
+    const currentAdvanced = (wsSettings.data?.advanced ?? {}) as Record<string, unknown>;
+    const locList = (Array.isArray(currentAdvanced.locations) ? [...currentAdvanced.locations] : []) as Record<string, unknown>[];
+    const active = locList.filter((l) => !l.archived_at);
+    if (active.length === 0) {
+      isDefault = true;
+    }
+    if (isDefault) {
+      for (const loc of locList) loc.is_default = false;
+    }
+    const newLoc = {
+      id: randomUUID(),
+      workspace_id: wid,
+      name: input.data.name,
+      city: input.data.city,
+      state: input.data.state,
+      address: input.data.address,
+      is_default: isDefault,
+      created_by: scoped.access.userId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      archived_at: null,
+    };
+    locList.push(newLoc);
+    await supabase.from("workspace_settings").update({
+      advanced: { ...currentAdvanced, locations: locList },
+      updated_by: scoped.access.userId,
+    }).eq("workspace_id", wid);
+
+    await audit(supabase, "settings.organization.location_created", id);
+    return ok(locationDto(newLoc), 201, id);
+  }
+
+  return methodNotAllowed(id);
+}
+
+async function organizationLocationItemApi(request: Request, supabase: SupabaseClient, id: string, locId: string) {
+  const scoped = await workspaceAccess(supabase, id, true, true);
+  if ("response" in scoped) return scoped.response;
+  const wid = scoped.access.workspaceId;
+
+  if (request.method === "PATCH") {
+    const input = await parsed(request, locationPatchSchema, id);
+    if (input.response) return input.response;
+
+    const updates: Record<string, unknown> = {};
+    if (input.data.name !== undefined) updates.name = input.data.name;
+    if (input.data.city !== undefined) updates.city = input.data.city;
+    if (input.data.state !== undefined) updates.state = input.data.state;
+    if (input.data.address !== undefined) updates.address = input.data.address;
+    if (input.data.isDefault !== undefined) updates.is_default = input.data.isDefault;
+
+    const checkTable = await supabase.from("workspace_locations").select("id").eq("workspace_id", wid).limit(1);
+    if (!checkTable.error) {
+      if (input.data.isDefault) {
+        await supabase.from("workspace_locations").update({ is_default: false }).eq("workspace_id", wid).is("archived_at", null);
+      }
+      const updRes = await supabase
+        .from("workspace_locations")
+        .update(updates)
+        .eq("workspace_id", wid)
+        .eq("id", locId)
+        .is("archived_at", null)
+        .select()
+        .maybeSingle();
+
+      if (updRes.error || !updRes.data) {
+        return fail("NOT_FOUND", "Location was not found.", 404, id);
+      }
+      await audit(supabase, "settings.organization.location_updated", id);
+      return ok(locationDto(updRes.data as Record<string, unknown>), 200, id);
+    }
+
+    // Fallback: workspace_settings.advanced.locations
+    const wsSettings = await supabase.from("workspace_settings").select("advanced").eq("workspace_id", wid).maybeSingle();
+    const currentAdvanced = (wsSettings.data?.advanced ?? {}) as Record<string, unknown>;
+    const locList = (Array.isArray(currentAdvanced.locations) ? [...currentAdvanced.locations] : []) as Record<string, unknown>[];
+    const target = locList.find((l) => l.id === locId && !l.archived_at);
+    if (!target) return fail("NOT_FOUND", "Location was not found.", 404, id);
+
+    if (input.data.isDefault) {
+      for (const loc of locList) loc.is_default = false;
+    }
+    Object.assign(target, updates, { updated_at: new Date().toISOString() });
+    await supabase.from("workspace_settings").update({
+      advanced: { ...currentAdvanced, locations: locList },
+      updated_by: scoped.access.userId,
+    }).eq("workspace_id", wid);
+
+    await audit(supabase, "settings.organization.location_updated", id);
+    return ok(locationDto({ ...target, workspace_id: wid }), 200, id);
+  }
+
+  if (request.method === "DELETE") {
+    const checkTable = await supabase.from("workspace_locations").select("id,is_default").eq("workspace_id", wid).is("archived_at", null);
+    if (!checkTable.error) {
+      const activeRows = checkTable.data ?? [];
+      const target = activeRows.find((r) => r.id === locId);
+      if (!target) return fail("NOT_FOUND", "Location was not found.", 404, id);
+
+      const delRes = await supabase
+        .from("workspace_locations")
+        .update({ archived_at: new Date().toISOString(), is_default: false })
+        .eq("workspace_id", wid)
+        .eq("id", locId)
+        .is("archived_at", null);
+
+      if (delRes.error) return fail("INTERNAL_ERROR", "Failed to archive location.", 500, id);
+
+      if (target.is_default) {
+        const remaining = activeRows.filter((r) => r.id !== locId);
+        if (remaining.length > 0) {
+          await supabase.from("workspace_locations").update({ is_default: true }).eq("workspace_id", wid).eq("id", remaining[0].id);
+        }
+      }
+
+      await audit(supabase, "settings.organization.location_archived", id);
+      return ok({ success: true, archived: true }, 200, id);
+    }
+
+    // Fallback: workspace_settings.advanced.locations
+    const wsSettings = await supabase.from("workspace_settings").select("advanced").eq("workspace_id", wid).maybeSingle();
+    const currentAdvanced = (wsSettings.data?.advanced ?? {}) as Record<string, unknown>;
+    const locList = (Array.isArray(currentAdvanced.locations) ? [...currentAdvanced.locations] : []) as Record<string, unknown>[];
+    const target = locList.find((l) => l.id === locId && !l.archived_at);
+    if (!target) return fail("NOT_FOUND", "Location was not found.", 404, id);
+
+    const wasDefault = Boolean(target.is_default);
+    target.archived_at = new Date().toISOString();
+    target.is_default = false;
+
+    if (wasDefault) {
+      const remaining = locList.filter((l) => !l.archived_at && l.id !== locId);
+      if (remaining.length > 0) {
+        remaining[0].is_default = true;
+      }
+    }
+
+    await supabase.from("workspace_settings").update({
+      advanced: { ...currentAdvanced, locations: locList },
+      updated_by: scoped.access.userId,
+    }).eq("workspace_id", wid);
+
+    await audit(supabase, "settings.organization.location_archived", id);
+    return ok({ success: true, archived: true }, 200, id);
+  }
+
+  return methodNotAllowed(id);
+}
+
+async function organizationLocationDefaultApi(request: Request, supabase: SupabaseClient, id: string, locId: string) {
+  if (request.method !== "POST") return methodNotAllowed(id);
+  const scoped = await workspaceAccess(supabase, id, true, true);
+  if ("response" in scoped) return scoped.response;
+  const wid = scoped.access.workspaceId;
+
+  const checkTable = await supabase.from("workspace_locations").select("id").eq("workspace_id", wid).is("archived_at", null);
+  if (!checkTable.error) {
+    const active = checkTable.data ?? [];
+    const target = active.find((r) => r.id === locId);
+    if (!target) return fail("NOT_FOUND", "Location was not found.", 404, id);
+
+    await supabase.from("workspace_locations").update({ is_default: false }).eq("workspace_id", wid).is("archived_at", null);
+    await supabase.from("workspace_locations").update({ is_default: true }).eq("workspace_id", wid).eq("id", locId);
+
+    await audit(supabase, "settings.organization.location_default_changed", id);
+    return ok({ success: true, id: locId }, 200, id);
+  }
+
+  // Fallback: workspace_settings.advanced.locations
+  const wsSettings = await supabase.from("workspace_settings").select("advanced").eq("workspace_id", wid).maybeSingle();
+  const currentAdvanced = (wsSettings.data?.advanced ?? {}) as Record<string, unknown>;
+  const locList = (Array.isArray(currentAdvanced.locations) ? [...currentAdvanced.locations] : []) as Record<string, unknown>[];
+  const target = locList.find((l) => l.id === locId && !l.archived_at);
+  if (!target) return fail("NOT_FOUND", "Location was not found.", 404, id);
+
+  for (const loc of locList) {
+    if (!loc.archived_at) loc.is_default = false;
+  }
+  target.is_default = true;
+
+  await supabase.from("workspace_settings").update({
+    advanced: { ...currentAdvanced, locations: locList },
+    updated_by: scoped.access.userId,
+  }).eq("workspace_id", wid);
+
+  await audit(supabase, "settings.organization.location_default_changed", id);
+  return ok({ success: true, id: locId }, 200, id);
+}
+
 async function activitySummary(supabase: SupabaseClient, id: string) {
   const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
   const [tasks, approvals, stages] = await Promise.all([supabase.from("activity_tasks").select("status,due_date").eq("workspace_id", scoped.access.workspaceId), supabase.from("activity_approvals").select("status,due_date").eq("workspace_id", scoped.access.workspaceId), supabase.from("activity_stages").select("id").eq("workspace_id", scoped.access.workspaceId)]);
@@ -4437,6 +4906,12 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (request.method === "POST" && route === "billing/subscription/reactivate") return billingMutation(request, supabase, id, "reactivate");
   if (request.method === "POST" && route === "billing/subscription/retry-payment") return billingMutation(request, supabase, id, "retry-payment");
   if (request.method === "GET" && route === "settings/overview") return settingsApi(request, supabase, id);
+  if (["GET", "PATCH"].includes(request.method) && route === "settings/organization") return organizationSettingsApi(request, supabase, id);
+  if (route === "settings/organization/locations" && ["GET", "POST"].includes(request.method)) return organizationLocationsApi(request, supabase, id);
+  const locationDefaultMatch = route.match(/^settings\/organization\/locations\/([0-9a-f-]{36})\/default$/i);
+  if (locationDefaultMatch && request.method === "POST") return organizationLocationDefaultApi(request, supabase, id, locationDefaultMatch[1]);
+  const locationMatch = route.match(/^settings\/organization\/locations\/([0-9a-f-]{36})$/i);
+  if (locationMatch && ["PATCH", "DELETE"].includes(request.method)) return organizationLocationItemApi(request, supabase, id, locationMatch[1]);
   const settingsMatch = route.match(/^settings\/(branding|boq-costing|integrations|notifications|security|advanced)$/i);
   if (settingsMatch && ["GET", "PATCH"].includes(request.method)) return settingsApi(request, supabase, id, settingsMatch[1]);
   if (request.method === "GET" && route === "activities/summary") return activitySummary(supabase, id);

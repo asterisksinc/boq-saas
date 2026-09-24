@@ -28,6 +28,7 @@ import SettingsNavigation from "@/components/settings/SettingsNavigation";
 import SettingsOverviewComponent from "@/components/settings/SettingsOverview";
 import MyProfile from "@/components/settings/MyProfile";
 import SettingsSkeleton from "@/components/settings/SettingsSkeleton";
+import OrganizationSettings from "@/components/settings/OrganizationSettings";
 import { SettingsErrorState, SettingsEmptyTab } from "@/components/settings/SettingsEmptyState";
 import { adaptOverview } from "@/lib/settings/adapter";
 import { SettingsTab } from "@/lib/settings/types";
@@ -186,7 +187,15 @@ export default function SettingsPage() {
         }
 
         if (activeTab === "organization") {
-            return <OrganizationTabContent overview={overview} />;
+            return (
+                <OrganizationSettings
+                    overview={overview}
+                    loading={loading}
+                    error={error}
+                    onRefresh={loadOverview}
+                    showNotice={showNotice}
+                />
+            );
         }
 
         if (activeTab === "additional") {
@@ -399,72 +408,6 @@ function ProfileTabContent({
     );
 }
 
-function OrganizationTabContent({ overview }: { overview: SettingsOverview | null }) {
-    const ws = overview?.workspace;
-    const wp = (ws?.profile as Record<string, unknown>) || {};
-
-    return (
-        <div className="settings-section-card">
-            <div className="form-header">
-                <h2>Organization Profile</h2>
-                <p>Workspace company details, tax registration, and billing address</p>
-            </div>
-
-            <div className="form-grid">
-                <Field
-                    label="Company / Workspace Name"
-                    type="text"
-                    value={(ws?.name as string) || "—"}
-                    onChange={() => {}}
-                    disabled
-                />
-                <Field
-                    label="Tax ID / GSTIN"
-                    type="text"
-                    value={(wp.tax_id as string) || "Not configured"}
-                    onChange={() => {}}
-                    disabled
-                />
-                <Field
-                    label="Business Email"
-                    type="text"
-                    value={(wp.business_email as string) || "—"}
-                    onChange={() => {}}
-                    disabled
-                />
-                <Field
-                    label="Phone"
-                    type="text"
-                    value={(wp.phone as string) || "—"}
-                    onChange={() => {}}
-                    disabled
-                />
-                <Field
-                    label="Currency"
-                    type="text"
-                    value={(ws?.currency as string) || "INR"}
-                    onChange={() => {}}
-                    disabled
-                />
-                <Field
-                    label="Timezone"
-                    type="text"
-                    value={(ws?.timezone as string) || "Asia/Kolkata"}
-                    onChange={() => {}}
-                    disabled
-                />
-                <Field
-                    label="Address"
-                    type="text"
-                    value={(wp.address as string) || "—"}
-                    onChange={() => {}}
-                    disabled
-                    fullWidth
-                />
-            </div>
-        </div>
-    );
-}
 
 function BaseForm({
     title,
