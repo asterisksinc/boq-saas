@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { integrationsApi, FormWithStats } from '@/lib/api/integrations';
 import Pagination from './Pagination';
+import FormEditModal from './FormEditModal';
 
 function formatRelative(iso: string | null): string {
     if (!iso) return '-';
@@ -18,21 +19,23 @@ export default function FormLeadsTable({ integrationId }: { integrationId: strin
     const router = useRouter();
     const [forms, setForms] = useState<FormWithStats[]>([]);
     const [loading, setLoading] = useState(true);
+    const [editFormId, setEditFormId] = useState<string | null>(null);
+
+    const loadForms = useCallback(async () => {
+        setLoading(true);
+        try {
+            const res = await integrationsApi.listIntegrationForms(integrationId);
+            setForms(res.items || []);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    }, [integrationId]);
 
     useEffect(() => {
-        const load = async () => {
-            setLoading(true);
-            try {
-                const res = await integrationsApi.listIntegrationForms(integrationId);
-                setForms(res.items || []);
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
-        };
-        load();
-    }, [integrationId]);
+        loadForms();
+    }, [loadForms]);
 
     if (loading) {
         return <div className="intg-skeleton intg-skeleton-chart" style={{ height: '300px' }} />;
@@ -69,7 +72,13 @@ export default function FormLeadsTable({ integrationId }: { integrationId: strin
                             </td>
                             <td>{row.leadsThisMonth}</td>
                             <td>{formatRelative(row.lastLeadAt)}</td>
-                            <td>
+                            <td style={{ display: 'flex', gap: '8px' }}>
+                                <button 
+                                    className="intg-action-link"
+                                    onClick={() => setEditFormId(row.id)}
+                                >
+                                    Edit
+                                </button>
                                 <button 
                                     className="intg-action-link"
                                     onClick={() => router.push(`/integrations/${integrationId}/forms/${row.id}`)}
@@ -81,6 +90,17 @@ export default function FormLeadsTable({ integrationId }: { integrationId: strin
                     ))}
                 </tbody>
             </table>
+
+            {editFormId && (
+                <FormEditModal
+                    formId={editFormId}
+                    onClose={(updated) => {
+                        setEditFormId(null);
+                        if (updated) loadForms();
+                    }}
+                />
+            )}
         </div>
     );
 }
+

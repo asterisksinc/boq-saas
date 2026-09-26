@@ -5,36 +5,9 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import DashboardRail from "@/components/DashboardRail";
 import { DashboardOverview, getApiErrorMessage, getDashboardOverview } from "@/lib/api/auth";
-import { type DashboardPeriod } from "@/lib/domain/dashboard-demo";
 
+type DashboardPeriod = "week" | "month" | "quarter";
 type DashboardItem = { name: string; subtitle?: string; value?: number; status?: string };
-
-// Chart data for each period - used when backend returns empty series
-const fallbackCharts: Record<DashboardPeriod, Array<{ label: string; estimated: number; actual: number }>> = {
-    week: [
-        { label: "Mon", estimated: 3200000, actual: 3000000 },
-        { label: "Tue", estimated: 3800000, actual: 3500000 },
-        { label: "Wed", estimated: 4400000, actual: 4100000 },
-        { label: "Thu", estimated: 4600000, actual: 4300000 },
-        { label: "Fri", estimated: 3900000, actual: 3700000 },
-        { label: "Sat", estimated: 4300000, actual: 4000000 },
-        { label: "Sun", estimated: 5100000, actual: 4700000 },
-    ],
-    month: [
-        { label: "Mar", estimated: 3800000, actual: 3500000 },
-        { label: "Apr", estimated: 5200000, actual: 4700000 },
-        { label: "May", estimated: 5900000, actual: 5400000 },
-        { label: "Jun", estimated: 4400000, actual: 4200000 },
-        { label: "Jul", estimated: 5200000, actual: 4800000 },
-        { label: "Aug", estimated: 7600000, actual: 6900000 },
-    ],
-    quarter: [
-        { label: "Q1", estimated: 11800000, actual: 10900000 },
-        { label: "Q2", estimated: 15300000, actual: 14100000 },
-        { label: "Q3", estimated: 17600000, actual: 15800000 },
-        { label: "Q4", estimated: 20100000, actual: 18200000 },
-    ],
-};
 
 function formatNumber(value: number) { return new Intl.NumberFormat("en-IN").format(value); }
 
@@ -151,11 +124,12 @@ function Analytics({ overview, hasContent, money, activePeriod, onPeriodChange }
     const canSeeMoney = overview.permissions.canViewFinancials && estimated !== null;
     const trends = computeTrends(overview.kpis);
 
-    // Get chart series data - use backend data if available, fall back to demo data if hasContent
-    const backendSeries = (overview as any).costOverview?.series;
+    // Get chart series data - use backend data only, no fallback demo data
+    const costOverview = (overview as Record<string, unknown>).costOverview as Record<string, unknown> | undefined;
+    const backendSeries = costOverview?.series as Array<{ label: string; estimated: number; actual: number }> | undefined;
     const chartData = (Array.isArray(backendSeries) && backendSeries.length > 0)
         ? backendSeries
-        : hasContent ? fallbackCharts[activePeriod] : null;
+        : null;
 
     return <section className={`fig-analytics ${hasContent ? "has-content" : ""}`}><div className="fig-card-heading"><div><h2>Analytics</h2><p>{hasContent ? `Updated ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(overview.scope.generatedAt))}` : "No data to display yet"}</p></div></div>
         {hasContent ? <>

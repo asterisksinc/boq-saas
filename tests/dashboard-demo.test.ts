@@ -30,10 +30,15 @@ describe("temporary dashboard demo backend", () => {
     expect(dashboard.projectsAndBoqs.totalBoqValue).toBeNull();
   });
 
-  it("keeps explicit replacement comments at both backend integration points", () => {
+  it("keeps explicit replacement comments at demo source (route.ts now uses real queries)", () => {
     const demoSource = readFileSync("lib/domain/dashboard-demo.ts", "utf8");
     const route = readFileSync("app/api/v1/[...path]/route.ts", "utf8");
     expect(demoSource).toContain("TODO(PROJECT_BOQ_BACKEND)");
-    expect(route.match(/TODO\(PROJECT_BOQ_BACKEND\)/g)?.length).toBeGreaterThanOrEqual(2);
+    // dashboardList in route.ts now uses real DB queries, so TODO markers were removed.
+    // The demo data is no longer imported or used by the route handler.
+    expect(route).not.toContain("demoRecentProjects");
+    expect(route).not.toContain("demoRecentBoqs");
+    expect(route).not.toContain("demoPendingActions");
+    expect(route).not.toContain("demoUpcomingDeliverables");
   });
 });

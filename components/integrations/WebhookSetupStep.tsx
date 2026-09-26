@@ -1,41 +1,24 @@
 "use client";
 
-import { Copy } from 'lucide-react';
-import { useState } from 'react';
-
 interface Props {
     webhookUrl: string;
     onNext: () => void;
     onCancel: () => void;
 }
 
-export default function WebhookSetupStep({ webhookUrl, onNext, onCancel }: Props) {
-    const [copied, setCopied] = useState(false);
-
-    const handleCopy = () => {
-        navigator.clipboard.writeText(webhookUrl);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
-
+export default function WebhookSetupStep({ onNext, onCancel }: Props) {
     return (
         <div className="intg-modal-content">
             <h2>Setup Webhook</h2>
-            <p className="intg-modal-subtitle">Copy this URL to your custom website to send leads to BOQ.</p>
+            <p className="intg-modal-subtitle">Configure your custom form to send leads to BOQ.</p>
             
-            <div className="intg-webhook-box">
-                <label>Webhook URL</label>
-                <div className="intg-input-group">
-                    <input type="text" readOnly value={webhookUrl} className="intg-input" />
-                    <button className="intg-btn intg-btn-secondary" onClick={handleCopy}>
-                        <Copy size={16} /> {copied ? 'Copied!' : 'Copy'}
-                    </button>
-                </div>
+            <div className="intg-webhook-box" style={{ padding: '20px', textAlign: 'center', background: '#f8fafc', borderRadius: '8px', marginBottom: '24px' }}>
+                <p>The webhook URL will be generated when you create a form in the next step.</p>
             </div>
 
             <div className="intg-info-panel">
                 <h4>How it works?</h4>
-                <p>1. Copy the webhook URL above.<br/>2. Paste it in your website's form action or webhook settings.<br/>3. Send POST requests with form data.</p>
+                <p>1. Complete the form setup in the next step.<br/>2. Copy the generated webhook URL.<br/>3. Paste it in your website's form action and send POST requests.</p>
             </div>
 
             <div className="intg-modal-actions">

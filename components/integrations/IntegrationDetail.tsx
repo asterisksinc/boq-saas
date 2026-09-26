@@ -62,6 +62,20 @@ export default function IntegrationDetail({ id }: { id: string }) {
         }
     };
 
+    const handleDisconnect = async () => {
+        if (!confirm('Are you sure you want to disconnect this integration?')) return;
+        setActionLoading(true);
+        try {
+            await integrationsApi.disconnect(id);
+            setToast({ message: 'Integration disconnected', type: 'success' });
+            await loadData();
+        } catch (err) {
+            setToast({ message: err instanceof Error ? err.message : 'Disconnect failed', type: 'error' });
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     useEffect(() => {
         if (!toast) return;
         const t = setTimeout(() => setToast(null), 3000);
@@ -112,22 +126,34 @@ export default function IntegrationDetail({ id }: { id: string }) {
                     {integration.lastSyncedAt && (
                         <span className="intg-last-sync">Last synced {formatTimeAgo(integration.lastSyncedAt)}</span>
                     )}
-                    <button
-                        className="intg-btn intg-btn-outline"
-                        onClick={handlePauseResume}
-                        disabled={actionLoading}
-                    >
-                        {integration.status === 'paused'
-                            ? <><PlayCircle size={16}/> Resume Integration</>
-                            : <><PauseCircle size={16}/> Pause Integration</>}
-                    </button>
-                    {isCustomWebsite && (
-                        <button 
-                            className="intg-btn intg-btn-primary intg-new-form-btn"
-                            onClick={() => setShowNewFormModal(true)}
-                        >
-                            <Plus size={16} /> New Custom Form
-                        </button>
+                    {(integration.status as string) !== 'disconnected' && (
+                        <>
+                            <button
+                                className="intg-btn intg-btn-outline"
+                                onClick={handlePauseResume}
+                                disabled={actionLoading}
+                            >
+                                {integration.status === 'paused'
+                                    ? <><PlayCircle size={16}/> Resume</>
+                                    : <><PauseCircle size={16}/> Pause</>}
+                            </button>
+                            <button
+                                className="intg-btn intg-btn-outline"
+                                onClick={handleDisconnect}
+                                disabled={actionLoading}
+                                style={{ color: '#dc2626', borderColor: '#fca5a5' }}
+                            >
+                                Disconnect
+                            </button>
+                            {isCustomWebsite && (
+                                <button 
+                                    className="intg-btn intg-btn-primary intg-new-form-btn"
+                                    onClick={() => setShowNewFormModal(true)}
+                                >
+                                    <Plus size={16} /> New Custom Form
+                                </button>
+                            )}
+                        </>
                     )}
                 </div>
             </header>

@@ -7,7 +7,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { EmailOtpError, issueEmailOtp, verifyEmailOtp } from "@/lib/auth/email-otp";
 import { isEmailOtpBypassed } from "@/lib/auth/otp-bypass";
 import { pagination } from "@/lib/domain/dashboard";
-import { demoPendingActions, demoRecentBoqs, demoRecentProjects, demoUpcomingDeliverables } from "@/lib/domain/dashboard-demo";
+// Demo data imports removed — dashboardList now uses real database queries.
 import { consumeRateLimit, rateLimitKey } from "@/lib/api/rate-limit";
 import { fail, methodNotAllowed, ok, requestId } from "@/lib/api/response";
 import {
@@ -1044,27 +1044,76 @@ async function dashboardList(request: NextRequest, supabase: SupabaseClient, id:
   const workspaceId = dashboardContext?.workspace?.id;
   if (!workspaceId) return fail("FORBIDDEN", "Active workspace membership required.", 403, id);
   const { page, pageSize, from, to } = pagination(request.nextUrl.searchParams);
-  if (name !== "notifications") {
-    // TODO(PROJECT_BOQ_BACKEND): Replace these demo pages with tenant-scoped domain queries.
-    // TODO(PROJECT_BOQ_BACKEND): Replace these demo pages with tenant-scoped
-    // Project/BOQ/Workflow/Deliverable queries when those tables are available.
-    const demoItems: Record<string, unknown[]> = {
-      "recent-projects": demoRecentProjects,
-      "recent-boqs": demoRecentBoqs,
-      "pending-actions": demoPendingActions,
-      "upcoming-deliverables": demoUpcomingDeliverables,
-    };
-    const all = name === "recent-boqs" && dashboardContext?.permissions?.canViewFinancials !== true
-      ? (demoItems[name] ?? []).map((item) => ({ ...(item as Record<string, unknown>), value: null }))
-      : demoItems[name] ?? [];
-    return ok({ items: all.slice(from, to + 1), page, pageSize, total: all.length, hasMore: to + 1 < all.length, dataSource: "hardcoded_demo", demoData: true }, 200, id);
+
+  if (name === "recent-projects") {
+    const countQ = supabase.from("projects").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("archived_at", null);
+    const itemsQ = supabase.from("projects").select(projectSelect).eq("workspace_id", workspaceId).is("archived_at", null).order("updated_at", { ascending: false }).range(from, to);
+    const [count, items] = await Promise.all([countQ, itemsQ]);
+    if (count.error || items.error) return fail("INTERNAL_ERROR", "Recent projects could not be loaded.", 500, id);
+    const total = count.count ?? 0;
+    return ok({ items: (items.data ?? []).map((r: Record<string, unknown>) => projectDto(r)), page, pageSize, total, hasMore: to + 1 < total }, 200, id);
   }
-  const countQuery = supabase.from("notifications").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId);
-  const itemsQuery = supabase.from("notifications").select("id,type,title,priority,target_type,target_id,read_at,created_at").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).range(from, to);
-  const [count, items] = await Promise.all([countQuery, itemsQuery]);
-  if (count.error || items.error) return fail("INTERNAL_ERROR", "Notifications could not be loaded.", 500, id);
-  const total = count.count ?? 0;
-  return ok({ items: items.data ?? [], page, pageSize, total, hasMore: to + 1 < total }, 200, id);
+
+  if (name === "recent-boqs") {
+    const countQ = supabase.from("boqs").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("archived_at", null);
+    const itemsQ = supabase.from("boqs").select(boqSelect).eq("workspace_id", workspaceId).is("archived_at", null).order("updated_at", { ascending: false }).range(from, to);
+    const [count, items] = await Promise.all([countQ, itemsQ]);
+    if (count.error || items.error) return fail("INTERNAL_ERROR", "Recent BOQs could not be loaded.", 500, id);
+    const rows = (items.data ?? []) as Record<string, unknown>[];
+    const boqIds = rows.map((r) => String(r.id));
+    const stats = await boqStats(supabase, workspaceId, boqIds);
+    const total = count.count ?? 0;
+    const mapped = rows.map((r) => {
+      const s = stats.get(String(r.id)) ?? { rooms: 0, items: 0, subtotal: 0 };
+      const dto = boqDto(r, s.rooms, s.items, s.subtotal);
+      if (dashboardContext?.permissions?.canViewFinancials !== true) {
+        return { ...dto, subtotal: null, markupAmount: null, taxAmount: null, grandTotal: null };
+      }
+      return dto;
+    });
+    return ok({ items: mapped, page, pageSize, total, hasMore: to + 1 < total }, 200, id);
+  }
+
+  if (name === "pending-actions") {
+    const countQ = supabase.from("activity_approvals").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).not("status", "in", "(approved,rejected,cancelled)");
+    const itemsQ = supabase.from("activity_approvals").select("id,project_id,stage_id,name,description,approver_id,approver_name,due_date,status,requested_at,created_at").eq("workspace_id", workspaceId).not("status", "in", "(approved,rejected,cancelled)").order("due_date", { ascending: true, nullsFirst: false }).range(from, to);
+    const [count, items] = await Promise.all([countQ, itemsQ]);
+    if (count.error || items.error) return fail("INTERNAL_ERROR", "Pending actions could not be loaded.", 500, id);
+    const total = count.count ?? 0;
+    const mapped = (items.data ?? []).map((r: Record<string, unknown>) => ({
+      id: r.id, title: r.name, description: r.description, priority: r.status === "sent" || r.status === "in_review" ? "high" : "normal",
+      targetType: "approval", targetId: r.id, dueDate: r.due_date, status: r.status, projectId: r.project_id,
+    }));
+    return ok({ items: mapped, page, pageSize, total, hasMore: to + 1 < total }, 200, id);
+  }
+
+  if (name === "upcoming-deliverables") {
+    const now = new Date().toISOString();
+    const countQ = supabase.from("activity_tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).in("status", ["not_started", "in_progress"]).gte("due_date", now.slice(0, 10));
+    const itemsQ = supabase.from("activity_tasks").select("id,project_id,name,status,due_date,assigned_to,created_at").eq("workspace_id", workspaceId).in("status", ["not_started", "in_progress"]).gte("due_date", now.slice(0, 10)).order("due_date", { ascending: true }).range(from, to);
+    const [count, items] = await Promise.all([countQ, itemsQ]);
+    if (count.error || items.error) return fail("INTERNAL_ERROR", "Upcoming deliverables could not be loaded.", 500, id);
+    const total = count.count ?? 0;
+    const projectIds = Array.from(new Set((items.data ?? []).map((r: Record<string, unknown>) => String(r.project_id)).filter(Boolean)));
+    const projRes = projectIds.length ? await supabase.from("projects").select("id,name").in("id", projectIds) : { data: [] };
+    const projMap = new Map<string, string>();
+    for (const p of (projRes.data ?? []) as Array<{ id: string; name: string }>) projMap.set(p.id, p.name);
+    const mapped = (items.data ?? []).map((r: Record<string, unknown>) => ({
+      id: r.id, title: r.name, projectName: projMap.get(String(r.project_id)) ?? null, status: r.status, dueDate: r.due_date,
+    }));
+    return ok({ items: mapped, page, pageSize, total, hasMore: to + 1 < total }, 200, id);
+  }
+
+  if (name === "notifications") {
+    const countQuery = supabase.from("notifications").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId);
+    const itemsQuery = supabase.from("notifications").select("id,type,title,priority,target_type,target_id,read_at,created_at").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).range(from, to);
+    const [count, items] = await Promise.all([countQuery, itemsQuery]);
+    if (count.error || items.error) return fail("INTERNAL_ERROR", "Notifications could not be loaded.", 500, id);
+    const total = count.count ?? 0;
+    return ok({ items: items.data ?? [], page, pageSize, total, hasMore: to + 1 < total }, 200, id);
+  }
+
+  return fail("NOT_FOUND", `Unknown dashboard list: ${name}`, 404, id);
 }
 
 type WorkspaceAccess = { userId: string; workspaceId: string; role: "owner" | "admin" | "member" | "viewer"; currency: string; email?: string | null; workspaceName?: string | null };

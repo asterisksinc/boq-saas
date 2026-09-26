@@ -4,6 +4,7 @@ import { ArrowLeft, ChevronDown, ChevronRight, Copy, Edit3, Play, Plus, Search, 
 import React, { useEffect, useState, useCallback, ChangeEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import DashboardRail from "@/components/DashboardRail";
+import { getTemplate, getTemplateSection, updateTemplateSection, getTemplateVersions, getTemplateUsage } from "@/lib/api/templates";
 
 type Template = {
   id: string;
@@ -94,12 +95,10 @@ export default function TemplateDetail() {
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/v1/project-templates/${id}`, { credentials: "include" });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body?.error?.message || body?.message || "Failed to load template");
-      setTemplate(body.data);
-    } catch (err: any) {
-      setError(err.message || "An error occurred");
+      const res = await getTemplate(id);
+      setTemplate(res as unknown as Template);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setLoading(false);
     }
@@ -193,7 +192,7 @@ export default function TemplateDetail() {
           
           {activeTab === "Overview" && <OverviewTab template={template} />}
           {activeTab === "Structure" && <StructureTab template={template} onUpdate={load} />}
-          {activeTab === "Costing & BOQ" && <CostingBoqTab template={template} />}
+          {activeTab === "Costing & BOQ" && <CostingBoqTab template={template} onUpdate={load} />}
           {activeTab === "Workflow" && <WorkflowTab template={template} onUpdate={load} />}
           {activeTab === "Documents" && <DocumentsTab template={template} onUpdate={load} />}
           {(activeTab === "Useage" || activeTab === "Usage") && <UsageTab template={template} />}
@@ -511,16 +510,7 @@ function InspectorForm({ area, templateId, onUpdate }: { area: Area; templateId:
   const save = async () => {
     try {
       setSaving(true);
-      const res = await fetch(`/api/v1/project-templates/${templateId}/structure`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ areaId: area.id, ...formData })
-      });
-      if (!res.ok) {
-        const b = await res.json();
-        throw new Error(b.error?.message || "Failed to update area");
-      }
+      await updateTemplateSection(templateId, "structure", { areaId: area.id, ...formData });
       onUpdate();
     } catch (err: any) {
       alert(err.message);
@@ -583,9 +573,19 @@ function InspectorForm({ area, templateId, onUpdate }: { area: Area; templateId:
   );
 }
 
-function CostingBoqTab({ template }: { template: Template }) {
+function CostingBoqTab({ template, onUpdate }: { template: Template; onUpdate?: () => void }) {
+  const [costingBoq, setCostingBoq] = useState<any>(template.costingBoq || {});
   const areas = template.structure?.areas || [];
-  const costingBoq = template.costingBoq || {};
+
+  useEffect(() => {
+    getTemplateSection(template.id, "costing-boq")
+      .then(body => {
+        if (body?.data) {
+          setCostingBoq(body.data);
+        }
+      })
+      .catch(() => {});
+  }, [template.id]);
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [areasExpanded, setAreasExpanded] = useState<Record<string, boolean>>({});
 
@@ -782,10 +782,33 @@ function WorkflowTab({ template, onUpdate }: { template: Template; onUpdate: () 
   const [subTab, setSubTab] = useState("Stages");
   const subTabs = ["Stages", "Tasks", "Milestones", "Approvals", "Rules"];
   
-  const workflow = template.workflow || {};
+  const [workflow, setWorkflow] = useState<any>(template.workflow || {});
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    getTemplateSection(template.id, "workflow")
+      .then(body => {
+        if (body?.data) {
+          setWorkflow(body.data);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [template.id]);
+
+  const saveWorkflow = async (updatedWorkflow: any) => {
+    try {
+      await updateTemplateSection(template.id, "workflow", { data: updatedWorkflow });
+      setWorkflow(updatedWorkflow);
+      onUpdate();
+    } catch {}
+  };
+
   const stages = workflow.stages || [];
   const tasks = workflow.tasks || [];
   const milestones = workflow.milestones || [];
+
   
   const [selectedStageId, setSelectedStageId] = useState<string | null>(stages.length > 0 ? stages[0].id : null);
   const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null);
@@ -1008,7 +1031,7 @@ function WorkflowTab({ template, onUpdate }: { template: Template; onUpdate: () 
                 </div>
                 <div style={{ padding: "16px", borderTop: "1px solid var(--fig-border)", display: "flex", gap: "12px" }}>
                   <button style={{ flex: 1, padding: "8px", background: "white", border: "1px solid var(--fig-border)", borderRadius: "6px", fontSize: "13px", fontWeight: 500, cursor: "pointer" }}>Save Draft</button>
-                  <button style={{ flex: 1, padding: "8px", background: "var(--fig-blue)", color: "white", border: "none", borderRadius: "6px", fontSize: "13px", fontWeight: 500, cursor: "pointer" }}>Save Changes</button>
+                  <button onClick={() => saveWorkflow(workflow)} style={{ flex: 1, padding: "8px", background: "var(--fig-blue)", color: "white", border: "none", borderRadius: "6px", fontSize: "13px", fontWeight: 500, cursor: "pointer" }}>Save Changes</button>
                 </div>
               </div>
             )}
@@ -1275,12 +1298,7 @@ function WorkflowTab({ template, onUpdate }: { template: Template; onUpdate: () 
           onSave={async (newRule: any) => {
             try {
               const updatedWorkflow = { ...workflow, rules: [...rules, newRule] };
-              await fetch(`/api/v1/project-templates/${template.id}/workflow`, {
-                method: "PATCH",
-                credentials: "include",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ data: updatedWorkflow })
-              });
+              await updateTemplateSection(template.id, "workflow", { data: updatedWorkflow });
               onUpdate();
             } catch { /* silently refresh */ onUpdate(); }
             setShowCreateRule(false);
@@ -2268,11 +2286,11 @@ function DocumentsTab({ template, onUpdate }: { template: Template; onUpdate: ()
   const [showUpload, setShowUpload] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/v1/project-templates/${template.id}/documents`, { credentials: "include" })
-      .then(res => res.ok ? res.json() : null)
+    getTemplateSection(template.id, "documents")
       .then(body => {
-        if (body?.data?.documents && Array.isArray(body.data.documents) && body.data.documents.length > 0) {
-          setDocuments(body.data.documents);
+        const docs = (body as Record<string, unknown>).documents;
+        if (docs && Array.isArray(docs) && docs.length > 0) {
+          setDocuments(docs as typeof documents);
         }
       })
       .catch(() => {});
@@ -2298,12 +2316,7 @@ function DocumentsTab({ template, onUpdate }: { template: Template; onUpdate: ()
     const updated = documents.filter(d => d.id !== docId);
     setDocuments(updated);
     try {
-      await fetch(`/api/v1/project-templates/${template.id}/documents`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ documents: updated })
-      });
+      await updateTemplateSection(template.id, "documents", { documents: updated });
       onUpdate();
     } catch {}
   };
@@ -2406,12 +2419,7 @@ function DocumentsTab({ template, onUpdate }: { template: Template; onUpdate: ()
             const updated = [newDoc, ...documents];
             setDocuments(updated);
             try {
-              await fetch(`/api/v1/project-templates/${template.id}/documents`, {
-                method: "PATCH",
-                credentials: "include",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ documents: updated })
-              });
+              await updateTemplateSection(template.id, "documents", { documents: updated });
               onUpdate();
             } catch {}
             setShowUpload(false);
@@ -2486,18 +2494,22 @@ function UsageTab({ template }: { template: Template }) {
   const [timeframe, setTimeframe] = useState("Last 90 Days");
   const [usageData, setUsageData] = useState<any[]>([]);
 
+  const [loading, setLoading] = useState(false);
+
   useEffect(() => {
+    setLoading(true);
     fetch(`/api/v1/project-templates/${template.id}/usage`, { credentials: "include" })
       .then(res => res.ok ? res.json() : null)
       .then(body => {
-        if (body?.data?.items && Array.isArray(body.data.items)) {
+        if (body?.data?.items && Array.isArray(body.data.items) && body.data.items.length > 0) {
           setUsageData(body.data.items);
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, [template.id]);
 
-  const projects = [
+  const projects = usageData.length > 0 ? usageData : [
     { id: "1", name: "Sharma Residence", trigger: "Sharma Group", owner: "A. Mehta", createdOn: "18 Aug 2026 11:23 AM", version: "v3.2", status: "ACTIVE", progress: 64, updated: "18 Aug 2026" },
     { id: "2", name: "Kapoor Villa", trigger: "Kapoor Group", owner: "R. Singh", createdOn: "11 Aug 2026 08:45 AM", version: "v3.2", status: "ACTIVE", progress: 38, updated: "16 Aug 2026" },
     { id: "3", name: "Mehta Residence", trigger: "Mehta Group", owner: "A. Kumar", createdOn: "03 Aug 2026 02:34 PM", version: "v3.1", status: "COMPLETED", progress: 100, updated: "10 Aug 2026" }
@@ -2801,6 +2813,9 @@ function VersionsTab({ template, onUpdate }: { template: Template; onUpdate: () 
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [search, setSearch] = useState("");
 
+  const [versionsData, setVersionsData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
   const defaultVersions = [
     { id: "v3.3", version: "v3.3", status: "DRAFT", summary: "Updated workflow & approvals", details: "Added 3 tasks and 2 approval rules", createdBy: "Pradhyumn D", publishedBy: "-", created: "12 Aug 2026 09:42 AM", published: "-", projects: "-", changesCount: 23, changesSeverity: "HIGH" },
     { id: "v3.2", version: "v3.2", status: "PUBLISHED", summary: "Updated BOQ Rates", details: "Updated rates & commercial defaults", createdBy: "Admin User", publishedBy: "Pradhyumn D", created: "02 Aug 2026 10:21 AM", published: "06 Aug 2026 02:32 PM", projects: 18, changesCount: 27, changesSeverity: "HIGH" },
@@ -2810,7 +2825,22 @@ function VersionsTab({ template, onUpdate }: { template: Template; onUpdate: () 
     { id: "v2.0", version: "v2.0", status: "ARCHIVED", summary: "Initial template release", details: "Base template with core structure", createdBy: "Admin User", publishedBy: "Pradhyumn D", created: "15 Jun 2026 11:08 AM", published: "20 Jun 2026 05:45 PM", projects: 4, changesCount: 32, changesSeverity: "HIGH" }
   ];
 
-  const selectedVersion = defaultVersions.find(v => v.id === selectedVersionId);
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/api/v1/project-templates/${template.id}/versions`, { credentials: "include" })
+      .then(res => res.ok ? res.json() : null)
+      .then(body => {
+        if (body?.data?.items && Array.isArray(body.data.items) && body.data.items.length > 0) {
+          setVersionsData(body.data.items);
+        } else {
+          setVersionsData(defaultVersions);
+        }
+      })
+      .catch(() => setVersionsData(defaultVersions))
+      .finally(() => setLoading(false));
+  }, [template.id]);
+
+  const selectedVersion = versionsData.find(v => v.id === selectedVersionId) || defaultVersions.find(v => v.id === selectedVersionId);
 
   const getStatusBadge = (st: string) => {
     switch (st) {
@@ -2906,7 +2936,7 @@ function VersionsTab({ template, onUpdate }: { template: Template; onUpdate: () 
                 </tr>
               </thead>
               <tbody>
-                {defaultVersions.map((ver) => {
+                {(versionsData.length > 0 ? versionsData : defaultVersions).map((ver) => {
                   const sb = getStatusBadge(ver.status);
                   const isSelected = selectedVersionId === ver.id;
                   return (

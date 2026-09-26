@@ -28,15 +28,12 @@ export default function IntegrationModal({ provider, onClose }: Props) {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
 
-    /* 1 — On mount, connect the integration and get a webhook URL */
+    /* 1 — On mount, connect the integration */
     useEffect(() => {
         (async () => {
             try {
                 const intg = await integrationsApi.connect({ provider });
                 setIntegrationId(intg.id);
-                const baseUrl = `${window.location.origin}/api/v1/webhooks`;
-                /* placeholder token — real one comes after form creation */
-                setWebhookUrl(`${baseUrl}/<token>`);
             } catch (err) {
                 setError(err instanceof Error ? err.message : 'Failed to connect integration');
             }
