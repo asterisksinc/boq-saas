@@ -971,6 +971,64 @@ export async function updateSettingsSection(section: string, input: SettingsSect
     });
 }
 
+export async function getBrandingSettings() {
+    const res = await request<SettingsSection>("/api/v1/settings/branding");
+    return res.data as unknown as import("@/lib/settings/types").BrandingSettings;
+}
+
+export async function updateBrandingSettings(input: Partial<import("@/lib/settings/types").BrandingSettings>) {
+    const res = await request<SettingsSection>("/api/v1/settings/branding", {
+        method: "PATCH",
+        body: JSON.stringify({ data: input }),
+    });
+    return res.data as unknown as import("@/lib/settings/types").BrandingSettings;
+}
+
+export async function uploadBrandingAsset(file: File, assetType: import("@/lib/settings/types").BrandAssetType) {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("assetType", assetType);
+
+    const response = await fetch("/api/v1/settings/branding/assets", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        throw new Error(getApiErrorMessage(payload));
+    }
+    return parseApiResponse<{
+        assetType: import("@/lib/settings/types").BrandAssetType;
+        url: string;
+        branding: import("@/lib/settings/types").BrandingSettings;
+    }>(payload);
+}
+
+export async function deleteBrandingAsset(assetType: import("@/lib/settings/types").BrandAssetType) {
+    const response = await fetch("/api/v1/settings/branding/assets", {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assetType }),
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        throw new Error(getApiErrorMessage(payload));
+    }
+    return parseApiResponse<{
+        assetType: import("@/lib/settings/types").BrandAssetType;
+        branding: import("@/lib/settings/types").BrandingSettings;
+    }>(payload);
+}
+
+export async function getBrandingPreviewData() {
+    return request<import("@/lib/settings/types").BrandingPreviewData>("/api/v1/settings/branding/preview-data");
+}
+
+
 export type OrganizationInput = {
     companyName?: string;
     name?: string;

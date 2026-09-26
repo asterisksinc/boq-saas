@@ -336,6 +336,55 @@ export const organizationPatchSchema = z
   .strict();
 
 export const settingsSectionSchema = z.object({ data: z.record(z.string(), z.unknown()) }).strict();
+
+export const brandAssetTypeSchema = z.enum([
+  "primaryLogo",
+  "lightLogo",
+  "darkLogo",
+  "favicon",
+  "signature",
+]);
+
+export const brandHexColorSchema = z
+  .string()
+  .trim()
+  .regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, "Invalid HEX color format. Expected #RRGGBB or #RGB.");
+
+export const brandColorsSchema = z
+  .object({
+    primary: brandHexColorSchema,
+    secondary: brandHexColorSchema,
+    accent: brandHexColorSchema,
+    text: brandHexColorSchema,
+  })
+  .strict();
+
+export const brandingSettingsPatchSchema = z
+  .object({
+    primaryLogo: z.string().url().nullable().optional(),
+    lightLogo: z.string().url().nullable().optional(),
+    darkLogo: z.string().url().nullable().optional(),
+    favicon: z.string().url().nullable().optional(),
+    signature: z.string().url().nullable().optional(),
+    logoUrl: z.string().url().nullable().optional(),
+    faviconUrl: z.string().url().nullable().optional(),
+    companyName: z.string().trim().max(200).optional(),
+    colors: brandColorsSchema.partial().optional(),
+    primaryColor: brandHexColorSchema.optional(),
+    secondaryColor: brandHexColorSchema.optional(),
+    font: z.string().trim().min(1).max(100).optional(),
+    buttonStyle: z.enum(["rounded", "square", "pill"]).optional(),
+    documentSpacing: z.enum(["compact", "standard", "spacious"]).optional(),
+    status: z.string().optional(),
+  })
+  .strict();
+
+export const brandAssetDeleteSchema = z
+  .object({
+    assetType: brandAssetTypeSchema,
+  })
+  .strict();
+
 export const billingContactSchema = z.object({ email: z.string().trim().email().max(254) }).strict();
 export const paymentMethodSchema = z.object({
   brand: z.string().trim().min(1).max(40), last4: z.string().regex(/^\d{4}$/),

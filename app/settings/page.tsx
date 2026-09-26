@@ -29,6 +29,7 @@ import SettingsOverviewComponent from "@/components/settings/SettingsOverview";
 import MyProfile from "@/components/settings/MyProfile";
 import SettingsSkeleton from "@/components/settings/SettingsSkeleton";
 import OrganizationSettings from "@/components/settings/OrganizationSettings";
+import BrandingSettingsComponent from "@/components/settings/branding/BrandingSettings";
 import { SettingsErrorState, SettingsEmptyTab } from "@/components/settings/SettingsEmptyState";
 import { adaptOverview } from "@/lib/settings/adapter";
 import { SettingsTab } from "@/lib/settings/types";
@@ -104,6 +105,13 @@ export default function SettingsPage() {
 
     useEffect(() => {
         loadOverview();
+        if (typeof window !== "undefined") {
+            const params = new URLSearchParams(window.location.search);
+            const tabParam = params.get("tab") as SettingsTab | null;
+            if (tabParam && ["overview", "profile", "organization", "branding", "boq-costing", "integrations", "notifications", "security", "advanced", "additional"].includes(tabParam)) {
+                handleSelectTab(tabParam);
+            }
+        }
     }, [loadOverview]);
 
     const showNotice = (message: string, type: "success" | "error" = "success") => {
@@ -113,7 +121,7 @@ export default function SettingsPage() {
 
     const handleSelectTab = async (tab: SettingsTab) => {
         setActiveTab(tab);
-        if (tab === "overview" || tab === "additional" || tab === "profile" || tab === "organization") {
+        if (tab === "overview" || tab === "additional" || tab === "profile" || tab === "organization" || tab === "branding") {
             return;
         }
 
@@ -134,7 +142,7 @@ export default function SettingsPage() {
 
     const handleSaveSection = async (e: FormEvent) => {
         e.preventDefault();
-        if (activeTab === "overview" || activeTab === "additional" || activeTab === "profile" || activeTab === "organization") {
+        if (activeTab === "overview" || activeTab === "additional" || activeTab === "profile" || activeTab === "organization" || activeTab === "branding") {
             return;
         }
 
@@ -198,6 +206,18 @@ export default function SettingsPage() {
             );
         }
 
+        if (activeTab === "branding") {
+            return (
+                <BrandingSettingsComponent
+                    overview={overview}
+                    loading={loading}
+                    error={error}
+                    onRefresh={loadOverview}
+                    showNotice={showNotice}
+                />
+            );
+        }
+
         if (activeTab === "additional") {
             return (
                 <SettingsEmptyTab
@@ -223,15 +243,6 @@ export default function SettingsPage() {
         }
 
         switch (activeTab) {
-            case "branding":
-                return (
-                    <BrandingForm
-                        data={sectionData}
-                        onChange={handleInputChange}
-                        onSave={handleSaveSection}
-                        saving={saving}
-                    />
-                );
             case "boq-costing":
                 return (
                     <BoqCostingForm
@@ -436,74 +447,6 @@ function BaseForm({
                 </button>
             </div>
         </form>
-    );
-}
-
-function BrandingForm({
-    data,
-    onChange,
-    onSave,
-    saving,
-}: {
-    data: SectionData;
-    onChange: (key: string, value: unknown) => void;
-    onSave: (e: FormEvent) => void;
-    saving: boolean;
-}) {
-    return (
-        <BaseForm
-            title="Branding"
-            description="Customize your workspace's visual identity and brand assets"
-            onSave={onSave}
-            saving={saving}
-        >
-            <div className="form-grid">
-                <Field
-                    label="Company Name"
-                    type="text"
-                    value={(data.companyName as string) ?? ""}
-                    onChange={(v) => onChange("companyName", v)}
-                    placeholder="Acme Inc."
-                />
-                <Field
-                    label="Logo URL"
-                    type="text"
-                    value={(data.logoUrl as string) ?? ""}
-                    onChange={(v) => onChange("logoUrl", v)}
-                    placeholder="https://example.com/logo.svg"
-                />
-                <Field
-                    label="Primary Color"
-                    type="color"
-                    value={(data.primaryColor as string) || "#2563eb"}
-                    onChange={(v) => onChange("primaryColor", v)}
-                />
-                <Field
-                    label="Secondary Color"
-                    type="color"
-                    value={(data.secondaryColor as string) || "#64748b"}
-                    onChange={(v) => onChange("secondaryColor", v)}
-                />
-                <Field
-                    label="Favicon URL"
-                    type="text"
-                    value={(data.faviconUrl as string) ?? ""}
-                    onChange={(v) => onChange("faviconUrl", v)}
-                    placeholder="https://example.com/favicon.ico"
-                    fullWidth
-                />
-            </div>
-            <div className="color-preview">
-                <div className="preview-item">
-                    <span style={{ background: (data.primaryColor as string) || "#2563eb" }} />
-                    <span>Primary Accent</span>
-                </div>
-                <div className="preview-item">
-                    <span style={{ background: (data.secondaryColor as string) || "#64748b" }} />
-                    <span>Secondary Color</span>
-                </div>
-            </div>
-        </BaseForm>
     );
 }
 

@@ -62,6 +62,8 @@ export function formatTimeAgo(dateString: string): string {
 export function formatActionDescription(action: string): string {
     const knownActions: Record<string, string> = {
         "settings.branding.updated": "Updated brand identity & colors",
+        "settings.branding.asset_uploaded": "Uploaded brand asset",
+        "settings.branding.asset_deleted": "Removed brand asset",
         "settings.boq-costing.updated": "Updated BOQ & costing defaults",
         "settings.integrations.updated": "Updated third-party integrations",
         "settings.notifications.updated": "Updated notification preferences",
@@ -110,7 +112,7 @@ export function deriveConfigurationHealth(overview: SettingsOverview): Configura
     };
 
     // 2. Branding
-    const hasLogo = Boolean(branding.logoUrl || workspaceProf?.logo_url);
+    const hasLogo = Boolean(branding.primaryLogo || branding.logoUrl || workspaceProf?.logo_url);
     const brandingCard: ConfigurationHealthCard = {
         id: "branding",
         title: "Branding",

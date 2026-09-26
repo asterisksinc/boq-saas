@@ -4340,13 +4340,315 @@ async function settingsApi(request: Request, supabase: SupabaseClient, id: strin
   const column = settingsSections[section]; if (!column) return fail("NOT_FOUND", "Settings section was not found.", 404, id);
   if (request.method === "GET") {
     const result = await supabase.from("workspace_settings").select(column).eq("workspace_id", wid).single();
-    return result.error ? fail("NOT_FOUND", "Settings were not found.", 404, id) : ok({ section, data: (result.data as unknown as Record<string, unknown>)[column] }, 200, id);
+    if (result.error) return fail("NOT_FOUND", "Settings were not found.", 404, id);
+    let sectionData = (result.data as unknown as Record<string, unknown>)[column] as Record<string, unknown>;
+    if (section === "branding") {
+      const cur = sectionData ?? {};
+      const curColors = (cur.colors ?? {}) as Record<string, string>;
+      const pColor = curColors.primary ?? (cur.primaryColor as string) ?? "#2563EB";
+      const sColor = curColors.secondary ?? (cur.secondaryColor as string) ?? "#E2E8F0";
+      sectionData = {
+        primaryLogo: cur.primaryLogo ?? cur.logoUrl ?? null,
+        lightLogo: cur.lightLogo ?? null,
+        darkLogo: cur.darkLogo ?? null,
+        favicon: cur.favicon ?? cur.faviconUrl ?? null,
+        signature: cur.signature ?? null,
+        colors: {
+          primary: pColor,
+          secondary: sColor,
+          accent: curColors.accent ?? "#64748B",
+          text: curColors.text ?? "#0F172A",
+        },
+        font: cur.font ?? "Urbanist",
+        buttonStyle: cur.buttonStyle ?? "rounded",
+        documentSpacing: cur.documentSpacing ?? "compact",
+        companyName: cur.companyName ?? null,
+        logoUrl: cur.primaryLogo ?? cur.logoUrl ?? null,
+        faviconUrl: cur.favicon ?? cur.faviconUrl ?? null,
+        primaryColor: pColor,
+        secondaryColor: sColor,
+        status: cur.status ?? "done",
+      };
+    }
+    return ok({ section, data: sectionData }, 200, id);
   }
   const input = await parsed(request, settingsSectionSchema, id); if (input.response) return input.response;
-  const result = await supabase.from("workspace_settings").update({ [column]: input.data.data, updated_by: scoped.access.userId }).eq("workspace_id", wid).select(column).single();
+  let updateData = input.data.data;
+  if (section === "branding") {
+    const existing = await supabase.from("workspace_settings").select("branding").eq("workspace_id", wid).maybeSingle();
+    const cur = (existing.data?.branding ?? {}) as Record<string, unknown>;
+    const curColors = (cur.colors ?? {}) as Record<string, string>;
+    const patch = input.data.data as Record<string, unknown>;
+    const patchColors = (patch.colors ?? {}) as Record<string, string>;
+
+    const primaryLogo = patch.primaryLogo !== undefined ? patch.primaryLogo : (patch.logoUrl !== undefined ? patch.logoUrl : (cur.primaryLogo ?? cur.logoUrl ?? null));
+    const pColor = patchColors.primary ?? (patch.primaryColor as string) ?? curColors.primary ?? (cur.primaryColor as string) ?? "#2563EB";
+    const sColor = patchColors.secondary ?? (patch.secondaryColor as string) ?? curColors.secondary ?? (cur.secondaryColor as string) ?? "#E2E8F0";
+
+    updateData = {
+      ...cur,
+      ...patch,
+      primaryLogo,
+      lightLogo: patch.lightLogo !== undefined ? patch.lightLogo : (cur.lightLogo ?? null),
+      darkLogo: patch.darkLogo !== undefined ? patch.darkLogo : (cur.darkLogo ?? null),
+      favicon: patch.favicon !== undefined ? patch.favicon : (patch.faviconUrl !== undefined ? patch.faviconUrl : (cur.favicon ?? cur.faviconUrl ?? null)),
+      signature: patch.signature !== undefined ? patch.signature : (cur.signature ?? null),
+      colors: {
+        primary: pColor,
+        secondary: sColor,
+        accent: patchColors.accent ?? curColors.accent ?? "#64748B",
+        text: patchColors.text ?? curColors.text ?? "#0F172A",
+      },
+      primaryColor: pColor,
+      secondaryColor: sColor,
+      logoUrl: primaryLogo,
+      faviconUrl: patch.favicon !== undefined ? patch.favicon : (cur.favicon ?? null),
+      font: patch.font ?? cur.font ?? "Urbanist",
+      buttonStyle: patch.buttonStyle ?? cur.buttonStyle ?? "rounded",
+      documentSpacing: patch.documentSpacing ?? cur.documentSpacing ?? "compact",
+      companyName: patch.companyName ?? cur.companyName,
+      status: "done",
+    };
+
+    if (primaryLogo !== undefined) {
+      await supabase.from("workspace_profiles").update({ logo_url: primaryLogo }).eq("workspace_id", wid);
+    }
+  }
+
+  const result = await supabase.from("workspace_settings").update({ [column]: updateData, updated_by: scoped.access.userId }).eq("workspace_id", wid).select(column).single();
   if (result.error) return fail("VALIDATION_ERROR", "Settings could not be updated.", 400, id);
   await audit(supabase, `settings.${section}.updated`, id); return ok({ section, data: (result.data as unknown as Record<string, unknown>)[column] }, 200, id);
 }
+
+async function uploadBrandingAsset(request: Request, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id, true);
+  if ("response" in scoped) return scoped.response;
+  const wid = scoped.access.workspaceId;
+
+  const form = await request.formData().catch(() => null);
+  if (!form) return fail("VALIDATION_ERROR", "Multipart form data is required.", 400, id);
+
+  const file = form.get("file");
+  const assetType = form.get("assetType");
+
+  const allowedAssetTypes = ["primaryLogo", "lightLogo", "darkLogo", "favicon", "signature"];
+  if (!assetType || typeof assetType !== "string" || !allowedAssetTypes.includes(assetType)) {
+    return fail("VALIDATION_ERROR", `assetType must be one of: ${allowedAssetTypes.join(", ")}`, 400, id);
+  }
+
+  if (!file || typeof file === "string" || !(file instanceof File)) {
+    return fail("VALIDATION_ERROR", "File is required.", 400, id);
+  }
+
+  const maxBytes = assetType === "favicon" ? 2 * 1024 * 1024 : 5 * 1024 * 1024;
+  if (file.size < 1 || file.size > maxBytes) {
+    return fail("VALIDATION_ERROR", `File exceeds ${maxBytes / (1024 * 1024)}MB limit.`, 400, id);
+  }
+
+  const mime = file.type || "application/octet-stream";
+  const allowedLogosMimes = ["image/jpeg", "image/png", "image/webp", "image/svg+xml", "image/gif"];
+  const allowedFaviconMimes = ["image/x-icon", "image/vnd.microsoft.icon", "image/png", "image/svg+xml", "image/webp", "image/jpeg", "image/gif"];
+  const allowedMimes = assetType === "favicon" ? allowedFaviconMimes : allowedLogosMimes;
+
+  const rawExt = file.name.split(".").pop()?.toLowerCase() || "";
+  const allowedExtensions = assetType === "favicon"
+    ? ["ico", "png", "svg", "webp", "jpg", "jpeg"]
+    : ["png", "jpg", "jpeg", "webp", "svg", "gif"];
+
+  if (!allowedExtensions.includes(rawExt) && !allowedMimes.includes(mime)) {
+    return fail("VALIDATION_ERROR", "Only valid image files (PNG, JPG, SVG, WebP" + (assetType === "favicon" ? ", ICO" : "") + ") are accepted.", 400, id);
+  }
+
+  const ext = rawExt || (mime === "image/png" ? "png" : mime === "image/svg+xml" ? "svg" : mime === "image/webp" ? "webp" : "jpg");
+  const safeExt = allowedExtensions.includes(ext) ? ext : "png";
+  const storagePath = `${wid}/branding/${assetType}-${Date.now()}.${safeExt}`;
+  const bytes = Buffer.from(await file.arrayBuffer());
+
+  const admin = createSupabaseAdminClient();
+
+  const existingRes = await supabase.from("workspace_settings").select("branding").eq("workspace_id", wid).maybeSingle();
+  const currentBranding = (existingRes.data?.branding ?? {}) as Record<string, unknown>;
+
+  const uploadRes = await admin.storage.from("workspace-documents").upload(storagePath, bytes, {
+    contentType: mime || "image/png",
+    upsert: true,
+  });
+
+  if (uploadRes.error) {
+    console.error(JSON.stringify({ requestId: id, event: "brand_asset_upload_failed", error: uploadRes.error }));
+    return fail("INTERNAL_ERROR", `Failed to upload brand asset: ${uploadRes.error.message}`, 500, id);
+  }
+
+  const signed = await admin.storage.from("workspace-documents").createSignedUrl(storagePath, 60 * 60 * 24 * 365 * 5);
+  if (signed.error || !signed.data?.signedUrl) {
+    return fail("INTERNAL_ERROR", "Failed to generate asset URL.", 500, id);
+  }
+  const assetUrl = signed.data.signedUrl;
+
+  const oldUrl = currentBranding[assetType] as string | undefined;
+  if (oldUrl && oldUrl.includes("workspace-documents") && oldUrl.includes(wid)) {
+    try {
+      const match = oldUrl.match(new RegExp(`${wid}/branding/[^?]+`));
+      if (match) {
+        await admin.storage.from("workspace-documents").remove([match[0]]);
+      }
+    } catch {
+      // Ignore cleanup error
+    }
+  }
+
+  const updatedBranding: Record<string, unknown> = {
+    ...currentBranding,
+    [assetType]: assetUrl,
+  };
+  if (assetType === "primaryLogo") {
+    updatedBranding.logoUrl = assetUrl;
+    await supabase.from("workspace_profiles").update({ logo_url: assetUrl }).eq("workspace_id", wid);
+  }
+  if (assetType === "favicon") {
+    updatedBranding.faviconUrl = assetUrl;
+  }
+
+  const updateRes = await supabase.from("workspace_settings").update({
+    branding: updatedBranding,
+    updated_by: scoped.access.userId,
+  }).eq("workspace_id", wid);
+
+  if (updateRes.error) {
+    return fail("INTERNAL_ERROR", "Failed to persist brand asset in settings.", 500, id);
+  }
+
+  await audit(supabase, "settings.branding.asset_uploaded", id);
+  return ok({ assetType, url: assetUrl, branding: updatedBranding }, 200, id);
+}
+
+async function deleteBrandingAsset(request: Request, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id, true);
+  if ("response" in scoped) return scoped.response;
+  const wid = scoped.access.workspaceId;
+
+  const body = await request.json().catch(() => ({}));
+  const assetType = body.assetType;
+  const allowedAssetTypes = ["primaryLogo", "lightLogo", "darkLogo", "favicon", "signature"];
+  if (!assetType || typeof assetType !== "string" || !allowedAssetTypes.includes(assetType)) {
+    return fail("VALIDATION_ERROR", `assetType must be one of: ${allowedAssetTypes.join(", ")}`, 400, id);
+  }
+
+  const existingRes = await supabase.from("workspace_settings").select("branding").eq("workspace_id", wid).maybeSingle();
+  const currentBranding = (existingRes.data?.branding ?? {}) as Record<string, unknown>;
+  const oldUrl = currentBranding[assetType] as string | undefined;
+
+  if (oldUrl && oldUrl.includes("workspace-documents") && oldUrl.includes(wid)) {
+    try {
+      const admin = createSupabaseAdminClient();
+      const match = oldUrl.match(new RegExp(`${wid}/branding/[^?]+`));
+      if (match) {
+        await admin.storage.from("workspace-documents").remove([match[0]]);
+      }
+    } catch {
+      // Ignore cleanup error
+    }
+  }
+
+  const updatedBranding: Record<string, unknown> = {
+    ...currentBranding,
+    [assetType]: null,
+  };
+  if (assetType === "primaryLogo") {
+    updatedBranding.logoUrl = null;
+    await supabase.from("workspace_profiles").update({ logo_url: null }).eq("workspace_id", wid);
+  }
+  if (assetType === "favicon") {
+    updatedBranding.faviconUrl = null;
+  }
+
+  await supabase.from("workspace_settings").update({
+    branding: updatedBranding,
+    updated_by: scoped.access.userId,
+  }).eq("workspace_id", wid);
+
+  await audit(supabase, "settings.branding.asset_deleted", id);
+  return ok({ assetType, branding: updatedBranding }, 200, id);
+}
+
+async function getBrandingPreviewData(supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id);
+  if ("response" in scoped) return scoped.response;
+  const wid = scoped.access.workspaceId;
+
+  const [ws, wp, boq, prop, inv] = await Promise.all([
+    supabase.from("workspaces").select("id,name,currency").eq("id", wid).maybeSingle(),
+    supabase.from("workspace_profiles").select("*").eq("workspace_id", wid).maybeSingle(),
+    supabase.from("boqs").select("id,boq_number,title,grand_total").eq("workspace_id", wid).is("archived_at", null).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("proposals").select("id,project_name,proposed_value,created_at").eq("workspace_id", wid).is("archived_at", null).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("invoices").select("id,invoice_code,project_name,total_amount,status,issue_date").eq("workspace_id", wid).is("archived_at", null).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+
+  const orgName = ws.data?.name || "Arvin Interiors";
+  const orgAddress = wp.data?.address || "204, Bhulabhai Desai Rd, Mumbai 400026";
+  const orgPhone = wp.data?.phone || "+91 98200 00001";
+  const orgEmail = wp.data?.business_email || "contact@arvininteriors.com";
+
+  const boqNumber = boq.data?.boq_number || "BOQ-2026-014";
+  const boqTitle = boq.data?.title || "Residence - Andheri West";
+  const boqAmount = boq.data?.grand_total ?? 360000;
+
+  const propNumber = prop.data?.id ? `PROP-${prop.data.id.slice(0, 4).toUpperCase()}` : "BOQ-2026-014";
+  const propProject = prop.data?.project_name || "Residence - Andheri West";
+  const propAmount = prop.data?.proposed_value ?? 360000;
+
+  const invNumber = inv.data?.invoice_code || "BOQ-2026-014";
+  const invProject = inv.data?.project_name || "Residence - Andheri West";
+  const invAmount = inv.data?.total_amount ?? 360000;
+
+  return ok({
+    organization: {
+      name: orgName,
+      address: orgAddress,
+      phone: orgPhone,
+      email: orgEmail,
+      website: wp.data?.website ?? null,
+      taxId: wp.data?.tax_id ?? null,
+    },
+    boq: {
+      number: boqNumber,
+      title: boqTitle,
+      amount: boqAmount,
+      items: [
+        { name: "Living Room Furniture", amount: 120000 },
+        { name: "Kitchen Cabinets", amount: 120000 },
+        { name: "Electrical Works", amount: 120000 },
+      ],
+    },
+    proposal: {
+      number: propNumber,
+      projectName: propProject,
+      amount: propAmount,
+      items: [
+        { name: "Living Room Furniture", amount: 120000 },
+        { name: "Kitchen Cabinets", amount: 120000 },
+        { name: "Electrical Works", amount: 120000 },
+      ],
+    },
+    invoice: {
+      number: invNumber,
+      projectName: invProject,
+      amount: invAmount,
+      items: [
+        { name: "Living Room Furniture", amount: 120000 },
+        { name: "Kitchen Cabinets", amount: 120000 },
+        { name: "Electrical Works", amount: 120000 },
+      ],
+    },
+    email: {
+      subject: `Document Update from ${orgName}`,
+      greeting: "Dear Client,",
+      body: `Please review the latest project details from ${orgName}. Your feedback and approval ensure our team stays on schedule.`,
+      ctaText: "Review & Approve Document",
+    },
+  }, 200, id);
+}
+
 
 async function organizationSettingsApi(request: Request, supabase: SupabaseClient, id: string) {
   const scoped = await workspaceAccess(supabase, id, request.method === "PATCH", request.method === "PATCH");
@@ -5504,6 +5806,9 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (locationDefaultMatch && request.method === "POST") return organizationLocationDefaultApi(request, supabase, id, locationDefaultMatch[1]);
   const locationMatch = route.match(/^settings\/organization\/locations\/([0-9a-f-]{36})$/i);
   if (locationMatch && ["PATCH", "DELETE"].includes(request.method)) return organizationLocationItemApi(request, supabase, id, locationMatch[1]);
+  if (request.method === "POST" && route === "settings/branding/assets") return uploadBrandingAsset(request, supabase, id);
+  if (request.method === "DELETE" && route === "settings/branding/assets") return deleteBrandingAsset(request, supabase, id);
+  if (request.method === "GET" && route === "settings/branding/preview-data") return getBrandingPreviewData(supabase, id);
   const settingsMatch = route.match(/^settings\/(branding|boq-costing|integrations|notifications|security|advanced)$/i);
   if (settingsMatch && ["GET", "PATCH"].includes(request.method)) return settingsApi(request, supabase, id, settingsMatch[1]);
   if (request.method === "GET" && route === "activities/summary") return activitySummary(supabase, id);
