@@ -584,39 +584,24 @@ function IntegrationsForm({
     onSave: (e: FormEvent) => void;
     saving: boolean;
 }) {
-    const integrations = ["accounting", "crm", "storage", "communication"];
     return (
-        <BaseForm
-            title="Integrations"
-            description="Manage third-party tools and API connections"
-            onSave={onSave}
-            saving={saving}
-        >
-            <div className="integrations-list">
-                {integrations.map((key) => {
-                    const isConnected = Boolean(
-                        data[key] && typeof data[key] === "object" && (data[key] as Record<string, unknown>).connected
-                    );
-                    return (
-                        <div key={key} className="integration-card">
-                            <div className="integration-info">
-                                <h4>{key.charAt(0).toUpperCase() + key.slice(1)}</h4>
-                                <p>{isConnected ? "Connected and active" : `Connect your ${key} provider`}</p>
-                            </div>
-                            <button
-                                type="button"
-                                className={isConnected ? "btn-secondary" : "btn-primary"}
-                                onClick={() =>
-                                    onChange(key, { connected: !isConnected, provider: "service" })
-                                }
-                            >
-                                {isConnected ? "Disconnect" : "Connect"}
-                            </button>
-                        </div>
-                    );
-                })}
+        <div className="settings-section-card">
+            <div className="form-header">
+                <h2>Integrations</h2>
+                <p>Manage third-party tools and API connections</p>
             </div>
-        </BaseForm>
+            <div className="form-body" style={{ padding: '40px 20px', textAlign: 'center' }}>
+                <p style={{ marginBottom: '20px', color: '#6b7280' }}>The Integrations module has been moved to a dedicated page with enhanced features and analytics.</p>
+                <button 
+                    type="button" 
+                    className="btn-primary" 
+                    onClick={() => window.location.href = '/integrations'}
+                    style={{ margin: '0 auto' }}
+                >
+                    Go to Integrations
+                </button>
+            </div>
+        </div>
     );
 }
 

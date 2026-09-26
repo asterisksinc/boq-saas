@@ -4871,6 +4871,549 @@ async function ticketsApi(request:NextRequest,supabase:SupabaseClient,id:string,
 }
 async function ticketMessages(request:NextRequest,supabase:SupabaseClient,id:string,ticketId:string){const scoped=await workspaceAccess(supabase,id,request.method==="POST");if("response"in scoped)return scoped.response;if(request.method==="GET"){const r=await supabase.from("support_ticket_messages").select("id,body,attachments,author_id,created_at").eq("workspace_id",scoped.access.workspaceId).eq("ticket_id",ticketId).order("created_at");return r.error?fail("INTERNAL_ERROR","Ticket messages could not be loaded.",500,id):ok({items:r.data??[]},200,id);}const input=await parsed(request,activityCommentSchema,id);if(input.response)return input.response;const r=await supabase.from("support_ticket_messages").insert({workspace_id:scoped.access.workspaceId,ticket_id:ticketId,body:input.data.body,attachments:input.data.attachments,author_id:scoped.access.userId}).select().single();return r.error?fail("NOT_FOUND","Ticket was not found.",404,id):ok(r.data,201,id);}
 
+
+// ==================== INTEGRATIONS ====================
+
+function integrationDto(row: any) {
+  return {
+    id: row.id, workspaceId: row.workspace_id, provider: row.provider, name: row.name, status: row.status,
+    config: row.config, connectedAt: row.connected_at, lastSyncedAt: row.last_synced_at,
+    createdBy: row.created_by, createdAt: row.created_at, updatedAt: row.updated_at
+  };
+}
+
+function formDto(row: any) {
+  return {
+    id: row.id, workspaceId: row.workspace_id, integrationId: row.integration_id, name: row.name,
+    publicToken: row.public_token, campaignId: row.campaign_id, campaignName: row.campaign_name,
+    status: row.status, createdBy: row.created_by, createdAt: row.created_at, updatedAt: row.updated_at,
+    fields: row.integration_form_fields ? row.integration_form_fields.map((f: any) => ({
+      id: f.id, formId: f.form_id, name: f.name, fieldType: f.field_type, required: f.required,
+      position: f.position, config: f.config, createdAt: f.created_at, updatedAt: f.updated_at
+    })) : undefined
+  };
+}
+
+async function listIntegrations(request: NextRequest, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const { data, error } = await supabase.from("integrations").select("*").eq("workspace_id", scoped.access.workspaceId).order("created_at", { ascending: false });
+  if (error) return fail("INTERNAL_ERROR", "Could not load integrations.", 500, id);
+  return ok({ items: data.map(integrationDto) }, 200, id);
+}
+
+async function integrationSummary(request: NextRequest, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const wid = scoped.access.workspaceId;
+  
+  const [ints, leads] = await Promise.all([
+    supabase.from("integrations").select("id, status").eq("workspace_id", wid),
+    supabase.from("integration_leads").select("id, status, created_at").eq("workspace_id", wid)
+  ]);
+  
+  if (ints.error || leads.error) return fail("INTERNAL_ERROR", "Could not load summary.", 500, id);
+  
+  const activeIntegrations = ints.data.filter(i => i.status === 'connected').length;
+  const totalIntegrations = ints.data.length;
+  
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const startOfDay = new Date(now.setHours(0,0,0,0)).toISOString();
+  const startOfYesterday = new Date(now.setDate(now.getDate() - 1)).toISOString();
+  
+  const leadsCaptured = leads.data.filter(l => l.created_at >= startOfMonth).length;
+  const leadsTodayCount = leads.data.filter(l => l.created_at >= startOfDay).length;
+  const leadsYesterdayCount = leads.data.filter(l => l.created_at >= startOfYesterday && l.created_at < startOfDay).length;
+  
+  const leadsTodayChangePercent = leadsYesterdayCount === 0 ? (leadsTodayCount > 0 ? 100 : 0) : Math.round(((leadsTodayCount - leadsYesterdayCount) / leadsYesterdayCount) * 100);
+  const failedDeliveries = leads.data.filter(l => l.status === 'failed').length;
+  
+  return ok({ activeIntegrations, totalIntegrations, leadsCaptured, leadsToday: leadsTodayCount, leadsTodayChangePercent, failedDeliveries }, 200, id);
+}
+
+async function getIntegration(supabase: SupabaseClient, id: string, integrationId: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const { data, error } = await supabase.from("integrations").select("*").eq("workspace_id", scoped.access.workspaceId).eq("id", integrationId).single();
+  if (error) return fail("NOT_FOUND", "Integration not found.", 404, id);
+  
+  const { count: leadForms } = await supabase.from("integration_forms").select("*", { count: 'exact', head: true }).eq("integration_id", integrationId);
+  const { count: leadFormsActive } = await supabase.from("integration_forms").select("*", { count: 'exact', head: true }).eq("integration_id", integrationId).eq("status", "active");
+  const { count: leadsThisMonth } = await supabase.from("integration_leads").select("*", { count: 'exact', head: true }).eq("integration_id", integrationId);
+  const { count: leadsToday } = await supabase.from("integration_leads").select("*", { count: 'exact', head: true }).eq("integration_id", integrationId);
+  const { count: failedDeliveries } = await supabase.from("integration_leads").select("*", { count: 'exact', head: true }).eq("integration_id", integrationId).eq("status", "failed");
+
+  return ok({
+    integration: integrationDto(data),
+    leadForms: leadForms || 0,
+    leadFormsActive: leadFormsActive || 0,
+    leadsThisMonth: leadsThisMonth || 0,
+    leadsThisMonthChange: 0,
+    leadsToday: leadsToday || 0,
+    leadsTodayChange: 0,
+    failedDeliveries: failedDeliveries || 0,
+    failedDeliveriesChange: 0
+  }, 200, id);
+}
+
+async function connectIntegration(request: NextRequest, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  if (!["owner", "admin"].includes(scoped.access.role)) return fail("FORBIDDEN", "Not allowed to manage integrations.", 403, id);
+  
+  const bodyData = await body(request);
+  if (!bodyData || !bodyData.provider) return fail("VALIDATION_ERROR", "Provider is required.", 400, id);
+  
+  const providerNames: Record<string, string> = {
+    'meta_lead_ads': 'Meta Lead Ads', 'google_ads': 'Google Ads', 'custom_website': 'Custom Website',
+    'whatsapp': 'WhatsApp', 'email': 'Email', 'razorpay': 'Razorpay'
+  };
+  const name = providerNames[bodyData.provider] || bodyData.provider;
+  
+  const { data, error } = await supabase.from("integrations").insert({
+    workspace_id: scoped.access.workspaceId,
+    provider: bodyData.provider,
+    name: name,
+    status: 'connected',
+    config: bodyData.config || {},
+    connected_at: new Date().toISOString(),
+    created_by: scoped.access.userId
+  }).select("*").single();
+  
+  if (error) return fail("INTERNAL_ERROR", "Could not connect integration.", 500, id);
+  await audit(supabase, "integration.connected", id);
+  return ok(integrationDto(data), 201, id);
+}
+
+async function disconnectIntegration(supabase: SupabaseClient, id: string, integrationId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  if (!["owner", "admin"].includes(scoped.access.role)) return fail("FORBIDDEN", "Not allowed to manage integrations.", 403, id);
+  
+  const { data, error } = await supabase.from("integrations").delete().eq("workspace_id", scoped.access.workspaceId).eq("id", integrationId).select().single();
+  if (error) return fail("INTERNAL_ERROR", "Could not disconnect integration.", 500, id);
+  await audit(supabase, "integration.disconnected", id);
+  return ok({ success: true }, 200, id);
+}
+
+async function pauseIntegration(supabase: SupabaseClient, id: string, integrationId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  if (!["owner", "admin"].includes(scoped.access.role)) return fail("FORBIDDEN", "Not allowed to manage integrations.", 403, id);
+  
+  const { data, error } = await supabase.from("integrations").update({ status: 'paused' }).eq("workspace_id", scoped.access.workspaceId).eq("id", integrationId).select().single();
+  if (error) return fail("INTERNAL_ERROR", "Could not pause integration.", 500, id);
+  await audit(supabase, "integration.paused", id);
+  return ok(integrationDto(data), 200, id);
+}
+
+async function resumeIntegration(supabase: SupabaseClient, id: string, integrationId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  if (!["owner", "admin"].includes(scoped.access.role)) return fail("FORBIDDEN", "Not allowed to manage integrations.", 403, id);
+  
+  const { data, error } = await supabase.from("integrations").update({ status: 'connected' }).eq("workspace_id", scoped.access.workspaceId).eq("id", integrationId).select().single();
+  if (error) return fail("INTERNAL_ERROR", "Could not resume integration.", 500, id);
+  await audit(supabase, "integration.resumed", id);
+  return ok(integrationDto(data), 200, id);
+}
+
+async function integrationAnalytics(request: NextRequest, supabase: SupabaseClient, id: string, integrationId: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  
+  const { data: leads, error } = await supabase.from("integration_leads").select("created_at, source_provider").eq("workspace_id", scoped.access.workspaceId).eq("integration_id", integrationId);
+  if (error) return fail("INTERNAL_ERROR", "Could not load analytics.", 500, id);
+  
+  const leadsOverTime: Record<string, number> = {};
+  const leadSourceBreakdown: Record<string, number> = {};
+  
+  for (const lead of leads) {
+    const date = lead.created_at.split('T')[0];
+    leadsOverTime[date] = (leadsOverTime[date] || 0) + 1;
+    leadSourceBreakdown[lead.source_provider] = (leadSourceBreakdown[lead.source_provider] || 0) + 1;
+  }
+  
+  const overTime = Object.entries(leadsOverTime).map(([date, count]) => ({ date, count })).sort((a, b) => a.date.localeCompare(b.date));
+  const sources = Object.entries(leadSourceBreakdown).map(([source, count]) => ({ source, count })).sort((a, b) => b.count - a.count);
+  
+  return ok({ leadsOverTime: overTime, leadSourceBreakdown: sources, totalLeads: leads.length }, 200, id);
+}
+
+async function listIntegrationForms(request: NextRequest, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const { data, error } = await supabase.from("integration_forms").select("*, integration_form_fields(*)").eq("workspace_id", scoped.access.workspaceId).order("created_at", { ascending: false });
+  if (error) return fail("INTERNAL_ERROR", "Could not load forms.", 500, id);
+  return ok({ items: data.map(formDto) }, 200, id);
+}
+
+async function getIntegrationForm(supabase: SupabaseClient, id: string, formId: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const { data, error } = await supabase.from("integration_forms").select("*, integration_form_fields(*)").eq("workspace_id", scoped.access.workspaceId).eq("id", formId).single();
+  if (error) return fail("NOT_FOUND", "Form not found.", 404, id);
+  return ok(formDto(data), 200, id);
+}
+
+async function createIntegrationForm(request: NextRequest, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  if (!["owner", "admin"].includes(scoped.access.role)) return fail("FORBIDDEN", "Not allowed to manage forms.", 403, id);
+  
+  const bodyData = await body(request);
+  if (!bodyData || !bodyData.integrationId || !bodyData.name) return fail("VALIDATION_ERROR", "Invalid input.", 400, id);
+  
+  const { data: form, error: formError } = await supabase.from("integration_forms").insert({
+    workspace_id: scoped.access.workspaceId,
+    integration_id: bodyData.integrationId,
+    name: bodyData.name,
+    campaign_id: bodyData.campaignId || null,
+    campaign_name: bodyData.campaignName || null,
+    created_by: scoped.access.userId
+  }).select().single();
+  
+  if (formError) return fail("INTERNAL_ERROR", "Could not create form.", 500, id);
+  
+  if (bodyData.fields && Array.isArray(bodyData.fields)) {
+    const fieldsToInsert = bodyData.fields.map((f: any, i: number) => ({
+      form_id: form.id,
+      name: f.name,
+      field_type: f.fieldType,
+      required: f.required || false,
+      position: f.position !== undefined ? f.position : i,
+      config: f.config || {}
+    }));
+    if (fieldsToInsert.length > 0) {
+      await supabase.from("integration_form_fields").insert(fieldsToInsert);
+    }
+  }
+  
+  const { data: finalForm } = await supabase.from("integration_forms").select("*, integration_form_fields(*)").eq("id", form.id).single();
+  await audit(supabase, "integration_form.created", id);
+  return ok(formDto(finalForm), 201, id);
+}
+
+async function updateIntegrationForm(request: NextRequest, supabase: SupabaseClient, id: string, formId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  if (!["owner", "admin"].includes(scoped.access.role)) return fail("FORBIDDEN", "Not allowed to manage forms.", 403, id);
+  
+  const bodyData = await body(request);
+  if (!bodyData) return fail("VALIDATION_ERROR", "Invalid input.", 400, id);
+  
+  const updateData: any = {};
+  if (bodyData.name !== undefined) updateData.name = bodyData.name;
+  if (bodyData.campaignId !== undefined) updateData.campaign_id = bodyData.campaignId;
+  if (bodyData.campaignName !== undefined) updateData.campaign_name = bodyData.campaignName;
+  if (bodyData.status !== undefined) updateData.status = bodyData.status;
+  
+  if (Object.keys(updateData).length > 0) {
+    const { error } = await supabase.from("integration_forms").update(updateData).eq("workspace_id", scoped.access.workspaceId).eq("id", formId);
+    if (error) return fail("INTERNAL_ERROR", "Could not update form.", 500, id);
+  }
+  
+  if (bodyData.fields && Array.isArray(bodyData.fields)) {
+    await supabase.from("integration_form_fields").delete().eq("form_id", formId);
+    const fieldsToInsert = bodyData.fields.map((f: any, i: number) => ({
+      form_id: formId,
+      name: f.name,
+      field_type: f.fieldType,
+      required: f.required || false,
+      position: f.position !== undefined ? f.position : i,
+      config: f.config || {}
+    }));
+    if (fieldsToInsert.length > 0) {
+      await supabase.from("integration_form_fields").insert(fieldsToInsert);
+    }
+  }
+  
+  const { data: finalForm } = await supabase.from("integration_forms").select("*, integration_form_fields(*)").eq("id", formId).single();
+  await audit(supabase, "integration_form.updated", id);
+  return ok(formDto(finalForm), 200, id);
+}
+
+async function deleteIntegrationForm(supabase: SupabaseClient, id: string, formId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  if (!["owner", "admin"].includes(scoped.access.role)) return fail("FORBIDDEN", "Not allowed to manage forms.", 403, id);
+  
+  const { error } = await supabase.from("integration_forms").delete().eq("workspace_id", scoped.access.workspaceId).eq("id", formId);
+  if (error) return fail("INTERNAL_ERROR", "Could not delete form.", 500, id);
+  await audit(supabase, "integration_form.deleted", id);
+  return ok({ deleted: true }, 200, id);
+}
+
+async function integrationWebhook(request: NextRequest, supabase: SupabaseClient, id: string, token: string) {
+  const { data: form, error: formError } = await supabase.from("integration_forms").select("id, workspace_id, integration_id, status").eq("public_token", token).single();
+  if (formError || !form || form.status !== 'active') return fail("NOT_FOUND", "Form not found or inactive.", 404, id);
+  
+  const bodyData = await body(request);
+  if (!bodyData) return fail("VALIDATION_ERROR", "Payload is required.", 400, id);
+  
+  // Basic field validation
+  const { data: fields } = await supabase.from("integration_form_fields").select("name, required").eq("form_id", form.id);
+  if (fields && typeof bodyData === 'object' && bodyData !== null) {
+    const payloadKeys = Object.keys(bodyData as Record<string, unknown>);
+    const missing = fields.filter(f => f.required && !payloadKeys.includes(f.name));
+    if (missing.length > 0) return fail("VALIDATION_ERROR", `Missing required fields: ${missing.map(f=>f.name).join(', ')}`, 400, id);
+  }
+  
+  const { error: leadError } = await supabase.from("integration_leads").insert({
+    workspace_id: form.workspace_id,
+    integration_id: form.integration_id,
+    form_id: form.id,
+    source_provider: 'custom_website',
+    payload: bodyData,
+    status: 'delivered'
+  });
+  
+  if (leadError) return fail("INTERNAL_ERROR", "Could not process lead.", 500, id);
+  return ok({ success: true }, 200, id);
+}
+
+async function listFormLeads(request: NextRequest, supabase: SupabaseClient, id: string, formId: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  
+  const form = await supabase.from("integration_forms").select("id").eq("workspace_id", scoped.access.workspaceId).eq("id", formId).single();
+  if (form.error || !form.data) return fail("NOT_FOUND", "Form not found.", 404, id);
+
+  const { page, pageSize, from, to } = pagination(request.nextUrl.searchParams);
+  const search = request.nextUrl.searchParams.get("search")?.trim().toLowerCase();
+
+  let query = supabase.from("integration_leads")
+    .select("id, form_id, payload, status, created_at", { count: "exact" })
+    .eq("workspace_id", scoped.access.workspaceId)
+    .eq("form_id", formId)
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  const result = await query;
+  if (result.error) return fail("INTERNAL_ERROR", "Could not load leads.", 500, id);
+  
+  let items = result.data.map((row: any) => ({
+    id: row.id, formId: row.form_id, payload: row.payload, status: row.status, createdAt: row.created_at
+  }));
+  
+  if (search) {
+    items = items.filter(i => JSON.stringify(i.payload).toLowerCase().includes(search));
+  }
+
+  const total = result.count ?? 0;
+  return ok({ items, page, pageSize, total, hasMore: to + 1 < total }, 200, id);
+}
+
+async function setFormStatus(supabase: SupabaseClient, id: string, formId: string, status: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const { data, error } = await supabase.from("integration_forms")
+    .update({ status })
+    .eq("workspace_id", scoped.access.workspaceId)
+    .eq("id", formId)
+    .select("*").single();
+  
+  if (error || !data) return fail(error ? "VALIDATION_ERROR" : "NOT_FOUND", "Could not update form.", 400, id);
+  await audit(supabase, `integration_form.${status}`, id);
+  return ok(formDto(data), 200, id);
+}
+
+async function exportFormLeads(supabase: SupabaseClient, id: string, formId: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  
+  const form = await supabase.from("integration_forms").select("id").eq("workspace_id", scoped.access.workspaceId).eq("id", formId).single();
+  if (form.error || !form.data) return fail("NOT_FOUND", "Form not found.", 404, id);
+
+  const fields = await supabase.from("integration_form_fields").select("name").eq("form_id", formId).order("position");
+  const fieldNames = fields.data?.map(f => f.name) || [];
+
+  const leads = await supabase.from("integration_leads").select("id, payload, created_at").eq("workspace_id", scoped.access.workspaceId).eq("form_id", formId).order("created_at", { ascending: false });
+  if (leads.error) return fail("INTERNAL_ERROR", "Could not export leads.", 500, id);
+
+  const header = ["ID", ...fieldNames, "Timestamp"].join(",") + "\n";
+  const rows = leads.data.map(lead => {
+    const payload = lead.payload as Record<string, any>;
+    const values = fieldNames.map(f => payload[f] ? `"${String(payload[f]).replace(/"/g, '""')}"` : "");
+    return [lead.id, ...values, lead.created_at].join(",");
+  }).join("\n");
+
+  return new Response(header + rows, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/csv",
+      "Content-Disposition": `attachment; filename="leads_${formId}.csv"`
+    }
+  });
+}
+
+async function listFormsWithStats(supabase: SupabaseClient, id: string, integrationId: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  
+  const forms = await supabase.from("integration_forms").select("id, name, public_token, campaign_name, status").eq("workspace_id", scoped.access.workspaceId).eq("integration_id", integrationId).neq("status", "archived").order("created_at", { ascending: false });
+  if (forms.error) return fail("INTERNAL_ERROR", "Could not load forms.", 500, id);
+
+  const formIds = forms.data.map(f => f.id);
+  if (formIds.length === 0) return ok({ items: [] }, 200, id);
+
+  const firstDayOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+  
+  const leads = await supabase.from("integration_leads").select("form_id, created_at").in("form_id", formIds);
+  if (leads.error) return fail("INTERNAL_ERROR", "Could not load stats.", 500, id);
+
+  const stats = formIds.reduce((acc, fId) => {
+    acc[fId] = { count: 0, lastLead: null as string | null };
+    return acc;
+  }, {} as Record<string, { count: number; lastLead: string | null }>);
+
+  leads.data.forEach(lead => {
+    if (!lead.form_id) return;
+    if (lead.created_at >= firstDayOfMonth) stats[lead.form_id].count++;
+    if (!stats[lead.form_id].lastLead || lead.created_at > stats[lead.form_id].lastLead!) {
+      stats[lead.form_id].lastLead = lead.created_at;
+    }
+  });
+
+  const items = forms.data.map(f => ({
+    id: f.id,
+    name: f.name,
+    publicToken: f.public_token,
+    campaignName: f.campaign_name,
+    status: f.status,
+    leadsThisMonth: stats[f.id]?.count || 0,
+    lastLeadAt: stats[f.id]?.lastLead || null
+  }));
+
+  return ok({ items }, 200, id);
+}
+
+async function paymentSummary(supabase: SupabaseClient, id: string, integrationId: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+
+  const intg = await supabase.from("integrations").select("id").eq("workspace_id", scoped.access.workspaceId).eq("id", integrationId).eq("provider", "razorpay").single();
+  if (intg.error || !intg.data) return fail("NOT_FOUND", "Razorpay integration not found.", 404, id);
+
+  const invoices = await supabase.from("invoices").select("total_amount, total_paid, status, currency, created_at").eq("workspace_id", scoped.access.workspaceId);
+  if (invoices.error) return fail("INTERNAL_ERROR", "Could not load invoice data.", 500, id);
+
+  let accountReceived = 0, amountDue = 0, totalPending = 0, failedPayments = 0;
+  let accountReceivedPrev = 0, amountDuePrev = 0, totalPendingPrev = 0, failedPaymentsPrev = 0;
+  let currency = "INR";
+  
+  const firstDayOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+
+  invoices.data.forEach(inv => {
+    currency = inv.currency;
+    const isCurrent = inv.created_at >= firstDayOfMonth;
+    const outstanding = Number(inv.total_amount) - Number(inv.total_paid);
+    
+    if (inv.status !== 'void' && inv.status !== 'draft') {
+      const paid = Number(inv.total_paid);
+      if (isCurrent) {
+        accountReceived += paid;
+        amountDue += outstanding;
+      } else {
+        accountReceivedPrev += paid;
+        amountDuePrev += outstanding;
+      }
+    }
+    
+    if (inv.status === 'pending') {
+      const amt = Number(inv.total_amount);
+      if (isCurrent) totalPending += amt;
+      else totalPendingPrev += amt;
+    }
+    
+    if (inv.status === 'void') {
+      const amt = Number(inv.total_amount);
+      if (isCurrent) failedPayments += amt;
+      else failedPaymentsPrev += amt;
+    }
+  });
+
+  const calcChange = (curr: number, prev: number) => prev === 0 ? (curr > 0 ? 100 : 0) : ((curr - prev) / prev) * 100;
+
+  return ok({
+    accountReceived,
+    amountDue,
+    totalPending,
+    failedPayments,
+    currency,
+    accountReceivedChange: calcChange(accountReceived, accountReceivedPrev),
+    amountDueChange: calcChange(amountDue, amountDuePrev),
+    totalPendingChange: calcChange(totalPending, totalPendingPrev),
+    failedPaymentsChange: calcChange(failedPayments, failedPaymentsPrev)
+  }, 200, id);
+}
+
+async function paymentAnalytics(supabase: SupabaseClient, id: string, integrationId: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  
+  const intg = await supabase.from("integrations").select("id").eq("workspace_id", scoped.access.workspaceId).eq("id", integrationId).eq("provider", "razorpay").single();
+  if (intg.error || !intg.data) return fail("NOT_FOUND", "Razorpay integration not found.", 404, id);
+
+  const invoices = await supabase.from("invoices").select("id, total_amount, total_paid, status, currency, created_at").eq("workspace_id", scoped.access.workspaceId);
+  const payments = await supabase.from("invoice_payments").select("amount, paid_at").eq("workspace_id", scoped.access.workspaceId);
+  
+  if (invoices.error || payments.error) return fail("INTERNAL_ERROR", "Could not load analytics.", 500, id);
+
+  const dateMap: Record<string, { received: number, due: number, pending: number }> = {};
+  let currency = "INR";
+  
+  payments.data.forEach(p => {
+    const d = p.paid_at.split('T')[0];
+    if (!dateMap[d]) dateMap[d] = { received: 0, due: 0, pending: 0 };
+    dateMap[d].received += Number(p.amount);
+  });
+
+  invoices.data.forEach(inv => {
+    currency = inv.currency;
+    const d = inv.created_at.split('T')[0];
+    if (!dateMap[d]) dateMap[d] = { received: 0, due: 0, pending: 0 };
+    if (inv.status !== 'void' && inv.status !== 'draft') {
+      dateMap[d].due += (Number(inv.total_amount) - Number(inv.total_paid));
+    }
+    if (inv.status === 'pending' || inv.status === 'sent') {
+      dateMap[d].pending += Number(inv.total_amount);
+    }
+  });
+
+  const paymentOverview = Object.keys(dateMap).sort().map(date => ({
+    date,
+    ...dateMap[date]
+  }));
+
+  const statusBreakdown = { successful: 0, pending: 0, failed: 0, total: invoices.data.length };
+  invoices.data.forEach(inv => {
+    if (inv.status === 'paid' || inv.status === 'partial' || inv.status === 'accepted') statusBreakdown.successful++;
+    else if (inv.status === 'pending' || inv.status === 'sent') statusBreakdown.pending++;
+    else if (inv.status === 'void') statusBreakdown.failed++;
+  });
+
+  return ok({ paymentOverview, statusBreakdown, currency }, 200, id);
+}
+
+async function integrationTransactions(request: NextRequest, supabase: SupabaseClient, id: string, integrationId: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const { page, pageSize, from, to } = pagination(request.nextUrl.searchParams);
+
+  const { data, count, error } = await supabase.from("invoice_payments")
+    .select(`
+      id, amount, paid_at, method, 
+      invoices!inner(invoice_code, project_name, project_id, client_name, currency, status)
+    `, { count: "exact" })
+    .eq("workspace_id", scoped.access.workspaceId)
+    .order("paid_at", { ascending: false })
+    .range(from, to);
+
+  if (error) return fail("INTERNAL_ERROR", "Could not load transactions.", 500, id);
+
+  const items = data.map((p: any) => ({
+    id: p.id,
+    paymentId: p.id,
+    projectName: p.invoices.project_name,
+    projectCode: "", 
+    boqRef: p.invoices.project_id || "", 
+    invoiceNumber: p.invoices.invoice_code,
+    amount: Number(p.amount),
+    currency: p.invoices.currency,
+    clientName: p.invoices.client_name,
+    method: p.method,
+    timestamp: p.paid_at,
+    status: p.invoices.status
+  }));
+
+  const total = count ?? 0;
+  return ok({ items, page, pageSize, total, hasMore: to + 1 < total }, 200, id);
+}
+
+
+// ======================================================
 async function dispatch(request: NextRequest, path: string[]) {
   const id = requestId(request);
   const route = path.join("/");
@@ -5075,7 +5618,63 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (invoicePaymentMatch && request.method === "POST") return recordInvoicePayment(request, supabase, id, invoicePaymentMatch[1]);
   const invoicePdfMatch = route.match(/^invoices\/([0-9a-f-]{36})\/pdf$/i);
   if (invoicePdfMatch && request.method === "GET") return invoicePdf(supabase, id, invoicePdfMatch[1]);
-  return methodNotAllowed(id);
+  
+  if (request.method === "POST" && route.startsWith("integrations/webhook/")) {
+    const tokenMatch = route.match(/^integrations\/webhook\/([a-z0-9]+)$/i);
+    if (tokenMatch) return integrationWebhook(request, supabase, id, tokenMatch[1]);
+  }
+  if (request.method === "GET" && route === "integrations") return listIntegrations(request, supabase, id);
+  if (request.method === "GET" && route === "integrations/summary") return integrationSummary(request, supabase, id);
+  if (request.method === "POST" && route === "integrations/connect") return connectIntegration(request, supabase, id);
+  
+  const intFormListMatch = route.match(/^integrations\/forms$/i);
+  if (intFormListMatch && request.method === "GET") return listIntegrationForms(request, supabase, id);
+  if (intFormListMatch && request.method === "POST") return createIntegrationForm(request, supabase, id);
+  
+  const intFormMatch = route.match(/^integrations\/forms\/([0-9a-f-]{36})$/i);
+  if (intFormMatch && request.method === "GET") return getIntegrationForm(supabase, id, intFormMatch[1]);
+  if (intFormMatch && request.method === "PATCH") return updateIntegrationForm(request, supabase, id, intFormMatch[1]);
+  if (intFormMatch && request.method === "DELETE") return deleteIntegrationForm(supabase, id, intFormMatch[1]);
+
+  const intFormLeadsMatch = route.match(/^integrations\/forms\/([0-9a-f-]{36})\/leads$/i);
+  if (intFormLeadsMatch && request.method === "GET") return listFormLeads(request, supabase, id, intFormLeadsMatch[1]);
+
+  const intFormPauseMatch = route.match(/^integrations\/forms\/([0-9a-f-]{36})\/pause$/i);
+  if (intFormPauseMatch && request.method === "POST") return setFormStatus(supabase, id, intFormPauseMatch[1], 'paused');
+
+  const intFormResumeMatch = route.match(/^integrations\/forms\/([0-9a-f-]{36})\/resume$/i);
+  if (intFormResumeMatch && request.method === "POST") return setFormStatus(supabase, id, intFormResumeMatch[1], 'active');
+
+  const intFormExportMatch = route.match(/^integrations\/forms\/([0-9a-f-]{36})\/export$/i);
+  if (intFormExportMatch && request.method === "GET") return exportFormLeads(supabase, id, intFormExportMatch[1]);
+
+  const intFormsMatch = route.match(/^integrations\/([0-9a-f-]{36})\/forms$/i);
+  if (intFormsMatch && request.method === "GET") return listFormsWithStats(supabase, id, intFormsMatch[1]);
+
+  const intPaymentSummaryMatch = route.match(/^integrations\/([0-9a-f-]{36})\/payment-summary$/i);
+  if (intPaymentSummaryMatch && request.method === "GET") return paymentSummary(supabase, id, intPaymentSummaryMatch[1]);
+
+  const intPaymentAnalyticsMatch = route.match(/^integrations\/([0-9a-f-]{36})\/payment-analytics$/i);
+  if (intPaymentAnalyticsMatch && request.method === "GET") return paymentAnalytics(supabase, id, intPaymentAnalyticsMatch[1]);
+
+  const intTransactionsMatch = route.match(/^integrations\/([0-9a-f-]{36})\/transactions$/i);
+  if (intTransactionsMatch && request.method === "GET") return integrationTransactions(request, supabase, id, intTransactionsMatch[1]);
+
+  const intMatch = route.match(/^integrations\/([0-9a-f-]{36})$/i);
+  if (intMatch && request.method === "GET") return getIntegration(supabase, id, intMatch[1]);
+  
+  const intDisconnectMatch = route.match(/^integrations\/([0-9a-f-]{36})\/disconnect$/i);
+  if (intDisconnectMatch && request.method === "POST") return disconnectIntegration(supabase, id, intDisconnectMatch[1]);
+  
+  const intPauseMatch = route.match(/^integrations\/([0-9a-f-]{36})\/pause$/i);
+  if (intPauseMatch && request.method === "POST") return pauseIntegration(supabase, id, intPauseMatch[1]);
+  
+  const intResumeMatch = route.match(/^integrations\/([0-9a-f-]{36})\/resume$/i);
+  if (intResumeMatch && request.method === "POST") return resumeIntegration(supabase, id, intResumeMatch[1]);
+  
+  const intAnalyticsMatch = route.match(/^integrations\/([0-9a-f-]{36})\/analytics$/i);
+  if (intAnalyticsMatch && request.method === "GET") return integrationAnalytics(request, supabase, id, intAnalyticsMatch[1]);
+return methodNotAllowed(id);
 }
 
 export async function GET(request: NextRequest, params: Params) { return dispatch(request, (await params.params).path); }
