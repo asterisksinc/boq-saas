@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "clean:next": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\"",
+    "predev": "npm run clean:next",
     "dev": "next dev",
+    "prebuild": "npm run clean:next",
     "build": "next build",
     "start": "next start",
     "seed:demo-user": "node scripts/seed-demo-user.mjs",

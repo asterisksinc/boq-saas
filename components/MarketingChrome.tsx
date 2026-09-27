@@ -1,7 +1,8 @@
-import { ArrowRight, Code2, Globe2, Tag as TagIcon } from "lucide-react";
+import { ArrowRight, ChevronDown, Code2, Globe2, Tag as TagIcon } from "lucide-react";
 import MobileNav from "@/app/components/MobileNav";
+import { marketingSolutions } from "@/lib/marketing-solutions";
 
-const navItems = ["Home", "Product", "Features", "Pricing", "Solutions", "Insights", "Company"];
+const navItems = ["Home", "Pricing", "Solutions"];
 
 const footerColumns = [
   [
@@ -33,7 +34,21 @@ const footerSecondary = [
   ],
 ] as const;
 
-export function MarketingNav({ current = "Home" }: { current?: "Home" | "Pricing" }) {
+function footerHrefFor(column: string, item: string) {
+  if (column === "Solutions") {
+    const normalizedItem = item.replace("-", " ");
+    const solution = marketingSolutions.find((entry) => entry.title === normalizedItem);
+    return solution ? `/solutions/${solution.slug}` : "#";
+  }
+
+  if (item === "Pricing") return "/pricing";
+  if (item === "All Integrations") return "/#insights";
+  if (item === "Book a Demo" || item === "Contact") return "/#demo";
+
+  return "#";
+}
+
+export function MarketingNav({ current = "Home" }: { current?: "Home" | "Pricing" | "Solutions" }) {
   return (
     <header className="nav-shell home-nav">
       <div className="nav-rail">
@@ -47,11 +62,33 @@ export function MarketingNav({ current = "Home" }: { current?: "Home" | "Pricing
           </span>
         </a>
         <nav aria-label="Primary navigation">
-          {navItems.map((item) => (
-            <a href={item === "Home" ? "/" : item === "Pricing" ? "/#pricing" : `/#${item.toLowerCase()}`} key={item}>
-              {item}
-            </a>
-          ))}
+          {navItems.map((item) =>
+            item === "Solutions" ? (
+              <div className="nav-dropdown" key={item}>
+                <button className={current === "Solutions" ? "active-nav" : undefined} type="button" aria-haspopup="true">
+                  {item}
+                  <ChevronDown />
+                </button>
+                <div className="nav-dropdown-panel" aria-label="Solutions menu">
+                  {marketingSolutions.map((solution) => (
+                    <a href={`/solutions/${solution.slug}`} key={solution.slug}>
+                      <span>{solution.title}</span>
+                      <small>{solution.eyebrow}</small>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <a
+                className={item === current ? "active-nav" : undefined}
+                aria-current={item === current ? "page" : undefined}
+                href={item === "Home" ? "/" : item === "Pricing" ? "/pricing" : `/#${item.toLowerCase()}`}
+                key={item}
+              >
+                {item}
+              </a>
+            )
+          )}
         </nav>
         <a className="button blue nav-cta" href="/register">
           Get Started
@@ -84,7 +121,7 @@ export function MarketingFooter() {
           <div className="footer-column" key={title}>
             <h3>{title}</h3>
             {items.map((item) => (
-              <a href="#" key={item}>
+              <a href={footerHrefFor(title, item)} key={item}>
                 {item}
               </a>
             ))}
