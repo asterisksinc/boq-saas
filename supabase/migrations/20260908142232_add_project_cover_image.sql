@@ -1,1 +1,1 @@
-y
+-- no-op: superseded by 20260908200000_add_project_cover.sql

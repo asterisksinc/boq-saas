@@ -7,7 +7,6 @@ export const integrationDefinitions: IntegrationDefinition[] = [
     { provider: 'custom_website', title: 'Custom Website', description: 'Receive new leads using webhooks from your custom website to your BOQ SaaS Account', category: 'lead_source', iconPath: '/assets/integrations/custom-website.svg' },
     // Automation
     { provider: 'whatsapp', title: 'WhatsApp Automation', description: 'Send automated messages to your clients via WhatsApp from your BOQ SaaS Account', category: 'automation', iconPath: '/assets/integrations/whatsapp.svg' },
-    { provider: 'email', title: 'Email Integration', description: 'Share files Proposal, Order Sheet & Invoice, etc. to your clients via Email from your BOQ SaaS Account', category: 'automation', iconPath: '/assets/integrations/email.svg' },
     // Payment
     { provider: 'razorpay', title: 'RazorPay Integration', description: 'Start receiving payments from your clients on the invoices created.', category: 'payment', iconPath: '/assets/integrations/razorpay.svg' },
 ];

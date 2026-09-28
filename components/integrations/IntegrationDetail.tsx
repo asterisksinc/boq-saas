@@ -107,7 +107,17 @@ export default function IntegrationDetail({ id }: { id: string }) {
                 </div>
             )}
 
-            <button className="intg-back-btn" onClick={() => router.push('/integrations')}>
+            <button 
+                type="button"
+                className="intg-back-btn" 
+                onClick={() => {
+                    if (typeof window !== 'undefined' && window.history.length > 1) {
+                        router.back();
+                    } else {
+                        router.push('/settings?tab=integrations');
+                    }
+                }}
+            >
                 <ChevronLeft size={20} /> Back to Integrations
             </button>
 

@@ -28,5 +28,6 @@ export function permissionsFor(role: string) {
     canManageSettings: elevated,
     canManageActivities: contributor,
     canUseSupport: contributor,
+    canManageIntegrations: elevated,
   };
 }

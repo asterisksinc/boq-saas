@@ -886,6 +886,51 @@ export const locationPatchSchema = z
   .strict()
   .refine((data) => Object.keys(data).length > 0, "At least one field is required to update.");
 
+export const workspaceUserCreateSchema = z
+  .object({
+    firstName: z.string().trim().min(1, "First name is required").max(60),
+    lastName: z.string().trim().min(1, "Last name is required").max(60),
+    email: z.string().trim().email("Valid email address is required").transform((v) => v.toLowerCase()),
+    phone: z.string().trim().min(5, "Phone number is required").max(30),
+    role: z.string().trim().min(1, "Role is required").max(100),
+  })
+  .strict();
+
+export const workspaceUserPatchSchema = z
+  .object({
+    firstName: z.string().trim().min(1, "First name cannot be empty").max(60).optional(),
+    lastName: z.string().trim().min(1, "Last name cannot be empty").max(60).optional(),
+    email: z.string().trim().email("Valid email address is required").transform((v) => v.toLowerCase()).optional(),
+    phone: z.string().trim().min(5, "Phone number is required").max(30).optional(),
+    role: z.string().trim().min(1, "Role cannot be empty").max(100).optional(),
+  })
+  .strict()
+  .refine((data) => Object.keys(data).length > 0, "At least one field is required to update.");
+
+export const workspaceRoleCreateSchema = z
+  .object({
+    name: z.string().trim().min(1, "Role name is required").max(80),
+    description: z.string().trim().max(300).optional(),
+  })
+  .strict();
+
+export const workspaceRolePatchSchema = z
+  .object({
+    name: z.string().trim().min(1, "Role name cannot be empty").max(80).optional(),
+    description: z.string().trim().max(300).optional(),
+  })
+  .strict()
+  .refine((data) => Object.keys(data).length > 0, "At least one field is required to update.");
+
+export const workspacePermissionToggleSchema = z
+  .object({
+    permissionId: z.string().min(1).optional(),
+    category: z.string().min(1).optional(),
+    enabled: z.boolean(),
+  })
+  .strict()
+  .refine((data) => Boolean(data.permissionId || data.category), "Either permissionId or category is required.");
+
 export function fieldErrors(error: z.ZodError) {
   const result: Record<string, string[]> = {};
 

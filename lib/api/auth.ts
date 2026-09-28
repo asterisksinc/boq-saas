@@ -1179,3 +1179,136 @@ export async function archiveOrganizationLocation(locationId: string) {
     });
 }
 
+// ─── Security & Access: Dynamic Users, Roles & Permissions ─────────────────
+
+export interface WorkspaceUserItem {
+    id: string;
+    userId: string;
+    firstName: string;
+    lastName: string;
+    displayName: string;
+    email: string;
+    phone: string;
+    role: string;
+    roleId: string | null;
+    avatarUrl: string | null;
+    status: string;
+    joinedAt: string;
+}
+
+export interface WorkspaceUserCreateInput {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    role: string;
+}
+
+export interface WorkspaceUserPatchInput {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+    role?: string;
+}
+
+export interface WorkspaceRoleItem {
+    id: string;
+    name: string;
+    description: string | null;
+    is_system: boolean;
+    system_fallback: string;
+    created_at: string;
+}
+
+export interface WorkspaceRoleCreateInput {
+    name: string;
+    description?: string;
+}
+
+export interface WorkspaceRolePatchInput {
+    name?: string;
+    description?: string;
+}
+
+export interface PermissionPrivilegeItem {
+    id: string;
+    name: string;
+    description: string | null;
+}
+
+export interface PermissionCategoryGroup {
+    category: string;
+    privileges: PermissionPrivilegeItem[];
+}
+
+export interface RolesAndPermissionsResponse {
+    roles: WorkspaceRoleItem[];
+    categories: PermissionCategoryGroup[];
+    permissions: Record<string, Record<string, boolean>>;
+}
+
+export interface PermissionToggleInput {
+    permissionId?: string;
+    category?: string;
+    enabled: boolean;
+}
+
+export async function getWorkspaceUsers() {
+    return request<{ items: WorkspaceUserItem[] }>("/api/v1/settings/security/users");
+}
+
+export async function createWorkspaceUser(input: WorkspaceUserCreateInput) {
+    return request<{ user: WorkspaceUserItem }>("/api/v1/settings/security/users", {
+        method: "POST",
+        body: JSON.stringify(input),
+    });
+}
+
+export async function updateWorkspaceUser(memberId: string, input: WorkspaceUserPatchInput) {
+    return request<{ user: WorkspaceUserItem }>(`/api/v1/settings/security/users/${memberId}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+    });
+}
+
+export async function deleteWorkspaceUser(memberId: string) {
+    return request<{ success: boolean; removedMemberId: string }>(`/api/v1/settings/security/users/${memberId}`, {
+        method: "DELETE",
+    });
+}
+
+export async function getWorkspaceRolesAndPermissions() {
+    return request<RolesAndPermissionsResponse>("/api/v1/settings/security/roles");
+}
+
+export async function createWorkspaceRole(input: WorkspaceRoleCreateInput) {
+    return request<{ role: WorkspaceRoleItem }>("/api/v1/settings/security/roles", {
+        method: "POST",
+        body: JSON.stringify(input),
+    });
+}
+
+export async function updateWorkspaceRole(roleId: string, input: WorkspaceRolePatchInput) {
+    return request<{ role: WorkspaceRoleItem }>(`/api/v1/settings/security/roles/${roleId}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+    });
+}
+
+export async function deleteWorkspaceRole(roleId: string) {
+    return request<{ success: boolean; deletedRoleId: string }>(`/api/v1/settings/security/roles/${roleId}`, {
+        method: "DELETE",
+    });
+}
+
+export async function toggleWorkspaceRolePermission(roleId: string, input: PermissionToggleInput) {
+    return request<{ success: boolean; roleId: string; updated: Record<string, boolean> }>(
+        `/api/v1/settings/security/roles/${roleId}/permissions`,
+        {
+            method: "PATCH",
+            body: JSON.stringify(input),
+        }
+    );
+}
+

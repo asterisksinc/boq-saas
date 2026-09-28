@@ -138,3 +138,149 @@ export interface BrandingPreviewData {
     };
 }
 
+// ── BOQ & Costing Sub-Navigation & Domain Types ─────────────────────────────
+
+export type BoqCostingSubTab =
+    | "units"
+    | "numbering"
+    | "tax-rules"
+    | "pricing-rules"
+    | "revision-rules"
+    | "approval-rules";
+
+export type UnitType = "Count" | "Area" | "Length" | "Weight" | "Volume" | "Time" | "Other";
+
+export interface BoqUnit {
+    id: string;
+    name: string;
+    code: string;
+    type: UnitType;
+    decimals: number;
+    active: boolean;
+    isCustom?: boolean;
+    createdAt?: string;
+}
+
+export interface BoqNumberingSettings {
+    boqPrefix: string;
+    projectPrefix: string;
+    financialYear: string;
+    sequenceFormat: string;
+    revisionFormat: string;
+}
+
+export interface BoqTaxRule {
+    id: string;
+    name: string;
+    code: string;
+    rate: number;
+    inclusive: boolean;
+    active: boolean;
+    createdAt?: string;
+}
+
+export interface CategoryMarkup {
+    id: string;
+    name: string;
+    markupPercent: number;
+}
+
+export interface BoqPricingSettings {
+    defaultMarkupPercent: number;
+    categoryMarkups: CategoryMarkup[];
+    discountLimitPercent: number;
+    marginThresholdPercent: number;
+    wastagePercent: number;
+    contingencyPercent: number;
+    rounding: string;
+}
+
+export interface BoqRevisionSettings {
+    autoRevisionNumbering: boolean;
+    revisionReasonRequired: boolean;
+    lockApprovedVersions: boolean;
+    reopenAfterApproval: boolean;
+    compareVersions: boolean;
+}
+
+export interface BoqApprovalSettings {
+    internalApprovalRequired: boolean;
+    clientApprovalRequired: boolean;
+    minValueForApproval: number;
+    discountApprovalThresholdPercent: number;
+    marginApprovalThresholdPercent: number;
+}
+
+export interface BoqPricingRule {
+    id: string;
+    name: string;
+    appliesTo: string;
+    type: string;
+    ratePercent: number;
+    active: boolean;
+    createdAt?: string;
+}
+
+export interface BoqRevisionRule {
+    id: string;
+    ruleName: string;
+    triggerEvent: string;
+    requiresApproval: boolean;
+    active: boolean;
+    description?: string;
+}
+
+export interface BoqApprovalRule {
+    id: string;
+    ruleName: string;
+    threshold: string;
+    approverRole: string;
+    sequenceOrder: number;
+    active: boolean;
+}
+
+export interface BoqCostingSettingsData {
+    defaultTaxPercent?: number;
+    defaultMarkupPercent?: number;
+    defaultWastePercent?: number;
+    currency?: string;
+    numberFormat?: string;
+    units: BoqUnit[];
+    numbering: BoqNumberingSettings;
+    taxRules: BoqTaxRule[];
+    pricing: BoqPricingSettings;
+    revision: BoqRevisionSettings;
+    approval: BoqApprovalSettings;
+    pricingRules?: BoqPricingRule[];
+    revisionRules?: BoqRevisionRule[];
+    approvalRules?: BoqApprovalRule[];
+    [key: string]: unknown;
+}
+
+// ── Notification Settings & Matrix Types ─────────────────────────────────────
+
+export type NotificationChannel = "email" | "in_app" | "push" | "whatsapp";
+
+export type NotificationEvent =
+    | "boq_approval"
+    | "payment_alert"
+    | "document_shared"
+    | "new_comment"
+    | "task_due"
+    | "weekly_digest"
+    | "marketing";
+
+export type NotificationMatrix = Record<NotificationEvent, Record<NotificationChannel, boolean>>;
+
+export interface NotificationSettingsData {
+    matrix: NotificationMatrix;
+    email?: boolean;
+    tasks?: boolean;
+    approvals?: boolean;
+    billing?: boolean;
+    weeklyDigest?: boolean;
+    [key: string]: unknown;
+}
+
+
+

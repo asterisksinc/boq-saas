@@ -30,6 +30,10 @@ import MyProfile from "@/components/settings/MyProfile";
 import SettingsSkeleton from "@/components/settings/SettingsSkeleton";
 import OrganizationSettings from "@/components/settings/OrganizationSettings";
 import BrandingSettingsComponent from "@/components/settings/branding/BrandingSettings";
+import BoqCostingLayout from "@/components/settings/boq-costing/BoqCostingLayout";
+import SettingsIntegrations from "@/components/settings/SettingsIntegrations";
+import SettingsNotifications from "@/components/settings/SettingsNotifications";
+import SecurityAccessLayout from "@/components/settings/security/SecurityAccessLayout";
 import { SettingsErrorState, SettingsEmptyTab } from "@/components/settings/SettingsEmptyState";
 import { adaptOverview } from "@/lib/settings/adapter";
 import { SettingsTab } from "@/lib/settings/types";
@@ -121,7 +125,15 @@ export default function SettingsPage() {
 
     const handleSelectTab = async (tab: SettingsTab) => {
         setActiveTab(tab);
-        if (tab === "overview" || tab === "additional" || tab === "profile" || tab === "organization" || tab === "branding") {
+        if (typeof window !== "undefined") {
+            const url = new URL(window.location.href);
+            url.searchParams.set("tab", tab);
+            if (tab !== "boq-costing") {
+                url.searchParams.delete("section");
+            }
+            window.history.replaceState({}, "", url.toString());
+        }
+        if (tab === "overview" || tab === "additional" || tab === "profile" || tab === "organization" || tab === "branding" || tab === "boq-costing" || tab === "integrations" || tab === "notifications" || tab === "security") {
             return;
         }
 
@@ -142,7 +154,7 @@ export default function SettingsPage() {
 
     const handleSaveSection = async (e: FormEvent) => {
         e.preventDefault();
-        if (activeTab === "overview" || activeTab === "additional" || activeTab === "profile" || activeTab === "organization" || activeTab === "branding") {
+        if (activeTab === "overview" || activeTab === "additional" || activeTab === "profile" || activeTab === "organization" || activeTab === "branding" || activeTab === "boq-costing" || activeTab === "integrations" || activeTab === "notifications" || activeTab === "security") {
             return;
         }
 
@@ -218,6 +230,43 @@ export default function SettingsPage() {
             );
         }
 
+        if (activeTab === "boq-costing") {
+            return (
+                <BoqCostingLayout
+                    overview={overview}
+                    showNotice={showNotice}
+                    onRefreshOverview={loadOverview}
+                />
+            );
+        }
+
+        if (activeTab === "integrations") {
+            return (
+                <SettingsIntegrations
+                    showNotice={showNotice}
+                    userRole={overview?.role}
+                />
+            );
+        }
+
+        if (activeTab === "notifications") {
+            return (
+                <SettingsNotifications
+                    showNotice={showNotice}
+                    userRole={overview?.role}
+                />
+            );
+        }
+
+        if (activeTab === "security") {
+            return (
+                <SecurityAccessLayout
+                    showNotice={showNotice}
+                    userRole={overview?.role}
+                />
+            );
+        }
+
         if (activeTab === "additional") {
             return (
                 <SettingsEmptyTab
@@ -243,42 +292,6 @@ export default function SettingsPage() {
         }
 
         switch (activeTab) {
-            case "boq-costing":
-                return (
-                    <BoqCostingForm
-                        data={sectionData}
-                        onChange={handleInputChange}
-                        onSave={handleSaveSection}
-                        saving={saving}
-                    />
-                );
-            case "integrations":
-                return (
-                    <IntegrationsForm
-                        data={sectionData}
-                        onChange={handleInputChange}
-                        onSave={handleSaveSection}
-                        saving={saving}
-                    />
-                );
-            case "notifications":
-                return (
-                    <NotificationsForm
-                        data={sectionData}
-                        onChange={handleInputChange}
-                        onSave={handleSaveSection}
-                        saving={saving}
-                    />
-                );
-            case "security":
-                return (
-                    <SecurityForm
-                        data={sectionData}
-                        onChange={handleInputChange}
-                        onSave={handleSaveSection}
-                        saving={saving}
-                    />
-                );
             case "advanced":
                 return (
                     <AdvancedForm
@@ -450,149 +463,9 @@ function BaseForm({
     );
 }
 
-function BoqCostingForm({
-    data,
-    onChange,
-    onSave,
-    saving,
-}: {
-    data: SectionData;
-    onChange: (key: string, value: unknown) => void;
-    onSave: (e: FormEvent) => void;
-    saving: boolean;
-}) {
-    return (
-        <BaseForm
-            title="BOQ & Costing"
-            description="Configure defaults for estimates, margins, and taxation"
-            onSave={onSave}
-            saving={saving}
-        >
-            <div className="form-grid">
-                <Field
-                    label="Default Tax %"
-                    type="number"
-                    value={(data.defaultTaxPercent as number) ?? 18}
-                    onChange={(v) => onChange("defaultTaxPercent", Number(v))}
-                    min={0}
-                    max={100}
-                    step={0.5}
-                />
-                <Field
-                    label="Default Markup %"
-                    type="number"
-                    value={(data.defaultMarkupPercent as number) ?? 0}
-                    onChange={(v) => onChange("defaultMarkupPercent", Number(v))}
-                    min={0}
-                    max={1000}
-                    step={0.5}
-                />
-                <Field
-                    label="Default Waste %"
-                    type="number"
-                    value={(data.defaultWastePercent as number) ?? 5}
-                    onChange={(v) => onChange("defaultWastePercent", Number(v))}
-                    min={0}
-                    max={100}
-                    step={0.5}
-                />
-                <Field
-                    label="Currency"
-                    type="select"
-                    value={(data.currency as string) || "INR"}
-                    onChange={(v) => onChange("currency", v)}
-                    options={["INR", "USD", "EUR", "GBP", "AED", "SGD"]}
-                />
-                <Field
-                    label="Number Format"
-                    type="select"
-                    value={(data.numberFormat as string) || "indian"}
-                    onChange={(v) => onChange("numberFormat", v)}
-                    options={["indian", "international"]}
-                    fullWidth
-                />
-            </div>
-        </BaseForm>
-    );
-}
 
-function IntegrationsForm({
-    data,
-    onChange,
-    onSave,
-    saving,
-}: {
-    data: SectionData;
-    onChange: (key: string, value: unknown) => void;
-    onSave: (e: FormEvent) => void;
-    saving: boolean;
-}) {
-    return (
-        <div className="settings-section-card">
-            <div className="form-header">
-                <h2>Integrations</h2>
-                <p>Manage third-party tools and API connections</p>
-            </div>
-            <div className="form-body" style={{ padding: '40px 20px', textAlign: 'center' }}>
-                <p style={{ marginBottom: '20px', color: '#6b7280' }}>The Integrations module has been moved to a dedicated page with enhanced features and analytics.</p>
-                <button 
-                    type="button" 
-                    className="btn-primary" 
-                    onClick={() => window.location.href = '/integrations'}
-                    style={{ margin: '0 auto' }}
-                >
-                    Go to Integrations
-                </button>
-            </div>
-        </div>
-    );
-}
 
-function NotificationsForm({
-    data,
-    onChange,
-    onSave,
-    saving,
-}: {
-    data: SectionData;
-    onChange: (key: string, value: unknown) => void;
-    onSave: (e: FormEvent) => void;
-    saving: boolean;
-}) {
-    const toggles = [
-        { key: "email", label: "Email notifications", desc: "Receive email updates on project changes" },
-        { key: "tasks", label: "Task notifications", desc: "Get notified about task assignments and due dates" },
-        { key: "approvals", label: "Approval notifications", desc: "Get notified about pending and completed approvals" },
-        { key: "billing", label: "Billing notifications", desc: "Receive billing receipts and invoice updates" },
-        { key: "weeklyDigest", label: "Weekly digest", desc: "Receive weekly summary digest email" },
-    ];
 
-    return (
-        <BaseForm
-            title="Notifications"
-            description="Configure email and in-app alert preferences"
-            onSave={onSave}
-            saving={saving}
-        >
-            <div className="toggles-list">
-                {toggles.map((t) => (
-                    <label key={t.key} className="toggle-item">
-                        <div className="toggle-info">
-                            <span className="toggle-label">{t.label}</span>
-                            <span className="toggle-desc">{t.desc}</span>
-                        </div>
-                        <input
-                            type="checkbox"
-                            checked={(data[t.key] as boolean) ?? false}
-                            onChange={(e) => onChange(t.key, e.target.checked)}
-                            className="toggle-input"
-                        />
-                    </label>
-                ))}
-            </div>
-        </BaseForm>
-    );
-}
 
 function SecurityForm({
     data,

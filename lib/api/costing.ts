@@ -1,4 +1,6 @@
 import { getApiErrorMessage, parseApiResponse } from "./auth";
+import type { BoqCostingSettingsData } from "../settings/types";
+import { adaptBoqCostingSettings } from "../settings/adapter";
 import type {
     CostingCategoryBackend,
     CostingCategoryDetail,
@@ -211,4 +213,19 @@ export async function duplicateCostingScenario(scenarioId: string): Promise<Cost
     return fetchApi<CostingScenario>(`/api/v1/costing/scenarios/${scenarioId}/duplicate`, {
         method: "POST",
     });
+}
+
+// ── BOQ & Costing Section Settings ──────────────────────────────────────────
+
+export async function getBoqCostingSettings(): Promise<BoqCostingSettingsData> {
+    const res = await fetchApi<{ section: string; data: Record<string, unknown> }>("/api/v1/settings/boq-costing");
+    return adaptBoqCostingSettings(res.data);
+}
+
+export async function updateBoqCostingSettings(patch: Partial<BoqCostingSettingsData>): Promise<BoqCostingSettingsData> {
+    const res = await fetchApi<{ section: string; data: Record<string, unknown> }>("/api/v1/settings/boq-costing", {
+        method: "PATCH",
+        body: JSON.stringify({ data: patch }),
+    });
+    return adaptBoqCostingSettings(res.data);
 }
