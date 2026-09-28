@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { ArrowRight, Check, ChevronDown, ClipboardList, FileText, Layers3, ReceiptText, UsersRound } from "lucide-react";
+import { ArrowRight, BadgeCheck, Check, ChevronDown, ClipboardList, Code2, FileText, Layers3, ReceiptText, Star, UsersRound } from "lucide-react";
 import { MarketingFooter, MarketingNav } from "@/components/MarketingChrome";
 import { getSolutionBySlug, marketingSolutions, type MarketingSolution } from "@/lib/marketing-solutions";
 
@@ -11,6 +11,74 @@ const stats = [
 ];
 
 const logos = ["LOGOIPSUM", "LOGOIPSUM", "Logoipsum", "LOGOIPSUM"];
+
+const templateOneLogos = [
+  ["/figma/logo-openai.svg", "OpenAI"],
+  ["/figma/logo-google.svg", "Google"],
+  ["/figma/logo-nvidia.svg", "Nvidia"],
+  ["/figma/logo-shopify.svg", "Shopify"],
+];
+
+const workflowCards = [
+  ["Work Faster", "Create reusable BOQ structures, costing templates, and workflows instead of rebuilding the same commercial process for every project."],
+  ["Stay Accurate", "Keep rates, quantities, revisions, approvals, and commercial information connected so your team spends less time reconciling versions."],
+  ["Know Your Margin", "Track project costs, pricing, approvals, procurement movement, and margin exposure from one connected workspace."],
+];
+
+const templateTwoFeatures = [
+  ["Get paid more quickly with pre-built invoices", "Turn approved BOQs and milestones into cleaner billing workflows that are ready to share with clients."],
+  ["Launch a customer approval portal in minutes", "Give clients a secure place to review project scope, approvals, documents, and commercial decisions."],
+  ["Standardize repeatable project pricing", "Use templates, costing rules, and material libraries so every team quotes from the same system."],
+  ["Track operations as your team grows", "See project status, approvals, documents, and margin pressure without asking five people for updates."],
+];
+
+const stackModules = [
+  ["BOQ Builder", "Build structured project estimates without Excel dependency.", ["Structured BOQ hierarchy", "Templates and Excel import", "Revisions and version control"]],
+  ["Costing & Materials", "Create a reliable pricing foundation for every estimate.", ["Material cost library", "Vendor-linked rates", "GST, margin and costing logic"]],
+  ["Approvals & Procurement", "Move approved costs into actionable project workflows.", ["Client approvals", "Vendor comparison", "Procurement handoff"]],
+  ["Project Intelligence", "See what is happening across projects and commercials.", ["Project dashboards", "Cost and margin visibility", "Documents and activity tracking"]],
+];
+
+const integrationFeatures = [
+  ["Google Ad Forms", "Bring campaign leads into RVYO automatically."],
+  ["Meta Ad Forms", "Capture Facebook and Instagram enquiries inside your workflow."],
+  ["Custom Forms", "Embed custom forms with your own project intake fields."],
+  ["WhatsApp Business", "Send timely client updates without losing project context."],
+  ["Email", "Connect communication to key project touchpoints."],
+  ["Razorpay", "Collect payments against invoices created in RVYO."],
+];
+
+const pricingPlans = [
+  {
+    title: "For Growing Teams",
+    price: "₹1,499",
+    cta: "Start Today",
+    copy: "Everything you need to bring your BOQ workflow into one system.",
+    items: ["BOQ Builder", "Costing & Materials", "Projects & Documents", "Approvals", "Core Integrations"],
+  },
+  {
+    title: "Enterprise",
+    price: "₹2,799",
+    cta: "Get Enterprise Now",
+    copy: "Advanced commercial control for larger project teams.",
+    items: ["Everything in Professional", "Advanced Project Controls", "Advanced Integrations", "Advanced Reporting", "Priority Support"],
+  },
+];
+
+const comparisonRows = [
+  ["BOQ Management", "Structured", "Spreadsheets"],
+  ["Costing Logic", "Centralised", "Manual"],
+  ["Revisions", "Controlled", "Scattered"],
+  ["Client Approvals", "Tracked", "Informal"],
+  ["Project Visibility", "Real-time", "Fragmented"],
+  ["Commercial Control", "Centralized", "Disconnected"],
+];
+
+const testimonials = [
+  ["David R.", "NovaTech", "The difference is having one structured version of the project. Our team spends less time searching for information and more time controlling the project."],
+  ["James C.", "Vertex Labs", "RVYO helped us bring BOQs, costing, approvals, and project information into one workflow instead of managing everything across multiple files."],
+  ["Liam F.", "Altura", "We wanted something more controlled than Excel without a complicated ERP. RVYO gives us that middle ground."],
+];
 
 const faqs = [
   "Can I import my existing Excel BOQs?",
@@ -35,9 +103,10 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
     <main className={`site home-page rvyo-page solution-page ${solution.template}`}>
       <MarketingNav current="Solutions" />
       <Hero solution={solution} />
+      {solution.template === "template1" && <TemplateOneTrustedStrip />}
       {solution.template === "template3" && <TrustedStrip />}
-      <MetricsBlock />
-      {solution.template === "template2" ? <TemplateTwoSections solution={solution} /> : <TemplateOneThreeSections solution={solution} />}
+      {solution.template !== "template2" && <MetricsBlock />}
+      {solution.template === "template1" ? <TemplateOneFullSections solution={solution} /> : solution.template === "template2" ? <TemplateTwoFullSections solution={solution} /> : <TemplateThreeFullSections solution={solution} />}
       <FaqBlock />
       <section className="final-cta rail">
         <div className="blue-grain" />
@@ -83,6 +152,21 @@ function DashboardPreview() {
         <span>Live margin, approval, and material visibility</span>
       </div>
     </div>
+  );
+}
+
+function TemplateOneTrustedStrip() {
+  return (
+    <section className="solution-trusted solution-trusted-logos rail" aria-label="Trusted partner logos">
+      <p>Used by interior design studios, firms, architects, estimators, and procurement teams.</p>
+      <div>
+        {templateOneLogos.map(([src, label]) => (
+          <span key={label}>
+            <img src={src} alt={`${label} logo`} />
+          </span>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -197,6 +281,361 @@ function TemplateTwoSections({ solution }: { solution: MarketingSolution }) {
         ))}
       </div>
     </section>
+  );
+}
+
+function TemplateOneFullSections({ solution }: { solution: MarketingSolution }) {
+  return (
+    <>
+      <section className="solution-control rail">
+        <div>
+          <Tag>Workflow control</Tag>
+          <h2>Stop managing projects. Start controlling them.</h2>
+          <p>{solution.proof} RVYO connects the commercial decisions that usually live across spreadsheets, chats, documents, and approvals.</p>
+        </div>
+        <div className="solution-control-grid">
+          {workflowCards.map(([title, copy], index) => (
+            <article key={title}>
+              <div className={`solution-art solution-art-${index + 1}`} />
+              <h3>{title}</h3>
+              <p>{copy}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="solution-stack rail">
+        <Tag>The RVYO stack</Tag>
+        <h2>Purpose-built modules work together from initial scope to controlled execution.</h2>
+        <div className="solution-stack-grid">
+          {stackModules.map(([title, copy, items], index) => (
+            <article key={title as string} className={index % 2 ? "reverse" : ""}>
+              <div>
+                <h3>{title}</h3>
+                <p>{copy}</p>
+              </div>
+              <ul>
+                {(items as string[]).map((item) => (
+                  <li key={item}>
+                    <Check />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="solution-integrations">
+        <div className="solution-integrations-rail">
+          <Tag>Connected workflow</Tag>
+          <h2>Bring every client touchpoint into RVYO.</h2>
+          <p>Connect the tools your team already uses to capture leads, communicate with clients, and collect project payments without breaking your workflow.</p>
+          <div className="solution-logo-orbit" aria-hidden="true">
+            {["K", "N", "G", "+", "O", "A", "GH", "L", "M", "R"].map((glyph, index) => (
+              <span key={`${glyph}-${index}`}>{glyph}</span>
+            ))}
+          </div>
+          <div className="solution-dark-grid">
+            {integrationFeatures.map(([title, copy]) => (
+              <article key={title}>
+                <span><Code2 /></span>
+                <div>
+                  <h3>{title}</h3>
+                  <p>{copy}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="solution-pricing rail">
+        <Tag>Simple pricing</Tag>
+        <h2>Choose the plan that fits your team today. Upgrade when your operations grow.</h2>
+        <div className="solution-pricing-grid">
+          {pricingPlans.map((plan, index) => (
+            <article key={plan.title} className={index === 1 ? "featured" : ""}>
+              {index === 1 && <b>Most Popular</b>}
+              <h3>{plan.title}</h3>
+              <p>{plan.copy}</p>
+              <div>
+                <strong>{plan.price}</strong>
+                <small>/ mo</small>
+              </div>
+              <a href="/register">{plan.cta}</a>
+              <ul>
+                {plan.items.map((item) => (
+                  <li key={item}>
+                    <Check />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="solution-comparison rail">
+        <Tag>The switch</Tag>
+        <h2>Keep BOQs, costing, approvals, documents, and project information connected.</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Capability</th>
+              <th>RVYO</th>
+              <th>Other Apps</th>
+            </tr>
+          </thead>
+          <tbody>
+            {comparisonRows.map(([label, rvyo, other]) => (
+              <tr key={label}>
+                <td>{label}</td>
+                <td><BadgeCheck />{rvyo}</td>
+                <td>{other}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <section className="solution-testimonials rail">
+        <Tag>From the people using RVYO</Tag>
+        <h2>Built around how project teams actually work.</h2>
+        <div>
+          {testimonials.map(([name, company, quote], index) => (
+            <article key={name}>
+              <p>“{quote}”</p>
+              <footer>
+                <span className={`solution-avatar avatar-${index + 1}`} />
+                <div>
+                  <strong>{name}</strong>
+                  <small>{company}</small>
+                </div>
+                <span className="solution-stars">
+                  {Array.from({ length: 5 }, (_, starIndex) => <Star key={starIndex} />)}
+                </span>
+              </footer>
+            </article>
+          ))}
+        </div>
+      </section>
+    </>
+  );
+}
+
+function TemplateTwoFullSections({ solution }: { solution: MarketingSolution }) {
+  return (
+    <>
+      <section className="solution-template2-intro rail">
+        <div>
+          <Tag>Pre-built workflows</Tag>
+          <h2>More control at every stage of the project.</h2>
+          <p>
+            {solution.proof} Launch cleaner billing, approval, and operational workflows without diverting your team from the project work that matters.
+          </p>
+        </div>
+        <div className="template2-feature-grid">
+          {templateTwoFeatures.map(([title, copy]) => (
+            <article key={title}>
+              <h3>{title}</h3>
+              <p>{copy}</p>
+              <a href="/register">Learn more <ArrowRight /></a>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="template2-billing rail">
+        <div>
+          <Tag>Revenue workflow</Tag>
+          <h2>From approved BOQ to client-ready invoice in one connected flow.</h2>
+          <p>
+            Keep milestone billing, approvals, revisions, and documents tied to the same project record, so finance and delivery teams work from shared context.
+          </p>
+          <div className="template2-mini-plans">
+            <article>
+              <strong>Standard</strong>
+              <span>INR 6.67/mo</span>
+              <a href="/register">Get started</a>
+            </article>
+            <article>
+              <strong>Plus</strong>
+              <span>INR 12.50/mo</span>
+              <a href="/register">Get started</a>
+            </article>
+          </div>
+        </div>
+        <InvoicePreview />
+      </section>
+
+      <SharedLowerSections variant="template2" />
+    </>
+  );
+}
+
+function TemplateThreeFullSections({ solution }: { solution: MarketingSolution }) {
+  return (
+    <>
+      <section className="template3-showcase rail">
+        <div>
+          <Tag>Design to delivery</Tag>
+          <h2>Everything your {solution.title.toLowerCase()} need before site work begins.</h2>
+          <p>{solution.proof} Keep scope, costing, approvals, documentation, and delivery signals visible from the first estimate onward.</p>
+        </div>
+        <div className="template3-image-grid">
+          <img src="/figma/asset-11.png" alt="Project workspace preview" />
+          <img src="/figma/asset-12.png" alt="RVYO dashboard preview" />
+          <img src="/figma/asset-17.jpeg" alt="Interior project team discussion" />
+        </div>
+      </section>
+
+      <SharedLowerSections variant="template3" />
+    </>
+  );
+}
+
+function SharedLowerSections({ variant }: { variant: "template2" | "template3" }) {
+  return (
+    <>
+      <section className={`solution-control rail ${variant}`}>
+        <div>
+          <Tag>Workflow control</Tag>
+          <h2>Stop managing projects. Start controlling them.</h2>
+          <p>Bring project scope, costing, approvals, documents, communication, and commercial visibility into one workflow your whole team can trust.</p>
+        </div>
+        <div className="solution-control-grid">
+          {workflowCards.map(([title, copy], index) => (
+            <article key={title}>
+              <div className={`solution-art solution-art-${index + 1}`} />
+              <h3>{title}</h3>
+              <p>{copy}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="solution-stack rail">
+        <Tag>The RVYO stack</Tag>
+        <h2>Purpose-built modules work together from initial scope to controlled execution.</h2>
+        <div className="solution-stack-grid">
+          {stackModules.map(([title, copy, items], index) => (
+            <article key={title as string} className={index % 2 ? "reverse" : ""}>
+              <div>
+                <h3>{title}</h3>
+                <p>{copy}</p>
+              </div>
+              <ul>
+                {(items as string[]).map((item) => (
+                  <li key={item}>
+                    <Check />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="solution-integrations">
+        <div className="solution-integrations-rail">
+          <Tag>Connected workflow</Tag>
+          <h2>Bring every client touchpoint into RVYO.</h2>
+          <p>Connect the tools your team already uses to capture leads, communicate with clients, and collect project payments without breaking your workflow.</p>
+          <div className="solution-logo-orbit" aria-hidden="true">
+            {["K", "N", "G", "+", "O", "A", "GH", "L", "M", "R"].map((glyph, index) => (
+              <span key={`${glyph}-${index}`}>{glyph}</span>
+            ))}
+          </div>
+          <div className="solution-dark-grid">
+            {integrationFeatures.map(([title, copy]) => (
+              <article key={title}>
+                <span><Code2 /></span>
+                <div>
+                  <h3>{title}</h3>
+                  <p>{copy}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="solution-pricing rail">
+        <Tag>Simple pricing</Tag>
+        <h2>Choose the plan that fits your team today. Upgrade when your operations grow.</h2>
+        <div className="solution-pricing-grid">
+          {pricingPlans.map((plan, index) => (
+            <article key={plan.title} className={index === 1 ? "featured" : ""}>
+              {index === 1 && <b>Most Popular</b>}
+              <h3>{plan.title}</h3>
+              <p>{plan.copy}</p>
+              <div>
+                <strong>{plan.price}</strong>
+                <small>/ mo</small>
+              </div>
+              <a href="/register">{plan.cta}</a>
+              <ul>
+                {plan.items.map((item) => (
+                  <li key={item}>
+                    <Check />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="solution-comparison rail">
+        <Tag>The switch</Tag>
+        <h2>Keep BOQs, costing, approvals, documents, and project information connected.</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Capability</th>
+              <th>RVYO</th>
+              <th>Other Apps</th>
+            </tr>
+          </thead>
+          <tbody>
+            {comparisonRows.map(([label, rvyo, other]) => (
+              <tr key={label}>
+                <td>{label}</td>
+                <td><BadgeCheck />{rvyo}</td>
+                <td>{other}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <section className="solution-testimonials rail">
+        <Tag>From the people using RVYO</Tag>
+        <h2>Built around how project teams actually work.</h2>
+        <div>
+          {testimonials.map(([name, company, quote], index) => (
+            <article key={name}>
+              <p>&quot;{quote}&quot;</p>
+              <footer>
+                <span className={`solution-avatar avatar-${index + 1}`} />
+                <div>
+                  <strong>{name}</strong>
+                  <small>{company}</small>
+                </div>
+                <span className="solution-stars">
+                  {Array.from({ length: 5 }, (_, starIndex) => <Star key={starIndex} />)}
+                </span>
+              </footer>
+            </article>
+          ))}
+        </div>
+      </section>
+    </>
   );
 }
 
