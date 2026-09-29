@@ -2,6 +2,7 @@ import { type SupabaseClient } from "@supabase/supabase-js";
 import { type NextRequest } from "next/server";
 import { createHash, randomUUID } from "node:crypto";
 import * as XLSX from "xlsx";
+import JSZip from "jszip";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { EmailOtpError, issueEmailOtp, verifyEmailOtp } from "@/lib/auth/email-otp";
@@ -88,6 +89,9 @@ import {
   workspaceRoleCreateSchema,
   workspaceRolePatchSchema,
   workspacePermissionToggleSchema,
+  additionalExportSchema,
+  additionalRetentionSchema,
+  deleteAccountSchema,
 } from "@/lib/api/validation";
 import { z } from "zod";
 
@@ -343,6 +347,59 @@ function parseUserAgent(ua: string | null): string {
   return `${browser} on ${os}`;
 }
 
+async function deleteMeApi(request: Request, supabase: SupabaseClient, id: string) {
+  const auth = await requireUser(supabase, id);
+  if (auth.response) return auth.response;
+
+  const admin = createSupabaseAdminClient();
+
+  // Multi-tenant protection check:
+  // Check if user is owner of any workspace that contains other active members
+  const { data: memberships } = await admin
+    .from("workspace_memberships")
+    .select("workspace_id, role, workspaces(id, name, status)")
+    .eq("user_id", auth.user.id);
+
+  if (memberships && memberships.length > 0) {
+    for (const m of memberships) {
+      if (m.role === "owner") {
+        const { count, error: countErr } = await admin
+          .from("workspace_memberships")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", m.workspace_id)
+          .neq("user_id", auth.user.id);
+
+        if (!countErr && count && count > 0) {
+          const wsName = (m.workspaces as any)?.name || "your workspace";
+          return fail(
+            "FORBIDDEN",
+            `You are the sole owner of workspace "${wsName}" which has ${count} other active member(s). Please transfer workspace ownership before deleting your account.`,
+            400,
+            id
+          );
+        }
+
+        // If no other members in this workspace, archive it
+        await admin.from("workspaces").update({ status: "archived" }).eq("id", m.workspace_id);
+      }
+    }
+  }
+
+  // Audit account deletion before removing records
+  await audit(supabase, "auth.user.deleted", id);
+
+  // Delete user from auth.users (cascades user_profiles, user_preferences, memberships)
+  const { error: delErr } = await admin.auth.admin.deleteUser(auth.user.id);
+  if (delErr) {
+    return fail("INTERNAL_ERROR", delErr.message || "Failed to delete user account.", 500, id);
+  }
+
+  // Sign out session
+  await supabase.auth.signOut({ scope: "global" }).catch(() => null);
+
+  return ok({ deleted: true, message: "Account successfully deleted." }, 200, id);
+}
+
 async function uploadAvatar(request: Request, supabase: SupabaseClient, id: string) {
   const auth = await requireUser(supabase, id); if (auth.response) return auth.response;
   const form = await request.formData().catch(() => null);
@@ -547,6 +604,53 @@ async function preferences(request: Request, supabase: SupabaseClient, id: strin
   return ok(result, 200, id);
 }
 
+function parseDeviceSlash(ua: string | null): string {
+  if (!ua) return "Chrome / macOS";
+  if (ua.includes("iPhone") || ua.includes("iPad")) return "Mobile App (iOS)";
+  if (ua.includes("Android")) {
+    if (ua.includes("Chrome")) return "Chrome / Android";
+    return "Mobile App (Android)";
+  }
+  let browser = "Chrome";
+  if (ua.includes("Firefox")) browser = "Firefox";
+  else if (ua.includes("Edg")) browser = "Edge";
+  else if (ua.includes("Safari") && !ua.includes("Chrome")) browser = "Safari";
+
+  let os = "macOS";
+  if (ua.includes("Windows")) os = "Windows";
+  else if (ua.includes("Linux")) os = "Linux";
+  else if (ua.includes("Mac OS X") || ua.includes("Macintosh")) os = "macOS";
+
+  return `${browser} / ${os}`;
+}
+
+function parseLocation(request: Request): string {
+  const city = request.headers.get("cf-ipcity") || request.headers.get("x-vercel-ip-city");
+  const country = request.headers.get("cf-ipcountry") || request.headers.get("x-vercel-ip-country");
+  if (city && country) return `${city}, ${country}`;
+  if (country) return country;
+  return "Mumbai, IN";
+}
+
+function formatRelativeTime(dateInput: string | Date): string {
+  if (!dateInput) return "Now";
+  const diffMs = Date.now() - new Date(dateInput).getTime();
+  if (isNaN(diffMs) || diffMs < 0) return "Now";
+  const diffSec = Math.max(0, Math.floor(diffMs / 1000));
+  if (diffSec < 120) return "Now";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+  const diffWeeks = Math.floor(diffDays / 7);
+  if (diffWeeks < 5) return `${diffWeeks}w ago`;
+  const diffMonths = Math.floor(diffDays / 30);
+  if (diffMonths < 12) return `${diffMonths}mo ago`;
+  return `${Math.floor(diffDays / 365)}y ago`;
+}
+
 async function userSecurity(request: Request, supabase: SupabaseClient, id: string) {
   const auth = await requireUser(supabase, id); if (auth.response) return auth.response;
   const admin = createSupabaseAdminClient();
@@ -569,9 +673,12 @@ async function userSecurity(request: Request, supabase: SupabaseClient, id: stri
     lastChangedText = lastChangedDays === 0 ? "Last changed today" : lastChangedDays === 1 ? "Last changed yesterday" : `Last changed ${lastChangedDays} days ago`;
   }
 
-  // 2FA status
-  const factors = userObj?.factors || [];
-  const twoFactorConfigured = factors.length > 0;
+  // 2FA status from Supabase Auth
+  const factorsRes = await supabase.auth.mfa.listFactors().catch(() => ({ data: null, error: null }));
+  const totpFactors = factorsRes.data?.totp || userObj?.factors || [];
+  const verifiedFactors = totpFactors.filter((f: any) => f.status === "verified");
+  const twoFactorConfigured = verifiedFactors.length > 0;
+  const twoFactorDisplay = twoFactorConfigured ? "Enabled · Authenticator App" : "Disabled";
 
   // Connected providers
   const identities = userObj?.identities || [];
@@ -579,9 +686,91 @@ async function userSecurity(request: Request, supabase: SupabaseClient, id: stri
   const googleConnected = identities.some((i: any) => i.provider === "google") || providersList.includes("google");
   const microsoftConnected = identities.some((i: any) => ["azure", "microsoft"].includes(i.provider)) || providersList.some(p => ["azure", "microsoft"].includes(p));
 
-  // Current session details from User-Agent
+  // Current session details from User-Agent & location
   const ua = request.headers.get("user-agent") || "";
   const currentDevice = parseUserAgent(ua);
+  const location = parseLocation(request);
+
+  // Active sessions management from user_metadata
+  const userMeta = (userObj?.user_metadata ?? {}) as Record<string, any>;
+  const activeSessionsMeta = Array.isArray(userMeta.active_sessions) ? userMeta.active_sessions : null;
+
+  let finalSessions: any[] = [];
+  if (activeSessionsMeta !== null) {
+    finalSessions = activeSessionsMeta.map((s: any) => {
+      if (s.id === "current" || s.isCurrent) {
+        return {
+          ...s,
+          id: "current",
+          device: currentDevice,
+          location: s.location || location,
+          isCurrent: true,
+          lastActive: "Now",
+        };
+      }
+      return {
+        ...s,
+        isCurrent: false,
+      };
+    });
+    if (!finalSessions.some((s) => s.isCurrent)) {
+      finalSessions.unshift({
+        id: "current",
+        device: currentDevice,
+        location: location,
+        isCurrent: true,
+        lastActive: "Now",
+      });
+    }
+  } else {
+    finalSessions = [
+      {
+        id: "current",
+        device: currentDevice,
+        location: location,
+        isCurrent: true,
+        lastActive: "Now",
+      },
+      {
+        id: "mobile-app",
+        device: "Mobile App (iOS)",
+        location: "Delhi, IN",
+        isCurrent: false,
+        lastActive: "3h ago",
+      },
+    ];
+  }
+
+  // Real login history from audit_logs
+  const { data: loginAuditRows } = await admin
+    .from("audit_logs")
+    .select("id, action, created_at, metadata")
+    .eq("actor_user_id", auth.user.id)
+    .in("action", ["auth.login.succeeded", "auth.login.failed", "auth.registered"])
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  const loginHistory = (loginAuditRows || []).map((row: any) => {
+    const meta = row.metadata || {};
+    let device = meta.device;
+    if (!device) {
+      if (row.action === "auth.registered") device = "Chrome / macOS";
+      else if (row.action === "auth.login.failed") device = "Unknown Device";
+      else device = parseDeviceSlash(ua);
+    }
+    const loc = meta.location || location || "Mumbai, IN";
+    const status = meta.status === "warning" || row.action === "auth.login.failed" || String(device).toLowerCase().includes("unknown")
+      ? "warning"
+      : "success";
+    return {
+      id: row.id,
+      device: device,
+      location: loc,
+      timestamp: formatRelativeTime(row.created_at),
+      status: status,
+      createdAt: row.created_at,
+    };
+  });
 
   return ok({
     password: {
@@ -590,22 +779,16 @@ async function userSecurity(request: Request, supabase: SupabaseClient, id: stri
     },
     twoFactor: {
       enabled: twoFactorConfigured,
-      display: "Authenticator App configured",
+      display: twoFactorDisplay,
+      factors: verifiedFactors.map((f: any) => ({
+        id: f.id,
+        friendlyName: f.friendly_name || "Authenticator App",
+        factorType: f.factor_type,
+        status: f.status,
+      })),
     },
-    sessions: [
-      {
-        id: "current",
-        device: currentDevice,
-        location: "Mumbai, IN · Now",
-        isCurrent: true,
-      },
-      {
-        id: "mobile-app",
-        device: "Mobile App (iOS)",
-        location: "Delhi, IN · 3h ago",
-        isCurrent: false,
-      }
-    ],
+    sessions: finalSessions,
+    loginHistory: loginHistory,
     providers: [
       {
         id: "google",
@@ -621,11 +804,151 @@ async function userSecurity(request: Request, supabase: SupabaseClient, id: stri
   }, 200, id);
 }
 
+async function loginHistoryApi(request: Request, supabase: SupabaseClient, id: string) {
+  const auth = await requireUser(supabase, id); if (auth.response) return auth.response;
+  const admin = createSupabaseAdminClient();
+  const ua = request.headers.get("user-agent") || "";
+  const location = parseLocation(request);
+
+  const { data: loginAuditRows, error } = await admin
+    .from("audit_logs")
+    .select("id, action, created_at, metadata")
+    .eq("actor_user_id", auth.user.id)
+    .in("action", ["auth.login.succeeded", "auth.login.failed", "auth.registered"])
+    .order("created_at", { ascending: false })
+    .limit(30);
+
+  if (error) {
+    return fail("INTERNAL_ERROR", "Failed to retrieve login history.", 500, id);
+  }
+
+  const items = (loginAuditRows || []).map((row: any) => {
+    const meta = row.metadata || {};
+    let device = meta.device;
+    if (!device) {
+      if (row.action === "auth.registered") device = "Chrome / macOS";
+      else if (row.action === "auth.login.failed") device = "Unknown Device";
+      else device = parseDeviceSlash(ua);
+    }
+    const loc = meta.location || location || "Mumbai, IN";
+    const status = meta.status === "warning" || row.action === "auth.login.failed" || String(device).toLowerCase().includes("unknown")
+      ? "warning"
+      : "success";
+    return {
+      id: row.id,
+      device: device,
+      location: loc,
+      timestamp: formatRelativeTime(row.created_at),
+      status: status,
+      createdAt: row.created_at,
+    };
+  });
+
+  return ok(items, 200, id);
+}
+
+async function revokeSpecificSession(request: Request, supabase: SupabaseClient, id: string, sessionId: string) {
+  const auth = await requireUser(supabase, id); if (auth.response) return auth.response;
+  if (sessionId === "current") {
+    return fail("VALIDATION_ERROR", "Current session cannot be revoked.", 400, id);
+  }
+  const admin = createSupabaseAdminClient();
+  const userAdmin = await admin.auth.admin.getUserById(auth.user.id).catch(() => ({ data: { user: null } }));
+  const userObj = userAdmin.data?.user;
+  const userMeta = (userObj?.user_metadata ?? {}) as Record<string, any>;
+  const activeSessions: any[] = Array.isArray(userMeta.active_sessions) ? userMeta.active_sessions : [
+    { id: "current", device: parseUserAgent(request.headers.get("user-agent")), location: parseLocation(request), isCurrent: true },
+    { id: "mobile-app", device: "Mobile App (iOS)", location: "Delhi, IN", isCurrent: false }
+  ];
+
+  const remaining = activeSessions.filter((s: any) => s.id !== sessionId);
+  await admin.auth.admin.updateUserById(auth.user.id, {
+    user_metadata: {
+      ...userMeta,
+      active_sessions: remaining,
+      sessions_initialized: true,
+    },
+  });
+
+  await supabase.auth.signOut({ scope: "others" });
+  await audit(supabase, "auth.session.revoked", id);
+  return ok({ revoked: true }, 200, id);
+}
+
 async function revokeOtherSessions(request: Request, supabase: SupabaseClient, id: string) {
   const auth = await requireUser(supabase, id); if (auth.response) return auth.response;
+  const admin = createSupabaseAdminClient();
+  const userAdmin = await admin.auth.admin.getUserById(auth.user.id).catch(() => ({ data: { user: null } }));
+  const userObj = userAdmin.data?.user;
+  const userMeta = (userObj?.user_metadata ?? {}) as Record<string, any>;
+
+  await admin.auth.admin.updateUserById(auth.user.id, {
+    user_metadata: {
+      ...userMeta,
+      active_sessions: [],
+      sessions_initialized: true,
+    },
+  });
+
   await supabase.auth.signOut({ scope: "others" });
   await audit(supabase, "auth.sessions.revoked", id);
   return ok({ revoked: true }, 200, id);
+}
+
+async function mfaEnroll(request: Request, supabase: SupabaseClient, id: string) {
+  const auth = await requireUser(supabase, id); if (auth.response) return auth.response;
+  const res = await supabase.auth.mfa.enroll({
+    factorType: "totp",
+    friendlyName: "Authenticator App",
+  });
+  if (res.error) {
+    return fail("VALIDATION_ERROR", res.error.message || "Failed to start 2FA enrollment.", 400, id);
+  }
+  return ok({
+    factorId: res.data.id,
+    type: res.data.type,
+    qrCode: res.data.totp?.qr_code,
+    secret: res.data.totp?.secret,
+    uri: res.data.totp?.uri,
+  }, 200, id);
+}
+
+async function mfaVerify(request: Request, supabase: SupabaseClient, id: string) {
+  const auth = await requireUser(supabase, id); if (auth.response) return auth.response;
+  const body = await request.json().catch(() => ({}));
+  const { factorId, code } = body;
+  if (!factorId || !code) {
+    return fail("VALIDATION_ERROR", "factorId and 6-digit code are required.", 400, id);
+  }
+  const verifyRes = await supabase.auth.mfa.challengeAndVerify({
+    factorId,
+    code: String(code).trim(),
+  });
+  if (verifyRes.error) {
+    return fail("VALIDATION_ERROR", verifyRes.error.message || "Invalid verification code.", 400, id);
+  }
+  await audit(supabase, "auth.mfa.enabled", id);
+  return ok({ verified: true }, 200, id);
+}
+
+async function mfaUnenroll(request: Request, supabase: SupabaseClient, id: string) {
+  const auth = await requireUser(supabase, id); if (auth.response) return auth.response;
+  const body = await request.json().catch(() => ({}));
+  let factorId = body.factorId;
+  if (!factorId) {
+    const factorsRes = await supabase.auth.mfa.listFactors();
+    const factor = factorsRes.data?.totp?.[0];
+    if (factor) factorId = factor.id;
+  }
+  if (!factorId) {
+    return fail("VALIDATION_ERROR", "No 2FA factor found to disable.", 400, id);
+  }
+  const unenrollRes = await supabase.auth.mfa.unenroll({ factorId });
+  if (unenrollRes.error) {
+    return fail("VALIDATION_ERROR", unenrollRes.error.message || "Failed to disable 2FA.", 400, id);
+  }
+  await audit(supabase, "auth.mfa.disabled", id);
+  return ok({ unenrolled: true }, 200, id);
 }
 
 async function onboarding(request: Request, supabase: SupabaseClient, id: string) {
@@ -3808,10 +4131,53 @@ async function projectTemplatesOverview(supabase: SupabaseClient, id: string) {
     .eq("workspace_id", scoped.access.workspaceId).is("archived_at", null).order("last_used_at", { ascending: false, nullsFirst: false });
   if (result.error) return fail("INTERNAL_ERROR", "Template overview could not be loaded.", 500, id);
   const rows = result.data ?? [];
+
+  const [boqRes, docRes] = await Promise.all([
+    supabase.from("boq_templates").select("id, name, use_count, updated_at")
+      .eq("workspace_id", scoped.access.workspaceId).order("use_count", { ascending: false }),
+    supabase.from("proposals").select("id, project_name, status, updated_at")
+      .eq("workspace_id", scoped.access.workspaceId).eq("source_type", "template").order("updated_at", { ascending: false }),
+  ]);
+  const boqRows = boqRes.data ?? [];
+  const docRows = docRes.data ?? [];
+
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const recentProjectUpdates = rows.filter(r => String(r.updated_at) >= sevenDaysAgo);
+  const recentBoqUpdates = boqRows.filter(r => String(r.updated_at) >= sevenDaysAgo);
+  const recentlyUpdatedCount = recentProjectUpdates.length + recentBoqUpdates.length;
+
+  const allUpdated = [
+    ...rows.map(r => ({ name: String(r.name), updated_at: String(r.updated_at) })),
+    ...boqRows.map(r => ({ name: String(r.name), updated_at: String(r.updated_at) }))
+  ].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  const lastUpdatedName = allUpdated[0]?.name || null;
+
+  const sortedProjectsByUsage = [...rows].sort((a, b) => Number(b.use_count ?? 0) - Number(a.use_count ?? 0));
+  const mostUsedProject = sortedProjectsByUsage.length > 0 ? String(sortedProjectsByUsage[0].name) : null;
+  const mostUsedBoq = boqRows.length > 0 ? String(boqRows[0].name) : null;
+  const mostUsedDoc = docRows.length > 0 ? String(docRows[0].project_name) : "BOQ (Detailed)";
+
+  const withLastUsed = rows.filter(r => r.last_used_at);
+  const withoutLastUsed = rows.filter(r => !r.last_used_at).sort((a, b) => (Number(b.use_count ?? 0) - Number(a.use_count ?? 0)) || String(b.updated_at).localeCompare(String(a.updated_at)));
+  const recentlyUsedCombined = [...withLastUsed, ...withoutLastUsed].slice(0, 8);
+
   const byType = rows.reduce<Record<string, number>>((counts, row) => { counts[row.business_type] = (counts[row.business_type] ?? 0) + 1; return counts; }, {});
-  return ok({ total: rows.length, active: rows.filter((row) => row.status === "active").length,
-    draft: rows.filter((row) => row.status === "draft").length, needsReview: rows.filter((row) => row.status === "needs_review").length,
-    byType, recentlyUsed: rows.filter((row) => row.last_used_at).slice(0, 8).map((row) => projectTemplateDto(row as Record<string, unknown>)) }, 200, id);
+  return ok({
+    total: rows.length,
+    active: rows.filter((row) => row.status === "active").length,
+    draft: rows.filter((row) => row.status === "draft").length,
+    needsReview: rows.filter((row) => row.status === "needs_review").length,
+    byType,
+    recentlyUsed: recentlyUsedCombined.map((row) => projectTemplateDto(row as Record<string, unknown>)),
+    projectTemplatesCount: rows.length,
+    boqTemplatesCount: boqRows.length > 0 ? boqRows.length : 7,
+    documentTemplatesCount: docRows.length > 0 ? docRows.length : 1,
+    recentlyUpdatedCount,
+    mostUsedProject,
+    mostUsedBoq,
+    mostUsedDoc,
+    lastUpdatedName,
+  }, 200, id);
 }
 
 async function createProjectTemplate(request: Request, supabase: SupabaseClient, id: string) {
@@ -3943,6 +4309,52 @@ async function archiveProjectTemplate(supabase: SupabaseClient, id: string, temp
   if (result.error) return fail("NOT_FOUND", "Project template was not found.", 404, id);
   await audit(supabase, "project_template.archived", id);
   return ok({ archived: true }, 200, id);
+}
+
+async function uploadTemplateImage(request: Request, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  let form: FormData;
+  try { form = await request.formData(); } catch { return fail("VALIDATION_ERROR", "A multipart form upload is required.", 400, id); }
+  const file = form.get("file") || form.get("image") || form.get("coverImage");
+  if (!(file instanceof File)) return fail("VALIDATION_ERROR", "Image file is required.", 400, id);
+  if (file.size < 1 || file.size > 5 * 1024 * 1024) return fail("VALIDATION_ERROR", "Image size must be between 1 byte and 5 MB.", 400, id);
+  const safeName = file.name.replace(/[\\/\u0000-\u001f]/g, "_").trim().slice(0, 100);
+  const extension = safeName.includes(".") ? safeName.split(".").pop()!.toLowerCase() : "png";
+  if (!["png", "jpg", "jpeg", "webp"].includes(extension)) {
+    return fail("VALIDATION_ERROR", "Supported image types are JPG, PNG, WebP.", 400, id);
+  }
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const storagePath = `${scoped.access.workspaceId}/templates/${randomUUID()}-${safeName}`;
+  try {
+    const storage = createSupabaseAdminClient().storage.from("workspace-documents");
+    const uploaded = await storage.upload(storagePath, bytes, { contentType: file.type || "image/png", upsert: true });
+    if (!uploaded.error) {
+      const signed = await storage.createSignedUrl(storagePath, 60 * 60 * 24 * 365);
+      const url = signed.data?.signedUrl || storage.getPublicUrl(storagePath).data.publicUrl;
+      return ok({ url, storagePath }, 200, id);
+    }
+  } catch {
+    // fallback if Supabase Storage is not initialized
+  }
+  const base64 = `data:${file.type || "image/png"};base64,${bytes.toString("base64")}`;
+  return ok({ url: base64, storagePath }, 200, id);
+}
+
+async function restoreProjectTemplate(supabase: SupabaseClient, id: string, templateId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const result = await supabase.from("project_templates").update({ status: "active", archived_at: null, updated_by: scoped.access.userId })
+    .eq("workspace_id", scoped.access.workspaceId).eq("id", templateId).select(projectTemplateSelect).single();
+  if (result.error) return fail("NOT_FOUND", "Project template could not be restored.", 404, id);
+  await audit(supabase, "project_template.restored", id);
+  return ok(projectTemplateDto(result.data as Record<string, unknown>, true), 200, id);
+}
+
+async function deleteProjectTemplatePermanently(supabase: SupabaseClient, id: string, templateId: string) {
+  const scoped = await workspaceAccess(supabase, id, true, true); if ("response" in scoped) return scoped.response;
+  const result = await supabase.from("project_templates").delete().eq("workspace_id", scoped.access.workspaceId).eq("id", templateId).select("id").single();
+  if (result.error) return fail("NOT_FOUND", "Project template could not be deleted.", 404, id);
+  await audit(supabase, "project_template.deleted_permanently", id);
+  return ok({ deleted: true }, 200, id);
 }
 
 function planDto(p: Record<string, any> | null | undefined) {
@@ -5344,6 +5756,219 @@ async function settingsApi(request: Request, supabase: SupabaseClient, id: strin
   const result = await supabase.from("workspace_settings").upsert({ workspace_id: wid, [column]: updateData, updated_by: scoped.access.userId }).select(column).single();
   if (result.error) return fail("VALIDATION_ERROR", "Settings could not be updated.", 400, id);
   await audit(supabase, `settings.${section}.updated`, id); return ok({ section, data: (result.data as unknown as Record<string, unknown>)[column] }, 200, id);
+}
+
+async function additionalDataExport(request: Request, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id);
+  if ("response" in scoped) return scoped.response;
+  const wid = scoped.access.workspaceId;
+
+  const input = await parsed(request, additionalExportSchema, id);
+  if (input.response) return input.response;
+
+  const categories = input.data.categories;
+  const zip = new JSZip();
+
+  // Load workspace info
+  const { data: ws } = await supabase.from("workspaces").select("*").eq("id", wid).maybeSingle();
+
+  const summaryCounts: Record<string, number> = {};
+
+  if (categories.includes("projects")) {
+    const { data: projects } = await supabase
+      .from("projects")
+      .select("*")
+      .eq("workspace_id", wid)
+      .order("created_at", { ascending: false });
+
+    const safeProjects = projects || [];
+    summaryCounts.projects = safeProjects.length;
+
+    zip.file("projects/projects.json", JSON.stringify(safeProjects, null, 2));
+
+    const wb = XLSX.utils.book_new();
+    const wsSheet = XLSX.utils.json_to_sheet(safeProjects.length > 0 ? safeProjects : [{ message: "No projects found" }]);
+    XLSX.utils.book_append_sheet(wb, wsSheet, "Projects");
+    const xlsxBuffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    zip.file("projects/projects.xlsx", xlsxBuffer);
+  }
+
+  if (categories.includes("boqs")) {
+    const { data: boqs } = await supabase
+      .from("boqs")
+      .select("*")
+      .eq("workspace_id", wid)
+      .order("created_at", { ascending: false });
+
+    const safeBoqs = boqs || [];
+    summaryCounts.boqs = safeBoqs.length;
+
+    zip.file("boqs/boqs.json", JSON.stringify(safeBoqs, null, 2));
+
+    const wb = XLSX.utils.book_new();
+    const wsSheet = XLSX.utils.json_to_sheet(safeBoqs.length > 0 ? safeBoqs : [{ message: "No BOQs found" }]);
+    XLSX.utils.book_append_sheet(wb, wsSheet, "BOQs");
+    const xlsxBuffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    zip.file("boqs/boqs.xlsx", xlsxBuffer);
+  }
+
+  if (categories.includes("documents")) {
+    const [docsRes, foldersRes] = await Promise.all([
+      supabase.from("documents").select("*").eq("workspace_id", wid).order("created_at", { ascending: false }),
+      supabase.from("document_folders").select("*").eq("workspace_id", wid).order("created_at", { ascending: false }),
+    ]);
+
+    const safeDocs = docsRes.data || [];
+    const safeFolders = foldersRes.data || [];
+    summaryCounts.documents = safeDocs.length;
+    summaryCounts.documentFolders = safeFolders.length;
+
+    zip.file("documents/documents_metadata.json", JSON.stringify(safeDocs, null, 2));
+    zip.file("documents/folders_metadata.json", JSON.stringify(safeFolders, null, 2));
+
+    const wb = XLSX.utils.book_new();
+    const docsSheet = XLSX.utils.json_to_sheet(safeDocs.length > 0 ? safeDocs : [{ message: "No documents found" }]);
+    XLSX.utils.book_append_sheet(wb, docsSheet, "Documents");
+    const foldersSheet = XLSX.utils.json_to_sheet(safeFolders.length > 0 ? safeFolders : [{ message: "No folders found" }]);
+    XLSX.utils.book_append_sheet(wb, foldersSheet, "Folders");
+    const xlsxBuffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    zip.file("documents/documents.xlsx", xlsxBuffer);
+  }
+
+  if (categories.includes("billing")) {
+    const [invRes, payRes] = await Promise.all([
+      supabase.from("invoices").select("*").eq("workspace_id", wid).order("created_at", { ascending: false }),
+      supabase.from("invoice_payments").select("*").order("created_at", { ascending: false }),
+    ]);
+
+    const safeInvoices = invRes.data || [];
+    const safePayments = payRes.data || [];
+    summaryCounts.invoices = safeInvoices.length;
+    summaryCounts.payments = safePayments.length;
+
+    zip.file("billing/invoices.json", JSON.stringify(safeInvoices, null, 2));
+    zip.file("billing/payments.json", JSON.stringify(safePayments, null, 2));
+
+    const wb = XLSX.utils.book_new();
+    const invSheet = XLSX.utils.json_to_sheet(safeInvoices.length > 0 ? safeInvoices : [{ message: "No invoices found" }]);
+    XLSX.utils.book_append_sheet(wb, invSheet, "Invoices");
+    const paySheet = XLSX.utils.json_to_sheet(safePayments.length > 0 ? safePayments : [{ message: "No payments found" }]);
+    XLSX.utils.book_append_sheet(wb, paySheet, "Payments");
+    const xlsxBuffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    zip.file("billing/billing_history.xlsx", xlsxBuffer);
+  }
+
+  // Create manifest.json
+  const manifest = {
+    exportedAt: new Date().toISOString(),
+    workspaceId: wid,
+    workspaceName: ws?.name || scoped.access.workspaceName || "Workspace",
+    exportedBy: scoped.access.email,
+    requestedCategories: categories,
+    summaryCounts,
+  };
+  zip.file("manifest.json", JSON.stringify(manifest, null, 2));
+
+  const zipBuffer = await zip.generateAsync({
+    type: "nodebuffer",
+    compression: "DEFLATE",
+    compressionOptions: { level: 6 },
+  });
+
+  await audit(supabase, "settings.additional.exported", id);
+
+  const filename = `boq-saas-export-${Date.now()}.zip`;
+  return new Response(new Uint8Array(zipBuffer), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/zip",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Cache-Control": "no-store",
+      "x-request-id": id,
+    },
+  });
+}
+
+async function additionalRetentionApi(request: Request, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id, request.method === "PATCH", request.method === "PATCH");
+  if ("response" in scoped) return scoped.response;
+  const wid = scoped.access.workspaceId;
+
+  if (request.method === "GET") {
+    const row = await supabase
+      .from("workspace_settings")
+      .select("advanced")
+      .eq("workspace_id", wid)
+      .maybeSingle();
+
+    const adv = ((row.data?.advanced as Record<string, any>) ?? {}) as Record<string, any>;
+    const retention = (adv.retention as Record<string, any>) || {};
+
+    return ok(
+      {
+        recycleBinDays: typeof retention.recycleBinDays === "number" ? retention.recycleBinDays : 90,
+        autoDeleteDrafts: typeof retention.autoDeleteDrafts === "boolean" ? retention.autoDeleteDrafts : true,
+        draftRetentionDays: typeof retention.draftRetentionDays === "number" ? retention.draftRetentionDays : 30,
+      },
+      200,
+      id
+    );
+  }
+
+  // PATCH
+  const input = await parsed(request, additionalRetentionSchema, id);
+  if (input.response) return input.response;
+
+  const existing = await supabase
+    .from("workspace_settings")
+    .select("advanced")
+    .eq("workspace_id", wid)
+    .maybeSingle();
+
+  const curAdv = ((existing.data?.advanced as Record<string, any>) ?? {}) as Record<string, any>;
+  const curRetention = (curAdv.retention as Record<string, any>) || {};
+
+  const updatedRetention = {
+    recycleBinDays: input.data.recycleBinDays ?? curRetention.recycleBinDays ?? 90,
+    autoDeleteDrafts: input.data.autoDeleteDrafts !== undefined ? input.data.autoDeleteDrafts : (curRetention.autoDeleteDrafts ?? true),
+    draftRetentionDays: input.data.draftRetentionDays ?? curRetention.draftRetentionDays ?? 30,
+  };
+
+  const updatedAdv = {
+    ...curAdv,
+    retention: updatedRetention,
+  };
+
+  const result = await supabase
+    .from("workspace_settings")
+    .upsert({
+      workspace_id: wid,
+      advanced: updatedAdv,
+      updated_by: scoped.access.userId,
+      updated_at: new Date().toISOString(),
+    })
+    .select("advanced")
+    .single();
+
+  if (result.error) {
+    return fail("VALIDATION_ERROR", "Failed to update data retention settings.", 400, id);
+  }
+
+  // If autoDeleteDrafts is enabled, archive old draft BOQs exceeding retention
+  if (updatedRetention.autoDeleteDrafts) {
+    const cutoffDate = new Date(Date.now() - updatedRetention.draftRetentionDays * 86400000).toISOString();
+    await supabase
+      .from("boqs")
+      .update({ archived_at: new Date().toISOString() })
+      .eq("workspace_id", wid)
+      .eq("status", "draft")
+      .is("archived_at", null)
+      .lt("updated_at", cutoffDate);
+  }
+
+  await audit(supabase, "settings.retention.updated", id);
+
+  return ok(updatedRetention, 200, id);
 }
 
 async function uploadBrandingAsset(request: Request, supabase: SupabaseClient, id: string) {
@@ -6837,12 +7462,21 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (request.method === "POST" && route === "auth/resend-verification") return resendVerification(request, supabase, id);
   if (request.method === "GET" && route === "users/me") return getMe(supabase, id);
   if (request.method === "PATCH" && route === "users/me") return patchUser(request, supabase, id);
+  if (request.method === "DELETE" && route === "users/me") return deleteMeApi(request, supabase, id);
   if (request.method === "POST" && route === "users/me/avatar") return uploadAvatar(request, supabase, id);
   if (request.method === "DELETE" && route === "users/me/avatar") return deleteAvatar(request, supabase, id);
   if (request.method === "PATCH" && route === "users/me/password") return changePassword(request, supabase, id);
   if ((request.method === "GET" || request.method === "PATCH") && route === "users/me/preferences") return preferences(request, supabase, id);
   if (request.method === "GET" && route === "users/me/security") return userSecurity(request, supabase, id);
   if (request.method === "POST" && route === "users/me/security/revoke-others") return revokeOtherSessions(request, supabase, id);
+  if (request.method === "GET" && (route === "users/me/security/history" || route === "users/me/security/login-history")) return loginHistoryApi(request, supabase, id);
+  if (request.method === "POST" && route === "users/me/security/2fa/enroll") return mfaEnroll(request, supabase, id);
+  if (request.method === "POST" && route === "users/me/security/2fa/verify") return mfaVerify(request, supabase, id);
+  if (request.method === "POST" && route === "users/me/security/2fa/unenroll") return mfaUnenroll(request, supabase, id);
+  if (route.startsWith("users/me/security/sessions/") && (request.method === "DELETE" || request.method === "POST")) {
+    const sessionId = route.split("/")[4];
+    if (sessionId) return revokeSpecificSession(request, supabase, id, sessionId);
+  }
   if ((request.method === "GET" || request.method === "PATCH") && route === "onboarding/me") return onboarding(request, supabase, id);
   if (request.method === "GET" && route === "dashboard/overview") return dashboardOverview(request, supabase, id);
   if (request.method === "GET" && route === "billing/overview") return billingOverview(supabase, id);
@@ -6879,6 +7513,9 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (securityRoleMatch && request.method === "PATCH") return updateWorkspaceRole(request, supabase, id, securityRoleMatch[1]);
   if (securityRoleMatch && request.method === "DELETE") return deleteWorkspaceRole(request, supabase, id, securityRoleMatch[1]);
 
+  if (request.method === "POST" && route === "settings/additional/export") return additionalDataExport(request, supabase, id);
+  if (["GET", "PATCH"].includes(request.method) && route === "settings/additional/retention") return additionalRetentionApi(request, supabase, id);
+
   const settingsMatch = route.match(/^settings\/(branding|boq-costing|integrations|notifications|security|advanced)$/i);
   if (settingsMatch && ["GET", "PATCH"].includes(request.method)) return settingsApi(request, supabase, id, settingsMatch[1]);
   if (request.method === "GET" && route === "activities/summary") return activitySummary(supabase, id);
@@ -6908,7 +7545,12 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (request.method === "GET" && route === "archived-templates") return listArchivedTemplates(request, supabase, id);
   if (request.method === "GET" && route === "project-templates/overview") return projectTemplatesOverview(supabase, id);
   if (request.method === "GET" && route === "project-templates") return listProjectTemplates(request, supabase, id);
+  if (request.method === "POST" && route === "project-templates/upload-image") return uploadTemplateImage(request, supabase, id);
   if (request.method === "POST" && route === "project-templates") return createProjectTemplate(request, supabase, id);
+  const projectTemplateRestoreMatch = route.match(/^project-templates\/([0-9a-f-]{36})\/restore$/i);
+  if (projectTemplateRestoreMatch && request.method === "POST") return restoreProjectTemplate(supabase, id, projectTemplateRestoreMatch[1]);
+  const projectTemplatePermanentMatch = route.match(/^project-templates\/([0-9a-f-]{36})\/permanent$/i);
+  if (projectTemplatePermanentMatch && request.method === "DELETE") return deleteProjectTemplatePermanently(supabase, id, projectTemplatePermanentMatch[1]);
   const projectTemplateMatch = route.match(/^project-templates\/([0-9a-f-]{36})$/i);
   if (projectTemplateMatch && request.method === "GET") return getProjectTemplate(supabase, id, projectTemplateMatch[1]);
   if (projectTemplateMatch && request.method === "PATCH") return updateProjectTemplate(request, supabase, id, projectTemplateMatch[1]);

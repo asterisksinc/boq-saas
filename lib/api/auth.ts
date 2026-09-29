@@ -874,12 +874,30 @@ export type UserSessionInfo = {
     device: string;
     location: string;
     isCurrent: boolean;
+    lastActive?: string;
+    createdAt?: string;
 };
 
 export type UserProviderInfo = {
     id: "google" | "microsoft";
     name: string;
     connected: boolean;
+};
+
+export type LoginHistoryItem = {
+    id: string | number;
+    device: string;
+    location: string;
+    timestamp: string;
+    status: "success" | "warning";
+    createdAt?: string;
+};
+
+export type TwoFactorFactor = {
+    id: string;
+    friendlyName?: string;
+    factorType: string;
+    status: string;
 };
 
 export type UserSecuritySettings = {
@@ -890,8 +908,10 @@ export type UserSecuritySettings = {
     twoFactor: {
         enabled: boolean;
         display: string;
+        factors?: TwoFactorFactor[];
     };
     sessions: UserSessionInfo[];
+    loginHistory?: LoginHistoryItem[];
     providers: UserProviderInfo[];
 };
 
@@ -924,6 +944,42 @@ export async function revokeOtherSessions() {
     return request<{ revoked: boolean }>("/api/v1/users/me/security/revoke-others", {
         method: "POST",
     });
+}
+
+export async function revokeSession(sessionId: string) {
+    return request<{ revoked: boolean }>(`/api/v1/users/me/security/sessions/${sessionId}`, {
+        method: "DELETE",
+    });
+}
+
+export async function enrollTwoFactor() {
+    return request<{
+        factorId: string;
+        type: string;
+        qrCode?: string;
+        secret?: string;
+        uri?: string;
+    }>("/api/v1/users/me/security/2fa/enroll", {
+        method: "POST",
+    });
+}
+
+export async function verifyTwoFactor(factorId: string, code: string) {
+    return request<{ verified: boolean }>("/api/v1/users/me/security/2fa/verify", {
+        method: "POST",
+        body: JSON.stringify({ factorId, code }),
+    });
+}
+
+export async function disableTwoFactor(factorId?: string) {
+    return request<{ unenrolled: boolean }>("/api/v1/users/me/security/2fa/unenroll", {
+        method: "POST",
+        body: JSON.stringify({ factorId }),
+    });
+}
+
+export async function getLoginHistory() {
+    return request<LoginHistoryItem[]>("/api/v1/users/me/security/history");
 }
 
 export async function updateUserPassword(input: {
@@ -1311,4 +1367,68 @@ export async function toggleWorkspaceRolePermission(roleId: string, input: Permi
         }
     );
 }
+
+// -------------------------------------------------------------
+// Settings -> Additional: Data Export, Retention & Account Deletion
+// -------------------------------------------------------------
+
+export interface RetentionSettings {
+    recycleBinDays: number;
+    autoDeleteDrafts: boolean;
+    draftRetentionDays: number;
+}
+
+export async function getRetentionSettings() {
+    return request<RetentionSettings>("/api/v1/settings/additional/retention");
+}
+
+export async function updateRetentionSettings(input: Partial<RetentionSettings>) {
+    return request<RetentionSettings>("/api/v1/settings/additional/retention", {
+        method: "PATCH",
+        body: JSON.stringify(input),
+    });
+}
+
+export async function exportAdditionalData(categories: string[]): Promise<{ success: boolean; filename: string }> {
+    const response = await fetch("/api/v1/settings/additional/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ categories }),
+    });
+
+    if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(getApiErrorMessage(payload) || "Failed to export data archive.");
+    }
+
+    const blob = await response.blob();
+    const contentDisposition = response.headers.get("content-disposition");
+    let filename = `boq-saas-export-${Date.now()}.zip`;
+    if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?([^"]+)"?/i);
+        if (match?.[1]) filename = match[1];
+    }
+
+    if (typeof window !== "undefined") {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.style.display = "none";
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    }
+
+    return { success: true, filename };
+}
+
+export async function deleteUserAccount(confirmation?: string) {
+    return request<{ deleted: boolean; message: string }>("/api/v1/users/me", {
+        method: "DELETE",
+        body: JSON.stringify({ confirmation }),
+    });
+}
+
 

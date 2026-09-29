@@ -594,6 +594,43 @@ await upsert("notifications", [{
   priority: "normal", target_type: "workspace", target_id: WORKSPACE_ID, read_at: null,
 }]);
 
+// Seed demo audit records for realistic login history
+const demoLogins = [
+  { device: "Chrome / macOS", location: "Mumbai, IN", status: "success", deltaMs: 60 * 1000 },
+  { device: "Mobile App", location: "Delhi, IN", status: "success", deltaMs: 3 * 3600 * 1000 },
+  { device: "Firefox / Windows", location: "Mumbai, IN", status: "success", deltaMs: 2 * 86400 * 1000 },
+  { device: "Unknown Device", location: "Unknown", status: "warning", deltaMs: 5 * 86400 * 1000 },
+  { device: "Chrome / Android", location: "Bengaluru, IN", status: "success", deltaMs: 7 * 86400 * 1000 },
+];
+
+for (let i = 0; i < demoLogins.length; i++) {
+  const d = demoLogins[i];
+  const reqId = `seed:login:demo:${i + 1}`;
+  const existing = await admin.from("audit_logs").select("id").eq("request_id", reqId).maybeSingle();
+  if (!existing.data) {
+    await admin.from("audit_logs").insert({
+      workspace_id: WORKSPACE_ID,
+      actor_user_id: userId,
+      action: "auth.login.succeeded",
+      metadata: { device: d.device, location: d.location, status: d.status },
+      request_id: reqId,
+      created_at: new Date(Date.now() - d.deltaMs).toISOString(),
+    });
+  }
+}
+
+// Seed active sessions in user_metadata
+await admin.auth.admin.updateUserById(userId, {
+  user_metadata: {
+    display_name: "Demo User",
+    company_name: "Arena Design Studio",
+    active_sessions: [
+      { id: "current", device: "Chrome on macOS", location: "Mumbai, IN", isCurrent: true, lastActive: "Now" },
+      { id: "mobile-app", device: "Mobile App (iOS)", location: "Delhi, IN", isCurrent: false, lastActive: "3h ago" }
+    ],
+  },
+});
+
 const counts = {};
 for (const table of ["projects", "project_templates", "project_template_versions", "project_template_usage", "workspace_subscriptions", "activity_stages", "activity_tasks", "activity_approvals", "support_tickets", "boqs", "boq_items", "proposals", "invoices", "notifications"]) {
   const result = await admin.from(table).select("id", { count: "exact", head: true }).eq("workspace_id", WORKSPACE_ID);

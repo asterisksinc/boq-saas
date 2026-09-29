@@ -34,6 +34,8 @@ import BoqCostingLayout from "@/components/settings/boq-costing/BoqCostingLayout
 import SettingsIntegrations from "@/components/settings/SettingsIntegrations";
 import SettingsNotifications from "@/components/settings/SettingsNotifications";
 import SecurityAccessLayout from "@/components/settings/security/SecurityAccessLayout";
+import AdvancedSettingsLayout from "@/components/settings/advanced/AdvancedSettingsLayout";
+import AdditionalSettingsLayout from "@/components/settings/additional/AdditionalSettingsLayout";
 import { SettingsErrorState, SettingsEmptyTab } from "@/components/settings/SettingsEmptyState";
 import { adaptOverview } from "@/lib/settings/adapter";
 import { SettingsTab } from "@/lib/settings/types";
@@ -128,12 +130,12 @@ export default function SettingsPage() {
         if (typeof window !== "undefined") {
             const url = new URL(window.location.href);
             url.searchParams.set("tab", tab);
-            if (tab !== "boq-costing") {
+            if (tab !== "boq-costing" && tab !== "advanced" && tab !== "additional") {
                 url.searchParams.delete("section");
             }
             window.history.replaceState({}, "", url.toString());
         }
-        if (tab === "overview" || tab === "additional" || tab === "profile" || tab === "organization" || tab === "branding" || tab === "boq-costing" || tab === "integrations" || tab === "notifications" || tab === "security") {
+        if (tab === "overview" || tab === "additional" || tab === "profile" || tab === "organization" || tab === "branding" || tab === "boq-costing" || tab === "integrations" || tab === "notifications" || tab === "security" || tab === "advanced") {
             return;
         }
 
@@ -269,11 +271,18 @@ export default function SettingsPage() {
 
         if (activeTab === "additional") {
             return (
-                <SettingsEmptyTab
-                    title="Additional Settings"
-                    description="No additional configuration modules or third-party add-ons are enabled for this workspace."
-                    actionLabel="Return to Overview"
-                    onAction={() => setActiveTab("overview")}
+                <AdditionalSettingsLayout
+                    showNotice={showNotice}
+                    overview={overview}
+                />
+            );
+        }
+
+        if (activeTab === "advanced") {
+            return (
+                <AdvancedSettingsLayout
+                    showNotice={showNotice}
+                    overview={overview}
                 />
             );
         }
@@ -291,19 +300,7 @@ export default function SettingsPage() {
             );
         }
 
-        switch (activeTab) {
-            case "advanced":
-                return (
-                    <AdvancedForm
-                        data={sectionData}
-                        onChange={handleInputChange}
-                        onSave={handleSaveSection}
-                        saving={saving}
-                    />
-                );
-            default:
-                return null;
-        }
+        return null;
     };
 
     return (

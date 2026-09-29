@@ -931,6 +931,30 @@ export const workspacePermissionToggleSchema = z
   .strict()
   .refine((data) => Boolean(data.permissionId || data.category), "Either permissionId or category is required.");
 
+export const additionalExportSchema = z
+  .object({
+    categories: z
+      .array(z.enum(["projects", "boqs", "documents", "billing"]))
+      .min(1, "Select at least one category to export."),
+  })
+  .strict();
+
+export const additionalRetentionSchema = z
+  .object({
+    recycleBinDays: z.number().int().min(1).max(365).optional(),
+    autoDeleteDrafts: z.boolean().optional(),
+    draftRetentionDays: z.number().int().min(1).max(365).optional(),
+  })
+  .strict()
+  .refine((data) => Object.keys(data).length > 0, "At least one retention setting must be provided.");
+
+export const deleteAccountSchema = z
+  .object({
+    confirmation: z.string().trim().optional(),
+    forceTransfer: z.boolean().optional(),
+  })
+  .strict();
+
 export function fieldErrors(error: z.ZodError) {
   const result: Record<string, string[]> = {};
 
@@ -941,4 +965,5 @@ export function fieldErrors(error: z.ZodError) {
 
   return result;
 }
+
 
