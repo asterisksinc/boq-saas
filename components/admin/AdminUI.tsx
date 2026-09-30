@@ -37,7 +37,7 @@ type AdminTableColumn<T> = { key: string; label: string; width?: string; render:
 type AdminTableProps<T> = { columns: AdminTableColumn<T>[]; rows: T[]; menu?: ReactNode };
 
 const navItems = [
-  { href: "/dashboard", label: "Overview", icon: Gauge },
+  { href: "/admin", label: "Overview", icon: Gauge },
   { href: "/admin/organizations", label: "Organizations", icon: Building2 },
   { href: "/admin/users", label: "Users", icon: UserCircle },
   { href: "/admin/roles", label: "Roles", icon: ShieldCheck },
@@ -149,7 +149,7 @@ export function AdminShell({ title, children, actionLabel = "New" }: { title: st
     <main className="admin-fig">
       <div className="admin-fig-glow" />
       <aside className="admin-rail" aria-label="Admin navigation">
-        <Link className="admin-logo" href="/dashboard" aria-label="BOQ admin dashboard">
+        <Link className="admin-logo" href="/admin" aria-label="BOQ admin dashboard">
           <img src="/assets/boq-logo-small.svg" alt="" />
         </Link>
         <nav className="admin-nav">
@@ -182,7 +182,7 @@ export function AdminShell({ title, children, actionLabel = "New" }: { title: st
 function AdminNavItem({ href, label, Icon }: { href: string; label: string; Icon: typeof Gauge }) {
   const pathname = usePathname();
   const path = href.split("?")[0];
-  const active = pathname === path || (path !== "/dashboard" && Boolean(pathname?.startsWith(`${path}/`)));
+  const active = pathname === path || (path !== "/admin" && Boolean(pathname?.startsWith(`${path}/`)));
   return <Link className={active ? "active" : ""} href={href} title={label} aria-label={label}><Icon size={20} /></Link>;
 }
 
