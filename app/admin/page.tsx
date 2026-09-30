@@ -1,5 +1,5 @@
 import { AdminOverviewPage } from "@/components/admin/AdminUI";
 
-export default function DashboardPage() {
+export default function AdminPage() {
   return <AdminOverviewPage />;
 }
