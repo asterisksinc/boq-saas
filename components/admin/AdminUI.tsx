@@ -16,7 +16,6 @@ import {
   Filter,
   Gauge,
   ImageIcon,
-  LayoutTemplate,
   LifeBuoy,
   MoreHorizontal,
   Percent,
@@ -28,7 +27,6 @@ import {
   Trash2,
   UserCircle,
   Users,
-  X,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -104,15 +102,23 @@ const templates = [
 
 const modules = {
   blogs: [
-    ["BOQ basics for modern studios", "Resource", "Published", "Sarah T.", "12,480", "Updated 1 hr ago"],
-    ["Choosing the right costing model", "Blog", "Draft", "Content Team", "3,240", "Updated 4 hrs ago"],
-    ["Contractor onboarding checklist", "Guide", "Published", "Mike D.", "8,912", "Updated yesterday"],
-    ["Invoice automation playbook", "Resource", "Review", "Anika Rao", "6,128", "Updated 2 days ago"],
+    ["Lorem ipsum dolor self amet consectetur adipiscing alie", "TPL-PROP-001", "Blog", "2,840", "30th Sept, 2026\n12:11:03", "30th Sept, 2026\n12:11:03", "Active"],
+    ["Lorem ipsum dolor self amet consectetur adipiscing alie", "TPL-CON-002", "Blog", "1,920", "30th Sept, 2026\n12:11:03", "30th Sept, 2026\n12:11:03", "Active"],
+    ["Lorem ipsum dolor self amet consectetur adipiscing alie", "TPL-INV-003", "Resource", "3,420", "30th Sept, 2026\n12:11:03", "30th Sept, 2026\n12:11:03", "Paused"],
+    ["Lorem ipsum dolor self amet consectetur adipiscing alie", "TPL-INV-004", "Blog", "1,680", "30th Sept, 2026\n12:11:03", "30th Sept, 2026\n12:11:03", "Paused"],
+    ["Lorem ipsum dolor self amet consectetur adipiscing alie", "TPL-BOQ-005", "Resource", "980", "30th Sept, 2026\n12:11:03", "30th Sept, 2026\n12:11:03", "Active"],
+    ["Lorem ipsum dolor self amet consectetur adipiscing alie", "TPL-PROP-006", "Resource", "760", "30th Sept, 2026\n12:11:03", "30th Sept, 2026\n12:11:03", "Active"],
+    ["Lorem ipsum dolor self amet consectetur adipiscing alie", "TPL-CON-007", "Resource", "620", "30th Sept, 2026\n12:11:03", "30th Sept, 2026\n12:11:03", "Active"],
+    ["Lorem ipsum dolor self amet consectetur adipiscing alie", "TPL-PROP-008", "Resource", "540", "30th Sept, 2026\n12:11:03", "30th Sept, 2026\n12:11:03", "Active"],
   ],
   offers: [
-    ["WELCOME20", "20% off first 3 months", "Active", "3,420", "30 Sep 2026"],
-    ["PROUPGRADE", "Professional plan upgrade", "Scheduled", "880", "15 Oct 2026"],
-    ["REACTIVATE", "Win-back coupon", "Paused", "214", "22 Sep 2026"],
+    ["Lorem Ipsum Dolor", "₹4,99 OFF", "For first purchase", "(₹) Discount", "RYVOFIRST", "2,745", "ACTIVE", "5 Aug 2024"],
+    ["Lorem Ipsum Dolor", "8% OFF", "For first purchase", "(%) Discount", "RYVO8OFF", "2,745", "ACTIVE", "5 Aug 2024"],
+    ["Lorem Ipsum Dolor", "₹4,99 OFF", "on Pro Plan", "Plan Offer", "PROISME", "2,745", "ACTIVE", "5 Aug 2024"],
+    ["Lorem Ipsum Dolor", "20% OFF", "on All Plans", "Sale", "HAPPYUSER", "2,745", "ACTIVE", "5 Aug 2024"],
+    ["Lorem Ipsum Dolor", "₹4,99 OFF", "on Pro Plan", "Plan Offer", "PROISME", "2,745", "ACTIVE", "5 Aug 2024"],
+    ["Lorem Ipsum Dolor", "₹4,99 OFF", "on Pro Plan", "Plan Offer", "PROISME", "2,745", "ACTIVE", "5 Aug 2024"],
+    ["Lorem Ipsum Dolor", "₹4,99 OFF", "on Pro Plan", "Plan Offer", "PROISME", "2,745", "ACTIVE", "5 Aug 2024"],
   ],
   support: [
     ["Failed Integration", "Payments", "Attention Required", "12", "8 min ago"],
@@ -121,9 +127,14 @@ const modules = {
     ["Pending Abuse Reviews", "Trust", "Warning", "4", "2 hrs ago"],
   ],
   contacts: [
-    ["Northline Design Studio", "jane@northline.example", "Enterprise enquiry", "New", "2 min ago"],
-    ["Verona Infra", "ops@verona.example", "Pricing question", "Assigned", "18 min ago"],
-    ["Meridian Interiors", "hello@meridian.example", "Partnership", "Closed", "1 day ago"],
+    ["Kathryn Murphy", "kathryn@gmail.com", "+910 123456789", "Contact Page", "Form-01", "ACTIVE", "5 Aug 2024"],
+    ["Kathryn Murphy", "kathryn@gmail.com", "+910 123456789", "Contact Page", "Form-01", "ACTIVE", "5 Aug 2024"],
+    ["Kathryn Murphy", "kathryn@gmail.com", "+910 123456789", "Contact Page", "Form-01", "ACTIVE", "5 Aug 2024"],
+    ["Kathryn Murphy", "kathryn@gmail.com", "+910 123456789", "Contact Page", "Form-01", "ACTIVE", "5 Aug 2024"],
+    ["Kathryn Murphy", "kathryn@gmail.com", "+910 123456789", "Contact Page", "Form-01", "ACTIVE", "5 Aug 2024"],
+    ["Kathryn Murphy", "kathryn@gmail.com", "+910 123456789", "Contact Page", "Form-01", "ACTIVE", "5 Aug 2024"],
+    ["Kathryn Murphy", "kathryn@gmail.com", "+910 123456789", "Contact Page", "Form-01", "ACTIVE", "5 Aug 2024"],
+    ["Kathryn Murphy", "kathryn@gmail.com", "+910 123456789", "Contact Page", "Form-01", "ACTIVE", "5 Aug 2024"],
   ],
   cms: [
     ["Home hero", "Landing Page", "Published", "20", "Updated 12 min ago"],
@@ -197,7 +208,7 @@ export function AdminOverviewPage() {
           <MetricRow icon={Gauge} value="$2.4M" label="Monthly Recurring Revenue" trend="+6.2%" />
           <MetricRow icon={Users} value="1,284" label="Active Users" trend="+6.2%" />
         </Panel>
-        <Panel>
+        <Panel className="admin-product-health">
           <SectionTitle title="Product Health" />
           <div className="admin-mini-grid">
             <Metric value="1,284" label="Active Users" trend="+14.1%" />
@@ -208,15 +219,15 @@ export function AdminOverviewPage() {
             <Metric value="3,891" label="Invoice Generated" trend="+14.1%" />
           </div>
         </Panel>
-        <Panel>
+        <Panel className="admin-operational-health">
           <SectionTitle title="Operational Health" />
           {modules.support.slice(0, 3).map((row) => <OpsRow key={row[0]} title={row[0]} label={row[2]} value={row[3]} />)}
         </Panel>
-        <Panel>
+        <Panel className="admin-subscription-status">
           <SectionTitle title="Subscription Status" />
           <Donut value="248" label="Organizations" />
         </Panel>
-        <Panel className="admin-span">
+        <Panel className="admin-recent-activity">
           <SectionTitle title="Recent Activity" />
           {["Organization Created", "Role permission updated", "Template published"].map((title) => (
             <ActivityRow key={title} title={title} detail="Northline Design Studio" />
@@ -320,6 +331,46 @@ export function TemplatesAdminPage() {
 }
 
 export function ModulePage({ kind }: { kind: keyof typeof modules }) {
+  if (kind === "cms") {
+    return <CmsAdminPage />;
+  }
+  if (kind === "blogs") {
+    const columns: AdminTableColumn<(typeof modules.blogs)[number]>[] = [
+      { key: "article", label: "Article", render: row => <TwoLine title={row[0]} detail={row[1]} /> },
+      { key: "category", label: "Category", width: "160px", render: row => row[2] },
+      { key: "views", label: "Total Views", width: "160px", render: row => row[3] },
+      { key: "published", label: "Published On", width: "160px", render: row => <StackedText value={row[4]} /> },
+      { key: "edited", label: "Last Edited", width: "160px", render: row => <StackedText value={row[5]} /> },
+      { key: "status", label: "Status", width: "120px", render: row => <Badge tone={row[6] === "Paused" ? "orange" : "green"}>{row[6]}</Badge> },
+    ];
+    return <ListPage title="Blogs & Resources" heading="Blogs & Recources" detail="Create and manage blogs, resources, and content for the users." action="Create Resource" tabs={["All", "Blogs", "Resources"]} search="Search by resource name or ID...." table={<AdminTable rows={modules.blogs} columns={columns} />} />;
+  }
+  if (kind === "contacts") {
+    const columns: AdminTableColumn<(typeof modules.contacts)[number]>[] = [
+      { key: "name", label: "Contact Name", width: "281px", render: row => row[0] },
+      { key: "email", label: "Contact Email", width: "279px", render: row => row[1] },
+      { key: "phone", label: "Contact Phone", width: "206px", render: row => row[2] },
+      { key: "form", label: "Linked Form", width: "231px", render: row => <TwoLine title={row[3]} detail={row[4]} /> },
+      { key: "status", label: "Status", width: "124px", render: row => <Badge tone="green">{row[5]}</Badge> },
+      { key: "received", label: "Received On", width: "121px", render: row => row[6] },
+    ];
+    return <ListPage title="Contact Submissions" heading="Contact Submissions" detail="View & Manage contacts received upon website forms." action="" tabs={["All", "Contact", "Marketing Landing"]} search="Search by contact name or ID...." table={<AdminTable rows={modules.contacts} columns={columns} />} hideAction />;
+  }
+  if (kind === "offers" || kind === "support") {
+    const columns: AdminTableColumn<(typeof modules.offers)[number]>[] = [
+      { key: "name", label: "Coupon Name", width: "221px", render: row => row[0] },
+      { key: "discount", label: "Discount", width: "213px", render: row => <TwoLine title={row[1]} detail={row[2]} /> },
+      { key: "type", label: "Type", width: "142px", render: row => <Badge tone={row[3] === "Sale" ? "blue" : row[3] === "Plan Offer" ? "purple" : "orange"}>{row[3]}</Badge> },
+      { key: "code", label: "Code", width: "220px", render: row => row[4] },
+      { key: "uses", label: "Uses", width: "162px", render: row => row[5] },
+      { key: "status", label: "Status", width: "145px", render: row => <Badge tone="green">{row[6]}</Badge> },
+      { key: "created", label: "Created On", width: "142px", render: row => row[7] },
+    ];
+    const page = kind === "offers"
+      ? { title: "Offers & Coupons", detail: "Boost sales by giving users special offers & discounts.", action: "Create Coupon", stats: [["Total Coupons", "24"], ["Active Coupons", "20"], ["Total Uses", "12,840"], ["Uses This Month", "1,842"]], tabs: ["All", "Discount", "Plan Offer", "Sale"] }
+      : { title: "Support & Operations", detail: "Manage your user tickets & help desk operations.", action: "", stats: [["Total Tickets", "24"], ["Active Tickets", "20"], ["Pending Tickets", "1,842"], ["Closed Tickets", "12,840"]], tabs: ["Tickets", "Help Center"] };
+    return <ListPage title={page.title} heading={page.title} detail={page.detail} action={page.action} stats={page.stats} tabs={page.tabs} search="Search by contact name or ID...." table={<AdminTable rows={modules.offers} columns={columns} />} hideAction={kind === "support"} />;
+  }
   const config = {
     blogs: ["Blogs & Resources", "Publish, review and monitor educational content across the platform.", "New Resource", ["Total Resources", "42"], ["Published", "34"], ["In Review", "5"], ["Drafts", "3"]],
     offers: ["Offers & Coupons", "Create and monitor promotional campaigns and subscription coupons.", "New Coupon", ["Active Coupons", "12"], ["Redemptions", "4,514"], ["Scheduled", "3"], ["Paused", "2"]],
@@ -339,17 +390,18 @@ export function ModulePage({ kind }: { kind: keyof typeof modules }) {
   return <ListPage title={config[0]} heading={config[0]} detail={config[1]} action={config[2]} stats={stats} search={`Search ${config[0].toLowerCase()}...`} table={<AdminTable rows={rows} columns={columns} />} />;
 }
 
-function ListPage({ title, heading, detail, action, stats, search, tabs, table }: { title: string; heading: string; detail: string; action: string; stats?: string[][]; search: string; tabs?: string[]; table: ReactNode }) {
+function ListPage({ title, heading, detail, action, stats, search, tabs, table, hideAction = false }: { title: string; heading: string; detail: string; action: string; stats?: string[][]; search: string; tabs?: string[]; table: ReactNode; hideAction?: boolean }) {
   const [filterOpen, setFilterOpen] = useState(false);
   return (
     <AdminShell title={title} actionLabel="New">
       <section className="admin-page-stack">
-        <PageHeading title={heading} detail={detail} actions={<button className="admin-primary single"><Plus size={18} />{action}</button>} />
+        <PageHeading title={heading} detail={detail} actions={!hideAction && action ? <button className="admin-primary single"><Plus size={18} />{action}</button> : undefined} />
         {stats && <div className="admin-stat-grid">{stats.map(([label, value, tone]) => <StatCard key={label} label={label} value={value} tone={tone as BadgeTone} />)}</div>}
-        {tabs && <Segmented items={tabs} />}
         <div className="admin-table-toolbar">
+          {tabs && <Segmented items={tabs} />}
           <label className="admin-search admin-content-search"><Search size={16} /><input placeholder={search} /></label>
           <button className={`admin-secondary ${filterOpen ? "active" : ""}`} onClick={() => setFilterOpen(!filterOpen)}><Filter size={16} />Filter</button>
+          <button className="admin-secondary square" aria-label="Refresh"><RefreshCw size={16} /></button>
           {filterOpen && <div className="admin-filter-popover"><b>FILTER</b><label><input type="checkbox" defaultChecked /> Active</label><label><input type="checkbox" /> Trial</label><label><input type="checkbox" /> Attention required</label><button onClick={() => setFilterOpen(false)}>Apply Filters</button></div>}
         </div>
         {table}
@@ -415,7 +467,52 @@ function ChartCard({ title }: { title: string }) {
 }
 
 function Donut({ value, label, compact }: { value: string; label: string; compact?: boolean }) {
-  return <div className={`admin-donut-wrap ${compact ? "compact" : ""}`}><div className="admin-donut"><strong>{value}</strong><span>{label}</span></div><div className="admin-donut-legend"><span><i className="blue" />Active <b>186</b></span><span><i className="sky" />Trial <b>42</b></span><span><i className="orange" />Past Due <b>9</b></span><span><i className="purple" />Grace Period <b>5</b></span><span><i className="red" />Suspended <b>4</b></span><span><i className="gray" />Cancelled <b>2</b></span></div></div>;
+  return <div className={`admin-donut-wrap ${compact ? "compact" : ""}`}><div className="admin-donut"><div className="admin-donut-center"><strong>{value}</strong><span>{label}</span></div></div><div className="admin-donut-legend"><span><i className="blue" />Active <b>186</b></span><span><i className="sky" />Trial <b>42</b></span><span><i className="orange" />Past Due <b>9</b></span><span><i className="purple" />Grace Period <b>5</b></span><span><i className="red" />Suspended <b>4</b></span><span><i className="gray" />Cancelled <b>2</b></span></div></div>;
+}
+
+function CmsAdminPage() {
+  const sections = Array.from({ length: 12 }, () => "Section Name");
+  return (
+    <AdminShell title="Content & CMS">
+      <section className="admin-page-stack">
+        <PageHeading
+          title="Content Management System"
+          detail="Manage and monitor your public pages content & images."
+          actions={<><button className="admin-secondary">Home Page <ChevronDown size={16} /></button><button className="admin-primary single">Update CMS</button><button className="admin-secondary square"><RefreshCw size={16} /></button></>}
+        />
+        <div className="admin-cms-layout">
+          <Panel className="admin-cms-sidebar">
+            <div className="admin-cms-sidebar-head"><div><b>HOME STRUCTURE</b><span>18 Sections</span></div><button className="admin-icon-button"><Search size={16} /></button></div>
+            <div className="admin-rule" />
+            <div className="admin-cms-section-list">{sections.map((section, index) => <button key={`${section}-${index}`} className={index === 0 ? "active" : ""}><span>::</span>{section}</button>)}</div>
+          </Panel>
+          <Panel className="admin-cms-editor">
+            <div className="admin-cms-card">
+              <InputField label="Heading" placeholder="Enter Section Heading" required />
+              <label className="admin-field"><span>Item Image</span><div className="admin-upload"><UploadMark /><b>Drag & Drop Your File Here</b></div></label>
+              <InputField label="Heading" placeholder="Enter Section Heading" required />
+              <InputField label="Heading" placeholder="Enter Section Heading" required />
+              <InputField label="Heading" placeholder="Enter Section Heading" required />
+              <InputField label="Heading" placeholder="Enter Section Heading" required />
+              <label className="admin-field"><span>Description <i>*</i></span><textarea placeholder="ex. lorem ipsum dolor sit amet, consectetur adipiscing elit..." /></label>
+            </div>
+          </Panel>
+        </div>
+      </section>
+    </AdminShell>
+  );
+}
+
+function StackedText({ value }: { value: string }) {
+  return <span className="admin-stacked-text">{value.split("\n").map((line) => <span key={line}>{line}</span>)}</span>;
+}
+
+function InputField({ label, placeholder, required }: { label: string; placeholder: string; required?: boolean }) {
+  return <label className="admin-field"><span>{label} {required && <i>*</i>}</span><input placeholder={placeholder} /></label>;
+}
+
+function UploadMark() {
+  return <span className="admin-upload-mark"><ImageIcon size={24} /></span>;
 }
 
 function OpsRow({ title, label, value }: { title: string; label: string; value: string }) {
