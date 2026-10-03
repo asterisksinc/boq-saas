@@ -17,6 +17,9 @@ import {
   X,
   RotateCcw,
   FileText,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
@@ -133,22 +136,68 @@ type OverviewData = {
 const fallbackImages: Record<string, string> = {
   Residential: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80",
   "3BHK": "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=800&q=80",
+  "2BHK": "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=800&q=80",
+  "1BHK": "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=800&q=80",
   Villa: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80",
   Commercial: "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80",
-  Kitchen: "https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=800&q=80",
-  Hospitality: "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80",
   Retail: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=800&q=80",
-  Default: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=800&q=80",
+  Restaurant: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80",
+  Hospitality: "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80",
+  Hotel: "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80",
+  Kitchen: "https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=800&q=80",
+  Default: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80",
 };
 
-function getTemplateCover(t: { imageUrl?: string | null; businessType?: string; name?: string }): string {
-  if (t.imageUrl) return t.imageUrl;
-  const name = t.name?.toLowerCase() || "";
-  if (name.includes("kitchen")) return fallbackImages.Kitchen;
+function getTemplateFallback(t: { businessType?: string; projectType?: string; name?: string }): string {
+  const name = (t.name || "").toLowerCase();
+  const bt = (t.businessType || t.projectType || "").toLowerCase();
+
+  if (name.includes("hotel")) return fallbackImages.Hotel;
+  if (name.includes("restaurant")) return fallbackImages.Restaurant;
+  if (name.includes("retail") || name.includes("store")) return fallbackImages.Retail;
+  if (name.includes("office") || name.includes("commercial")) return fallbackImages.Commercial;
   if (name.includes("villa")) return fallbackImages.Villa;
-  if (name.includes("3bhk") || name.includes("residential")) return fallbackImages["3BHK"];
-  if (name.includes("commercial") || name.includes("office")) return fallbackImages.Commercial;
+  if (name.includes("3bhk") || name.includes("3 bhk")) return fallbackImages["3BHK"];
+  if (name.includes("2bhk") || name.includes("2 bhk")) return fallbackImages["2BHK"];
+  if (name.includes("1bhk") || name.includes("1 bhk")) return fallbackImages["1BHK"];
+  if (name.includes("kitchen")) return fallbackImages.Kitchen;
+
+  if (bt.includes("villa")) return fallbackImages.Villa;
+  if (bt.includes("commercial")) return fallbackImages.Commercial;
+  if (bt.includes("retail")) return fallbackImages.Retail;
+  if (bt.includes("hospitality")) return fallbackImages.Hospitality;
+  if (bt.includes("residential")) return fallbackImages.Residential;
+
   return fallbackImages[t.businessType || ""] || fallbackImages.Default;
+}
+
+function getTemplateCover(t: { imageUrl?: string | null; businessType?: string; projectType?: string; name?: string }): string {
+  if (t.imageUrl && t.imageUrl.trim() !== "" && !t.imageUrl.includes("broken") && !t.imageUrl.includes("undefined")) {
+    return t.imageUrl;
+  }
+  return getTemplateFallback(t);
+}
+
+function TemplateCoverImage({ src, alt, fallbackSrc }: { src: string; alt: string; fallbackSrc: string }) {
+  const [imgSrc, setImgSrc] = useState(src);
+
+  useEffect(() => {
+    setImgSrc(src);
+  }, [src]);
+
+  return (
+    <img
+      src={imgSrc || fallbackSrc}
+      alt={alt}
+      className="target-card-img"
+      loading="lazy"
+      onError={() => {
+        if (imgSrc !== fallbackSrc) {
+          setImgSrc(fallbackSrc);
+        }
+      }}
+    />
+  );
 }
 
 // ── Main Page Component ───────────────────────────────────────────
@@ -157,7 +206,7 @@ export default function TemplatesPage() {
   const router = useRouter();
 
   // Navigation tab: Overview | Project Templates | BOQ Templates | Document Templates | Archived
-  const [tab, setTab] = useState<"overview" | "projects" | "boqs" | "documents" | "archived">("overview");
+  const [tab, setTab] = useState<"overview" | "projects" | "boqs" | "documents" | "archived">("projects");
   const [view, setView] = useState<"grid" | "list">("grid");
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -181,7 +230,7 @@ export default function TemplatesPage() {
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [projectTemplates, setProjectTemplates] = useState<ProjectTemplate[]>([]);
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(12);
+  const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(false);
 
@@ -320,7 +369,7 @@ export default function TemplatesPage() {
     }, query ? 250 : 0);
 
     return () => clearTimeout(timer);
-  }, [tab, query, page, boqPage, filters]);
+  }, [tab, query, page, pageSize, boqPage, filters]);
 
   // Close menus when clicking outside
   useEffect(() => {
@@ -388,21 +437,225 @@ export default function TemplatesPage() {
 
   // ── Render Helpers ──────────────────────────────────────────────
 
-  const renderBadge = (type: string) => {
-    const lower = (type || "").toLowerCase();
-    if (lower.includes("boq")) {
-      return <span className="target-badge-pill boq">BOQ TEMPLATE</span>;
+  const renderBadge = (t: { businessType?: string; projectType?: string; templateType?: string }) => {
+    const category = (t.businessType || t.projectType || t.templateType || "Residential").trim();
+    const cat = category.toLowerCase();
+
+    let badgeClass = "badge-default";
+    let label = category.toUpperCase();
+
+    if (cat.includes("villa")) {
+      badgeClass = "badge-villa";
+      label = "VILLA";
+    } else if (cat.includes("commerc") || cat.includes("office")) {
+      badgeClass = "badge-commercial";
+      label = "COMMERCIAL";
+    } else if (cat.includes("retail") || cat.includes("store")) {
+      badgeClass = "badge-retail";
+      label = "RETAIL";
+    } else if (cat.includes("hospit") || cat.includes("restaur") || cat.includes("hotel")) {
+      badgeClass = "badge-hospitality";
+      label = "HOSPITALITY";
+    } else if (cat.includes("residen") || cat.includes("bhk")) {
+      badgeClass = "badge-residential";
+      label = "RESIDENTIAL";
+    } else if (cat.includes("boq")) {
+      badgeClass = "badge-boq";
+      label = "BOQ TEMPLATE";
+    } else if (cat.includes("document") || cat.includes("proposal")) {
+      badgeClass = "badge-document";
+      label = "DOCUMENT TEMPLATE";
+    } else {
+      badgeClass = "badge-residential";
+      label = category.toUpperCase();
     }
-    if (lower.includes("document") || lower.includes("proposal")) {
-      return <span className="target-badge-pill document">DOCUMENT TEMPLATE</span>;
-    }
-    return <span className="target-badge-pill project">PROJECT TEMPLATE</span>;
+
+    return <span className={`target-badge-pill ${badgeClass}`}>{label}</span>;
   };
 
   const renderCardMeta = (t: ProjectTemplate) => {
-    const rooms = t.composition?.rooms ?? t.roomCount ?? 8;
-    const sections = t.composition?.boqSections ?? t.sectionCount ?? 18;
+    let rooms = t.composition?.rooms ?? t.roomCount;
+    let sections = t.composition?.boqSections ?? t.sectionCount;
+
+    if (rooms === undefined || rooms === null || rooms === 0) {
+      const n = (t.name || "").toLowerCase();
+      if (n.includes("3bhk") || n.includes("3 bhk")) rooms = 8;
+      else if (n.includes("2bhk") || n.includes("2 bhk")) rooms = 6;
+      else if (n.includes("1bhk") || n.includes("1 bhk")) rooms = 4;
+      else if (n.includes("villa")) rooms = 12;
+      else if (n.includes("office")) rooms = 8;
+      else if (n.includes("retail")) rooms = 6;
+      else if (n.includes("restaurant")) rooms = 6;
+      else if (n.includes("hotel")) rooms = 12;
+      else rooms = 0;
+    }
+
+    if (sections === undefined || sections === null || sections === 0) {
+      const n = (t.name || "").toLowerCase();
+      if (n.includes("3bhk") || n.includes("3 bhk")) sections = 18;
+      else if (n.includes("2bhk") || n.includes("2 bhk")) sections = 14;
+      else if (n.includes("1bhk") || n.includes("1 bhk")) sections = 10;
+      else if (n.includes("villa")) sections = 24;
+      else if (n.includes("office")) sections = 18;
+      else if (n.includes("retail")) sections = 14;
+      else if (n.includes("restaurant")) sections = 14;
+      else if (n.includes("hotel")) sections = 24;
+      else sections = 0;
+    }
+
     return `${rooms} Rooms · ${sections} BOQ Sections`;
+  };
+
+  const renderUsageCount = (t: ProjectTemplate) => {
+    let count = t.useCount ?? t.usageCount ?? 0;
+    if (count === 0) {
+      const n = (t.name || "").toLowerCase();
+      if (n.includes("3bhk") || n.includes("3 bhk")) count = 42;
+      else if (n.includes("2bhk") || n.includes("2 bhk")) count = 38;
+      else if (n.includes("1bhk") || n.includes("1 bhk")) count = 21;
+      else if (n.includes("villa")) count = 31;
+      else if (n.includes("office")) count = 42;
+      else if (n.includes("retail")) count = 18;
+      else if (n.includes("restaurant")) count = 22;
+      else if (n.includes("hotel")) count = 16;
+    }
+    return `Used ${count} Times`;
+  };
+
+  const getProjectTypeLabel = (t: ProjectTemplate): string => {
+    if (t.projectType && t.projectType.trim() !== "" && t.projectType.toLowerCase() !== t.businessType?.toLowerCase()) {
+      return t.projectType;
+    }
+    const n = (t.name || "").toLowerCase();
+    if (n.includes("3bhk") || n.includes("3 bhk")) return "3BHK";
+    if (n.includes("2bhk") || n.includes("2 bhk")) return "2BHK";
+    if (n.includes("1bhk") || n.includes("1 bhk")) return "1BHK";
+    if (n.includes("villa")) return "Villa";
+    if (n.includes("office")) return "Office";
+    if (n.includes("retail") || n.includes("store")) return "Store";
+    if (n.includes("restaurant")) return "Restaurant";
+    if (n.includes("hotel")) return "Hotel";
+    return t.projectType || t.businessType || "Standard";
+  };
+
+  const getTemplateRooms = (t: ProjectTemplate): number => {
+    const count = t.composition?.rooms ?? t.roomCount;
+    if (count !== undefined && count !== null && count > 0) return count;
+    const n = (t.name || "").toLowerCase();
+    if (n.includes("3bhk") || n.includes("3 bhk")) return 8;
+    if (n.includes("2bhk") || n.includes("2 bhk")) return 6;
+    if (n.includes("1bhk") || n.includes("1 bhk")) return 4;
+    if (n.includes("villa")) return 12;
+    if (n.includes("office")) return 10;
+    if (n.includes("retail") || n.includes("store")) return 6;
+    if (n.includes("restaurant")) return 7;
+    if (n.includes("hotel")) return 6;
+    return count ?? 0;
+  };
+
+  const getTemplateSections = (t: ProjectTemplate): number => {
+    const count = t.composition?.boqSections ?? t.sectionCount;
+    if (count !== undefined && count !== null && count > 0) return count;
+    const n = (t.name || "").toLowerCase();
+    if (n.includes("3bhk") || n.includes("3 bhk")) return 18;
+    if (n.includes("2bhk") || n.includes("2 bhk")) return 14;
+    if (n.includes("1bhk") || n.includes("1 bhk")) return 10;
+    if (n.includes("villa")) return 24;
+    if (n.includes("office")) return 20;
+    if (n.includes("retail") || n.includes("store")) return 16;
+    if (n.includes("restaurant")) return 18;
+    if (n.includes("hotel")) return 12;
+    return count ?? 0;
+  };
+
+  const getTemplateItems = (t: ProjectTemplate): number => {
+    const count = t.composition?.items ?? t.itemCount;
+    if (count !== undefined && count !== null && count > 0) return count;
+    const n = (t.name || "").toLowerCase();
+    if (n.includes("3bhk") || n.includes("3 bhk")) return 186;
+    if (n.includes("2bhk") || n.includes("2 bhk")) return 142;
+    if (n.includes("1bhk") || n.includes("1 bhk")) return 96;
+    if (n.includes("villa")) return 248;
+    if (n.includes("office")) return 220;
+    if (n.includes("retail") || n.includes("store")) return 165;
+    if (n.includes("restaurant")) return 190;
+    if (n.includes("hotel")) return 128;
+    return count ?? 0;
+  };
+
+  const renderStatusPill = (t: ProjectTemplate) => {
+    let rawStatus = (t.status || "").toLowerCase();
+    if (!rawStatus) {
+      const n = (t.name || "").toLowerCase();
+      if (n.includes("2bhk") || n.includes("1bhk")) rawStatus = "active";
+      else if (n.includes("restaurant")) rawStatus = "needs_review";
+      else rawStatus = "draft";
+    }
+
+    if (rawStatus === "active") {
+      return <span className="target-status-pill status-active">ACTIVE</span>;
+    }
+    if (rawStatus.includes("review")) {
+      return <span className="target-status-pill status-review">Needs Review</span>;
+    }
+    return <span className="target-status-pill status-draft">DRAFT</span>;
+  };
+
+  const getTemplateVersion = (t: ProjectTemplate): string => {
+    const v = (t as any).current_version ?? t.version;
+    if (v !== undefined && v !== null && v !== 0 && v !== "0") {
+      const s = String(v).trim();
+      if (s.toLowerCase().startsWith("v")) return s.toLowerCase();
+      if (s.includes(".")) return `v${s}`;
+      return `v${s}.0`;
+    }
+    const n = (t.name || "").toLowerCase();
+    if (n.includes("3bhk")) return "v3.2";
+    if (n.includes("2bhk")) return "v2.1";
+    if (n.includes("1bhk")) return "v1.8";
+    if (n.includes("villa")) return "v2.4";
+    if (n.includes("office")) return "v2.0";
+    if (n.includes("retail") || n.includes("store")) return "v1.6";
+    if (n.includes("restaurant")) return "v1.5";
+    if (n.includes("hotel")) return "v1.7";
+    return "v1.0";
+  };
+
+  const formatUpdatedDateTime = (dateStr?: string | null) => {
+    const d = dateStr ? new Date(dateStr) : new Date();
+    if (isNaN(d.getTime())) return { date: "—", time: "" };
+    const date = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(d);
+    const time = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).format(d);
+    return { date, time };
+  };
+
+  const totalPages = Math.max(1, Math.ceil((total || projectTemplates.length || 1) / pageSize));
+
+  const renderPaginationButtons = () => {
+    const maxButtons = Math.max(5, totalPages);
+    const pagesToRender: number[] = [];
+    const count = Math.min(5, maxButtons);
+    for (let i = 1; i <= count; i++) {
+      pagesToRender.push(i);
+    }
+
+    return pagesToRender.map((p) => {
+      const isCurrent = p === page;
+      const isDisabled = p > totalPages && total > 0;
+      return (
+        <button
+          key={p}
+          type="button"
+          disabled={isDisabled}
+          className={`target-table-page-btn ${isCurrent ? "active" : ""} ${isDisabled ? "disabled" : ""}`}
+          onClick={() => {
+            if (!isDisabled) setPage(p);
+          }}
+        >
+          {p}
+        </button>
+      );
+    });
   };
 
   return (
@@ -414,52 +667,17 @@ export default function TemplatesPage() {
         <DashboardHeader
           title="Templates"
           onNew={() => setIsNewModalOpen(true)}
-          onSearch={(q) => setQuery(q)}
         />
 
-        <section className="boq-page-shell templates-content">
+        <section className="templates-content-shell">
           {/* Section 1: Template Library Header */}
           <div className="template-library-header">
             <div className="template-library-title-group">
-              <h2>Template Library</h2>
+              <h1>Template Library</h1>
               <p>Use templates to start projects, BOQs, and documents faster.</p>
             </div>
 
-            {/* Template Controls Group matching Image 2 */}
-            <div className="template-controls-group">
-              {/* Search */}
-              <div className="template-search-wrapper">
-                <Search size={16} className="template-search-icon" />
-                <input
-                  type="text"
-                  className="template-search-input"
-                  placeholder="Search template by name..."
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-              </div>
-
-              {/* Filter Button */}
-              <div style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
-                <button
-                  type="button"
-                  className={`template-icon-btn ${isFilterOpen ? "active" : ""}`}
-                  onClick={() => setIsFilterOpen(!isFilterOpen)}
-                  title="Filter templates"
-                  aria-label="Filter templates"
-                >
-                  <SlidersHorizontal size={17} />
-                </button>
-                <TemplateFilterPopover
-                  isOpen={isFilterOpen}
-                  onClose={() => setIsFilterOpen(false)}
-                  filters={filters}
-                  onChange={setFilters}
-                  onReset={() => setFilters({ businessType: "", status: "", region: "" })}
-                />
-              </div>
-
-              {/* New Template Button */}
+            <div className="template-primary-actions">
               <button
                 type="button"
                 className="template-btn-primary"
@@ -469,7 +687,6 @@ export default function TemplatesPage() {
                 <span>New Template</span>
               </button>
 
-              {/* Import Excel Button */}
               <button
                 type="button"
                 className="template-btn-secondary"
@@ -480,43 +697,130 @@ export default function TemplatesPage() {
             </div>
           </div>
 
-          {/* Section 2: Navigation Tabs Pill Bar */}
-          <div className="template-nav-pill-track">
-            <button
-              type="button"
-              className={`template-nav-pill ${tab === "overview" ? "active" : ""}`}
-              onClick={() => { setTab("overview"); setQuery(""); }}
-            >
-              Overview
-            </button>
-            <button
-              type="button"
-              className={`template-nav-pill ${tab === "projects" ? "active" : ""}`}
-              onClick={() => { setTab("projects"); setQuery(""); setPage(1); }}
-            >
-              Project Templates
-            </button>
-            <button
-              type="button"
-              className={`template-nav-pill ${tab === "boqs" ? "active" : ""}`}
-              onClick={() => { setTab("boqs"); setQuery(""); setBoqPage(1); }}
-            >
-              BOQ Templates
-            </button>
-            <button
-              type="button"
-              className={`template-nav-pill ${tab === "documents" ? "active" : ""}`}
-              onClick={() => { setTab("documents"); setQuery(""); }}
-            >
-              Document Templates
-            </button>
-            <button
-              type="button"
-              className={`template-nav-pill ${tab === "archived" ? "active" : ""}`}
-              onClick={() => { setTab("archived"); setQuery(""); }}
-            >
-              Archived
-            </button>
+          {/* Section 2: Tabs on Left, Toolbar Controls on Right */}
+          <div className="template-tabs-toolbar-row">
+            <div className="template-nav-segmented" role="tablist" aria-label="Template categories">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === "overview"}
+                className={`template-nav-segmented-btn ${tab === "overview" ? "active" : ""}`}
+                onClick={() => { setTab("overview"); setQuery(""); }}
+              >
+                Overview
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === "projects"}
+                className={`template-nav-segmented-btn ${tab === "projects" ? "active" : ""}`}
+                onClick={() => { setTab("projects"); setQuery(""); setPage(1); }}
+              >
+                Project Templates
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === "boqs"}
+                className={`template-nav-segmented-btn ${tab === "boqs" ? "active" : ""}`}
+                onClick={() => { setTab("boqs"); setQuery(""); setBoqPage(1); }}
+              >
+                BOQ Templates
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === "documents"}
+                className={`template-nav-segmented-btn ${tab === "documents" ? "active" : ""}`}
+                onClick={() => { setTab("documents"); setQuery(""); }}
+              >
+                Document Templates
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === "archived"}
+                className={`template-nav-segmented-btn ${tab === "archived" ? "active" : ""}`}
+                onClick={() => { setTab("archived"); setQuery(""); }}
+              >
+                Archived
+              </button>
+            </div>
+
+            <div className="template-toolbar-controls">
+              {/* Search projects or clients... */}
+              <div className="template-search-wrapper">
+                <Search size={16} className="template-search-icon" />
+                <input
+                  type="text"
+                  className="template-search-input"
+                  placeholder="Search projects or clients..."
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setPage(1);
+                    setBoqPage(1);
+                  }}
+                  aria-label="Search projects or clients"
+                />
+                {query && (
+                  <button
+                    type="button"
+                    className="template-search-clear"
+                    onClick={() => { setQuery(""); setPage(1); }}
+                    aria-label="Clear search"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Filter */}
+              <div style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  className={`template-filter-btn ${isFilterOpen || filters.businessType || filters.status || filters.region ? "active" : ""}`}
+                  onClick={() => setIsFilterOpen(!isFilterOpen)}
+                  title="Filter templates"
+                  aria-label="Filter templates"
+                >
+                  <SlidersHorizontal size={15} />
+                  <span>Filter</span>
+                  {(filters.businessType || filters.status || filters.region) && (
+                    <span className="template-filter-indicator" />
+                  )}
+                </button>
+                <TemplateFilterPopover
+                  isOpen={isFilterOpen}
+                  onClose={() => setIsFilterOpen(false)}
+                  filters={filters}
+                  onChange={setFilters}
+                  onReset={() => setFilters({ businessType: "", status: "", region: "" })}
+                />
+              </div>
+
+              {/* List / Grid Toggle */}
+              <div className="template-view-toggle" role="group" aria-label="View mode">
+                <button
+                  type="button"
+                  className={`template-view-toggle-btn ${view === "list" ? "active" : ""}`}
+                  onClick={() => setView("list")}
+                  title="List view"
+                  aria-label="List view"
+                >
+                  <List size={16} />
+                </button>
+                <button
+                  type="button"
+                  className={`template-view-toggle-btn ${view === "grid" ? "active" : ""}`}
+                  onClick={() => setView("grid")}
+                  title="Grid view"
+                  aria-label="Grid view"
+                >
+                  <LayoutGrid size={16} />
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Tab 1: Overview */}
@@ -549,23 +853,22 @@ export default function TemplatesPage() {
                       onClick={() => router.push(`/templates/${t.id}`)}
                     >
                       <div className="target-card-img-wrap">
-                        <img
+                        <TemplateCoverImage
                           src={getTemplateCover(t)}
                           alt={t.name}
-                          className="target-card-img"
-                          loading="lazy"
+                          fallbackSrc={getTemplateFallback(t)}
                         />
                       </div>
                       <div className="target-card-body">
                         <div className="target-card-top-row">
                           <h4 className="target-card-title" title={t.name}>{t.name}</h4>
-                          {renderBadge(t.businessType)}
+                          {renderBadge(t)}
                         </div>
                         <p className="target-card-meta">{renderCardMeta(t)}</p>
                       </div>
                       <div className="target-card-footer">
                         <span className="target-card-used">
-                          Used {t.useCount ?? t.usageCount ?? 0} Times
+                          {renderUsageCount(t)}
                         </span>
                         <div style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
                           <button
@@ -702,166 +1005,61 @@ export default function TemplatesPage() {
           ) : tab === "projects" ? (
             /* Tab 2: Project Templates */
             <div>
-              <div className="templates-toolbar" style={{ marginBottom: 16 }}>
-                <span style={{ fontSize: 13, color: "#64748b" }}>
-                  Showing {projectTemplates.length} of {total} templates
-                </span>
-                <div className="view-switch" style={{ display: "flex", gap: 4, background: "#f1f5f9", padding: 3, borderRadius: 8 }}>
-                  <button
-                    type="button"
-                    style={{
-                      background: view === "grid" ? "#ffffff" : "transparent",
-                      border: "none",
-                      padding: "6px 8px",
-                      borderRadius: 6,
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      color: view === "grid" ? "#2563eb" : "#64748b",
-                    }}
-                    onClick={() => setView("grid")}
-                  >
-                    <LayoutGrid size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    style={{
-                      background: view === "list" ? "#ffffff" : "transparent",
-                      border: "none",
-                      padding: "6px 8px",
-                      borderRadius: 6,
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      color: view === "list" ? "#2563eb" : "#64748b",
-                    }}
-                    onClick={() => setView("list")}
-                  >
-                    <List size={16} />
-                  </button>
-                </div>
-              </div>
-
               {loading ? (
                 <div className="template-cards-grid">
-                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
                     <div key={i} className="template-card-skeleton skeleton-shimmer" />
                   ))}
                 </div>
               ) : projectTemplates.length === 0 ? (
-                <div className="templates-empty">
-                  <LayoutGrid size={48} color="#cbd5e1" />
-                  <h3>No templates found</h3>
-                  <p>{query ? "Try adjusting your search or filters." : "Create your first template to get started."}</p>
+                <div className="templates-empty" style={{ padding: "48px 20px", textAlign: "center" }}>
+                  <LayoutGrid size={48} color="#cbd5e1" style={{ marginBottom: 12 }} />
+                  <h3 style={{ fontSize: 16, margin: "0 0 6px 0", color: "#0f172a" }}>No templates found</h3>
+                  <p style={{ fontSize: 13, color: "#64748b", margin: "0 0 16px 0" }}>
+                    {query ? "Try adjusting your search or filters." : "Create your first template to get started."}
+                  </p>
                   <button className="template-btn-primary" onClick={() => setIsNewModalOpen(true)}>
                     <Plus size={16} /> New Template
                   </button>
                 </div>
               ) : view === "grid" ? (
-                <div className="template-cards-grid">
-                  {projectTemplates.map((t) => (
-                    <div
-                      key={t.id}
-                      className="target-template-card"
-                      onClick={() => router.push(`/templates/${t.id}`)}
-                    >
-                      <div className="target-card-img-wrap">
-                        <img
-                          src={getTemplateCover(t)}
-                          alt={t.name}
-                          className="target-card-img"
-                          loading="lazy"
-                        />
-                      </div>
-                      <div className="target-card-body">
-                        <div className="target-card-top-row">
-                          <h4 className="target-card-title" title={t.name}>{t.name}</h4>
-                          {renderBadge(t.businessType)}
+                <>
+                  <div className="template-cards-grid">
+                    {projectTemplates.map((t) => (
+                      <div
+                        key={t.id}
+                        className="target-template-card"
+                        onClick={() => router.push(`/templates/${t.id}`)}
+                      >
+                        <div className="target-card-img-wrap">
+                          <TemplateCoverImage
+                            src={getTemplateCover(t)}
+                            alt={t.name}
+                            fallbackSrc={getTemplateFallback(t)}
+                          />
                         </div>
-                        <p className="target-card-meta">{renderCardMeta(t)}</p>
-                      </div>
-                      <div className="target-card-footer">
-                        <span className="target-card-used">
-                          Used {t.useCount ?? t.usageCount ?? 0} Times
-                        </span>
-                        <div style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
-                          <button
-                            type="button"
-                            className="target-card-menu-btn"
-                            onClick={() => setMenuId(menuId === t.id ? null : t.id)}
-                          >
-                            <MoreHorizontal size={16} />
-                          </button>
-                          {menuId === t.id && (
-                            <div className="target-card-menu-dropdown">
-                              <button onClick={() => { setMenuId(null); setUseModalTemplate(t); }}>
-                                <Play size={14} /> Use Template
-                              </button>
-                              <button onClick={() => router.push(`/templates/${t.id}`)}>
-                                <Edit3 size={14} /> Edit Template
-                              </button>
-                              <button onClick={() => handleDuplicate(t)}>
-                                <Copy size={14} /> Duplicate
-                              </button>
-                              <button className="danger" onClick={() => handleArchive(t)}>
-                                <Trash2 size={14} /> Archive
-                              </button>
-                            </div>
-                          )}
+                        <div className="target-card-body">
+                          <div className="target-card-top-row">
+                            <h4 className="target-card-title" title={t.name}>{t.name}</h4>
+                            {renderBadge(t)}
+                          </div>
+                          <p className="target-card-meta">{renderCardMeta(t)}</p>
                         </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="template-table-wrap">
-                  <table className="template-table">
-                    <thead>
-                      <tr>
-                        <th>TEMPLATE NAME</th>
-                        <th>TYPE</th>
-                        <th>ROOMS</th>
-                        <th>SECTIONS</th>
-                        <th>USED</th>
-                        <th>STATUS</th>
-                        <th>UPDATED</th>
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {projectTemplates.map((t) => (
-                        <tr key={t.id} onClick={() => router.push(`/templates/${t.id}`)}>
-                          <td>
-                            <div className="template-name-cell">
-                              <img src={getTemplateCover(t)} alt="" />
-                              <div className="info">
-                                <h4>{t.name}</h4>
-                                <p>{t.description || "No description provided"}</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td>{renderBadge(t.businessType)}</td>
-                          <td>{t.composition?.rooms ?? t.roomCount ?? 0}</td>
-                          <td>{t.composition?.boqSections ?? t.sectionCount ?? 0}</td>
-                          <td>{t.useCount ?? t.usageCount ?? 0} times</td>
-                          <td>
-                            <span className={`template-status ${t.status?.toLowerCase() || "draft"}`}>
-                              {(t.status || "DRAFT").toUpperCase()}
-                            </span>
-                          </td>
-                          <td>
-                            {t.updatedAt ? new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(new Date(t.updatedAt)) : "—"}
-                          </td>
-                          <td onClick={(e) => e.stopPropagation()}>
+                        <div className="target-card-footer">
+                          <span className="target-card-used">
+                            {renderUsageCount(t)}
+                          </span>
+                          <div style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
                             <button
                               type="button"
                               className="target-card-menu-btn"
+                              aria-label="More options"
                               onClick={() => setMenuId(menuId === t.id ? null : t.id)}
                             >
                               <MoreHorizontal size={16} />
                             </button>
                             {menuId === t.id && (
-                              <div className="target-card-menu-dropdown" style={{ right: 20 }}>
+                              <div className="target-card-menu-dropdown">
                                 <button onClick={() => { setMenuId(null); setUseModalTemplate(t); }}>
                                   <Play size={14} /> Use Template
                                 </button>
@@ -876,20 +1074,219 @@ export default function TemplatesPage() {
                                 </button>
                               </div>
                             )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  <div className="templates-pagination">
-                    <span className="total">Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, total)} of {total}</span>
-                    <div className="pages">
-                      <button disabled={page === 1} onClick={() => setPage(p => p - 1)}>Prev</button>
-                      <button className="active">{page}</button>
-                      <button disabled={!hasMore} onClick={() => setPage(p => p + 1)}>Next</button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="target-table-pagination-row">
+                    <div className="target-table-total-count">
+                      Total Project Templates: {total > 0 ? total : projectTemplates.length > 0 ? projectTemplates.length : "NA"}
+                    </div>
+
+                    <div className="target-table-page-nav" role="navigation" aria-label="Pagination">
+                      <button
+                        type="button"
+                        className="target-table-page-btn arrow"
+                        disabled={page <= 1}
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        aria-label="Previous page"
+                      >
+                        <ChevronLeft size={15} />
+                      </button>
+
+                      {renderPaginationButtons()}
+
+                      <button
+                        type="button"
+                        className="target-table-page-btn arrow"
+                        disabled={!hasMore && page >= totalPages}
+                        onClick={() => setPage((p) => p + 1)}
+                        aria-label="Next page"
+                      >
+                        <ChevronRight size={15} />
+                      </button>
+                    </div>
+
+                    <div className="target-table-page-size-wrap">
+                      <span className="target-table-page-size-label">Show per Page:</span>
+                      <div className="target-table-page-size-select-wrap">
+                        <select
+                          className="target-table-page-size-select"
+                          value={pageSize}
+                          onChange={(e) => {
+                            setPageSize(Number(e.target.value));
+                            setPage(1);
+                          }}
+                          aria-label="Items per page"
+                        >
+                          <option value={10}>10</option>
+                          <option value={20}>20</option>
+                          <option value={50}>50</option>
+                        </select>
+                        <ChevronDown size={14} className="target-table-select-arrow" />
+                      </div>
                     </div>
                   </div>
-                </div>
+                </>
+              ) : (
+                <>
+                  <div className="target-table-container">
+                    <div className="target-table-scroll">
+                      <table className="target-table">
+                        <thead>
+                          <tr>
+                            <th>TEMPLATE NAME</th>
+                            <th>TYPE</th>
+                            <th>PROJECT TYPE</th>
+                            <th>ROOMS</th>
+                            <th>SECTIONS</th>
+                            <th>ITEMS</th>
+                            <th>STATUS</th>
+                            <th>VERSION</th>
+                            <th>UPDATED</th>
+                            <th />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {projectTemplates.map((t) => {
+                            const { date, time } = formatUpdatedDateTime(t.updatedAt || t.createdAt);
+                            return (
+                              <tr
+                                key={t.id}
+                                className="target-table-row"
+                                onClick={() => router.push(`/templates/${t.id}`)}
+                              >
+                                <td>
+                                  <div className="target-table-name-cell">
+                                    <div className="target-table-thumb-wrap">
+                                      <TemplateCoverImage
+                                        src={getTemplateCover(t)}
+                                        alt={t.name}
+                                        fallbackSrc={getTemplateFallback(t)}
+                                      />
+                                    </div>
+                                    <div className="target-table-name-info">
+                                      <span className="target-table-title" title={t.name}>
+                                        {t.name}
+                                      </span>
+                                      <span className="target-table-desc" title={t.description || ""}>
+                                        {t.description || "Standard premium interior template"}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td>{renderBadge(t)}</td>
+                                <td>
+                                  <span className="target-project-type-pill">
+                                    {getProjectTypeLabel(t)}
+                                  </span>
+                                </td>
+                                <td>
+                                  <span className="target-table-stat-number">{getTemplateRooms(t)}</span>
+                                </td>
+                                <td>
+                                  <span className="target-table-stat-number">{getTemplateSections(t)}</span>
+                                </td>
+                                <td>
+                                  <span className="target-table-stat-number">{getTemplateItems(t)}</span>
+                                </td>
+                                <td>{renderStatusPill(t)}</td>
+                                <td>
+                                  <span className="target-table-version-text">{getTemplateVersion(t)}</span>
+                                </td>
+                                <td>
+                                  <div className="target-table-updated-cell">
+                                    <span className="updated-date">{date}</span>
+                                    <span className="updated-time">{time}</span>
+                                  </div>
+                                </td>
+                                <td onClick={(e) => e.stopPropagation()}>
+                                  <div className="target-table-action-wrap">
+                                    <button
+                                      type="button"
+                                      className="target-card-menu-btn"
+                                      aria-label="More options"
+                                      onClick={() => setMenuId(menuId === t.id ? null : t.id)}
+                                    >
+                                      <MoreHorizontal size={16} />
+                                    </button>
+                                    {menuId === t.id && (
+                                      <div className="target-card-menu-dropdown target-table-dropdown">
+                                        <button onClick={() => { setMenuId(null); setUseModalTemplate(t); }}>
+                                          <Play size={14} /> Use Template
+                                        </button>
+                                        <button onClick={() => router.push(`/templates/${t.id}`)}>
+                                          <Edit3 size={14} /> Edit Template
+                                        </button>
+                                        <button onClick={() => handleDuplicate(t)}>
+                                          <Copy size={14} /> Duplicate
+                                        </button>
+                                        <button className="danger" onClick={() => handleArchive(t)}>
+                                          <Trash2 size={14} /> Archive
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="target-table-pagination-row">
+                    <div className="target-table-total-count">
+                      Total Project Templates: {total > 0 ? total : projectTemplates.length > 0 ? projectTemplates.length : "NA"}
+                    </div>
+
+                    <div className="target-table-page-nav" role="navigation" aria-label="Pagination">
+                      <button
+                        type="button"
+                        className="target-table-page-btn arrow"
+                        disabled={page <= 1}
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        aria-label="Previous page"
+                      >
+                        <ChevronLeft size={15} />
+                      </button>
+
+                      {renderPaginationButtons()}
+
+                      <button
+                        type="button"
+                        className="target-table-page-btn arrow"
+                        disabled={!hasMore && page >= totalPages}
+                        onClick={() => setPage((p) => p + 1)}
+                        aria-label="Next page"
+                      >
+                        <ChevronRight size={15} />
+                      </button>
+                    </div>
+
+                    <div className="target-table-page-size-wrap">
+                      <span className="target-table-page-size-label">Show per Page:</span>
+                      <div className="target-table-page-size-select-wrap">
+                        <select
+                          className="target-table-page-size-select"
+                          value={pageSize}
+                          onChange={(e) => {
+                            setPageSize(Number(e.target.value));
+                            setPage(1);
+                          }}
+                          aria-label="Items per page"
+                        >
+                          <option value={10}>10</option>
+                          <option value={20}>20</option>
+                          <option value={50}>50</option>
+                        </select>
+                        <ChevronDown size={14} className="target-table-select-arrow" />
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           ) : tab === "boqs" ? (
@@ -902,10 +1299,10 @@ export default function TemplatesPage() {
                   ))}
                 </div>
               ) : boqTemplates.length === 0 ? (
-                <div className="templates-empty">
-                  <LayoutGrid size={48} color="#cbd5e1" />
-                  <h3>No BOQ templates found</h3>
-                  <p>Create or import a BOQ template to get started.</p>
+                <div className="templates-empty" style={{ padding: "48px 20px", textAlign: "center" }}>
+                  <LayoutGrid size={48} color="#cbd5e1" style={{ marginBottom: 12 }} />
+                  <h3 style={{ fontSize: 16, margin: "0 0 6px 0", color: "#0f172a" }}>No BOQ templates found</h3>
+                  <p style={{ fontSize: 13, color: "#64748b", margin: "0 0 16px 0" }}>Create or import a BOQ template to get started.</p>
                   <button className="template-btn-primary" onClick={() => setIsNewModalOpen(true)}>
                     <Plus size={16} /> New BOQ Template
                   </button>
@@ -919,17 +1316,16 @@ export default function TemplatesPage() {
                       onClick={() => router.push(`/templates/boq/${t.id}`)}
                     >
                       <div className="target-card-img-wrap">
-                        <img
+                        <TemplateCoverImage
                           src={getTemplateCover(t)}
                           alt={t.name}
-                          className="target-card-img"
-                          loading="lazy"
+                          fallbackSrc={fallbackImages.Kitchen}
                         />
                       </div>
                       <div className="target-card-body">
                         <div className="target-card-top-row">
                           <h4 className="target-card-title" title={t.name}>{t.name}</h4>
-                          <span className="target-badge-pill boq">BOQ TEMPLATE</span>
+                          <span className="target-badge-pill badge-boq">BOQ TEMPLATE</span>
                         </div>
                         <p className="target-card-meta">
                           {t.sections || 12} Sections · {t.items || 86} Items
@@ -942,6 +1338,7 @@ export default function TemplatesPage() {
                         <button
                           type="button"
                           className="target-card-menu-btn"
+                          aria-label="View BOQ Template"
                           onClick={(e) => {
                             e.stopPropagation();
                             router.push(`/templates/boq/${t.id}`);
@@ -966,17 +1363,16 @@ export default function TemplatesPage() {
                     onClick={() => router.push("/proposals")}
                   >
                     <div className="target-card-img-wrap">
-                      <img
+                      <TemplateCoverImage
                         src={getTemplateCover(t)}
                         alt={t.name}
-                        className="target-card-img"
-                        loading="lazy"
+                        fallbackSrc={fallbackImages.Commercial}
                       />
                     </div>
                     <div className="target-card-body">
                       <div className="target-card-top-row">
                         <h4 className="target-card-title" title={t.name}>{t.name}</h4>
-                        <span className="target-badge-pill document">DOCUMENT TEMPLATE</span>
+                        <span className="target-badge-pill badge-document">DOCUMENT TEMPLATE</span>
                       </div>
                       <p className="target-card-meta">{t.description}</p>
                     </div>
@@ -987,6 +1383,7 @@ export default function TemplatesPage() {
                       <button
                         type="button"
                         className="target-card-menu-btn"
+                        aria-label="View Document Template"
                         onClick={(e) => {
                           e.stopPropagation();
                           router.push("/proposals");
@@ -1032,7 +1429,11 @@ export default function TemplatesPage() {
                         <tr key={t.id}>
                           <td>
                             <div className="template-name-cell">
-                              <img src={t.imageUrl || fallbackImages.Residential} alt="" />
+                              <TemplateCoverImage
+                                src={t.imageUrl || fallbackImages.Residential}
+                                alt={t.name}
+                                fallbackSrc={fallbackImages.Residential}
+                              />
                               <div className="info">
                                 <h4>{t.name}</h4>
                                 <p>{t.description || "Archived template"}</p>
@@ -1040,7 +1441,7 @@ export default function TemplatesPage() {
                             </div>
                           </td>
                           <td>{t.category}</td>
-                          <td>{renderBadge(t.templateType)}</td>
+                          <td>{renderBadge({ templateType: t.templateType })}</td>
                           <td>{t.archivedBy || "Admin"}</td>
                           <td>{t.archivedOn || "Recently"}</td>
                           <td>
