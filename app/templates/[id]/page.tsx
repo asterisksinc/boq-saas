@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import React, { useState, useEffect, useCallback, Suspense } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, RefreshCw, AlertCircle } from "lucide-react";
 import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
@@ -31,13 +31,33 @@ export default function TemplateDetailPage() {
   const rawId = params?.id;
   const id = Array.isArray(rawId) ? rawId[0] : (rawId as string) || "";
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams?.get("tab");
+  const subtabParam = searchParams?.get("subtab");
 
   const [template, setTemplate] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<DetailTabType>("Overview");
+  const [activeTab, setActiveTab] = useState<DetailTabType>(() => {
+    if (tabParam) {
+      const match = (["Overview", "Structure", "Costing & BOQ", "Workflow", "Documents", "Usage", "Versions", "Activity"] as DetailTabType[]).find(
+        (t) => t.toLowerCase() === tabParam.toLowerCase()
+      );
+      if (match) return match;
+    }
+    return "Overview";
+  });
   const [isUseModalOpen, setIsUseModalOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (tabParam) {
+      const match = (["Overview", "Structure", "Costing & BOQ", "Workflow", "Documents", "Usage", "Versions", "Activity"] as DetailTabType[]).find(
+        (t) => t.toLowerCase() === tabParam.toLowerCase()
+      );
+      if (match) setActiveTab(match);
+    }
+  }, [tabParam]);
 
   const fetchTemplateData = useCallback(async () => {
     if (!id) return;
@@ -237,7 +257,9 @@ export default function TemplateDetailPage() {
               {activeTab === "Workflow" && (
                 <TemplateWorkflow
                   templateId={template.id}
+                  templateName={template.name}
                   initialWorkflow={template.workflow}
+                  initialSubTab={subtabParam?.toLowerCase() === "rules" ? "Rules" : "Rules"}
                   onUpdate={fetchTemplateData}
                 />
               )}

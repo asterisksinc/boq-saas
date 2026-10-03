@@ -128,3 +128,21 @@ export async function uploadTemplateImage(file: File) {
   });
 }
 
+export async function testWorkflowRule(templateId: string, rule: Record<string, unknown>, payload: Record<string, unknown>) {
+  return fetchApi<{
+    matched: boolean;
+    summary: string;
+    conditionResults: Array<{
+      field: string;
+      operator: string;
+      expected: unknown;
+      actual: unknown;
+      passed: boolean;
+    }>;
+    executedActions: Array<Record<string, unknown>>;
+  }>(`/api/v1/project-templates/${templateId}/workflow/rules/test`, {
+    method: 'POST',
+    body: JSON.stringify({ rule, payload }),
+  });
+}
+

@@ -31,7 +31,9 @@ import WorkflowAddModal from "./workflow/WorkflowAddModal";
 
 interface TemplateWorkflowProps {
   templateId: string;
+  templateName?: string;
   initialWorkflow?: any;
+  initialSubTab?: "Stages" | "Tasks" | "Milestones" | "Approvals" | "Rules";
   onUpdate?: () => void;
 }
 
@@ -138,13 +140,15 @@ const defaultStages: WorkflowStageItem[] = [
 
 export default function TemplateWorkflow({
   templateId,
+  templateName = "Project Template",
   initialWorkflow,
+  initialSubTab,
   onUpdate,
 }: TemplateWorkflowProps) {
-  // Active sub-tab state
+  // Active sub-tab state (Rules active by default when accessing workflow rules)
   const [workflowSubTab, setWorkflowSubTab] = useState<
     "Stages" | "Tasks" | "Milestones" | "Approvals" | "Rules"
-  >("Tasks");
+  >(initialSubTab || "Rules");
 
   // Search input state
   const [searchQuery, setSearchQuery] = useState("");
@@ -471,26 +475,33 @@ export default function TemplateWorkflow({
       {workflowSubTab === "Rules" && (
         <WorkflowRulesView
           rules={rules}
+          templateId={templateId}
+          templateName={templateName}
           searchQuery={searchQuery}
+          availableApprovals={approvals.map((a: any) => ({ code: a.code || a.id, name: a.name }))}
           onUpdateRules={(updated) => {
-            setRules(updated);
+            setRules(updated as any);
             handleSaveToBackend({ rules: updated });
           }}
           onAddRuleClick={() => setIsAddModalOpen(true)}
+          isAddModalOpen={isAddModalOpen && workflowSubTab === "Rules"}
+          onCloseAddModal={() => setIsAddModalOpen(false)}
         />
       )}
 
-      {/* ── Add Item Modal ─────────────────────────────────────────── */}
-      <WorkflowAddModal
-        isOpen={isAddModalOpen}
-        defaultType={getDefaultAddType()}
-        onClose={() => setIsAddModalOpen(false)}
-        onAddTask={handleAddTask}
-        onAddMilestone={handleAddMilestone}
-        onAddApproval={handleAddApproval}
-        onAddRule={handleAddRule}
-        onAddStage={handleAddStage}
-      />
+      {/* ── Add Item Modal (for Tasks, Milestones, Approvals, Stages) ─ */}
+      {isAddModalOpen && workflowSubTab !== "Rules" && (
+        <WorkflowAddModal
+          isOpen={isAddModalOpen}
+          defaultType={getDefaultAddType()}
+          onClose={() => setIsAddModalOpen(false)}
+          onAddTask={handleAddTask}
+          onAddMilestone={handleAddMilestone}
+          onAddApproval={handleAddApproval}
+          onAddRule={handleAddRule}
+          onAddStage={handleAddStage}
+        />
+      )}
     </div>
   );
 }

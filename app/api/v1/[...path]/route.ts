@@ -4248,6 +4248,81 @@ async function projectTemplateDocuments(request: Request, supabase: SupabaseClie
   return ok({ templateId, version: result.data.current_version, documents: result.data.documents }, 200, id);
 }
 
+async function testProjectTemplateRule(request: Request, supabase: SupabaseClient, id: string, templateId: string) {
+  const scoped = await workspaceAccess(supabase, id);
+  if ("response" in scoped) return scoped.response;
+
+  const tpl = await supabase.from("project_templates").select("id, name").eq("workspace_id", scoped.access.workspaceId).eq("id", templateId).is("archived_at", null).single();
+  if (tpl.error) return fail("NOT_FOUND", "Project template was not found.", 404, id);
+
+  let body: any = {};
+  try {
+    body = await request.json();
+  } catch {
+    return fail("VALIDATION_ERROR", "Invalid JSON payload.", 400, id);
+  }
+
+  const { rule, payload = {} } = body;
+  if (!rule) return fail("VALIDATION_ERROR", "Rule definition is required.", 400, id);
+
+  const conditionResults: Array<{ field: string; operator: string; expected: any; actual: any; passed: boolean }> = [];
+
+  const evalSingle = (c: any) => {
+    const actual = payload[c.field];
+    let passed = false;
+    const op = c.operator;
+    const expected = c.value;
+
+    if (op === "is greater than" || op === "greaterThan") passed = Number(actual) > Number(expected);
+    else if (op === "is less than" || op === "lessThan") passed = Number(actual) < Number(expected);
+    else if (op === "is greater than or equal" || op === "greaterThanOrEqual") passed = Number(actual) >= Number(expected);
+    else if (op === "is less than or equal" || op === "lessThanOrEqual") passed = Number(actual) <= Number(expected);
+    else if (op === "equals") passed = String(actual).toLowerCase() === String(expected).toLowerCase();
+    else if (op === "does not equal") passed = String(actual).toLowerCase() !== String(expected).toLowerCase();
+    else if (op === "contains") passed = String(actual).toLowerCase().includes(String(expected).toLowerCase());
+    else passed = Boolean(actual);
+
+    conditionResults.push({
+      field: c.field,
+      operator: c.operator,
+      expected: c.value,
+      actual: actual !== undefined ? actual : "(empty)",
+      passed,
+    });
+    return passed;
+  };
+
+  const condList = rule.conditions?.conditions || rule.conditions?.all || [];
+  const conjunction = rule.conditions?.conjunction || (rule.conditions?.all ? "ALL" : "ALL");
+
+  const rootPassed = condList.length === 0
+    ? true
+    : conjunction === "ANY"
+    ? condList.some(evalSingle)
+    : condList.every(evalSingle);
+
+  let groupsPassed = false;
+  const groups = rule.conditions?.groups || [];
+  if (Array.isArray(groups) && groups.length > 0) {
+    groupsPassed = groups.some((g: any) => {
+      const gConds = g.conditions || [];
+      return g.conjunction === "ANY" ? gConds.some(evalSingle) : gConds.every(evalSingle);
+    });
+  }
+
+  const overallMatched = rootPassed || groupsPassed;
+  const executedActions = overallMatched ? (rule.actions || []) : [];
+
+  return ok({
+    matched: overallMatched,
+    summary: overallMatched
+      ? "All required criteria met. Rule actions simulated successfully."
+      : "Condition criteria not satisfied. Rule simulation halted.",
+    conditionResults,
+    executedActions,
+  }, 200, id);
+}
+
 async function publishProjectTemplate(request: Request, supabase: SupabaseClient, id: string, templateId: string) {
   const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
   const input = await parsed(request, projectTemplatePublishSchema, id); if (input.response) return input.response;
@@ -7557,6 +7632,8 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (projectTemplateMatch && request.method === "DELETE") return archiveProjectTemplate(supabase, id, projectTemplateMatch[1]);
   const projectTemplateSectionMatch = route.match(/^project-templates\/([0-9a-f-]{36})\/(structure|costing-boq|workflow)$/i);
   if (projectTemplateSectionMatch && ["GET", "PATCH"].includes(request.method)) return projectTemplateSection(request, supabase, id, projectTemplateSectionMatch[1], projectTemplateSectionMatch[2]);
+  const projectTemplateRulesTestMatch = route.match(/^project-templates\/([0-9a-f-]{36})\/workflow\/rules\/test$/i);
+  if (projectTemplateRulesTestMatch && request.method === "POST") return testProjectTemplateRule(request, supabase, id, projectTemplateRulesTestMatch[1]);
   const projectTemplateDocumentsMatch = route.match(/^project-templates\/([0-9a-f-]{36})\/documents$/i);
   if (projectTemplateDocumentsMatch && ["GET", "PATCH"].includes(request.method)) return projectTemplateDocuments(request, supabase, id, projectTemplateDocumentsMatch[1]);
   const projectTemplateVersionsMatch = route.match(/^project-templates\/([0-9a-f-]{36})\/versions$/i);
