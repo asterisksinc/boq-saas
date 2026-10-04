@@ -140,7 +140,7 @@ export default function InvoicesPage() {
     const [error, setError] = useState("");
     const [selected, setSelected] = useState<Invoice | null>(null);
     const [showCreate, setShowCreate] = useState(false);
-    const [orgName, setOrgName] = useState<string>("Arvin Interiors");
+    const [orgName, setOrgName] = useState<string>("");
 
     const load = useCallback(async (nextPage = 1, query = search, size = pageSize) => {
         setLoading(true);
@@ -618,9 +618,8 @@ function InvoicePreview({
                     {/* Brand Header */}
                     <div className="preview-brand-header">
                         <div className="brand-info">
-                            <h2>{orgName || "Arvin Interiors"}</h2>
-                            <p>42 Design House, Khar West, Mumbai</p>
-                            <p>GST: 27AABCA1234Z1Z9</p>
+                            <h2>{orgName || "Not configured"}</h2>
+                            <p>Address not configured</p>
                         </div>
                         <div className="brand-doc-meta">
                             <span className="doc-type-label">
@@ -699,22 +698,22 @@ function InvoicePreview({
                         <div className="bank-grid">
                             <div className="bank-item">
                                 <span className="b-lbl">Bank Name</span>
-                                <strong className="b-val">{detail.bankDetails?.bankName || "HDFC Bank"}</strong>
+                                <strong className="b-val">{detail.bankDetails?.bankName || "Not configured"}</strong>
                                 <span className="b-lbl" style={{ marginTop: 8 }}>IFSC Code</span>
-                                <strong className="b-val">{detail.bankDetails?.ifscCode || "HDFC0001234"}</strong>
+                                <strong className="b-val">{detail.bankDetails?.ifscCode || "Not configured"}</strong>
                             </div>
                             <div className="bank-item">
                                 <span className="b-lbl">Account Holder</span>
                                 <strong className="b-val">
-                                    {detail.bankDetails?.accountHolder || orgName || "Arvin Interiors LLP"}
+                                    {detail.bankDetails?.accountHolder || orgName || "Not configured"}
                                 </strong>
                                 <span className="b-lbl" style={{ marginTop: 8 }}>Branch</span>
-                                <strong className="b-val">{detail.bankDetails?.branch || "Branch Address"}</strong>
+                                <strong className="b-val">{detail.bankDetails?.branch || "Not configured"}</strong>
                             </div>
                             <div className="bank-item">
                                 <span className="b-lbl">Account Number</span>
                                 <strong className="b-val" style={{ fontSize: 13 }}>
-                                    {detail.bankDetails?.accountNumber || "50100123456789"}
+                                    {detail.bankDetails?.accountNumber || "Not configured"}
                                 </strong>
                             </div>
                         </div>
@@ -960,11 +959,11 @@ function EditInvoiceModal({
     const [milestone, setMilestone] = useState(invoice.milestone || "");
     const [taxRate, setTaxRate] = useState<number>(invoice.taxRate ?? 18);
     const [items, setItems] = useState<Array<{ description: string; quantity: number; rate: number }>>(initialItems);
-    const [bankName, setBankName] = useState(invoice.bankDetails?.bankName || "HDFC Bank");
-    const [accountHolder, setAccountHolder] = useState(invoice.bankDetails?.accountHolder || "Arvin Interiors LLP");
-    const [accountNumber, setAccountNumber] = useState(invoice.bankDetails?.accountNumber || "50100123456789");
-    const [ifscCode, setIfscCode] = useState(invoice.bankDetails?.ifscCode || "HDFC0001234");
-    const [branch, setBranch] = useState(invoice.bankDetails?.branch || "Branch Address");
+    const [bankName, setBankName] = useState(invoice.bankDetails?.bankName || "");
+    const [accountHolder, setAccountHolder] = useState(invoice.bankDetails?.accountHolder || "");
+    const [accountNumber, setAccountNumber] = useState(invoice.bankDetails?.accountNumber || "");
+    const [ifscCode, setIfscCode] = useState(invoice.bankDetails?.ifscCode || "");
+    const [branch, setBranch] = useState(invoice.bankDetails?.branch || "");
 
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
@@ -1750,9 +1749,8 @@ function CreateInvoiceView({
                         {/* Brand Header */}
                         <div className="preview-brand-header">
                             <div className="brand-info">
-                                <h2>{orgName || "Arvin Interiors"}</h2>
-                                <p>42 Design House, Khar West, Mumbai</p>
-                                <p>GST: 27AABCA1234Z1Z9</p>
+                                <h2>{orgName || "Not configured"}</h2>
+                                <p>Address not configured</p>
                             </div>
                             <div className="brand-doc-meta">
                                 <span className="doc-type-label">INVOICE</span>
@@ -1841,22 +1839,22 @@ function CreateInvoiceView({
                             <div className="bank-grid">
                                 <div className="bank-item">
                                     <span className="b-lbl">Bank Name</span>
-                                    <strong className="b-val">HDFC Bank</strong>
+                                    <strong className="b-val">Not configured</strong>
                                     <span className="b-lbl" style={{ marginTop: 8 }}>IFSC Code</span>
-                                    <strong className="b-val">HDFC0001234</strong>
+                                    <strong className="b-val">Not configured</strong>
                                 </div>
                                 <div className="bank-item">
                                     <span className="b-lbl">Account Holder</span>
                                     <strong className="b-val">
-                                        {orgName || "Arvin Interiors LLP"}
+                                        {orgName || "Not configured"}
                                     </strong>
                                     <span className="b-lbl" style={{ marginTop: 8 }}>Branch</span>
-                                    <strong className="b-val">Khar West, Mumbai</strong>
+                                    <strong className="b-val">Not configured</strong>
                                 </div>
                                 <div className="bank-item">
                                     <span className="b-lbl">Account Number</span>
                                     <strong className="b-val" style={{ fontSize: 13 }}>
-                                        50100123456789
+                                        Not configured
                                     </strong>
                                 </div>
                             </div>

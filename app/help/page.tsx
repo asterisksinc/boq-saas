@@ -605,35 +605,23 @@ export default function HelpPage() {
 
     // Calculate articles per category dynamically from the real dataset
     const categoriesWithCounts = useMemo(() => {
-        if (!helpData?.categories || helpData.categories.length === 0) {
-            return DEFAULT_CATEGORIES;
-        }
-        return DEFAULT_CATEGORIES.map((def) => {
-            const match = helpData.categories.find((c) => c.slug === def.slug);
-            if (!match) return def;
-            const realCount = (helpData.articles || []).filter((a) => {
+        return (helpData?.categories ?? []).map((category) => {
+            const realCount = (helpData?.articles ?? []).filter((a) => {
                 const catInfo = getArticleCategory(a);
-                if (catInfo?.slug === def.slug) return true;
-                if (a.categoryId === match.id || a.category_id === match.id) return true;
+                if (catInfo?.slug === category.slug) return true;
+                if (a.categoryId === category.id || a.category_id === category.id) return true;
                 return false;
             }).length;
             return {
-                ...def,
-                ...match,
-                articleCount: realCount > 0 ? realCount : def.articleCount,
+                ...category,
+                articleCount: realCount,
             };
         });
     }, [helpData]);
 
     // Popular articles (flagged popular or top articles)
     const popularArticles = useMemo(() => {
-        if (!helpData?.articles || helpData.articles.length === 0) {
-            return DEFAULT_POPULAR_ARTICLES;
-        }
-        return DEFAULT_POPULAR_ARTICLES.map((def) => {
-            const match = helpData.articles.find((a) => a.slug === def.slug);
-            return match ? { ...def, ...match } : def;
-        });
+        return helpData?.articles ?? [];
     }, [helpData]);
 
     // Filtered articles for All Articles view
@@ -1477,7 +1465,7 @@ export default function HelpPage() {
                 onTicketCreated={handleTicketCreated}
                 initialData={drawerInitialTicket}
                 initialArticleTitle={drawerArticleTitle}
-                helpArticles={helpData?.articles || DEFAULT_POPULAR_ARTICLES}
+                helpArticles={helpData?.articles || []}
             />
         </main>
     );

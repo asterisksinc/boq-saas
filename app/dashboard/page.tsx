@@ -33,8 +33,8 @@ export default function DashboardPage() {
         try {
             const [overviewData, projRes, boqRes] = await Promise.all([
                 getDashboardOverview(),
-                fetch("/api/v1/projects?pageSize=5&sortBy=updatedAt&sortOrder=desc", { credentials: "include" }).then(r => r.ok ? r.json() : null).catch(() => null),
-                fetch("/api/v1/boqs?pageSize=5", { credentials: "include" }).then(r => r.ok ? r.json() : null).catch(() => null),
+                fetch("/api/v1/dashboard/recent-projects?pageSize=5", { credentials: "include" }).then(r => r.ok ? r.json() : null).catch(() => null),
+                fetch("/api/v1/dashboard/recent-boqs?pageSize=5", { credentials: "include" }).then(r => r.ok ? r.json() : null).catch(() => null),
             ]);
             setOverview(overviewData);
             const projItems = (projRes?.data?.items ?? []).map((p: any) => ({
@@ -68,7 +68,7 @@ export default function DashboardPage() {
         <div className="fig-dashboard-glow" />
         <DashboardRail />
         <div className="fig-dashboard-main">
-            <DashboardHeader />
+            <DashboardHeader profile={overview?.profile} />
             {loading ? <DashboardLoading /> : error ? <section className="fig-dashboard-error"><h2>Couldn&apos;t load your dashboard</h2><p>{error}</p><button onClick={() => void load()}><RefreshCw size={16} /> Try again</button></section> : overview ? <section className="fig-dashboard-layout">
                 <div className="fig-dashboard-left">
                     <Analytics overview={overview} hasContent={hasContent} money={money} activePeriod={activePeriod} onPeriodChange={setActivePeriod} />
@@ -83,12 +83,14 @@ export default function DashboardPage() {
     </main>;
 }
 
-function DashboardHeader() {
+function DashboardHeader({ profile }: { profile?: DashboardOverview["profile"] }) {
     const router = useRouter();
+    const displayName = profile?.displayName?.trim() || profile?.email?.split("@")[0] || "User";
+    const initials = displayName.split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase();
     return <header className="fig-dashboard-header"><h1>Overview</h1><div className="fig-dashboard-header-actions">
         <label className="fig-dashboard-search"><img src="/assets/dashboard/dashboard-search.svg" alt="" /><input placeholder="Search..." aria-label="Search" /></label>
         <button type="button" className="fig-dashboard-new" onClick={() => router.push("/projects")}><Plus size={20} /><span>New</span><i /><ChevronDown size={20} /></button>
-        <button type="button" className="fig-dashboard-bell" aria-label="Notifications"><img src="/assets/dashboard/dashboard-notifications.svg" alt="" /></button><div className="fig-dashboard-avatar">BO</div>
+        <button type="button" className="fig-dashboard-bell" aria-label="Notifications"><img src="/assets/dashboard/dashboard-notifications.svg" alt="" /></button>{profile?.avatarUrl ? <img className="fig-dashboard-avatar" src={profile.avatarUrl} alt={displayName} /> : <div className="fig-dashboard-avatar" aria-label={displayName}>{initials}</div>}
     </div></header>;
 }
 
@@ -206,15 +208,15 @@ function DynamicChart({ data }: { data: Array<{ label: string; estimated: number
 function ProjectsCard({ overview, hasContent }: { overview: DashboardOverview; hasContent: boolean }) {
     const total = overview.kpis.totalProjects;
     const active = overview.kpis.activeProjects;
-    const completed = Math.max(0, total - active);
-    const planning = 0;
-    const onHold = 0;
+    const planning = overview.projectStatusBreakdown?.planning ?? null;
+    const onHold = overview.projectStatusBreakdown?.onHold ?? null;
+    const completed = overview.projectStatusBreakdown?.completed ?? Math.max(0, total - active);
 
     return <section className="fig-projects-card"><h2>Projects &amp; BOQ</h2>{hasContent ? <>
         <div className="fig-project-legend">
             <span>○ In Progress <b>{formatNumber(active)}</b></span>
-            <span>○ Planning <b>{planning}</b></span>
-            <span>○ On Hold <b>{onHold}</b></span>
+            <span>○ Planning <b>{planning ?? "—"}</b></span>
+            <span>○ On Hold <b>{onHold ?? "—"}</b></span>
             <span className="complete">● Completed <b>{completed}</b></span>
         </div>
         <div className="fig-project-graph">

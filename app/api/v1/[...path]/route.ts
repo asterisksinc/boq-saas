@@ -630,7 +630,7 @@ function parseLocation(request: Request): string {
   const country = request.headers.get("cf-ipcountry") || request.headers.get("x-vercel-ip-country");
   if (city && country) return `${city}, ${country}`;
   if (country) return country;
-  return "Mumbai, IN";
+  return "Unknown location";
 }
 
 function formatRelativeTime(dateInput: string | Date): string {
@@ -724,22 +724,13 @@ async function userSecurity(request: Request, supabase: SupabaseClient, id: stri
       });
     }
   } else {
-    finalSessions = [
-      {
-        id: "current",
-        device: currentDevice,
-        location: location,
-        isCurrent: true,
-        lastActive: "Now",
-      },
-      {
-        id: "mobile-app",
-        device: "Mobile App (iOS)",
-        location: "Delhi, IN",
-        isCurrent: false,
-        lastActive: "3h ago",
-      },
-    ];
+    finalSessions = [{
+      id: "current",
+      device: currentDevice,
+      location,
+      isCurrent: true,
+      lastActive: "Now",
+    }];
   }
 
   // Real login history from audit_logs
@@ -759,7 +750,7 @@ async function userSecurity(request: Request, supabase: SupabaseClient, id: stri
       else if (row.action === "auth.login.failed") device = "Unknown Device";
       else device = parseDeviceSlash(ua);
     }
-    const loc = meta.location || location || "Mumbai, IN";
+    const loc = meta.location || location;
     const status = meta.status === "warning" || row.action === "auth.login.failed" || String(device).toLowerCase().includes("unknown")
       ? "warning"
       : "success";
@@ -831,7 +822,7 @@ async function loginHistoryApi(request: Request, supabase: SupabaseClient, id: s
       else if (row.action === "auth.login.failed") device = "Unknown Device";
       else device = parseDeviceSlash(ua);
     }
-    const loc = meta.location || location || "Mumbai, IN";
+    const loc = meta.location || location;
     const status = meta.status === "warning" || row.action === "auth.login.failed" || String(device).toLowerCase().includes("unknown")
       ? "warning"
       : "success";
@@ -859,7 +850,6 @@ async function revokeSpecificSession(request: Request, supabase: SupabaseClient,
   const userMeta = (userObj?.user_metadata ?? {}) as Record<string, any>;
   const activeSessions: any[] = Array.isArray(userMeta.active_sessions) ? userMeta.active_sessions : [
     { id: "current", device: parseUserAgent(request.headers.get("user-agent")), location: parseLocation(request), isCurrent: true },
-    { id: "mobile-app", device: "Mobile App (iOS)", location: "Delhi, IN", isCurrent: false }
   ];
 
   const remaining = activeSessions.filter((s: any) => s.id !== sessionId);
@@ -969,14 +959,32 @@ async function onboarding(request: Request, supabase: SupabaseClient, id: string
 
 async function dashboardOverview(request: NextRequest, supabase: SupabaseClient, id: string) {
   const auth = await requireUser(supabase, id); if (auth.response) return auth.response;
-  const { data, error } = await supabase.rpc("get_dashboard_overview");
+  const [{ data, error }, profileResult, projectsResult] = await Promise.all([
+    supabase.rpc("get_dashboard_overview"),
+    supabase.from("user_profiles").select("display_name,avatar_url").eq("user_id", auth.user.id).maybeSingle(),
+    supabase.from("projects").select("status").is("archived_at", null),
+  ]);
   if (error) {
     console.error(JSON.stringify({ requestId: id, event: "dashboard_overview_failed", code: error.code }));
     return fail("INTERNAL_ERROR", "Dashboard overview is temporarily unavailable.", 500, id);
   }
   const base = (data ?? {}) as Record<string, unknown>;
-  // TODO(PROJECT_BOQ_BACKEND): Keep this endpoint aligned with real domain aggregates.
-  return ok(base, 200, id);
+  const counts = { active: 0, planning: 0, onHold: 0, completed: 0 };
+  for (const row of projectsResult.data ?? []) {
+    if (row.status === "active" || row.status === "in_progress") counts.active += 1;
+    else if (row.status === "planning") counts.planning += 1;
+    else if (row.status === "on_hold") counts.onHold += 1;
+    else if (row.status === "completed") counts.completed += 1;
+  }
+  return ok({
+    ...base,
+    profile: {
+      displayName: profileResult.data?.display_name ?? auth.user.user_metadata?.display_name ?? null,
+      avatarUrl: profileResult.data?.avatar_url ?? null,
+      email: auth.user.email ?? null,
+    },
+    projectStatusBreakdown: counts,
+  }, 200, id);
 }
 
 const projectSelect = "id,project_code,name,client_name,client_contact,client_email,project_type,status,location,description,area_sqft,project_value,approved_budget,start_date,target_completion_date,assigned_designer_id,tags,progress,created_by,created_at,updated_at";

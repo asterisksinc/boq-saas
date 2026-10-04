@@ -675,35 +675,9 @@ function ProposalTemplatesModal({
                     }
                 }
             } catch {
-                // Fallback to built-in templates
+                // The modal displays its empty state when the API is unavailable.
+                setTemplates([]);
             }
-
-            setTemplates([
-                {
-                    id: "tmpl-residential",
-                    name: "Residential Turnkey Fit-Out",
-                    description: "Comprehensive proposal for turnkey residential interior with modular woodwork, finishes, and electricals.",
-                    tags: ["Residential", "Turnkey", "Modular"],
-                },
-                {
-                    id: "tmpl-commercial",
-                    name: "Commercial Office L4 Fit-Out",
-                    description: "Corporate workspace package including partition walls, acoustics, MEP provisions, and modular desks.",
-                    tags: ["Commercial", "Office", "MEP"],
-                },
-                {
-                    id: "tmpl-villa",
-                    name: "Luxury Villa Package",
-                    description: "High-spec architectural finishes, Italian marble flooring, bespoke carpentry, and smart lighting setup.",
-                    tags: ["Luxury", "Villa", "Bespoke"],
-                },
-                {
-                    id: "tmpl-retail",
-                    name: "Nexus Retail Fit-Out Standard",
-                    description: "Complete retail showroom fit-out with high-traffic flooring, display shelving, and branding facade.",
-                    tags: ["Retail", "Showroom", "Commercial"],
-                },
-            ]);
             setLoading(false);
         };
 
@@ -872,14 +846,7 @@ function NewProposalModal({
             // Fallback
         }
 
-        setProjects([
-            { id: "00000000-0000-4000-8000-000000000202", name: "Oberoi Residence - Bandra", clientName: "Nikhil Oberoi", projectValue: 12000000 },
-            { id: "00000000-0000-4000-8000-000000000201", name: "Kohinoor Office - L4", clientName: "Kohinoor Group", projectValue: 2800000 },
-            { id: "00000000-0000-4000-8000-000000000203", name: "Westin Hotels - Suites", clientName: "Westin Hospitality", projectValue: 980000 },
-            { id: "00000000-0000-4000-8000-000000000204", name: "The Lakeview Villa", clientName: "Sharma Family", projectValue: 4250000 },
-            { id: "00000000-0000-4000-8000-000000000205", name: "Nexus Retail Fit - Out", clientName: "Nexus Malls", projectValue: 6500000 },
-            { id: "00000000-0000-4000-8000-000000000206", name: "Studio 47", clientName: "Ananya Bose", projectValue: 980000 },
-        ]);
+        setProjects([]);
     };
 
     const loadBoqs = async () => {
@@ -931,13 +898,7 @@ function NewProposalModal({
             // Fallback
         }
 
-        setBoqs([
-            { id: "00000000-0000-4000-8000-000000000301", name: "Kohinoor Office BOQ", projectId: "00000000-0000-4000-8000-000000000201", projectName: "Kohinoor Office - L4", subtotal: 2800000, status: "approved" },
-            { id: "00000000-0000-4000-8000-000000000302", name: "Oberoi Residence BOQ", projectId: "00000000-0000-4000-8000-000000000202", projectName: "Oberoi Residence - Bandra", subtotal: 12000000, status: "approved" },
-            { id: "00000000-0000-4000-8000-000000000303", name: "Westin Hotels BOQ", projectId: "00000000-0000-4000-8000-000000000203", projectName: "Westin Hotels - Suites", subtotal: 980000, status: "approved" },
-            { id: "00000000-0000-4000-8000-000000000304", name: "The Lakeview Villa BOQ", projectId: "00000000-0000-4000-8000-000000000204", projectName: "The Lakeview Villa", subtotal: 4250000, status: "approved" },
-            { id: "00000000-0000-4000-8000-000000000305", name: "Nexus Retail Fit - Out BOQ", projectId: "00000000-0000-4000-8000-000000000205", projectName: "Nexus Retail Fit - Out", subtotal: 6500000, status: "approved" },
-        ]);
+        setBoqs([]);
     };
 
     const loadTemplates = async () => {
@@ -956,12 +917,7 @@ function NewProposalModal({
             // Fallback
         }
 
-        setTemplates([
-            { id: "tmpl-residential", name: "Residential Turnkey Fit-Out" },
-            { id: "tmpl-commercial", name: "Commercial Office L4 Fit-Out" },
-            { id: "tmpl-villa", name: "Luxury Villa Package" },
-            { id: "tmpl-retail", name: "Nexus Retail Fit-Out Standard" },
-        ]);
+        setTemplates([]);
     };
 
     const loadProposals = async () => {
@@ -1509,10 +1465,10 @@ function ProposalPreviewModal({
         email: string;
         phone: string;
     }>({
-        companyName: "Arvin Interiors",
-        address: "42 Design House, Khar West, Mumbai 400052",
-        email: "contact@arvininteriors.com",
-        phone: "+91 98200 00001",
+        companyName: "",
+        address: "",
+        email: "",
+        phone: "",
     });
 
     useEffect(() => {
@@ -1524,10 +1480,10 @@ function ProposalPreviewModal({
                     const data = parseApiResponse<any>(payload);
                     if (data?.data) {
                         setBranding({
-                            companyName: data.data.companyName || data.data.company_name || "Arvin Interiors",
-                            address: data.data.address || "42 Design House, Khar West, Mumbai 400052",
-                            email: data.data.email || "contact@arvininteriors.com",
-                            phone: data.data.phone || "+91 98200 00001",
+                            companyName: data.data.companyName || data.data.company_name || "",
+                            address: data.data.address || "",
+                            email: data.data.email || "",
+                            phone: data.data.phone || "",
                         });
                     }
                 }
@@ -1784,4 +1740,3 @@ function ProposalPreviewModal({
         </div>
     );
 }
-

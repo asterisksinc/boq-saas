@@ -52,6 +52,8 @@ export type DashboardOverview = {
         grossMargin: number | null;
     };
     organization: { id: string; name: string; status: string; country: string | null };
+    profile?: { displayName: string | null; avatarUrl: string | null; email: string | null };
+    projectStatusBreakdown?: { active: number; planning: number; onHold: number; completed: number };
     recentProjects: unknown[];
     recentBoqs: unknown[];
     pendingActions: unknown[];
@@ -1430,5 +1432,4 @@ export async function deleteUserAccount(confirmation?: string) {
         body: JSON.stringify({ confirmation }),
     });
 }
-
 
