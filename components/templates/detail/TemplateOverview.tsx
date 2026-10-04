@@ -68,15 +68,15 @@ export default function TemplateOverview({
   const comp = template.composition || {};
   const areas = template.structure?.areas || [];
 
-  const roomsCount = comp.rooms ?? (areas.length > 0 ? areas.length : 8);
-  const boqSectionsCount = comp.boqSections ?? 18;
-  const itemsCount = comp.items ?? 186;
-  const milestonesCount = comp.milestones ?? 6;
-  const documentsCount = comp.documents ?? 4;
-  const approvalsCount = comp.approvals ?? 5;
-  const categoriesCount = comp.categories ?? 7;
-  const paymentStagesCount = comp.paymentStages ?? 3;
-  const teamsUsingCount = comp.teamsUsing ?? 2;
+  const roomsCount = comp.rooms ?? areas.length;
+  const boqSectionsCount = comp.boqSections ?? 0;
+  const itemsCount = comp.items ?? 0;
+  const milestonesCount = comp.milestones ?? 0;
+  const documentsCount = comp.documents ?? 0;
+  const approvalsCount = comp.approvals ?? 0;
+  const categoriesCount = comp.categories ?? 0;
+  const paymentStagesCount = comp.paymentStages ?? 0;
+  const teamsUsingCount = comp.teamsUsing ?? 0;
 
   // Derive rooms for the bottom Included Project Structure table
   const sampleAreas =
@@ -86,11 +86,7 @@ export default function TemplateOverview({
           sections: a.sections?.length || 6,
           items: a.sections?.reduce((sum, s) => sum + (s.items?.length || 0), 0) || 24,
         }))
-      : [
-          { name: "Entrance", sections: 6, items: 24 },
-          { name: "Living Room", sections: 8, items: 32 },
-          { name: "Master Bedroom", sections: 12, items: 46 },
-        ];
+      : [];
 
   const versionStr = template.version
     ? String(template.version).startsWith("v")
@@ -106,8 +102,8 @@ export default function TemplateOverview({
       ? "status-pill-review"
       : "status-pill-draft";
 
-  const totalUses = template.useCount ?? 42;
-  const projectsCreated = Math.max(1, Math.round(totalUses * 0.42));
+  const totalUses = template.useCount ?? 0;
+  const projectsCreated = comp.teamsUsing ?? 0;
 
   return (
     <div className="td-overview-wrapper">
@@ -121,7 +117,7 @@ export default function TemplateOverview({
             <div className="td-summary-item">
               <span className="td-summary-label">Business Type</span>
               <span className="td-summary-value">
-                {template.businessType || "Residential"}
+                {template.businessType || "—"}
               </span>
             </div>
 
@@ -137,26 +133,26 @@ export default function TemplateOverview({
               <span className="td-summary-value">
                 {template.visibility
                   ? template.visibility.charAt(0).toUpperCase() + template.visibility.slice(1)
-                  : "Organisation"}
+                  : "—"}
               </span>
             </div>
 
             <div className="td-summary-item">
               <span className="td-summary-label">Region</span>
-              <span className="td-summary-value">{template.region || "India"}</span>
+              <span className="td-summary-value">{template.region || "—"}</span>
             </div>
 
             <div className="td-summary-item">
               <span className="td-summary-label">Created On</span>
               <span className="td-summary-value">
-                {formatDate(template.createdAt || "2026-07-12T00:00:00Z")}
+                {formatDate(template.createdAt)}
               </span>
             </div>
 
             <div className="td-summary-item">
               <span className="td-summary-label">Last Updated</span>
               <span className="td-summary-value">
-                {formatDate(template.updatedAt || "2026-08-06T00:00:00Z")}
+                {formatDate(template.updatedAt)}
               </span>
             </div>
 
@@ -165,14 +161,14 @@ export default function TemplateOverview({
               <span className="td-summary-value">
                 {template.tags && template.tags.length > 0
                   ? template.tags.join(", ")
-                  : "Premium, 3BHK, Residential, Interiors"}
+                  : "—"}
               </span>
             </div>
 
             <div className="td-summary-item">
               <span className="td-summary-label">Last Viewed</span>
               <span className="td-summary-value">
-                {formatDate(template.lastUsedAt || template.updatedAt || "2026-08-06T00:00:00Z")}
+                {formatDate(template.lastUsedAt || template.updatedAt)}
               </span>
             </div>
           </div>
@@ -180,8 +176,7 @@ export default function TemplateOverview({
           <div className="td-summary-description-block">
             <span className="td-summary-label">Description</span>
             <p className="td-summary-description-text">
-              {template.description ||
-                "Complete ready-to-use structure for premium 3BHK residential interior projects including rooms, BOQ, workflow, approvals, documents and costing defaults."}
+              {template.description || "No description provided."}
             </p>
           </div>
         </div>

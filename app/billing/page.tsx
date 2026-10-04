@@ -65,7 +65,7 @@ const money = (n: number, currency = "INR") =>
 
 const fmtDate = (x?: string | null) =>
     x ? new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" })
-        .format(new Date(`${x.slice(0, 10)}T00:00:00`)) : "14 September 2026";
+        .format(new Date(`${x.slice(0, 10)}T00:00:00`)) : "Not available";
 
 const fmtDateShort = (x?: string | null) =>
     x ? new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" })
@@ -499,13 +499,13 @@ function CurrentPlanCard({
 }) {
     const isTrial = status === "trial";
     const rawPeriodEnd = sub?.periodEnd || (sub as any)?.period_end;
-    const periodEnd = rawPeriodEnd ? fmtDate(rawPeriodEnd) : (isTrial ? "Trial end date unavailable" : "14 September 2026");
+    const periodEnd = rawPeriodEnd ? fmtDate(rawPeriodEnd) : (isTrial ? "Trial end date unavailable" : "Not available");
     const planName = isTrial ? "Trial — Choose a Plan" : (plan?.name || (currentPlanCode === "professional" ? "Professional Plan" : currentPlanCode === "business" ? "Business Plan" : "Starter Plan"));
     const planPrice = plan?.monthlyPrice || (plan as any)?.monthly_price || (currentPlanCode === "professional" ? 9999 : currentPlanCode === "business" ? 18000 : 2999);
     const currency = plan?.currency || "INR";
     const usedSeats = sub?.seatsUsed ?? (sub as any)?.seats_used ?? usage?.teamMembers?.used ?? 12;
     const seatLimit = plan?.limits?.users ?? (plan?.limits as any)?.seats ?? (currentPlanCode === "professional" ? 20 : currentPlanCode === "business" ? 50 : 3);
-    const pmDisplay = paymentMethod?.last4 ? `•••• ${paymentMethod.last4}` : (isTrial ? "Not added" : "•••• 4242");
+    const pmDisplay = paymentMethod?.last4 ? `•••• ${paymentMethod.last4}` : "Not added";
 
     return (
         <section className="billing-section-card billing-current-plan-card">
@@ -580,8 +580,8 @@ function NextChargeCard({
     isTrial?: boolean;
     onViewDetails?: () => void;
 }) {
-    const pmDisplay = paymentMethod?.last4 ? `— ${paymentMethod.last4}` : (isTrial ? "Not added" : "— 4242");
-    const displayRenewal = renewalDate ? fmtDate(renewalDate) : (isTrial ? "Trial end date unavailable" : "14 September 2026");
+    const pmDisplay = paymentMethod?.last4 ? `— ${paymentMethod.last4}` : "Not added";
+    const displayRenewal = renewalDate ? fmtDate(renewalDate) : (isTrial ? "Trial end date unavailable" : "Not available");
     const displayAmount = isTrial && !renewalDate ? "Not Scheduled" : money(amount, currency);
 
     return (
@@ -823,7 +823,7 @@ function PaymentMethodCard({
     paymentMethod: PaymentMethod | null;
     onUpdate: () => void;
 }) {
-    const last4 = paymentMethod?.last4 || "4242";
+    const last4 = paymentMethod?.last4 || "Not added";
 
     return (
         <div className="billing-section-card billing-bottom-card">
@@ -1002,7 +1002,7 @@ function PaymentEditModal({
                             type="text"
                             value={formData.last4}
                             onChange={e => setFormData({ ...formData, last4: e.target.value })}
-                            placeholder="4242"
+                            placeholder="Last 4 digits"
                             maxLength={4}
                             pattern="\d{4}"
                             required

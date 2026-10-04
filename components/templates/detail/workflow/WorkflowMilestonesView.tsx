@@ -15,7 +15,7 @@ import {
   Trash2,
   AlertCircle,
 } from "lucide-react";
-import { MockMilestone, mockMilestones } from "@/lib/templates/mock-data";
+import type { MockMilestone } from "@/lib/templates/mock-data";
 
 interface WorkflowMilestonesViewProps {
   milestones?: MockMilestone[];
@@ -33,7 +33,7 @@ export default function WorkflowMilestonesView({
   const [milestones, setMilestones] = useState<MockMilestone[]>(
     propMilestones && Array.isArray(propMilestones) && propMilestones.length > 0
       ? propMilestones
-      : mockMilestones
+      : []
   );
 
   const [selectedMilestoneId, setSelectedMilestoneId] = useState<string>("ms-3");
@@ -71,7 +71,7 @@ export default function WorkflowMilestonesView({
   }, [milestones, searchQuery]);
 
   const selectedMilestone =
-    milestones.find((m) => m.id === selectedMilestoneId) || milestones[0] || mockMilestones[2];
+    milestones.find((m) => m.id === selectedMilestoneId) || milestones[0];
 
   const handleSelectMilestone = (m: MockMilestone) => {
     setSelectedMilestoneId(m.id);

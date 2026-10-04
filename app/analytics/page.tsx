@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Download, RefreshCw } from "lucide-react";
 import DashboardRail from "@/components/DashboardRail";
+import DashboardHeader from "@/components/DashboardHeader";
 import { getAnalytics, getAnalyticsPdf } from "@/lib/api/reports";
 import type { AnalyticsResponse } from "@/lib/types";
 
@@ -131,19 +132,7 @@ export default function AnalyticsPage() {
             <DashboardRail />
 
             <div className="fig-dashboard-main">
-                <header className="fig-dashboard-header">
-                    <h1>Analytics</h1>
-                    <div className="fig-dashboard-header-actions">
-                        <label className="fig-dashboard-search">
-                            <img src="/assets/dashboard/dashboard-search.svg" alt="" />
-                            <input placeholder="Search..." aria-label="Search" />
-                        </label>
-                        <button type="button" className="fig-dashboard-bell" aria-label="Notifications">
-                            <img src="/assets/dashboard/dashboard-notifications.svg" alt="" />
-                        </button>
-                        <div className="fig-dashboard-avatar">BO</div>
-                    </div>
-                </header>
+                <DashboardHeader title="Analytics" />
 
                 <section style={{ padding: "32px", display: "flex", flexDirection: "column", gap: "24px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

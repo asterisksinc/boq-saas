@@ -1,9 +1,10 @@
 "use client";
 
-import { ChevronDown, ChevronLeft, ChevronRight, FilePlus2, FileSpreadsheet, Plus, RefreshCw, UserPlus } from "lucide-react";
+import { ChevronLeft, ChevronRight, FilePlus2, FileSpreadsheet, RefreshCw, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import DashboardRail from "@/components/DashboardRail";
+import DashboardHeader from "@/components/DashboardHeader";
 import { DashboardOverview, getApiErrorMessage, getDashboardOverview } from "@/lib/api/auth";
 
 type DashboardPeriod = "week" | "month" | "quarter";
@@ -81,17 +82,6 @@ export default function DashboardPage() {
             </section> : null}
         </div>
     </main>;
-}
-
-function DashboardHeader({ profile }: { profile?: DashboardOverview["profile"] }) {
-    const router = useRouter();
-    const displayName = profile?.displayName?.trim() || profile?.email?.split("@")[0] || "User";
-    const initials = displayName.split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase();
-    return <header className="fig-dashboard-header"><h1>Overview</h1><div className="fig-dashboard-header-actions">
-        <label className="fig-dashboard-search"><img src="/assets/dashboard/dashboard-search.svg" alt="" /><input placeholder="Search..." aria-label="Search" /></label>
-        <button type="button" className="fig-dashboard-new" onClick={() => router.push("/projects")}><Plus size={20} /><span>New</span><i /><ChevronDown size={20} /></button>
-        <button type="button" className="fig-dashboard-bell" aria-label="Notifications"><img src="/assets/dashboard/dashboard-notifications.svg" alt="" /></button>{profile?.avatarUrl ? <img className="fig-dashboard-avatar" src={profile.avatarUrl} alt={displayName} /> : <div className="fig-dashboard-avatar" aria-label={displayName}>{initials}</div>}
-    </div></header>;
 }
 
 function computeTrends(kpis: DashboardOverview["kpis"]) {

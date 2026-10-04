@@ -19,12 +19,6 @@ import TemplateVersions from "@/components/templates/detail/TemplateVersions";
 import TemplateActivity from "@/components/templates/detail/TemplateActivity";
 import UseTemplateModal from "@/components/templates/detail/UseTemplateModal";
 import { getTemplate, duplicateProjectTemplate } from "@/lib/api/templates";
-import {
-  mockProjectTemplates,
-  mockAreas,
-  mockBoqItems,
-  USE_TEMPLATE_MOCKS,
-} from "@/lib/templates/mock-data";
 
 export default function TemplateDetailPage() {
   const params = useParams();
@@ -65,36 +59,15 @@ export default function TemplateDetailPage() {
       setLoading(true);
       setError(null);
 
-      // If mock mode is explicitly turned on in development, use mock template
-      if (USE_TEMPLATE_MOCKS) {
-        const found =
-          mockProjectTemplates.find((m) => m.id === id) || mockProjectTemplates[0];
-        setTemplate(found);
-        return;
-      }
-
-      // Real backend fetch
       const res = await getTemplate(id);
       if (res) {
         setTemplate(res);
       } else {
-        // Fallback to mock template 1 if not found in dev
-        if (process.env.NODE_ENV === "development") {
-          setTemplate(mockProjectTemplates[0]);
-        } else {
-          setError("Template not found");
-        }
+        setError("Template not found");
       }
     } catch (err: unknown) {
-      if (process.env.NODE_ENV === "development") {
-        // Provide mock template fallback during dev if backend lacks this specific ID
-        const found =
-          mockProjectTemplates.find((m) => m.id === id) || mockProjectTemplates[0];
-        setTemplate(found);
-      } else {
-        const msg = err instanceof Error ? err.message : "Failed to load template.";
-        setError(msg);
-      }
+      const msg = err instanceof Error ? err.message : "Failed to load template.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -241,7 +214,7 @@ export default function TemplateDetailPage() {
               {activeTab === "Structure" && (
                 <TemplateStructure
                   templateId={template.id}
-                  initialAreas={template.structure?.areas || mockAreas}
+                  initialAreas={template.structure?.areas || []}
                   onUpdate={fetchTemplateData}
                 />
               )}
@@ -249,7 +222,7 @@ export default function TemplateDetailPage() {
               {activeTab === "Costing & BOQ" && (
                 <TemplateCostingBoq
                   templateId={template.id}
-                  initialItems={template.costingBoq?.items || mockBoqItems}
+                  initialItems={template.costingBoq?.items || []}
                   onUpdate={fetchTemplateData}
                 />
               )}

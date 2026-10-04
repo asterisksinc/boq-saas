@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import DashboardRail from "@/components/DashboardRail";
+import DashboardHeader from "@/components/DashboardHeader";
 import { getApiErrorMessage, parseApiResponse } from "@/lib/api/auth";
 
 type FolderItem = {
@@ -160,39 +161,7 @@ export default function DocumentsPage() {
             <div className="fig-dashboard-glow" />
             <DashboardRail />
             <div className="fig-dashboard-main">
-                {/* Issue 1: Header identical to dashboard header */}
-                <header className="fig-dashboard-header">
-                    <h1>Documents</h1>
-                    <div className="fig-dashboard-header-actions">
-                        <label className="fig-dashboard-search">
-                            <img src="/assets/dashboard/dashboard-search.svg" alt="" />
-                            <input
-                                placeholder="Search..."
-                                aria-label="Search"
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                            />
-                        </label>
-                        <button
-                            className="fig-dashboard-new"
-                            type="button"
-                            onClick={() => setModal(activeFolder ? "upload" : "folder")}
-                        >
-                            <Plus size={20} />
-                            <span>New</span>
-                            <i />
-                            <ChevronDown size={20} />
-                        </button>
-                        <button
-                            className="fig-dashboard-bell"
-                            type="button"
-                            aria-label="Notifications"
-                        >
-                            <img src="/assets/dashboard/dashboard-notifications.svg" alt="" />
-                        </button>
-                        <div className="fig-dashboard-avatar">BO</div>
-                    </div>
-                </header>
+                <DashboardHeader title="Documents" onNew={() => setModal(activeFolder ? "upload" : "folder")} onSearch={setSearch} />
 
                 <section className="documents-content">
                     {/* Issue 2: Secondary search bar matches dashboard search bar UI */}

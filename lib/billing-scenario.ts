@@ -9,13 +9,13 @@ export type BillingScenario =
     | { type: "cancelled"; title: string; desc: string; actions: Array<"reactivate"> };
 
 export const fmtBillingDate = (x?: string | null) => {
-    if (!x) return "14 September 2026";
+    if (!x) return "Not available";
     try {
         const d = new Date(x.includes("T") ? x : `${x.slice(0, 10)}T00:00:00`);
-        if (isNaN(d.getTime())) return "14 September 2026";
+        if (isNaN(d.getTime())) return "Not available";
         return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" }).format(d);
     } catch {
-        return "14 September 2026";
+        return "Not available";
     }
 };
 

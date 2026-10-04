@@ -44,6 +44,7 @@ import {
 import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import DashboardRail from "@/components/DashboardRail";
+import DashboardHeader from "@/components/DashboardHeader";
 import {
   UseBoqTemplateModal,
   EditBoqTemplateModal,
@@ -327,23 +328,7 @@ export default function BoqTemplateDetailPage() {
       <div className="fig-dashboard-glow" />
       <DashboardRail />
       <div className="fig-dashboard-main">
-        {/* Top bar */}
-        <header className="fig-dashboard-header">
-          <h1>Templates</h1>
-          <div className="fig-dashboard-header-actions">
-            <label className="fig-dashboard-search">
-              <img src="/assets/dashboard/dashboard-search.svg" alt="" />
-              <input placeholder="Search..." />
-            </label>
-            <button className="fig-dashboard-new" onClick={() => setUseModalOpen(true)}>
-              <Plus size={19} /><span>New</span><i /><ChevronDown size={18} />
-            </button>
-            <button className="fig-dashboard-bell" aria-label="Notifications">
-              <img src="/assets/dashboard/dashboard-notifications.svg" alt="" />
-            </button>
-            <div className="fig-dashboard-avatar">BO</div>
-          </div>
-        </header>
+        <DashboardHeader title="Templates" onNew={() => setUseModalOpen(true)} />
 
         <div className="boq-page-shell boq-detail-container">
           {/* Breadcrumb */}

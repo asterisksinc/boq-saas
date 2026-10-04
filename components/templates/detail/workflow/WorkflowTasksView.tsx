@@ -13,7 +13,7 @@ import {
   Plus,
   Check,
 } from "lucide-react";
-import { MockWorkflowTask, mockWorkflowTasks } from "@/lib/templates/mock-data";
+import type { MockWorkflowTask } from "@/lib/templates/mock-data";
 
 interface WorkflowTasksViewProps {
   tasks?: MockWorkflowTask[];
@@ -29,7 +29,7 @@ export default function WorkflowTasksView({
   onAddTaskClick,
 }: WorkflowTasksViewProps) {
   const [tasks, setTasks] = useState<MockWorkflowTask[]>(
-    propTasks && propTasks.length > 0 ? propTasks : mockWorkflowTasks
+    propTasks || []
   );
 
   const [currentPage, setCurrentPage] = useState(1);

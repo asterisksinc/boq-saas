@@ -2,7 +2,15 @@
 
 import React, { useState, useEffect } from "react";
 import { getTemplateVersions } from "@/lib/api/templates";
-import { mockVersions, MockVersion } from "@/lib/templates/mock-data";
+
+type TemplateVersion = {
+  id: string;
+  version: string | number;
+  status?: string;
+  publishedAt?: string | null;
+  publishedBy?: string | null;
+  changeNote?: string | null;
+};
 
 interface TemplateVersionsProps {
   templateId: string;
@@ -15,19 +23,19 @@ export default function TemplateVersions({
   currentVersion = "v3.2",
   onUpdate,
 }: TemplateVersionsProps) {
-  const [versions, setVersions] = useState<MockVersion[]>(mockVersions);
+  const [versions, setVersions] = useState<TemplateVersion[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
     getTemplateVersions(templateId)
       .then((res: any) => {
-        if (mounted && res?.items && res.items.length > 0) {
+        if (mounted && Array.isArray(res?.items)) {
           setVersions(res.items);
         }
       })
       .catch(() => {
-        // Retain mock fallback
+        if (mounted) setVersions([]);
       })
       .finally(() => {
         if (mounted) setLoading(false);
@@ -63,12 +71,12 @@ export default function TemplateVersions({
                   <td>
                     <span
                       className={`td-status-pill ${
-                        ver.status === "ACTIVE"
+                        ver.status?.toUpperCase() === "ACTIVE"
                           ? "status-pill-active"
                           : "status-pill-draft"
                       }`}
                     >
-                      {ver.status}
+                      {ver.status || "—"}
                     </span>
                   </td>
                   <td>
@@ -82,12 +90,12 @@ export default function TemplateVersions({
                   </td>
                   <td>
                     <span className="text-slate-700 text-sm">
-                      {ver.publishedBy || "Pradhyumn D"}
+                      {ver.publishedBy || "—"}
                     </span>
                   </td>
                   <td>
                     <span className="text-slate-600 text-xs">
-                      {ver.changeNote || "Standard version release"}
+                      {ver.changeNote || "—"}
                     </span>
                   </td>
                 </tr>

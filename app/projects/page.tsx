@@ -7,6 +7,7 @@ type Project = { id: string; projectCode?: string | null; name: string; clientNa
 type Form = { name: string; clientName: string; clientContact: string; projectType: string; status: string; location: string; description: string; areaSqft: string; projectValue: string; startDate: string; targetCompletionDate: string };
 const blank: Form = { name: "", clientName: "", clientContact: "", projectType: "", status: "planning", location: "", description: "", areaSqft: "", projectValue: "", startDate: "", targetCompletionDate: "" };
 import DashboardRail from "@/components/DashboardRail";
+import DashboardHeader from "@/components/DashboardHeader";
 const message = (x: unknown, fallback: string) => (x as { error?: { message?: string }; message?: string })?.error?.message || (x as { message?: string })?.message || fallback;
 const money = (n?: number | null) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n || 0);
 const date = (x?: string | null) => x ? new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(new Date(`${x}T00:00:00`)) : "—";
@@ -40,16 +41,7 @@ export default function ProjectsPage() {
     <div className="fig-dashboard-glow" />
     <DashboardRail />
     <div className="fig-dashboard-main">
-      {/* Fix 1: Notification bell SVG + Fix 4: Search bar matching dashboard */}
-      <header className="fig-dashboard-header">
-        <h1>Projects</h1>
-        <div className="fig-dashboard-header-actions">
-          <label className="fig-dashboard-search"><img src="/assets/dashboard/dashboard-search.svg" alt="" /><input placeholder="Search..." value={query} onChange={e => setQuery(e.target.value)} /></label>
-          <button className="fig-dashboard-new" onClick={() => { setCreateScreen("choice"); setCreate(true); }}><Plus size={19} /><span>New</span><i /><ChevronDown size={18} /></button>
-          <button className="fig-dashboard-bell" aria-label="Notifications"><img src="/assets/dashboard/dashboard-notifications.svg" alt="" /></button>
-          <div className="fig-dashboard-avatar">PR</div>
-        </div>
-      </header>
+      <DashboardHeader title="Projects" onNew={() => { setCreateScreen("choice"); setCreate(true); }} />
       {(!create || createScreen === "choice") && (
       <section className="boq-page-shell projects-content">
         <div className="projects-title">

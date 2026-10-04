@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import DashboardRail from "@/components/DashboardRail";
+import DashboardHeader from "@/components/DashboardHeader";
 import { getApiErrorMessage, getDashboardOverview, parseApiResponse } from "@/lib/api/auth";
 
 export type InvoiceLineItem = {
@@ -202,43 +203,10 @@ export default function InvoicesPage() {
             <div className="fig-dashboard-glow" />
             <DashboardRail />
             <div className="fig-dashboard-main">
-                {/* Unified Dashboard Header with Search Bar */}
-                <header className="fig-dashboard-header">
-                    <h1>Invoices</h1>
-                    <div className="fig-dashboard-header-actions">
-                        <label className="fig-dashboard-search">
-                            <img src="/assets/dashboard/dashboard-search.svg" alt="" />
-                            <input
-                                value={search}
-                                placeholder="Search..."
-                                aria-label="Search"
-                                onChange={(event) => setSearch(event.target.value)}
-                                onKeyDown={(event) => {
-                                    if (event.key === "Enter") void load(1, search, pageSize);
-                                }}
-                            />
-                        </label>
-                        <button
-                            className="fig-dashboard-new"
-                            type="button"
-                            onClick={() => setShowCreate(true)}
-                        >
-                            <Plus size={20} />
-                            <span>New</span>
-                            <i />
-                            <ChevronDown size={20} />
-                        </button>
-                        <button
-                            className="fig-dashboard-bell"
-                            type="button"
-                            aria-label="Notifications"
-                        >
-                            <img src="/assets/dashboard/dashboard-notifications.svg" alt="" />
-                        </button>
-                        <div className="fig-dashboard-avatar">BO</div>
-                    </div>
-                </header>
-
+                <DashboardHeader title="Invoices" onNew={() => setShowCreate(true)} onSearch={(value) => {
+                    setSearch(value);
+                    void load(1, value, pageSize);
+                }} />
                 {showCreate ? (
                     <CreateInvoiceView
                         currency={currency}

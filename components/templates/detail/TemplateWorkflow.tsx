@@ -9,15 +9,11 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { updateTemplateSection } from "@/lib/api/templates";
-import {
+import type {
   MockWorkflowTask,
   MockMilestone,
   MockApprovalFlow,
   MockWorkflowRule,
-  mockWorkflowTasks,
-  mockMilestones,
-  mockApprovalFlows,
-  mockWorkflowRules,
 } from "@/lib/templates/mock-data";
 
 import WorkflowStagesView, {
@@ -157,27 +153,27 @@ export default function TemplateWorkflow({
   const [stages, setStages] = useState<WorkflowStageItem[]>(
     initialWorkflow?.stages && Array.isArray(initialWorkflow.stages) && initialWorkflow.stages.length > 0
       ? initialWorkflow.stages
-      : defaultStages
+      : []
   );
   const [tasks, setTasks] = useState<MockWorkflowTask[]>(
     initialWorkflow?.tasks && Array.isArray(initialWorkflow.tasks) && initialWorkflow.tasks.length > 0
       ? initialWorkflow.tasks
-      : mockWorkflowTasks
+      : []
   );
   const [milestones, setMilestones] = useState<MockMilestone[]>(
     initialWorkflow?.milestones && Array.isArray(initialWorkflow.milestones) && initialWorkflow.milestones.length > 0
       ? initialWorkflow.milestones
-      : mockMilestones
+      : []
   );
   const [approvals, setApprovals] = useState<MockApprovalFlow[]>(
     initialWorkflow?.approvals && Array.isArray(initialWorkflow.approvals) && initialWorkflow.approvals.length > 0
       ? initialWorkflow.approvals
-      : mockApprovalFlows
+      : []
   );
   const [rules, setRules] = useState<MockWorkflowRule[]>(
     initialWorkflow?.rules && Array.isArray(initialWorkflow.rules) && initialWorkflow.rules.length > 0
       ? initialWorkflow.rules
-      : mockWorkflowRules
+      : []
   );
 
   React.useEffect(() => {

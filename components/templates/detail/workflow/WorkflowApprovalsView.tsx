@@ -14,9 +14,8 @@ import {
   Trash2,
   ExternalLink,
 } from "lucide-react";
-import {
+import type {
   MockApprovalFlow,
-  mockApprovalFlows,
   MockApprover,
 } from "@/lib/templates/mock-data";
 
@@ -36,7 +35,7 @@ export default function WorkflowApprovalsView({
   const [approvals, setApprovals] = useState<MockApprovalFlow[]>(
     propApprovals && Array.isArray(propApprovals) && propApprovals.length > 0
       ? propApprovals
-      : mockApprovalFlows
+      : []
   );
 
   const [selectedFlowId, setSelectedFlowId] = useState<string>("apr-1");
@@ -73,7 +72,7 @@ export default function WorkflowApprovalsView({
   }, [filteredApprovals, currentPage, pageSize]);
 
   const selectedFlow =
-    approvals.find((a) => a.id === selectedFlowId) || approvals[0] || mockApprovalFlows[0];
+    approvals.find((a) => a.id === selectedFlowId) || approvals[0];
 
   const handleRowClick = (flow: MockApprovalFlow) => {
     setSelectedFlowId(flow.id);

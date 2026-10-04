@@ -5722,11 +5722,12 @@ input {
     align-items: center;
     justify-content: space-between;
     padding: 0 8px;
+    box-sizing: border-box;
 }
 
 .fig-dashboard-header h1 {
     margin: 0;
-    font-size: 18px;
+    font-size: 14px;
     font-weight: 600;
     line-height: 1.2;
 }
@@ -5740,12 +5741,12 @@ input {
 }
 
 .fig-dashboard-search {
-    width: 240px;
-    height: 46px;
+    width: 208px;
+    height: 36px;
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 5px 12px 5px 5px;
+    padding: 3px 10px 3px 4px;
     border: 1px solid rgba(255, 255, 255, .32);
     border-radius: 8px;
     background: rgba(255, 255, 255, .36);
@@ -5754,8 +5755,8 @@ input {
 }
 
 .fig-dashboard-search img {
-    width: 36px;
-    height: 36px;
+    width: 30px;
+    height: 30px;
 }
 
 .fig-dashboard-search input {
@@ -5765,7 +5766,7 @@ input {
     outline: 0;
     background: transparent;
     color: var(--fig-ink);
-    font-size: 14px;
+    font-size: 12px;
 }
 
 .fig-dashboard-search input::placeholder {
@@ -5774,19 +5775,38 @@ input {
 }
 
 .fig-dashboard-new {
-    height: 46px;
+    height: 36px;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 0;
     padding: 0;
     border: 0;
     border-radius: 6px;
     background: #2563eb;
     color: #fff;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     cursor: pointer;
     transition: background .15s, box-shadow .15s, transform .1s;
+}
+
+.fig-dashboard-new > button {
+    height: 100%;
+    display: inline-flex;
+    align-items: center;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.fig-dashboard-new > button:first-child {
+    padding: 0 12px;
+}
+
+.fig-dashboard-new > button:last-child {
+    padding: 0 10px;
 }
 
 .fig-dashboard-new:hover {
@@ -5799,25 +5819,187 @@ input {
 }
 
 .fig-dashboard-new svg:first-child {
-    margin-left: 14px;
+    margin-left: 0;
 }
 
 .fig-dashboard-new i {
     width: 1px;
     align-self: stretch;
-    margin-left: 8px;
+    margin-left: 0;
     background: #fff;
     opacity: .3;
 }
 
 .fig-dashboard-new svg:last-child {
-    margin: 0 13px;
+    margin: 0;
+}
+
+.fig-dashboard-new-menu,
+.fig-dashboard-notifications {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    z-index: 50;
+    border: 1px solid #dbe4f0;
+    background: #fff;
+    box-shadow: 0 16px 36px rgba(30, 64, 175, .16), 0 3px 8px rgba(15, 23, 42, .08);
+}
+
+.fig-dashboard-new-menu {
+    width: 196px;
+    padding: 6px;
+    border-radius: 10px;
+}
+
+.fig-dashboard-new-menu::before,
+.fig-dashboard-notifications::before {
+    content: "";
+    position: absolute;
+    top: -6px;
+    right: 18px;
+    width: 10px;
+    height: 10px;
+    border-top: 1px solid #dbe4f0;
+    border-left: 1px solid #dbe4f0;
+    background: #fff;
+    transform: rotate(45deg);
+}
+
+.fig-dashboard-new-menu button {
+    width: 100%;
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: #1e293b;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+}
+
+.fig-dashboard-new-menu button:hover {
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+.fig-dashboard-menu-icon {
+    width: 24px;
+    height: 24px;
+    display: grid;
+    place-items: center;
+    border-radius: 6px;
+    background: #eff6ff;
+    color: #2563eb;
+}
+
+.fig-dashboard-notifications {
+    width: 318px;
+    padding: 0;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.fig-dashboard-popover-header {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 15px 16px 13px;
+    border-bottom: 1px solid #edf2f7;
+}
+
+.fig-dashboard-popover-header strong {
+    display: block;
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.fig-dashboard-popover-header span:not(.text-xs) {
+    display: block;
+    margin-top: 3px;
+    color: #64748b;
+    font-size: 11px;
+}
+
+.fig-dashboard-popover-header .text-xs {
+    flex-shrink: 0;
+    padding: 3px 7px;
+    border-radius: 999px;
+    background: #eff6ff;
+    color: #2563eb;
+    font-size: 10px;
+}
+
+.fig-dashboard-notifications > p {
+    margin: 0;
+    padding: 24px 16px;
+    color: #64748b;
+    font-size: 12px;
+    text-align: center;
+}
+
+.fig-dashboard-notification-list {
+    max-height: 280px;
+    margin: 0;
+    padding: 6px;
+    overflow-y: auto;
+    list-style: none;
+}
+
+.fig-dashboard-notification-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 10px;
+    border-radius: 8px;
+    color: #334155;
+    font-size: 12px;
+}
+
+.fig-dashboard-notification-list li:hover,
+.fig-dashboard-notification-list li.is-unread {
+    background: #f8fbff;
+}
+
+.fig-dashboard-notification-list .font-medium {
+    color: #1e293b;
+    line-height: 1.35;
+}
+
+.fig-dashboard-notification-dot {
+    width: 7px;
+    height: 7px;
+    flex: 0 0 7px;
+    margin-top: 4px;
+    border-radius: 50%;
+    background: #cbd5e1;
+}
+
+.fig-dashboard-notification-list li.is-unread .fig-dashboard-notification-dot {
+    background: #2563eb;
+    box-shadow: 0 0 0 3px #dbeafe;
+}
+
+.fig-dashboard-popover-footer {
+    padding: 10px 16px;
+    border-top: 1px solid #edf2f7;
+    color: #94a3b8;
+    font-size: 10px;
+    text-align: center;
 }
 
 .fig-dashboard-bell,
 .fig-dashboard-avatar {
-    width: 46px;
-    height: 46px;
+    width: 36px;
+    height: 36px;
     display: grid;
     place-items: center;
     border: 0;
@@ -5833,8 +6015,8 @@ input {
 }
 
 .fig-dashboard-bell img {
-    width: 46px;
-    height: 46px;
+    width: 36px;
+    height: 36px;
 }
 
 .fig-dashboard-avatar {
@@ -6581,6 +6763,17 @@ input {
 
     .fig-dashboard-new svg:last-child {
         margin: 0 8px;
+    }
+
+    .fig-dashboard-new-menu {
+        right: -4px;
+    }
+
+    .fig-dashboard-notifications {
+        position: fixed;
+        top: 68px;
+        right: 12px;
+        width: min(318px, calc(100vw - 24px));
     }
 
     .fig-quick-actions>div {
@@ -42559,8 +42752,4 @@ input {
     color: #ffffff;
     cursor: pointer;
 }
-
-
-
-
 

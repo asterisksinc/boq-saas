@@ -24,6 +24,7 @@ import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { getApiErrorMessage, parseApiResponse } from "@/lib/api/auth";
 import { BoqStatusUi, mapBoqListItem, type BoqListItem } from "@/lib/domain/boq-data";
 import DashboardRail from "@/components/DashboardRail";
+import DashboardHeader from "@/components/DashboardHeader";
 
 type CreateMode = "blank" | "template";
 
@@ -191,25 +192,7 @@ export default function BoqsPage() {
             <DashboardRail />
 
             <div className="fig-dashboard-main">
-                <header className="fig-dashboard-header">
-                    <h1>Bill of Quantities</h1>
-                    <div className="fig-dashboard-header-actions">
-                        <label className="fig-dashboard-search">
-                            <img src="/assets/dashboard/dashboard-search.svg" alt="" />
-                            <input placeholder="Search..." aria-label="Search" />
-                        </label>
-                        <button type="button" className="fig-dashboard-new" onClick={() => setShowCreateModal(true)}>
-                            <Plus size={20} />
-                            <span>New</span>
-                            <i />
-                            <ChevronDown size={20} />
-                        </button>
-                        <button type="button" className="fig-dashboard-bell" aria-label="Notifications">
-                            <img src="/assets/dashboard/dashboard-notifications.svg" alt="" />
-                        </button>
-                        <div className="fig-dashboard-avatar">BO</div>
-                    </div>
-                </header>
+                <DashboardHeader title="Bill of Quantities" onNew={() => setShowCreateModal(true)} />
 
                 {screen === "list" ? (
                     <section className="boq-page-shell">

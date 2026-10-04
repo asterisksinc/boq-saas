@@ -6,14 +6,6 @@ import {
     AlertCircle,
     X,
     Loader2,
-    Sparkles,
-    FileBarChart,
-    HardDrive,
-    Cable,
-    UserCircle,
-    Paintbrush,
-    Headphones,
-    FileText,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -53,7 +45,7 @@ const money = (n: number, currency = "INR") =>
 
 const fmtDate = (x?: string | null) =>
     x ? new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" })
-        .format(new Date(`${x.slice(0, 10)}T00:00:00`)) : "14 September 2026";
+        .format(new Date(`${x.slice(0, 10)}T00:00:00`)) : "Not available";
 
 // Capitalize first letter, replace underscores with spaces and handle snake_case/camelCase
 const capitalize = (s: string | number | null | undefined): string => {
@@ -63,26 +55,6 @@ const capitalize = (s: string | number | null | undefined): string => {
     const cleaned = str.replace(/_/g, "-").replace(/([a-z])([A-Z])/g, "$1 $2");
     return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
 };
-
-// ─── Add-on Catalog (static — no backend) ────────────────────────────────────
-
-interface AddOnDef {
-    key: string;
-    name: string;
-    description: string;
-    icon: React.ReactNode;
-}
-
-const addOnCatalog: AddOnDef[] = [
-    { key: "proposal-generator", name: "Proposal Generator", description: "Create branded proposals from approved BOQs.", icon: <FileText size={22} /> },
-    { key: "ai-assistant", name: "AI Assistant", description: "Contextual assistance across estimation and project workflows.", icon: <Sparkles size={22} /> },
-    { key: "advanced-reports", name: "Advanced Reports", description: "Deeper analytics with configurable dashboards.", icon: <FileBarChart size={22} /> },
-    { key: "additional-storage", name: "Additional Storage", description: "Extend workflow forms beyond your plan allotment.", icon: <HardDrive size={22} /> },
-    { key: "advanced-integrations", name: "Advanced Integrations", description: "Premium connectors for ERPs and accounting systems.", icon: <Cable size={22} /> },
-    { key: "client-portal", name: "Client Portal", description: "Give clients a secure space to review and approve BOQs.", icon: <UserCircle size={22} /> },
-    { key: "white-label", name: "White-label Branding", description: "Remove BOQ branding and apply your own.", icon: <Paintbrush size={22} /> },
-    { key: "enterprise-support", name: "Enterprise Support", description: "Dedicated support with named engineers and SLAs.", icon: <Headphones size={22} /> },
-];
 
 // ─── Plan feature rows for comparison ─────────────────────────────────────────
 
@@ -151,7 +123,7 @@ export default function ManagePlanPage() {
 
     // Payment edit modal state
     const [showPaymentEdit, setShowPaymentEdit] = useState(false);
-    const [paymentForm, setPaymentForm] = useState({ brand: "Visa", last4: "4242", expiryMonth: "12", expiryYear: "2028" });
+    const [paymentForm, setPaymentForm] = useState({ brand: "", last4: "", expiryMonth: "", expiryYear: "" });
     const [paymentSaving, setPaymentSaving] = useState(false);
 
     // Toast
@@ -169,8 +141,8 @@ export default function ManagePlanPage() {
                 setPaymentForm({
                     brand: data.paymentMethod.brand,
                     last4: data.paymentMethod.last4,
-                    expiryMonth: (data.paymentMethod.expiryMonth || (data.paymentMethod as any).expiry_month)?.toString().padStart(2, "0") || "12",
-                    expiryYear: (data.paymentMethod.expiryYear || (data.paymentMethod as any).expiry_year)?.toString() || "2028",
+                    expiryMonth: (data.paymentMethod.expiryMonth || (data.paymentMethod as any).expiry_month)?.toString().padStart(2, "0") || "",
+                    expiryYear: (data.paymentMethod.expiryYear || (data.paymentMethod as any).expiry_year)?.toString() || "",
                 });
             }
         } catch (e: unknown) {
@@ -467,27 +439,8 @@ export default function ManagePlanPage() {
                     {/* ── Section 4: ADD-ONS ── */}
                     <section className="mp-section-card">
                         <p className="mp-section-label">ADD-ONS</p>
-                        <div className="mp-addon-grid">
-                            {addOnCatalog.map(addon => (
-                                <div key={addon.key} className="mp-addon-card">
-                                    <div className="mp-addon-top">
-                                        <div className="mp-addon-icon">{addon.icon}</div>
-                                        <span className="mp-addon-badge">Not Enabled</span>
-                                    </div>
-                                    <h4 className="mp-addon-name">{addon.name}</h4>
-                                    <p className="mp-addon-desc">{addon.description}</p>
-                                    <div className="mp-addon-bottom">
-                                        <span className="mp-addon-price">₹X / month</span>
-                                        <button
-                                            type="button"
-                                            className="mp-addon-btn"
-                                            onClick={() => showNotice("Add-ons coming soon", "success")}
-                                        >
-                                            + Add Add-ons
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
+                        <div className="mp-empty-state">
+                            Add-ons are not available for this workspace yet.
                         </div>
                     </section>
                 </div>
@@ -656,7 +609,7 @@ function PlanChangeConfirmationModal({
                     <div className="pcm-section-box pcm-pm-box">
                         <div className="pcm-pm-info">
                             <span className="pcm-pm-label">PAYMENT METHOD</span>
-                            <span className="pcm-pm-card">•••• {paymentMethod?.last4 || "4242"}</span>
+                            <span className="pcm-pm-card">{paymentMethod?.last4 ? `•••• ${paymentMethod.last4}` : "Not added"}</span>
                         </div>
                         <button type="button" className="pcm-pm-btn" onClick={onChangePaymentMethod}>
                             Change Payment Method
@@ -778,7 +731,7 @@ function PaymentEditModal({
                             type="text"
                             value={formData.last4}
                             onChange={e => setFormData({ ...formData, last4: e.target.value })}
-                            placeholder="4242"
+                            placeholder="Last 4 digits"
                             maxLength={4}
                             pattern="\d{4}"
                             required

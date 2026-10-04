@@ -38,6 +38,8 @@ export type DashboardNotification = {
     priority: string | null;
     createdAt: string;
     readAt: string | null;
+    targetType?: string | null;
+    targetId?: string | null;
 };
 
 export type DashboardOverview = {
@@ -130,6 +132,14 @@ export async function getCurrentUser() {
 
 export async function getDashboardOverview() {
     return request<DashboardOverview>("/api/v1/dashboard/overview");
+}
+
+export async function getDashboardNotifications(params?: { page?: number; pageSize?: number }) {
+    const query = new URLSearchParams();
+    if (params?.page) query.set("page", String(params.page));
+    if (params?.pageSize) query.set("pageSize", String(params.pageSize));
+    const suffix = query.toString() ? `?${query.toString()}` : "";
+    return request<{ unreadCount: number; items: DashboardNotification[] }>(`/api/v1/dashboard/notifications${suffix}`);
 }
 
 export async function createProject(input: { name: string; clientName: string; projectType: string; status: "active" | "on_hold" | "planning"; location?: string }) {
@@ -1432,4 +1442,3 @@ export async function deleteUserAccount(confirmation?: string) {
         body: JSON.stringify({ confirmation }),
     });
 }
-

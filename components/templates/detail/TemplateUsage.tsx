@@ -2,7 +2,14 @@
 
 import React, { useState, useEffect } from "react";
 import { getTemplateUsage } from "@/lib/api/templates";
-import { mockUsageRecords, MockUsageRecord } from "@/lib/templates/mock-data";
+
+type UsageRecord = {
+  id: string;
+  projectName?: string;
+  clientName?: string;
+  location?: string;
+  usedAt?: string | null;
+};
 
 interface TemplateUsageProps {
   templateId: string;
@@ -15,19 +22,19 @@ export default function TemplateUsage({
   useCount = 42,
   lastUsedAt,
 }: TemplateUsageProps) {
-  const [usageData, setUsageData] = useState<MockUsageRecord[]>(mockUsageRecords);
+  const [usageData, setUsageData] = useState<UsageRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
     getTemplateUsage(templateId)
       .then((res: any) => {
-        if (mounted && res?.items && res.items.length > 0) {
+        if (mounted && Array.isArray(res?.items)) {
           setUsageData(res.items);
         }
       })
       .catch(() => {
-        // Retain mock fallback
+        if (mounted) setUsageData([]);
       })
       .finally(() => {
         if (mounted) setLoading(false);
@@ -38,7 +45,7 @@ export default function TemplateUsage({
     };
   }, [templateId]);
 
-  const projectsCreated = Math.max(1, Math.round(useCount * 0.42));
+  const projectsCreated = usageData.length;
 
   return (
     <div className="td-usage-tab-wrapper">
@@ -65,7 +72,7 @@ export default function TemplateUsage({
                   month: "short",
                   year: "numeric",
                 }).format(new Date(lastUsedAt))
-              : "18 Aug 2026"}
+              : "—"}
           </span>
           <span className="sub">Recent deployment</span>
         </div>
@@ -87,14 +94,14 @@ export default function TemplateUsage({
                 <tr key={rec.id} className="target-table-row">
                   <td>
                     <span className="font-semibold text-slate-900 text-sm">
-                      {rec.projectName}
+                      {rec.projectName || "Unnamed project"}
                     </span>
                   </td>
                   <td>
-                    <span className="text-slate-600 text-sm">{rec.clientName}</span>
+                    <span className="text-slate-600 text-sm">{rec.clientName || "—"}</span>
                   </td>
                   <td>
-                    <span className="text-slate-500 text-sm">{rec.location}</span>
+                    <span className="text-slate-500 text-sm">{rec.location || "—"}</span>
                   </td>
                   <td>
                     <span className="text-slate-500 text-xs">

@@ -14,7 +14,7 @@ import {
   Check,
 } from "lucide-react";
 import { updateTemplateSection } from "@/lib/api/templates";
-import { mockAreas, MockArea } from "@/lib/templates/mock-data";
+import type { MockArea } from "@/lib/templates/mock-data";
 
 interface TemplateStructureProps {
   templateId: string;
@@ -27,9 +27,7 @@ export default function TemplateStructure({
   initialAreas,
   onUpdate,
 }: TemplateStructureProps) {
-  // Use backend areas if available, fallback to mock areas for visual validation
-  const areasList =
-    initialAreas && initialAreas.length > 0 ? initialAreas : mockAreas;
+  const areasList = initialAreas || [];
 
   const [areas, setAreas] = useState<MockArea[]>(areasList);
   const [selectedAreaId, setSelectedAreaId] = useState<string>(
@@ -44,7 +42,7 @@ export default function TemplateStructure({
 
   // Inspector form state for the currently selected area
   const selectedArea =
-    areas.find((a) => a.id === selectedAreaId) || areas[0] || mockAreas[0];
+    areas.find((a) => a.id === selectedAreaId) || areas[0];
 
   const [inspectorName, setInspectorName] = useState(selectedArea?.name || "");
   const [inspectorType, setInspectorType] = useState(selectedArea?.type || "Bedroom");
@@ -181,7 +179,7 @@ export default function TemplateStructure({
             name: "Furniture",
             itemsCount: 24,
             totalValue: 482000,
-            items: mockAreas[0]?.sections[0]?.items || [],
+            items: [],
           },
           {
             id: "sec-electrical",
@@ -354,10 +352,7 @@ export default function TemplateStructure({
                         </tr>
                       </thead>
                       <tbody>
-                        {(section.items && section.items.length > 0
-                          ? section.items
-                          : mockAreas[0].sections[0].items
-                        ).map((item, itemIdx) => (
+                        {(section.items || []).map((item, itemIdx) => (
                           <tr key={item.id || itemIdx}>
                             <td>
                               <div className="td-item-name-cell">

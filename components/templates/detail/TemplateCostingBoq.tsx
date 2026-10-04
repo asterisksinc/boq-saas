@@ -13,7 +13,7 @@ import {
   GripVertical,
   ChevronLeft,
 } from "lucide-react";
-import { mockBoqItems, MockItem } from "@/lib/templates/mock-data";
+import type { MockItem } from "@/lib/templates/mock-data";
 
 interface TemplateCostingBoqProps {
   templateId: string;
@@ -187,8 +187,7 @@ export default function TemplateCostingBoq({
   initialItems,
   onUpdate,
 }: TemplateCostingBoqProps) {
-  const items =
-    initialItems && initialItems.length > 0 ? initialItems : sampleItems;
+  const items = initialItems || [];
 
   const [selectedSubSec, setSelectedSubSec] = useState("sec-fur");
   const [expandedRoomId, setExpandedRoomId] = useState<string>("rm-master");

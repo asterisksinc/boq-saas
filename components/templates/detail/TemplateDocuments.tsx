@@ -1,12 +1,20 @@
 "use client";
 
-import React, { useState } from "react";
-import { FileText, Plus, Download, Trash2, Eye } from "lucide-react";
-import { mockDocuments, MockDocument } from "@/lib/templates/mock-data";
+import React from "react";
+import { FileText, Plus, Download } from "lucide-react";
+
+type TemplateDocument = {
+  id: string;
+  name?: string;
+  type?: string;
+  format?: string;
+  version?: string | number;
+  updatedAt?: string | null;
+};
 
 interface TemplateDocumentsProps {
   templateId: string;
-  initialDocuments?: MockDocument[];
+  initialDocuments?: TemplateDocument[];
   onUpdate?: () => void;
 }
 
@@ -15,10 +23,7 @@ export default function TemplateDocuments({
   initialDocuments,
   onUpdate,
 }: TemplateDocumentsProps) {
-  const documents =
-    initialDocuments && initialDocuments.length > 0
-      ? initialDocuments
-      : mockDocuments;
+  const documents = initialDocuments || [];
 
   return (
     <div className="td-doc-wrapper">
@@ -57,19 +62,19 @@ export default function TemplateDocuments({
                         <FileText size={18} className="text-blue-600" />
                       </div>
                       <div className="target-table-name-info">
-                        <span className="target-table-title">{doc.name}</span>
+                        <span className="target-table-title">                        {doc.name || "Unnamed document"}</span>
                         <span className="target-table-desc">Standard template attachment</span>
                       </div>
                     </div>
                   </td>
                   <td>
-                    <span className="target-project-type-pill">{doc.type}</span>
+                    <span className="target-project-type-pill">                    {doc.type || "—"}</span>
                   </td>
                   <td>
-                    <span className="cell-muted font-mono text-xs">{doc.format}</span>
+                    <span className="cell-muted font-mono text-xs">                    {doc.format || "—"}</span>
                   </td>
                   <td>
-                    <span className="target-table-version-text">{doc.version}</span>
+                    <span className="target-table-version-text">                    {doc.version || "—"}</span>
                   </td>
                   <td>
                     <span className="cell-muted text-xs">

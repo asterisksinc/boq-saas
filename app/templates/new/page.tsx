@@ -2,6 +2,7 @@
 
 import React, { useState, FormEvent, KeyboardEvent } from "react";
 import DashboardRail from "@/components/DashboardRail";
+import DashboardHeader from "@/components/DashboardHeader";
 import { ArrowLeft, Plus, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -87,20 +88,7 @@ export default function NewTemplatePage() {
       <div className="fig-dashboard-glow" />
       <DashboardRail />
       <div className="fig-dashboard-main">
-        <header className="fig-dashboard-header">
-          <h1>Templates</h1>
-          <div className="fig-dashboard-header-actions">
-            <label className="fig-dashboard-search">
-              <img src="/assets/dashboard/dashboard-search.svg" alt="" />
-              <input placeholder="Search..." />
-            </label>
-            <button className="fig-dashboard-new">...</button>
-            <button className="fig-dashboard-bell" aria-label="Notifications">
-              <img src="/assets/dashboard/dashboard-notifications.svg" alt="" />
-            </button>
-            <div className="fig-dashboard-avatar">BO</div>
-          </div>
-        </header>
+        <DashboardHeader title="Templates" />
 
         <section className="boq-page-shell templates-content">
           <Link href="/templates" className="template-detail-back">

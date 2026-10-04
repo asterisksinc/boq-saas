@@ -5333,22 +5333,6 @@ async function listWorkspaceUsers(request: Request, supabase: SupabaseClient, id
     }
   }
 
-  // Ensure default reference users from Design 1 are present if there are no technician/designer/etc users
-  const referenceDemoUsers = [
-    { id: "ref-user-fox", userId: "demo-user-fox", firstName: "Robert", lastName: "Fox", displayName: "Robert Fox", email: "robert.fox@example.com", phone: "(406) 555-0120", role: "Technician", roleId: null, avatarUrl: null, status: "active", joinedAt: "2026-01-15T08:00:00Z" },
-    { id: "ref-user-cooper", userId: "demo-user-cooper", firstName: "Bessie", lastName: "Cooper", displayName: "Bessie Cooper", email: "bessie.cooper@example.com", phone: "(406) 555-0120", role: "Designer", roleId: null, avatarUrl: null, status: "active", joinedAt: "2026-02-10T09:30:00Z" },
-    { id: "ref-user-robertson", userId: "demo-user-robertson", firstName: "Darlene", lastName: "Robertson", displayName: "Darlene Robertson", email: "darlene.robertson@example.com", phone: "(406) 555-0120", role: "Estimator", roleId: null, avatarUrl: null, status: "active", joinedAt: "2026-03-05T11:00:00Z" },
-    { id: "ref-user-nguyen", userId: "demo-user-nguyen", firstName: "Savannah", lastName: "Nguyen", displayName: "Savannah Nguyen", email: "savannah.nguyen@example.com", phone: "(406) 555-0120", role: "Procurement Specialist", roleId: null, avatarUrl: null, status: "active", joinedAt: "2026-04-12T14:15:00Z" },
-  ];
-
-  if (!items.some(i => i.role === "Technician")) {
-    for (const r of referenceDemoUsers) {
-      if (!items.some(i => i.email === r.email || i.id === r.id)) {
-        items.push(r);
-      }
-    }
-  }
-
   return ok({ items }, 200, id);
 }
 
@@ -7302,14 +7286,6 @@ function formDto(row: any) {
   };
 }
 
-const defaultIntegrationList = (wid: string) => [
-  { id: `meta-${wid.slice(0, 8)}`, workspaceId: wid, provider: "meta_lead_ads", name: "Meta Lead Ads", status: "connected", connectedAt: new Date().toISOString() },
-  { id: `gads-${wid.slice(0, 8)}`, workspaceId: wid, provider: "google_ads", name: "Google Ads Lead Form Assets", status: "connected", connectedAt: new Date().toISOString() },
-  { id: `web-${wid.slice(0, 8)}`, workspaceId: wid, provider: "custom_website", name: "Custom Website", status: "connected", connectedAt: new Date().toISOString() },
-  { id: `wa-${wid.slice(0, 8)}`, workspaceId: wid, provider: "whatsapp", name: "WhatsApp Automation", status: "connected", connectedAt: new Date().toISOString() },
-  { id: `rp-${wid.slice(0, 8)}`, workspaceId: wid, provider: "razorpay", name: "RazorPay Integration", status: "connected", connectedAt: new Date().toISOString() },
-];
-
 async function listIntegrations(request: NextRequest, supabase: SupabaseClient, id: string) {
   const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
   const wid = scoped.access.workspaceId;
@@ -7325,14 +7301,7 @@ async function listIntegrations(request: NextRequest, supabase: SupabaseClient, 
   const intgConfig = settings.data?.integrations as Record<string, unknown> | undefined;
   let connectedList = Array.isArray(intgConfig?.connected) ? intgConfig.connected : null;
 
-  if (!connectedList) {
-    connectedList = defaultIntegrationList(wid);
-    await supabase.from("workspace_settings").upsert({
-      workspace_id: wid,
-      integrations: { ...(intgConfig || {}), status: 'done', connected: connectedList },
-      updated_by: scoped.access.userId
-    });
-  }
+  if (!connectedList) connectedList = [];
 
   const items = connectedList.map((c: any) => ({
     id: c.id || `ws-${wid.slice(0, 8)}-${c.provider}`,
@@ -7382,7 +7351,7 @@ async function integrationSummary(request: NextRequest, supabase: SupabaseClient
   // Fallback to workspace_settings
   const cur = await supabase.from("workspace_settings").select("integrations").eq("workspace_id", wid).maybeSingle();
   const curInts = (cur.data?.integrations || {}) as Record<string, unknown>;
-  const connected = Array.isArray(curInts.connected) ? curInts.connected : defaultIntegrationList(wid);
+  const connected = Array.isArray(curInts.connected) ? curInts.connected : [];
   const activeCount = connected.filter((i: any) => i.status === 'connected').length;
 
   return ok({
@@ -7423,7 +7392,7 @@ async function getIntegration(supabase: SupabaseClient, id: string, integrationI
   // Fallback to workspace_settings
   const cur = await supabase.from("workspace_settings").select("integrations").eq("workspace_id", wid).maybeSingle();
   const curInts = (cur.data?.integrations || {}) as Record<string, unknown>;
-  const connected = Array.isArray(curInts.connected) ? curInts.connected : defaultIntegrationList(wid);
+  const connected = Array.isArray(curInts.connected) ? curInts.connected : [];
   const found = connected.find((i: any) => i.id === integrationId || i.provider === integrationId);
   if (found) {
     return ok({
@@ -7516,8 +7485,8 @@ async function disconnectIntegration(supabase: SupabaseClient, id: string, integ
 
   // 2. Fallback: remove from workspace_settings.integrations.connected
   const cur = await supabase.from("workspace_settings").select("integrations").eq("workspace_id", wid).maybeSingle();
-  const curInts = (cur.data?.integrations || { status: 'done', connected: defaultIntegrationList(wid) }) as Record<string, unknown>;
-  const connected = Array.isArray(curInts.connected) ? curInts.connected : defaultIntegrationList(wid);
+  const curInts = (cur.data?.integrations || { status: 'done', connected: [] }) as Record<string, unknown>;
+  const connected = Array.isArray(curInts.connected) ? curInts.connected : [];
   const filtered = connected.filter((i: any) => i.id !== integrationId && i.provider !== integrationId);
 
   await supabase.from("workspace_settings").update({

@@ -54,6 +54,7 @@ import {
     createActivityApprovalComment,
 } from "@/lib/api/auth";
 import DashboardRail from "@/components/DashboardRail";
+import DashboardHeader from "@/components/DashboardHeader";
 
 type ActivityStage = {
     id: string;
@@ -2687,30 +2688,11 @@ export default function ActivitiesPage() {
             <DashboardRail />
 
             <div className="fig-dashboard-main">
-                <header className="fig-dashboard-header">
-                    <h1>Activities</h1>
-                    <div className="fig-dashboard-header-actions">
-                        <label className="fig-dashboard-search">
-                            <img src="/assets/dashboard/dashboard-search.svg" alt="" />
-                            <input placeholder="Search..." aria-label="Search" />
-                        </label>
-                        <button
-                            type="button"
-                            className="fig-dashboard-new"
-                            onClick={() => {
-                                if (activeTab === "stages") setCreateStage(true);
-                                else if (activeTab === "tasks") setCreateTask(true);
-                                else setCreateApproval(true);
-                            }}
-                        >
-                            <Plus size={20} /><span>New</span><i /><ChevronDown size={20} />
-                        </button>
-                        <button type="button" className="fig-dashboard-bell" aria-label="Notifications">
-                            <img src="/assets/dashboard/dashboard-notifications.svg" alt="" />
-                        </button>
-                        <div className="fig-dashboard-avatar">{userInitials || "BO"}</div>
-                    </div>
-                </header>
+                <DashboardHeader title="Activities" onNew={() => {
+                    if (activeTab === "stages") setCreateStage(true);
+                    else if (activeTab === "tasks") setCreateTask(true);
+                    else setCreateApproval(true);
+                }} />
 
                 <section className="activities-content">
                     <div className="activities-controls-row">

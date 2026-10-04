@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus, ChevronDown } from "lucide-react";
 import DashboardRail from "@/components/DashboardRail";
+import DashboardHeader from "@/components/DashboardHeader";
 import { getApiErrorMessage, parseApiResponse } from "@/lib/api/auth";
 
 interface ProposalListItem {
@@ -624,31 +625,7 @@ function ProposalsHeader({
     onNewClick: () => void;
     onSearchChange: (search: string) => void;
 }) {
-    return (
-        <header className="fig-dashboard-header">
-            <h1>Proposals</h1>
-            <div className="fig-dashboard-header-actions">
-                <label className="fig-dashboard-search">
-                    <img src="/assets/dashboard/dashboard-search.svg" alt="" />
-                    <input
-                        placeholder="Search..."
-                        aria-label="Search proposals"
-                        onChange={(e) => onSearchChange(e.target.value)}
-                    />
-                </label>
-                <button type="button" className="fig-dashboard-new" onClick={onNewClick}>
-                    <Plus size={20} />
-                    <span>New</span>
-                    <i />
-                    <ChevronDown size={20} />
-                </button>
-                <button type="button" className="fig-dashboard-bell" aria-label="Notifications">
-                    <img src="/assets/dashboard/dashboard-notifications.svg" alt="" />
-                </button>
-                <div className="fig-dashboard-avatar">BO</div>
-            </div>
-        </header>
-    );
+    return <DashboardHeader title="Proposals" onNew={onNewClick} onSearch={onSearchChange} />;
 }
 
 function ProposalTemplatesModal({

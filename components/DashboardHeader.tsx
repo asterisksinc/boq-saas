@@ -1,9 +1,9 @@
 "use client";
 
-import { ChevronDown, Plus } from "lucide-react";
+import { Bell, ChevronDown, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getSettingsOverview } from "@/lib/api/auth";
+import { getDashboardNotifications, getSettingsOverview, DashboardNotification } from "@/lib/api/auth";
 
 interface DashboardHeaderProps {
     title?: string;
@@ -11,6 +11,7 @@ interface DashboardHeaderProps {
     onSearch?: (query: string) => void;
     avatarUrl?: string | null;
     userInitials?: string;
+    profile?: { displayName?: string | null; avatarUrl?: string | null; email?: string | null } | null;
 }
 
 export default function DashboardHeader({
@@ -19,20 +20,28 @@ export default function DashboardHeader({
     onSearch,
     avatarUrl: propAvatarUrl,
     userInitials: propUserInitials,
+    profile,
 }: DashboardHeaderProps) {
     const router = useRouter();
     const [searchValue, setSearchValue] = useState("");
-    const [avatarUrl, setAvatarUrl] = useState<string | null>(propAvatarUrl ?? null);
-    const [userInitials, setUserInitials] = useState(propUserInitials ?? "BO");
+    const profileName = profile?.displayName?.trim() || profile?.email?.split("@")[0] || "";
+    const profileInitials = profileName ? profileName.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() : "BO";
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(propAvatarUrl ?? profile?.avatarUrl ?? null);
+    const [userInitials, setUserInitials] = useState(propUserInitials ?? profileInitials);
+    const [newMenuOpen, setNewMenuOpen] = useState(false);
+    const [notificationsOpen, setNotificationsOpen] = useState(false);
+    const [notifications, setNotifications] = useState<DashboardNotification[]>([]);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [notificationError, setNotificationError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (propAvatarUrl !== undefined) {
-            setAvatarUrl(propAvatarUrl);
+        if (propAvatarUrl !== undefined || profile?.avatarUrl !== undefined) {
+            setAvatarUrl(propAvatarUrl ?? profile?.avatarUrl ?? null);
         }
-        if (propUserInitials !== undefined) {
-            setUserInitials(propUserInitials);
+        if (propUserInitials !== undefined || profileName) {
+            setUserInitials(propUserInitials ?? profileInitials);
         }
-    }, [propAvatarUrl, propUserInitials]);
+    }, [profileName, profileInitials, profile?.avatarUrl, propAvatarUrl, propUserInitials]);
 
     useEffect(() => {
         let mounted = true;
@@ -76,6 +85,18 @@ export default function DashboardHeader({
         };
     }, [propAvatarUrl]);
 
+    useEffect(() => {
+        let mounted = true;
+        getDashboardNotifications({ pageSize: 8 }).then((data) => {
+            if (!mounted) return;
+            setNotifications(data.items || []);
+            setUnreadCount(data.unreadCount || 0);
+        }).catch((error) => {
+            if (mounted) setNotificationError(error instanceof Error ? error.message : "Notifications could not be loaded.");
+        });
+        return () => { mounted = false; };
+    }, []);
+
     const handleNewClick = () => {
         if (onNew) {
             onNew();
@@ -105,23 +126,78 @@ export default function DashboardHeader({
                         onChange={handleSearchChange}
                     />
                 </label>
-                <button
-                    type="button"
-                    className="fig-dashboard-new"
-                    onClick={handleNewClick}
-                >
-                    <Plus size={20} />
-                    <span>New</span>
-                    <i />
-                    <ChevronDown size={20} />
-                </button>
-                <button
-                    type="button"
-                    className="fig-dashboard-bell"
-                    aria-label="Notifications"
-                >
-                    <img src="/assets/dashboard/dashboard-notifications.svg" alt="" />
-                </button>
+                <div className="relative">
+                    <div className="fig-dashboard-new">
+                        <button type="button" onClick={handleNewClick} className="flex items-center gap-2">
+                            <Plus size={20} />
+                            <span>New</span>
+                        </button>
+                        <i />
+                        <button
+                            type="button"
+                            aria-label="Open new menu"
+                            aria-expanded={newMenuOpen}
+                            onClick={() => {
+                                setNewMenuOpen((open) => !open);
+                                setNotificationsOpen(false);
+                            }}
+                        >
+                            <ChevronDown size={20} />
+                        </button>
+                    </div>
+                    {newMenuOpen && (
+                        <div className="fig-dashboard-new-menu" role="menu">
+                            <button type="button" role="menuitem" onClick={() => router.push("/projects")}>
+                                <span className="fig-dashboard-menu-icon"><Plus size={15} /></span>
+                                <span>New Project</span>
+                            </button>
+                            <button type="button" role="menuitem" onClick={() => router.push("/boqs")}>
+                                <span className="fig-dashboard-menu-icon"><Plus size={15} /></span>
+                                <span>New BOQ</span>
+                            </button>
+                            <button type="button" role="menuitem" onClick={() => router.push("/templates/new")}>
+                                <span className="fig-dashboard-menu-icon"><Plus size={15} /></span>
+                                <span>New Template</span>
+                            </button>
+                        </div>
+                    )}
+                </div>
+                <div className="relative">
+                    <button
+                        type="button"
+                        className="fig-dashboard-bell"
+                        aria-label="Notifications"
+                        aria-expanded={notificationsOpen}
+                        onClick={() => {
+                            setNotificationsOpen((open) => !open);
+                            setNewMenuOpen(false);
+                        }}
+                    >
+                        <Bell size={19} aria-hidden="true" />
+                        {unreadCount > 0 && <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-red-600 px-1 text-center text-[10px] leading-4 text-white">{unreadCount > 99 ? "99+" : unreadCount}</span>}
+                    </button>
+                    {notificationsOpen && (
+                        <div className="fig-dashboard-notifications" role="dialog" aria-label="Notifications">
+                            <div className="fig-dashboard-popover-header">
+                                <div>
+                                    <strong>Notifications</strong>
+                                    <span>Stay up to date with your workspace</span>
+                                </div>
+                                {unreadCount > 0 && <span className="text-xs text-gray-500">{unreadCount} unread</span>}
+                            </div>
+                            {notificationError ? <p className="text-sm text-red-600">{notificationError}</p> :
+                                notifications.length === 0 ? <p className="text-sm text-gray-500">No notifications yet.</p> :
+                                <ul className="fig-dashboard-notification-list">{notifications.map((notification) => <li key={notification.id} className={notification.readAt ? "" : "is-unread"}>
+                                    <span className="fig-dashboard-notification-dot" />
+                                    <div>
+                                        <div className="font-medium">{notification.title}</div>
+                                        <div className="mt-1 text-xs text-gray-500">{new Date(notification.createdAt).toLocaleString()}</div>
+                                    </div>
+                                </li>)}</ul>}
+                            <div className="fig-dashboard-popover-footer">You're all caught up</div>
+                        </div>
+                    )}
+                </div>
                 <div className="fig-dashboard-avatar" title="Profile">
                     {avatarUrl ? (
                         <img
