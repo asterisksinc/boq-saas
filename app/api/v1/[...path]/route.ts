@@ -53,6 +53,7 @@ import {
   boqCategorySchema,
   boqItemSchema,
   boqTemplateSchema,
+  boqTemplatePatchSchema,
   costingCategorySchema,
   costingCategoryPatchSchema,
   costingItemSchema,
@@ -2441,38 +2442,134 @@ const defaultBoqTemplateFixtures = [
   }
 ];
 
+function formatIndianLakhs(amount: number): string {
+  if (!amount || amount === 0) return "₹0.00L";
+  if (amount >= 10000000) {
+    return `₹${(amount / 10000000).toFixed(2)}Cr`;
+  }
+  return `₹${(amount / 100000).toFixed(2)}L`;
+}
+
 function boqTemplateDto(row: Record<string, unknown>, includeSnapshot = false) {
   const snapshotData = row.snapshot as any;
   let metadata: Record<string, any> = {};
   let rooms: any[] = [];
   if (snapshotData && typeof snapshotData === "object" && !Array.isArray(snapshotData)) {
     metadata = snapshotData.metadata || {};
-    rooms = snapshotData.rooms || [];
+    rooms = (snapshotData.rooms || []).map((room: any) => ({ ...room }));
   } else if (Array.isArray(snapshotData)) {
-    rooms = snapshotData;
+    rooms = snapshotData.map((room: any) => ({ ...room }));
   }
 
-  let sectionCount = 0;
-  let itemCount = 0;
-  let totalRate = 0;
-  let mappedRate = 0;
-  rooms.forEach((room: Record<string, unknown>) => {
-    const cats = (room.categories ?? []) as Record<string, unknown>[];
-    sectionCount += cats.length || 1;
-    cats.forEach((cat: Record<string, unknown>) => {
-      const items = (cat.items ?? []) as Record<string, unknown>[];
-      itemCount += items.length;
-      items.forEach((item: Record<string, unknown>) => {
-        const rate = Number(item.rate ?? 0);
-        totalRate++;
-        if (rate > 0) mappedRate++;
+  let totalItemCount = 0;
+  let mappedItemCount = 0;
+  let totalBaseCost = 0;
+  let materialAmount = 0;
+  let labourAmount = 0;
+  let transportAmount = 0;
+  let otherAmount = 0;
+  let itemsWithUnitsCount = 0;
+  let itemsWithQtyCount = 0;
+  let outdatedCount = 0;
+  let reviewCount = 0;
+  let currentFreshnessCount = 0;
+  let reviewSoonCount = 0;
+  let outdatedFreshnessCount = 0;
+
+  let totalCategories = 0;
+  let configuredRooms = 0;
+
+  rooms.forEach((room: any) => {
+    let roomItemsCount = 0;
+    let roomTotal = 0;
+    const cats = (room.categories || []) as any[];
+    totalCategories += cats.length;
+
+    let roomHasItems = false;
+    cats.forEach((cat: any) => {
+      let catItemsCount = 0;
+      let catTotal = 0;
+      const items = (cat.items || []) as any[];
+
+      items.forEach((item: any) => {
+        totalItemCount++;
+        catItemsCount++;
+        roomItemsCount++;
+        roomHasItems = true;
+
+        const qty = Number(item.quantity || 0);
+        const rate = Number(item.rate || 0);
+        const wastePercent = Number(item.wastePercent ?? item.waste_percent ?? 0);
+        const taxPercent = Number(item.taxPercent ?? item.tax_percent ?? 18);
+
+        // Standard BOQ formula: Quantity * Rate * (1 + Waste/100) * (1 + Tax/100)
+        const baseCost = qty * rate;
+        const amount = Math.round(baseCost * (1 + wastePercent / 100) * (1 + taxPercent / 100) * 100) / 100;
+        item.amount = amount;
+
+        catTotal += amount;
+        roomTotal += amount;
+        totalBaseCost += amount;
+
+        if (rate > 0) {
+          mappedItemCount++;
+          currentFreshnessCount++;
+        } else {
+          reviewCount++;
+          reviewSoonCount++;
+        }
+
+        if (item.unit && String(item.unit).trim().length > 0) {
+          itemsWithUnitsCount++;
+        }
+        if (qty > 0) {
+          itemsWithQtyCount++;
+        }
+
+        // Categorize into Material / Labour / Transport / Other
+        const catNameLower = String(cat.name || "").toLowerCase();
+        const itemNameLower = String(item.name || "").toLowerCase();
+        if (
+          catNameLower.includes("labour") ||
+          catNameLower.includes("labor") ||
+          catNameLower.includes("painting") ||
+          itemNameLower.includes("labour") ||
+          itemNameLower.includes("installation")
+        ) {
+          labourAmount += amount;
+        } else if (
+          catNameLower.includes("transport") ||
+          catNameLower.includes("logistics") ||
+          itemNameLower.includes("transport") ||
+          itemNameLower.includes("freight")
+        ) {
+          transportAmount += amount;
+        } else if (
+          catNameLower.includes("other") ||
+          catNameLower.includes("electrical") ||
+          itemNameLower.includes("other") ||
+          itemNameLower.includes("consultant")
+        ) {
+          otherAmount += amount;
+        } else {
+          materialAmount += amount;
+        }
       });
+
+      cat.itemsCount = catItemsCount;
+      cat.cost = formatIndianLakhs(catTotal);
+      cat.costAmount = catTotal;
     });
+
+    if (roomHasItems || roomItemsCount > 0) configuredRooms++;
+    room.itemsCount = roomItemsCount;
+    room.cost = formatIndianLakhs(roomTotal);
+    room.costAmount = roomTotal;
   });
 
-  const computedSections = metadata.sections || rooms.length || 18;
-  const computedItems = metadata.items || itemCount || 186;
-  const costMapping = metadata.costMapping !== undefined ? metadata.costMapping : (totalRate > 0 ? Math.round((mappedRate / totalRate) * 100) : 98);
+  const sectionCount = rooms.length || metadata.sections || 18;
+  const computedItems = totalItemCount || metadata.items || 186;
+  const costMapping = totalItemCount > 0 ? Math.round((mappedItemCount / totalItemCount) * 100) : (metadata.costMapping ?? 98);
   const tags = (row.tags ?? []) as string[];
 
   const category = metadata.category || tags.find(t => ["INTERIOR", "KITCHEN", "ELECTRICAL", "Flooring", "Plumbing", "Painting", "Commercial"].includes(t)) || "INTERIOR";
@@ -2481,6 +2578,72 @@ function boqTemplateDto(row: Record<string, unknown>, includeSnapshot = false) {
   const version = metadata.version || tags.find(t => t.startsWith("v")) || "v3.2";
   const usedIn = metadata.usedIn || (row.use_count ? `${row.use_count} Templates` : "12 Templates");
   const templateCode = metadata.templateCode || `BOQ-RES-${String(row.id).slice(0, 4).toUpperCase()}`;
+
+  // Dynamic Readiness calculation (0-100)
+  const structureRatio = sectionCount > 0 ? Math.min(1, (configuredRooms || sectionCount) / sectionCount) : 0;
+  const unitsRatio = computedItems > 0 ? Math.min(1, (itemsWithUnitsCount || computedItems) / computedItems) : 0;
+  const mappingRatio = computedItems > 0 ? Math.min(1, (mappedItemCount || computedItems) / computedItems) : 0;
+  const defaultsConfigured = 1;
+  const readiness = Math.min(100, Math.max(10, Math.round(structureRatio * 30 + unitsRatio * 30 + mappingRatio * 30 + defaultsConfigured * 10)));
+
+  const finalBaseCost = totalBaseCost > 0 ? totalBaseCost : (metadata.baseCostAmount || 2860000);
+  const indicativeBaseCost = totalBaseCost > 0 ? formatIndianLakhs(totalBaseCost) : (metadata.indicativeBaseCost || "₹28.60L");
+
+  // Ratios for commercial summary
+  const matVal = totalBaseCost > 0 ? materialAmount : 2140000;
+  const labVal = totalBaseCost > 0 ? labourAmount : 482000;
+  const trnVal = totalBaseCost > 0 ? transportAmount : 98000;
+  const othVal = totalBaseCost > 0 ? otherAmount : 140000;
+  const sumVal = (matVal + labVal + trnVal + othVal) || finalBaseCost || 1;
+
+  const matPct = Math.round((matVal / sumVal) * 100);
+  const labPct = Number(((labVal / sumVal) * 100).toFixed(1));
+  const trnPct = Number(((trnVal / sumVal) * 100).toFixed(1));
+  const othPct = Number(Math.max(0, 100 - matPct - labPct - trnPct).toFixed(1));
+
+  const commercialDefaults = metadata.commercialDefaults || {
+    currency: "INR (₹)",
+    taxProfile: "Default GST Profile",
+    taxPercent: 18,
+    defaultWastage: 5,
+    defaultMarkup: 12,
+    rounding: "Nearest ₹1"
+  };
+
+  const missingCount = Math.max(0, totalItemCount - mappedItemCount);
+  const costingHealth = metadata.costingHealth || {
+    mapped: mappedItemCount || totalItemCount || 175,
+    outdated: outdatedCount || 3,
+    reviewRequired: reviewCount || 8,
+    missing: missingCount,
+    rateFreshness: {
+      current: currentFreshnessCount || mappedItemCount || 168,
+      reviewSoon: reviewSoonCount || reviewCount || 10,
+      outdated: outdatedFreshnessCount || outdatedCount || 8,
+    }
+  };
+
+  const criticalIssues = missingCount;
+  const warningIssues = reviewCount || 5;
+  const infoIssues = totalItemCount > 0 && costMapping < 100 ? 1 : 1;
+  const attentionRequired = metadata.attentionRequired || {
+    critical: criticalIssues,
+    warning: warningIssues,
+    info: infoIssues,
+    total: criticalIssues + warningIssues + infoIssues,
+  };
+
+  const usageCount = Number(row.use_count ?? 0);
+  const usageDependencies = metadata.usageDependencies || {
+    projectTemplatesCount: parseInt(String(usedIn), 10) || 12,
+    activeProjectsCount: usageCount > 0 ? usageCount : 38,
+    draftTemplatesCount: 4,
+    dependencies: [
+      { name: "Interior Standard Library", status: "Active" },
+      { name: "Default GST Profile", status: `${commercialDefaults.taxPercent || 18}%` },
+      { name: "Interior Measurement Standard", status: "Active" }
+    ]
+  };
 
   const dto: Record<string, unknown> = {
     id: row.id,
@@ -2493,68 +2656,42 @@ function boqTemplateDto(row: Record<string, unknown>, includeSnapshot = false) {
     version,
     usedIn,
     tags,
-    useCount: Number(row.use_count ?? 0),
+    imageUrl: metadata.imageUrl || null,
+    useCount: usageCount,
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    sections: computedSections,
-    categories: sectionCount || 42,
+    sections: sectionCount,
+    categories: totalCategories || metadata.categories || 42,
     items: computedItems,
     costMapping,
-    indicativeBaseCost: metadata.indicativeBaseCost || "₹28.60L",
-    baseCostAmount: metadata.baseCostAmount || 2860000,
-    readiness: metadata.readiness || 94,
-    commercialSummary: metadata.commercialSummary || {
-      material: { amount: 2140000, percent: 75 },
-      labour: { amount: 482000, percent: 16.9 },
-      transport: { amount: 98000, percent: 3.4 },
-      other: { amount: 140000, percent: 4.9 },
-      indicativeCost: 2860000
+    indicativeBaseCost,
+    baseCostAmount: finalBaseCost,
+    readiness: metadata.readiness ?? readiness,
+    commercialSummary: {
+      material: { amount: matVal, percent: matPct },
+      labour: { amount: labVal, percent: labPct },
+      transport: { amount: trnVal, percent: trnPct },
+      other: { amount: othVal, percent: othPct },
+      indicativeCost: finalBaseCost
     },
-    commercialDefaults: metadata.commercialDefaults || {
-      currency: "INR (₹)",
-      taxProfile: "Default GST Profile",
-      taxPercent: 18,
-      defaultWastage: 5,
-      defaultMarkup: 12,
-      rounding: "Nearest ₹1"
-    },
-    costingHealth: metadata.costingHealth || {
-      mapped: 175,
-      outdated: 3,
-      reviewRequired: 8,
-      missing: 0,
-      rateFreshness: { current: 168, reviewSoon: 10, outdated: 8 }
-    },
-    usageDependencies: metadata.usageDependencies || {
-      projectTemplatesCount: 12,
-      activeProjectsCount: 38,
-      draftTemplatesCount: 4,
-      dependencies: [
-        { name: "Interior Standard Library", status: "Active" },
-        { name: "Default GST Profile", status: "18%" },
-        { name: "Interior Measurement Standard", status: "Active" }
-      ]
-    },
-    attentionRequired: metadata.attentionRequired || {
-      critical: 1,
-      warning: 5,
-      info: 1,
-      total: 8
-    },
+    commercialDefaults,
+    costingHealth,
+    usageDependencies,
+    attentionRequired,
     versionGovernance: metadata.versionGovernance || {
-      version: "v2.4",
+      version: version || "v2.4",
       status: "Current · Active",
-      publishedDate: "08 Aug 2026",
+      publishedDate: metadata.publishedDate || "08 Aug 2026",
       changes: [
-        { type: "add", text: "+4 Items Added" },
-        { type: "add", text: "+1 Sections Added" },
+        { type: "add", text: `+${Math.max(1, Math.min(8, computedItems))} Items Added` },
+        { type: "add", text: `+${Math.max(1, Math.min(3, sectionCount))} Sections Added` },
         { type: "update", text: "-7 Rate mappings updated" },
         { type: "remove", text: "-1 Deprecated item removed" }
       ]
     },
     recentActivity: metadata.recentActivity || [
-      { action: "Published", date: "06 Aug 2026 · 14:32", detail: "Pradhyumn Published v3.2", type: "published" },
+      { action: "Published", date: "06 Aug 2026 · 14:32", detail: `Published ${version}`, type: "published" },
       { action: "Approved", date: "06 Aug 2026 · 14:11", detail: "Approved by Lead Estimator", type: "approved" }
     ],
   };
@@ -2565,8 +2702,8 @@ function boqTemplateDto(row: Record<string, unknown>, includeSnapshot = false) {
       const items = cat.items as Array<Record<string,unknown>> || [];
       return items.map((item: Record<string,unknown>) => {
         const rate = Number(item.rate || 0);
-        const snapshotRate = rate > 0 ? Math.round(rate * (0.92 + Math.random() * 0.16)) : 0;
-        const variance = rate > 0 ? Number((((rate - snapshotRate) / snapshotRate) * 100).toFixed(1)) : 0;
+        const snapshotRate = rate > 0 ? Math.round(rate * 0.96) : 0;
+        const variance = rate > 0 && snapshotRate > 0 ? Number((((rate - snapshotRate) / snapshotRate) * 100).toFixed(1)) : 0;
         const varianceAmount = rate - snapshotRate;
         const freshArr: Array<{label:string,cls:string}> = [{label:"Current",cls:"current"},{label:"Review Soon",cls:"review-soon"},{label:"Outdated",cls:"outdated"},{label:"Unmapped",cls:"unmapped"}];
         const freshIdx = rate > 0 ? (snapshotRate > 0 ? (Math.abs(variance) < 5 ? 0 : Math.abs(variance) < 15 ? 1 : 2) : 3) : 3;
@@ -2594,41 +2731,37 @@ function boqTemplateDto(row: Record<string, unknown>, includeSnapshot = false) {
   });
 
   const rulesData = (metadata.rules as Array<Record<string,unknown>>) || [
-    { id: "r1", name: "Quantity Resolution", description: "How quantity is determined", scope: "BOQ", value: "Project Input", source: "TEMPLATE", status: "ACTIVE", impact: "186 Items", lastUpdated: "12 Aug 2026", category: "Commercial" },
-    { id: "r2", name: "Rate Resolution", description: "Where item rates comes from", scope: "BOQ", value: "Current Library", source: "TEMPLATE", status: "ACTIVE", impact: "174 Items", lastUpdated: "10 Aug 2026", category: "Commercial" },
-    { id: "r3", name: "Default Storage", description: "General Wastage %", scope: "BOQ", value: "5%", source: "TEMPLATE", status: "ACTIVE", impact: "142 Items", lastUpdated: "06 Aug 2026", category: "Calculation" },
+    { id: "r1", name: "Quantity Resolution", description: "How quantity is determined", scope: "BOQ", value: "Project Input", source: "TEMPLATE", status: "ACTIVE", impact: `${computedItems} Items`, lastUpdated: "12 Aug 2026", category: "Commercial" },
+    { id: "r2", name: "Rate Resolution", description: "Where item rates comes from", scope: "BOQ", value: "Current Library", source: "TEMPLATE", status: "ACTIVE", impact: `${mappedItemCount} Items`, lastUpdated: "10 Aug 2026", category: "Commercial" },
+    { id: "r3", name: "Default Storage", description: "General Wastage %", scope: "BOQ", value: "5%", source: "TEMPLATE", status: "ACTIVE", impact: `${Math.round(computedItems * 0.8)} Items`, lastUpdated: "06 Aug 2026", category: "Calculation" },
     { id: "r4", name: "Flooring Wastage", description: "Category Override", scope: "Category\nFlooring", value: "8%", source: "TEMPLATE", status: "OVERRIDE", impact: "27 Items", lastUpdated: "02 Aug 2026", category: "Calculation" },
-    { id: "r5", name: "Default Tax", description: "Markup percentage", scope: "BOQ", value: "18%(GST)", source: "TEMPLATE", status: "ACTIVE", impact: "186 Items", lastUpdated: "01 Aug 2026", category: "Commercial" },
-    { id: "r6", name: "Default Markup", description: "Markup Percentage", scope: "BOQ", value: "12%", source: "ORGANISATION", status: "ACTIVE", impact: "172 Items", lastUpdated: "01 Aug 2026", category: "Commercial" },
-    { id: "r7", name: "Material Minimum", description: "Minimum material threshold", scope: "BOQ", value: "₹500", source: "TEMPLATE", status: "ACTIVE", impact: "186 Items", lastUpdated: "28 Jul 2026", category: "Governance" },
+    { id: "r5", name: "Default Tax", description: "Markup percentage", scope: "BOQ", value: "18%(GST)", source: "TEMPLATE", status: "ACTIVE", impact: `${computedItems} Items`, lastUpdated: "01 Aug 2026", category: "Commercial" },
+    { id: "r6", name: "Default Markup", description: "Markup Percentage", scope: "BOQ", value: "12%", source: "ORGANISATION", status: "ACTIVE", impact: `${computedItems} Items`, lastUpdated: "01 Aug 2026", category: "Commercial" },
+    { id: "r7", name: "Material Minimum", description: "Minimum material threshold", scope: "BOQ", value: "₹500", source: "TEMPLATE", status: "ACTIVE", impact: `${computedItems} Items`, lastUpdated: "28 Jul 2026", category: "Governance" },
     { id: "r8", name: "Budget Cap Alert", description: "Alert when budget exceeds", scope: "BOQ", value: "₹50L", source: "TEMPLATE", status: "ACTIVE", impact: "1 BOQ", lastUpdated: "25 Jul 2026", category: "Governance" },
-    { id: "r9", name: "Labour Rate Cap", description: "Maximum labour rate", scope: "Category", value: "₹1,200/day", source: "ORGANISATION", status: "ACTIVE", impact: "48 Items", lastUpdated: "20 Jul 2026", category: "Commercial" },
-    { id: "r10", name: "Round-off Rule", description: "Amount rounding", scope: "BOQ", value: "Nearest ₹1", source: "TEMPLATE", status: "ACTIVE", impact: "186 Items", lastUpdated: "15 Jul 2026", category: "Calculation" },
-    { id: "r11", name: "Transport Allocation", description: "Transport cost allocation", scope: "BOQ", value: "3.5%", source: "TEMPLATE", status: "ACTIVE", impact: "186 Items", lastUpdated: "12 Jul 2026", category: "Calculation" },
-    { id: "r12", name: "Overhead Rate", description: "Standard overhead", scope: "BOQ", value: "8%", source: "ORGANISATION", status: "ACTIVE", impact: "186 Items", lastUpdated: "10 Jul 2026", category: "Governance" },
   ];
 
   const usageEntries = (metadata.usageEntries as Array<Record<string,unknown>>) || [
-    { project: "Sharma Residence", code: "PRJ-2026-0184", type: "PROJECT", client: "Sharma Family", templateVersion: "v2.4", templateVersionStatus: "CURRENT", ruleVersion: "v1.8", status: "ACTIVE", owner: "Rahul Mehta", role: "Project Manager" },
+    { project: "Sharma Residence", code: "PRJ-2026-0184", type: "PROJECT", client: "Sharma Family", templateVersion: version, templateVersionStatus: "CURRENT", ruleVersion: "v1.8", status: "ACTIVE", owner: "Rahul Mehta", role: "Project Manager" },
     { project: "Kapoor Apartment", code: "PRJ-2026-0172", type: "PROJECT", client: "Kapoor Associates", templateVersion: "v2.3", templateVersionStatus: "OLDER", ruleVersion: "v1.8", status: "ACTIVE", owner: "Ankit Varma", role: "Project Manager" },
-    { project: "Mehta Residence Estimate", code: "EST-2026-0063", type: "ESTIMATE", client: "Mehta Family", templateVersion: "v2.4", templateVersionStatus: "CURRENT", ruleVersion: "v1.8", status: "DRAFT", owner: "Priya Nair", role: "Estimator" },
-    { project: "Varma Villa BOQ", code: "BOQ-2026-0051", type: "BOQ", client: "Varma Group", templateVersion: "v2.4", templateVersionStatus: "CURRENT", ruleVersion: "v1.8", status: "APPROVED", owner: "Amit Shah", role: "Commercial Head" },
+    { project: "Mehta Residence Estimate", code: "EST-2026-0063", type: "ESTIMATE", client: "Mehta Family", templateVersion: version, templateVersionStatus: "CURRENT", ruleVersion: "v1.8", status: "DRAFT", owner: "Priya Nair", role: "Estimator" },
+    { project: "Varma Villa BOQ", code: "BOQ-2026-0051", type: "BOQ", client: "Varma Group", templateVersion: version, templateVersionStatus: "CURRENT", ruleVersion: "v1.8", status: "APPROVED", owner: "Amit Shah", role: "Commercial Head" },
     { project: "Rao Residence", code: "PRJ-2026-0128", type: "PROJECT", client: "Rao Family", templateVersion: "v2.1", templateVersionStatus: "VERY OLD", ruleVersion: "v1.8", status: "COMPLETED", owner: "Rajiv Rao", role: "Project Manager" },
   ];
 
   const usageData = {
-    totalUses: metadata.totalUses || 18,
-    activeProjects: metadata.activeProjects || 11,
-    draftEstimates: metadata.draftEstimates || 3,
-    approvedBoqs: metadata.approvedBoqs || 2,
+    totalUses: usageCount || 18,
+    activeProjects: usageDependencies.activeProjectsCount,
+    draftEstimates: 3,
+    approvedBoqs: 2,
     usages: usageEntries,
-    versionAdaptation: (metadata.versionAdaptation as Array<Record<string,unknown>>) || [
-      { version: "v2.4 (Current)", count: 11, percent: 61, color: "#2563eb" },
+    versionAdaptation: [
+      { version: `${version} (Current)`, count: 11, percent: 61, color: "#2563eb" },
       { version: "v2.3", count: 4, percent: 22, color: "#10b981" },
       { version: "v2.2", count: 2, percent: 11, color: "#f59e0b" },
       { version: "v2.1 & below", count: 1, percent: 6, color: "#94a3b8" },
     ],
-    usageByType: (metadata.usageByType as Array<Record<string,unknown>>) || [
+    usageByType: [
       { type: "Projects", count: 11, percent: 61, color: "#2563eb" },
       { type: "Estimates", count: 3, percent: 17, color: "#6366f1" },
       { type: "BOQs", count: 2, percent: 11, color: "#f59e0b" },
@@ -2640,32 +2773,20 @@ function boqTemplateDto(row: Record<string, unknown>, includeSnapshot = false) {
   dto.rules = rulesData;
   dto.usageData = usageData;
 
-  // Versions data
   const versionsData = (metadata.versionsData as Array<Record<string,unknown>>) || [
-    { version: "v3.3", status: "DRAFT", changeSummary: "Updated workflow & approvals", changeDetail: "Added 3 tasks and 2 approval rules", createdBy: "Pradhyumn D", publishedBy: "-", created: "12 Aug 2026\n09:42 AM", published: "-", projects: "-", changes: 23, changesLevel: "HIGH" },
-    { version: "v3.2", status: "PUBLISHED", changeSummary: "Updated BOQ Rates", changeDetail: "Updated rates & commercial defaults", createdBy: "Admin User", publishedBy: "Pradhyumn D", created: "02 Aug 2026\n10:21 AM", published: "06 Aug 2026\n02:32 PM", projects: 18, changes: 27, changesLevel: "HIGH" },
-    { version: "v3.1", status: "SUPERSEDED", changeSummary: "Added milestone workflow", changeDetail: "Added milestones & task dependencies", createdBy: "Diptish Gohane", publishedBy: "Pradhyumn D", created: "22 Jul 2026\n04:42 PM", published: "28 Jul 2026\n11:05 AM", projects: 14, changes: 16, changesLevel: "MEDIUM" },
-    { version: "v3.0", status: "ARCHIVED", changeSummary: "Major template restructure", changeDetail: "Restructured areas & sections", createdBy: "Pradhyumn D", publishedBy: "Pradhyumn D", created: "08 Jul 2026\n09:30 AM", published: "14 Jul 2026\n03:10 PM", projects: 10, changes: 41, changesLevel: "HIGH" },
-    { version: "v2.5", status: "ARCHIVED", changeSummary: "Initial workflow configuration", changeDetail: "Initial stages, tasks & approvals", createdBy: "Admin User", publishedBy: "Pradhyumn D", created: "26 Jun 2026\n02:19 PM", published: "30 Jun 2026\n10:22 AM", projects: 6, changes: 19, changesLevel: "MEDIUM" },
-    { version: "v2.0", status: "ARCHIVED", changeSummary: "Initial template release", changeDetail: "Base template with core structure", createdBy: "Admin User", publishedBy: "Pradhyumn D", created: "15 Jun 2026\n11:08 AM", published: "20 Jun 2026\n05:45 PM", projects: 4, changes: 32, changesLevel: "HIGH" },
+    { version: "v3.3", status: "DRAFT", changeSummary: "Updated structure & line items", changeDetail: "Added items and updated commercial rules", createdBy: "Pradhyumn D", publishedBy: "-", created: "12 Aug 2026\n09:42 AM", published: "-", projects: "-", changes: 23, changesLevel: "HIGH" },
+    { version: version, status: "PUBLISHED", changeSummary: "Updated BOQ Rates", changeDetail: "Updated rates & commercial defaults", createdBy: "Admin User", publishedBy: "Pradhyumn D", created: "02 Aug 2026\n10:21 AM", published: "06 Aug 2026\n02:32 PM", projects: 18, changes: 27, changesLevel: "HIGH" },
+    { version: "v2.5", status: "ARCHIVED", changeSummary: "Initial structure release", changeDetail: "Base template with core sections", createdBy: "Admin User", publishedBy: "Pradhyumn D", created: "15 Jun 2026\n11:08 AM", published: "20 Jun 2026\n05:45 PM", projects: 4, changes: 32, changesLevel: "HIGH" },
   ];
 
-  // Activity data
   const activityData = (metadata.activityData as Array<Record<string,unknown>>) || [
-    { time: "14:42", user: "Pradhyumn Dhondi", role: "Creative Director", dotColor: "#10b981", title: 'Published <b>Version 3.4</b>', detail: "Premium 3BHK Residential is not using Version 3.4 on the active published template.", link: "View Version", category: "Versions", categorySub: "v3.4", day: "TODAY" },
-    { time: "12:18", user: "Diptish Gohane", role: "Costing Manager", dotColor: "#94a3b8", title: 'updated <b>Full Height Wardrobe</b>', detail: "Costing & BOQ → Master Bedroom → Furniture", rateChange: { old: "₹2,860 / Sq.ft", new: "₹2,975 / Sq.ft" }, link: "View Change", category: "Costing & BOQ", categorySub: "FUR-001", day: "TODAY" },
-    { time: "11:04", user: "Dhruv", role: "Workflow Specialist", dotColor: "#6366f1", title: 'added <b>Workflow Task</b>', detail: "Client Material Approval\nWorkflow → Tasks", link: "View Version", category: "Workflow", categorySub: "Stage: Procurement", day: "TODAY" },
-    { time: "09:32", user: "System", role: "Automated Event", dotColor: "#2563eb", title: '<b>Costing Library Synchronisation Completed</b>', detail: "14 Costing Items were updated\n3 items require review", link: "View Version", category: "System", categorySub: "", day: "TODAY" },
-    { time: "17:15", user: "Admin User", role: "Administrator", dotColor: "#f59e0b", title: 'changed <b>Access Permissions</b>', detail: "Updated role-based access for Costing Manager", link: "View Change", category: "Access", categorySub: "Permissions", day: "YESTERDAY" },
-    { time: "14:30", user: "Pradhyumn D", role: "Creative Director", dotColor: "#10b981", title: 'approved <b>Version 3.3</b>', detail: "Version approved for publishing after review", link: "View Version", category: "Publishing", categorySub: "v3.3", day: "YESTERDAY" },
+    { time: "14:42", user: "Pradhyumn Dhondi", role: "Creative Director", dotColor: "#10b981", title: `Published <b>${version}</b>`, detail: `${row.name || "BOQ Template"} is active in library.`, link: "View Version", category: "Versions", categorySub: version, day: "TODAY" },
+    { time: "12:18", user: "Diptish Gohane", role: "Costing Manager", dotColor: "#94a3b8", title: "Updated rate mapping", detail: "Costing & BOQ → Master Bedroom → Furniture", rateChange: { old: "₹2,860 / Sq.ft", new: "₹2,975 / Sq.ft" }, link: "View Change", category: "Costing & BOQ", categorySub: "FUR-001", day: "TODAY" },
+    { time: "09:32", user: "System", role: "Automated Event", dotColor: "#2563eb", title: "<b>Costing Library Synchronisation Completed</b>", detail: "Rates synchronized with master database.", link: "View Version", category: "System", categorySub: "", day: "TODAY" },
   ];
-
-  // Archived templates data (for main templates page)
-  const archivedData = (metadata.archivedData as Array<Record<string,unknown>>) || [];
 
   dto.versionsData = versionsData;
   dto.activityData = activityData;
-  dto.archivedData = archivedData;
 
   if (includeSnapshot) {
     dto.snapshot = snapshotData;
@@ -2680,9 +2801,12 @@ async function boqTemplates(request: NextRequest, supabase: SupabaseClient, id: 
     const { page, pageSize, from, to } = pagination(request.nextUrl.searchParams);
     const search = request.nextUrl.searchParams.get("search")?.trim().slice(0, 120);
     const status = request.nextUrl.searchParams.get("status");
+    const projectType = request.nextUrl.searchParams.get("projectType");
     const category = request.nextUrl.searchParams.get("category");
+    const mapping = request.nextUrl.searchParams.get("mapping");
+    const usedIn = request.nextUrl.searchParams.get("usedIn");
 
-    let query = supabase.from("boq_templates").select(boqTemplateSelectFull, { count: "exact" }).eq("workspace_id", scoped.access.workspaceId).order("use_count", { ascending: false }).range(from, to);
+    let query = supabase.from("boq_templates").select(boqTemplateSelectFull, { count: "exact" }).eq("workspace_id", scoped.access.workspaceId).order("use_count", { ascending: false });
     if (search) {
       const safe = search.replace(/[%_,()]/g, " ");
       query = query.or(`name.ilike.%${safe}%,description.ilike.%${safe}%`);
@@ -2706,29 +2830,127 @@ async function boqTemplates(request: NextRequest, supabase: SupabaseClient, id: 
         created_by: scoped.access.userId
       }));
       await supabase.from("boq_templates").insert(inserts);
-      result = await supabase.from("boq_templates").select(boqTemplateSelectFull, { count: "exact" }).eq("workspace_id", scoped.access.workspaceId).order("use_count", { ascending: false }).range(from, to);
+      result = await supabase.from("boq_templates").select(boqTemplateSelectFull, { count: "exact" }).eq("workspace_id", scoped.access.workspaceId).order("use_count", { ascending: false });
       total = result.count ?? 0;
     }
 
     if (result.error) return fail("INTERNAL_ERROR", "BOQ templates could not be loaded.", 500, id);
 
     let items = (result.data ?? []).map((r) => boqTemplateDto(r as Record<string, unknown>));
-    if (status) items = items.filter(i => String(i.status).toLowerCase() === status.toLowerCase());
-    if (category && category !== "all") items = items.filter(i => String(i.category).toLowerCase() === category.toLowerCase());
 
-    return ok({ items, page, pageSize, total: total || items.length, hasMore: to + 1 < total }, 200, id);
+    if (status && status !== "all") {
+      const statusArr = status.toLowerCase().split(",").map(s => s.trim());
+      items = items.filter(i => statusArr.includes(String(i.status).toLowerCase()));
+    }
+    if (projectType && projectType !== "all") {
+      const typeArr = projectType.toLowerCase().split(",").map(t => t.trim());
+      items = items.filter(i => typeArr.includes(String(i.projectType).toLowerCase()));
+    }
+    if (category && category !== "all") {
+      items = items.filter(i => String(i.category).toLowerCase() === category.toLowerCase());
+    }
+    if (mapping && mapping !== "all") {
+      if (mapping === "fully_mapped") items = items.filter(i => Number(i.costMapping) >= 98);
+      else if (mapping === "partially_mapped") items = items.filter(i => Number(i.costMapping) >= 50 && Number(i.costMapping) < 98);
+      else if (mapping === "unmapped") items = items.filter(i => Number(i.costMapping) < 50);
+      else if (mapping === "need_review") items = items.filter(i => Number(i.costMapping) < 80);
+    }
+    if (usedIn && usedIn !== "all") {
+      if (usedIn === "10+") items = items.filter(i => Number(i.useCount) >= 10);
+      else if (usedIn === "6-10") items = items.filter(i => Number(i.useCount) >= 6 && Number(i.useCount) <= 10);
+      else if (usedIn === "1-5") items = items.filter(i => Number(i.useCount) >= 1 && Number(i.useCount) <= 5);
+      else if (usedIn === "unused") items = items.filter(i => Number(i.useCount) === 0);
+    }
+
+    const filteredTotal = items.length;
+    const paginatedItems = items.slice(from, to + 1);
+
+    return ok({ items: paginatedItems, page, pageSize, total: filteredTotal, hasMore: to + 1 < filteredTotal }, 200, id);
   }
+
+  // POST: create new BOQ template
   const input = await parsed(request, boqTemplateSchema, id); if (input.response) return input.response;
-  const detailResponse = await getBoq(supabase, id, input.data.boqId); const payload = await detailResponse.json(); if (!detailResponse.ok) return detailResponse;
-  const result = await supabase.from("boq_templates").insert({ workspace_id: scoped.access.workspaceId, name: input.data.name, description: input.data.description, tags: input.data.tags, snapshot: payload.data.rooms, created_by: scoped.access.userId }).select(boqTemplateSelectFull).single();
-  return result.error ? fail(result.error.code === "23505" ? "CONFLICT" : "VALIDATION_ERROR", "BOQ template could not be created.", result.error.code === "23505" ? 409 : 400, id) : ok(boqTemplateDto(result.data as Record<string, unknown>, true), 201, id);
+  let snapshotPayload: any = null;
+  if (input.data.boqId) {
+    const detailResponse = await getBoq(supabase, id, input.data.boqId);
+    const payload = await detailResponse.json();
+    if (!detailResponse.ok) return detailResponse;
+    snapshotPayload = {
+      metadata: {
+        templateCode: `BOQ-TMP-${Math.floor(1000 + Math.random() * 9000)}`,
+        category: input.data.category || "INTERIOR",
+        projectType: input.data.projectType || "Residential",
+        status: "ACTIVE",
+        version: "v1.0",
+        usedIn: "0 Templates",
+        imageUrl: input.data.imageUrl || null,
+      },
+      rooms: payload.data.rooms || []
+    };
+  } else {
+    snapshotPayload = input.data.snapshot || {
+      metadata: {
+        templateCode: `BOQ-TMP-${Math.floor(1000 + Math.random() * 9000)}`,
+        category: input.data.category || input.data.businessType || "INTERIOR",
+        projectType: input.data.projectType || input.data.businessType || "Residential",
+        status: "ACTIVE",
+        version: "v1.0",
+        usedIn: "0 Templates",
+        imageUrl: input.data.imageUrl || null,
+        ...(input.data.metadata || {})
+      },
+      rooms: input.data.rooms || [
+        {
+          name: "General Section",
+          itemsCount: 0,
+          cost: "₹0.00L",
+          categories: [
+            { name: "General Items", itemsCount: 0, cost: "₹0.00L", items: [] }
+          ]
+        }
+      ]
+    };
+    if (input.data.imageUrl && snapshotPayload.metadata) {
+      snapshotPayload.metadata.imageUrl = input.data.imageUrl;
+    }
+  }
+
+  let insertName = input.data.name.trim();
+  let result = await supabase.from("boq_templates").insert({
+    workspace_id: scoped.access.workspaceId,
+    name: insertName,
+    description: input.data.description,
+    tags: input.data.tags || [],
+    snapshot: snapshotPayload,
+    use_count: 0,
+    created_by: scoped.access.userId
+  }).select(boqTemplateSelectFull).single();
+
+  if (result.error && result.error.code === "23505") {
+    insertName = `${insertName} (${Math.floor(100 + Math.random() * 900)})`;
+    result = await supabase.from("boq_templates").insert({
+      workspace_id: scoped.access.workspaceId,
+      name: insertName,
+      description: input.data.description,
+      tags: input.data.tags || [],
+      snapshot: snapshotPayload,
+      use_count: 0,
+      created_by: scoped.access.userId
+    }).select(boqTemplateSelectFull).single();
+  }
+
+  if (result.error) {
+    const isConflict = result.error.code === "23505";
+    const msg = isConflict ? `A BOQ template named "${input.data.name}" already exists in this workspace.` : (result.error.message || "BOQ template could not be created.");
+    return fail(isConflict ? "CONFLICT" : "VALIDATION_ERROR", msg, isConflict ? 409 : 400, id);
+  }
+  return ok(boqTemplateDto(result.data as Record<string, unknown>, true), 201, id);
 }
 
 async function getBoqTemplate(supabase: SupabaseClient, id: string, templateId: string) {
   const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
   const result = await supabase.from("boq_templates").select(boqTemplateSelectFull).eq("workspace_id", scoped.access.workspaceId).eq("id", templateId).single();
   if (result.error) {
-    // If template not found by ID, search by default fixtures or maybe it was just seeded
     const fallback = defaultBoqTemplateFixtures[0];
     const created = await supabase.from("boq_templates").insert({
       workspace_id: scoped.access.workspaceId,
@@ -2745,6 +2967,207 @@ async function getBoqTemplate(supabase: SupabaseClient, id: string, templateId: 
     return fail("NOT_FOUND", "BOQ template was not found.", 404, id);
   }
   return ok(boqTemplateDto(result.data as Record<string, unknown>, true), 200, id);
+}
+
+async function updateBoqTemplate(request: NextRequest, supabase: SupabaseClient, id: string, templateId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const input = await parsed(request, boqTemplatePatchSchema, id); if (input.response) return input.response;
+
+  const existingRes = await supabase.from("boq_templates").select(boqTemplateSelectFull).eq("workspace_id", scoped.access.workspaceId).eq("id", templateId).single();
+  if (existingRes.error || !existingRes.data) return fail("NOT_FOUND", "BOQ template not found.", 404, id);
+
+  const existing = existingRes.data as any;
+  const snapshot = existing.snapshot || {};
+  const metadata = snapshot.metadata || {};
+
+  if (input.data.category) metadata.category = input.data.category;
+  if (input.data.projectType) metadata.projectType = input.data.projectType;
+  if (input.data.status) metadata.status = input.data.status;
+  if (input.data.version) metadata.version = input.data.version;
+  if (input.data.imageUrl !== undefined) metadata.imageUrl = input.data.imageUrl;
+  if (input.data.metadata) Object.assign(metadata, input.data.metadata);
+
+  let rooms = snapshot.rooms || [];
+  if (input.data.rooms) rooms = input.data.rooms;
+
+  const updatePayload: Record<string, any> = {
+    updated_at: new Date().toISOString()
+  };
+  if (input.data.name) updatePayload.name = input.data.name;
+  if (input.data.description !== undefined) updatePayload.description = input.data.description;
+  if (input.data.tags) updatePayload.tags = input.data.tags;
+
+  updatePayload.snapshot = {
+    ...snapshot,
+    metadata,
+    rooms
+  };
+
+  const updateRes = await supabase.from("boq_templates").update(updatePayload).eq("id", templateId).eq("workspace_id", scoped.access.workspaceId).select(boqTemplateSelectFull).single();
+  if (updateRes.error) return fail("INTERNAL_ERROR", "Failed to update BOQ template.", 500, id);
+
+  return ok(boqTemplateDto(updateRes.data as Record<string, unknown>, true), 200, id);
+}
+
+async function deleteBoqTemplate(request: NextRequest, supabase: SupabaseClient, id: string, templateId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const permanent = request.nextUrl.searchParams.get("permanent") === "true";
+
+  if (permanent) {
+    const delRes = await supabase.from("boq_templates").delete().eq("workspace_id", scoped.access.workspaceId).eq("id", templateId);
+    if (delRes.error) return fail("INTERNAL_ERROR", "Failed to delete BOQ template.", 500, id);
+    return ok({ success: true, id: templateId, deleted: true }, 200, id);
+  }
+
+  // Archive
+  const existingRes = await supabase.from("boq_templates").select(boqTemplateSelectFull).eq("workspace_id", scoped.access.workspaceId).eq("id", templateId).single();
+  if (existingRes.error || !existingRes.data) return fail("NOT_FOUND", "BOQ template not found.", 404, id);
+
+  const existing = existingRes.data as any;
+  const snapshot = existing.snapshot || {};
+  const metadata = snapshot.metadata || {};
+  metadata.status = "ARCHIVED";
+
+  const updateRes = await supabase.from("boq_templates").update({
+    snapshot: { ...snapshot, metadata },
+    updated_at: new Date().toISOString()
+  }).eq("id", templateId).eq("workspace_id", scoped.access.workspaceId).select(boqTemplateSelectFull).single();
+
+  if (updateRes.error) return fail("INTERNAL_ERROR", "Failed to archive BOQ template.", 500, id);
+  return ok(boqTemplateDto(updateRes.data as Record<string, unknown>, true), 200, id);
+}
+
+async function duplicateBoqTemplate(supabase: SupabaseClient, id: string, templateId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const existingRes = await supabase.from("boq_templates").select(boqTemplateSelectFull).eq("workspace_id", scoped.access.workspaceId).eq("id", templateId).single();
+  if (existingRes.error || !existingRes.data) return fail("NOT_FOUND", "BOQ template not found.", 404, id);
+
+  const existing = existingRes.data as any;
+  const snapshot = existing.snapshot || {};
+  const metadata = { ...(snapshot.metadata || {}) };
+  metadata.templateCode = `BOQ-CPY-${Math.floor(1000 + Math.random() * 9000)}`;
+  metadata.status = "DRAFT";
+
+  const dupName = `${existing.name} (Copy)`;
+  const dupRes = await supabase.from("boq_templates").insert({
+    workspace_id: scoped.access.workspaceId,
+    name: dupName,
+    description: existing.description,
+    tags: existing.tags || [],
+    snapshot: { ...snapshot, metadata },
+    use_count: 0,
+    created_by: scoped.access.userId
+  }).select(boqTemplateSelectFull).single();
+
+  if (dupRes.error) return fail("INTERNAL_ERROR", "Failed to duplicate BOQ template.", 500, id);
+  return ok(boqTemplateDto(dupRes.data as Record<string, unknown>, true), 201, id);
+}
+
+async function useBoqTemplate(request: NextRequest, supabase: SupabaseClient, id: string, templateId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const existingRes = await supabase.from("boq_templates").select("id,use_count").eq("workspace_id", scoped.access.workspaceId).eq("id", templateId).single();
+  if (existingRes.error || !existingRes.data) return fail("NOT_FOUND", "BOQ template not found.", 404, id);
+
+  const newCount = (Number(existingRes.data.use_count) || 0) + 1;
+  await supabase.from("boq_templates").update({ use_count: newCount }).eq("id", templateId);
+  return ok({ success: true, useCount: newCount, templateId }, 200, id);
+}
+
+async function addBoqTemplateSection(request: NextRequest, supabase: SupabaseClient, id: string, templateId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const body = await request.json().catch(() => ({}));
+  const sectionName = String(body.name || "").trim();
+  if (!sectionName) return fail("VALIDATION_ERROR", "Section name is required.", 400, id);
+  const categoryName = String(body.category || "General").trim();
+
+  const existingRes = await supabase.from("boq_templates").select(boqTemplateSelectFull).eq("workspace_id", scoped.access.workspaceId).eq("id", templateId).single();
+  if (existingRes.error || !existingRes.data) return fail("NOT_FOUND", "BOQ template not found.", 404, id);
+
+  const existing = existingRes.data as any;
+  const snapshot = existing.snapshot || {};
+  const rooms = (snapshot.rooms || []).map((r: any) => ({ ...r }));
+
+  const existingSection = rooms.find((r: any) => r.name.toLowerCase() === sectionName.toLowerCase());
+  if (existingSection) {
+    const cats = existingSection.categories || [];
+    if (!cats.some((c: any) => c.name.toLowerCase() === categoryName.toLowerCase())) {
+      cats.push({ name: categoryName, itemsCount: 0, cost: "₹0.00L", items: [] });
+    }
+  } else {
+    rooms.push({
+      name: sectionName,
+      itemsCount: 0,
+      cost: "₹0.00L",
+      categories: [
+        { name: categoryName, itemsCount: 0, cost: "₹0.00L", items: [] }
+      ]
+    });
+  }
+
+  const updateRes = await supabase.from("boq_templates").update({
+    snapshot: { ...snapshot, rooms },
+    updated_at: new Date().toISOString()
+  }).eq("id", templateId).eq("workspace_id", scoped.access.workspaceId).select(boqTemplateSelectFull).single();
+
+  if (updateRes.error) return fail("INTERNAL_ERROR", "Failed to add BOQ section.", 500, id);
+  return ok(boqTemplateDto(updateRes.data as Record<string, unknown>, true), 200, id);
+}
+
+async function addBoqTemplateItem(request: NextRequest, supabase: SupabaseClient, id: string, templateId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const body = await request.json().catch(() => ({}));
+  const sectionName = String(body.sectionName || "").trim();
+  const categoryName = String(body.categoryName || "General").trim();
+  const itemName = String(body.name || "").trim();
+  if (!itemName) return fail("VALIDATION_ERROR", "Item name is required.", 400, id);
+
+  const existingRes = await supabase.from("boq_templates").select(boqTemplateSelectFull).eq("workspace_id", scoped.access.workspaceId).eq("id", templateId).single();
+  if (existingRes.error || !existingRes.data) return fail("NOT_FOUND", "BOQ template not found.", 404, id);
+
+  const existing = existingRes.data as any;
+  const snapshot = existing.snapshot || {};
+  const rooms = (snapshot.rooms || []).map((r: any) => ({ ...r, categories: (r.categories || []).map((c: any) => ({ ...c, items: [...(c.items || [])] })) }));
+
+  let targetRoom = rooms.find((r: any) => r.name.toLowerCase() === sectionName.toLowerCase());
+  if (!targetRoom) {
+    targetRoom = { name: sectionName || "General", itemsCount: 0, cost: "₹0.00L", categories: [] };
+    rooms.push(targetRoom);
+  }
+
+  let targetCat = (targetRoom.categories || []).find((c: any) => c.name.toLowerCase() === categoryName.toLowerCase());
+  if (!targetCat) {
+    targetCat = { name: categoryName, itemsCount: 0, cost: "₹0.00L", items: [] };
+    targetRoom.categories.push(targetCat);
+  }
+
+  const qty = Number(body.quantity) || 1;
+  const rate = Number(body.rate) || 0;
+  const wastePercent = Number(body.wastePercent) || 0;
+  const taxPercent = Number(body.taxPercent) !== undefined ? Number(body.taxPercent) : 18;
+  const amount = Math.round(qty * rate * (1 + wastePercent / 100) * (1 + taxPercent / 100) * 100) / 100;
+
+  const newItem = {
+    code: body.code || `ITM-${Math.floor(100 + Math.random() * 900)}`,
+    name: itemName,
+    description: body.description || "",
+    unit: body.unit || "Nos",
+    quantity: qty,
+    rateBasis: body.rateBasis || "Current Library Rate",
+    rate,
+    wastePercent,
+    taxPercent,
+    amount
+  };
+
+  targetCat.items.push(newItem);
+
+  const updateRes = await supabase.from("boq_templates").update({
+    snapshot: { ...snapshot, rooms },
+    updated_at: new Date().toISOString()
+  }).eq("id", templateId).eq("workspace_id", scoped.access.workspaceId).select(boqTemplateSelectFull).single();
+
+  if (updateRes.error) return fail("INTERNAL_ERROR", "Failed to add BOQ item.", 500, id);
+  return ok(boqTemplateDto(updateRes.data as Record<string, unknown>, true), 200, id);
 }
 
 async function boqChild(request: Request, supabase: SupabaseClient, id: string, boqId: string, kind: "room"|"category"|"item", parentId?: string, childId?: string) {
@@ -7672,9 +8095,20 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (request.method === "POST" && route === "boq-imports") return createBoqImport(request, supabase, id);
   if (request.method === "GET" && route === "boqs") return listBoqs(request, supabase, id);
   if (request.method === "POST" && route === "boqs") return createBoq(request, supabase, id);
+  if (request.method === "POST" && route === "boq-templates/upload-image") return uploadTemplateImage(request, supabase, id);
   if (["GET","POST"].includes(request.method) && route === "boq-templates") return boqTemplates(request, supabase, id);
   const boqTemplateMatch = route.match(/^boq-templates\/([0-9a-f-]{36})$/i);
   if (boqTemplateMatch && request.method === "GET") return getBoqTemplate(supabase, id, boqTemplateMatch[1]);
+  if (boqTemplateMatch && request.method === "PATCH") return updateBoqTemplate(request, supabase, id, boqTemplateMatch[1]);
+  if (boqTemplateMatch && request.method === "DELETE") return deleteBoqTemplate(request, supabase, id, boqTemplateMatch[1]);
+  const boqTemplateDuplicateMatch = route.match(/^boq-templates\/([0-9a-f-]{36})\/duplicate$/i);
+  if (boqTemplateDuplicateMatch && request.method === "POST") return duplicateBoqTemplate(supabase, id, boqTemplateDuplicateMatch[1]);
+  const boqTemplateUseMatch = route.match(/^boq-templates\/([0-9a-f-]{36})\/use$/i);
+  if (boqTemplateUseMatch && request.method === "POST") return useBoqTemplate(request, supabase, id, boqTemplateUseMatch[1]);
+  const boqTemplateSectionMatch = route.match(/^boq-templates\/([0-9a-f-]{36})\/sections$/i);
+  if (boqTemplateSectionMatch && request.method === "POST") return addBoqTemplateSection(request, supabase, id, boqTemplateSectionMatch[1]);
+  const boqTemplateItemMatch = route.match(/^boq-templates\/([0-9a-f-]{36})\/items$/i);
+  if (boqTemplateItemMatch && request.method === "POST") return addBoqTemplateItem(request, supabase, id, boqTemplateItemMatch[1]);
   const boqMatch = route.match(/^boqs\/([0-9a-f-]{36})$/i);
   if (boqMatch && request.method === "GET") return getBoq(supabase, id, boqMatch[1]);
   if (boqMatch && request.method === "PATCH") return updateBoq(request, supabase, id, boqMatch[1]);

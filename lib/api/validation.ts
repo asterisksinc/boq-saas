@@ -233,8 +233,33 @@ export const boqItemSchema = z.object({
   rate: money, wastePercent: percent.default(0), taxPercent: percent.default(18), sortOrder: z.number().int().min(0).optional(),
 }).strict();
 export const boqTemplateSchema = z.object({
-  name: z.string().trim().min(1).max(160), boqId: z.string().uuid(),
-  description: z.string().trim().max(2000).nullable().optional(), tags: z.array(z.string().trim().min(1).max(40)).max(20).default([]),
+  name: z.string().trim().min(1).max(160),
+  boqId: z.string().uuid().optional(),
+  description: z.string().trim().max(2000).nullable().optional(),
+  tags: z.array(z.string().trim().min(1).max(40)).max(20).default([]),
+  businessType: z.string().trim().max(80).optional(),
+  category: z.string().trim().max(80).optional(),
+  projectType: z.string().trim().max(80).optional(),
+  imageUrl: z.string().max(200000).nullable().optional(),
+  team: z.string().trim().max(120).nullable().optional(),
+  region: z.string().trim().max(120).nullable().optional(),
+  rooms: z.any().optional(),
+  snapshot: z.any().optional(),
+  metadata: z.any().optional(),
+}).strict();
+
+export const boqTemplatePatchSchema = z.object({
+  name: z.string().trim().min(1).max(160).optional(),
+  description: z.string().trim().max(2000).nullable().optional(),
+  tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
+  status: z.string().trim().max(40).optional(),
+  category: z.string().trim().max(80).optional(),
+  projectType: z.string().trim().max(80).optional(),
+  version: z.string().trim().max(40).optional(),
+  imageUrl: z.string().max(200000).nullable().optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
+  snapshot: z.any().optional(),
+  rooms: z.any().optional(),
 }).strict();
 
 const templateVisibility = z.literal("workspace");

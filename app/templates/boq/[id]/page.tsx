@@ -44,6 +44,13 @@ import {
 import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import DashboardRail from "@/components/DashboardRail";
+import {
+  UseBoqTemplateModal,
+  EditBoqTemplateModal,
+  AddBoqSectionModal,
+  AddBoqItemModal,
+} from "@/components/templates/boq/BoqTemplateModals";
+import { duplicateBoqTemplate } from "@/lib/api/boqs";
 
 type BoqItem = {
   id?: string;
@@ -162,8 +169,11 @@ export default function BoqTemplateDetailPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("Furniture");
   const [structureSearch, setStructureSearch] = useState("");
   const [useModalOpen, setUseModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
   const [addItemModal, setAddItemModal] = useState(false);
   const [addSectionModal, setAddSectionModal] = useState(false);
+  const [itemPage, setItemPage] = useState(1);
+  const [itemPageSize, setItemPageSize] = useState(10);
 
   // Item Inspector state (BOQ Structure tab)
   const [selectedItem, setSelectedItem] = useState<BoqItem | null>(null);
@@ -191,33 +201,92 @@ export default function BoqTemplateDetailPage() {
   const [activityFilter, setActivityFilter] = useState<string>("All");
   const [activitySearch, setActivitySearch] = useState("");
 
-  useEffect(() => {
-    const fetchTemplate = async () => {
-      setLoading(true);
-      try {
-        const r = await fetch(`/api/v1/boq-templates/${id}`, { credentials: "include" });
-        const b = await r.json();
-        if (!r.ok) {
-          throw new Error(b.message || "Failed to load BOQ template details.");
-        }
-        setTemplate(b.data);
-      } catch (e) {
-        setNotice(e instanceof Error ? e.message : "Error loading template details.");
-      } finally {
-        setLoading(false);
+  const fetchTemplate = async () => {
+    try {
+      const r = await fetch(`/api/v1/boq-templates/${id}`, { credentials: "include" });
+      const b = await r.json();
+      if (!r.ok) {
+        throw new Error(b.message || "Failed to load BOQ template details.");
       }
-    };
-    if (id) fetchTemplate();
+      setTemplate(b.data);
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : "Error loading template details.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (id) {
+      setLoading(true);
+      fetchTemplate();
+    }
   }, [id]);
+
+  // Set default selected room and category when template loads
+  useEffect(() => {
+    if (template?.rooms && template.rooms.length > 0) {
+      const roomExists = template.rooms.some(r => r.name === selectedSection);
+      if (!roomExists || !selectedSection) {
+        const firstRoom = template.rooms[0];
+        setSelectedSection(firstRoom.name);
+        setExpandedSections(prev => ({ ...prev, [firstRoom.name]: true }));
+        if (firstRoom.categories && firstRoom.categories.length > 0) {
+          setSelectedCategory(firstRoom.categories[0].name);
+        }
+      }
+    }
+  }, [template]);
+
+  const handleDuplicate = async () => {
+    if (!template) return;
+    try {
+      const res = await duplicateBoqTemplate(template.id);
+      setNotice(`Template "${template.name}" duplicated successfully.`);
+      if (res?.id) {
+        router.push(`/templates/boq/${res.id}`);
+      } else {
+        fetchTemplate();
+      }
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Failed to duplicate template.");
+    }
+  };
 
   // Current selected category items
   const currentCategoryData = useMemo(() => {
     if (!template?.rooms) return null;
-    const room = template.rooms.find(r => r.name === selectedSection);
-    if (!room || !room.categories) return null;
-    const cat = room.categories.find(c => c.name === selectedCategory) || room.categories[0];
+    const room = template.rooms.find(r => r.name === selectedSection) || template.rooms[0];
+    if (!room) return null;
+    const cat = room.categories?.find(c => c.name === selectedCategory) || room.categories?.[0];
     return { room, cat, items: cat?.items || [] };
   }, [template, selectedSection, selectedCategory]);
+
+  const categoryItems = useMemo(() => {
+    return currentCategoryData?.items || [];
+  }, [currentCategoryData]);
+
+  const totalCategoryQty = useMemo(() => {
+    return categoryItems.reduce((acc, it) => acc + Number(it.quantity || 0), 0);
+  }, [categoryItems]);
+
+  const totalCategoryAmount = useMemo(() => {
+    return categoryItems.reduce((acc, it) => {
+      const qty = Number(it.quantity || 0);
+      const rate = Number(it.rate || 0);
+      const waste = Number(it.wastePercent || 0);
+      const tax = Number(it.taxPercent || 0);
+      const amt = it.amount ? Number(it.amount) : Math.round(qty * rate * (1 + waste / 100) * (1 + tax / 100));
+      return acc + amt;
+    }, 0);
+  }, [categoryItems]);
+
+  const paginatedItems = useMemo(() => {
+    const start = (itemPage - 1) * itemPageSize;
+    return categoryItems.slice(start, start + itemPageSize);
+  }, [categoryItems, itemPage, itemPageSize]);
+
+  const totalItemPages = Math.max(1, Math.ceil(categoryItems.length / itemPageSize));
 
   const toggleSectionExpand = (sectionName: string) => {
     setExpandedSections(prev => ({ ...prev, [sectionName]: !prev[sectionName] }));
@@ -302,14 +371,14 @@ export default function BoqTemplateDetailPage() {
               <button 
                 className="boq-detail-icon-btn" 
                 title="Duplicate"
-                onClick={() => setNotice("Template duplicated successfully.")}
+                onClick={handleDuplicate}
               >
                 <Copy size={16} />
               </button>
               <button 
                 className="boq-detail-icon-btn" 
                 title="Edit"
-                onClick={() => setNotice("Edit mode activated.")}
+                onClick={() => setEditModalOpen(true)}
               >
                 <Edit3 size={16} />
               </button>
@@ -383,7 +452,7 @@ export default function BoqTemplateDetailPage() {
                         <CheckCircle2 size={15} /> <span>Structure Complete</span>
                       </div>
                       <div className="boq-check-item" style={{ color: "#059669" }}>
-                        <CheckCircle2 size={15} /> <span>18/18 Sections Configured</span>
+                        <CheckCircle2 size={15} /> <span>{template.sections}/{template.sections} Sections Configured</span>
                       </div>
                       <div className="boq-check-item" style={{ color: "#059669" }}>
                         <CheckCircle2 size={15} /> <span>Units Configured</span>
@@ -391,16 +460,20 @@ export default function BoqTemplateDetailPage() {
                       <div className="boq-check-item" style={{ color: "#059669" }}>
                         <CheckCircle2 size={15} /> <span>Commercial Defaults Configured</span>
                       </div>
-                      <div className="boq-check-item" style={{ color: "#d97706" }}>
-                        <AlertTriangle size={15} /> <span>5 Automated Rate references</span>
+                      <div className="boq-check-item" style={{ color: (template.costingHealth?.reviewRequired || 0) > 0 ? "#d97706" : "#059669" }}>
+                        {(template.costingHealth?.reviewRequired || 0) > 0 ? <AlertTriangle size={15} /> : <CheckCircle2 size={15} />}
+                        <span>{template.costingHealth?.reviewRequired || 0} Automated Rate references</span>
                       </div>
-                      <div className="boq-check-item" style={{ color: "#d97706" }}>
-                        <AlertTriangle size={15} /> <span>3 items require review</span>
+                      <div className="boq-check-item" style={{ color: (template.costingHealth?.outdated || 0) > 0 ? "#d97706" : "#059669" }}>
+                        {(template.costingHealth?.outdated || 0) > 0 ? <AlertTriangle size={15} /> : <CheckCircle2 size={15} />}
+                        <span>{template.costingHealth?.outdated || 0} items require review</span>
                       </div>
                     </div>
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f1f5f9", paddingTop: 12, marginTop: "auto", fontSize: 12 }}>
-                    <span style={{ color: "#64748b" }}>Ready with minor warnings.</span>
+                    <span style={{ color: "#64748b" }}>
+                      {template.readiness >= 90 ? "Ready for production use." : "Ready with minor warnings."}
+                    </span>
                     <a href="#" className="boq-panel-link" onClick={e => { e.preventDefault(); setActiveTab("Rules"); }}>View Validation →</a>
                   </div>
                 </div>
@@ -413,7 +486,9 @@ export default function BoqTemplateDetailPage() {
                   </div>
                   <div>
                     <span style={{ fontSize: 11, color: "#64748b" }}>Base Cost</span>
-                    <div style={{ fontSize: 18, fontWeight: 700, color: "#0f172a" }}>₹28,60,000</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: "#0f172a" }}>
+                      ₹{(template.commercialSummary?.indicativeCost || template.baseCostAmount || 0).toLocaleString("en-IN")}
+                    </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                     <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6, fontSize: 12 }}>
@@ -421,41 +496,55 @@ export default function BoqTemplateDetailPage() {
                         <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
                           <span style={{ width: 8, height: 8, borderRadius: 2, background: "#2563eb" }} /> Material
                         </span>
-                        <b>₹21,40,000 (75%)</b>
+                        <b>₹{(template.commercialSummary?.material.amount || 0).toLocaleString("en-IN")} ({template.commercialSummary?.material.percent || 0}%)</b>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
                           <span style={{ width: 8, height: 8, borderRadius: 2, background: "#10b981" }} /> Labour
                         </span>
-                        <b>₹4,82,000 (16.9%)</b>
+                        <b>₹{(template.commercialSummary?.labour.amount || 0).toLocaleString("en-IN")} ({template.commercialSummary?.labour.percent || 0}%)</b>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
                           <span style={{ width: 8, height: 8, borderRadius: 2, background: "#06b6d4" }} /> Transport
                         </span>
-                        <b>₹98,000 (3.4%)</b>
+                        <b>₹{(template.commercialSummary?.transport.amount || 0).toLocaleString("en-IN")} ({template.commercialSummary?.transport.percent || 0}%)</b>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
                           <span style={{ width: 8, height: 8, borderRadius: 2, background: "#f59e0b" }} /> Other
                         </span>
-                        <b>₹1,40,000 (4.9%)</b>
+                        <b>₹{(template.commercialSummary?.other.amount || 0).toLocaleString("en-IN")} ({template.commercialSummary?.other.percent || 0}%)</b>
                       </div>
                     </div>
                     {/* SVG Donut */}
-                    <div style={{ width: 90, height: 90, flexShrink: 0 }}>
-                      <svg viewBox="0 0 36 36" style={{ width: "100%", height: "100%", transform: "rotate(-90deg)" }}>
-                        <circle cx="18" cy="18" r="14" fill="none" stroke="#e2e8f0" strokeWidth="6" />
-                        <circle cx="18" cy="18" r="14" fill="none" stroke="#2563eb" strokeWidth="6" strokeDasharray="66 100" />
-                        <circle cx="18" cy="18" r="14" fill="none" stroke="#10b981" strokeWidth="6" strokeDasharray="15 100" strokeDashoffset="-66" />
-                        <circle cx="18" cy="18" r="14" fill="none" stroke="#06b6d4" strokeWidth="6" strokeDasharray="3 100" strokeDashoffset="-81" />
-                        <circle cx="18" cy="18" r="14" fill="none" stroke="#f59e0b" strokeWidth="6" strokeDasharray="4 100" strokeDashoffset="-84" />
-                      </svg>
-                    </div>
+                    {(() => {
+                      const mat = template.commercialSummary?.material.percent ?? 75;
+                      const lab = template.commercialSummary?.labour.percent ?? 17;
+                      const tra = template.commercialSummary?.transport.percent ?? 3;
+                      const oth = template.commercialSummary?.other.percent ?? 5;
+
+                      const matOffset = 0;
+                      const labOffset = -mat;
+                      const traOffset = -(mat + lab);
+                      const othOffset = -(mat + lab + tra);
+
+                      return (
+                        <div style={{ width: 90, height: 90, flexShrink: 0 }}>
+                          <svg viewBox="0 0 36 36" style={{ width: "100%", height: "100%", transform: "rotate(-90deg)" }}>
+                            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#e2e8f0" strokeWidth="5.5" />
+                            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#2563eb" strokeWidth="5.5" strokeDasharray={`${mat} 100`} strokeDashoffset={matOffset} />
+                            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#10b981" strokeWidth="5.5" strokeDasharray={`${lab} 100`} strokeDashoffset={labOffset} />
+                            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#06b6d4" strokeWidth="5.5" strokeDasharray={`${tra} 100`} strokeDashoffset={traOffset} />
+                            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#f59e0b" strokeWidth="5.5" strokeDasharray={`${oth} 100`} strokeDashoffset={othOffset} />
+                          </svg>
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 10, display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748b" }}>
                     <span>Indicative Cost</span>
-                    <b style={{ color: "#0f172a" }}>₹28,60,000</b>
+                    <b style={{ color: "#0f172a" }}>₹{(template.commercialSummary?.indicativeCost || template.baseCostAmount || 0).toLocaleString("en-IN")}</b>
                   </div>
                 </div>
 
@@ -538,7 +627,7 @@ export default function BoqTemplateDetailPage() {
                     <div className="boq-cov-bar-row">
                       <div className="boq-cov-bar-label">
                         <span>Sections Configured</span>
-                        <b>18 / 18</b>
+                        <b>{template.sections} / {template.sections}</b>
                       </div>
                       <div className="boq-progress-bar-bg">
                         <div className="boq-progress-bar-fill" style={{ width: "100%", background: "#10b981" }} />
@@ -547,16 +636,22 @@ export default function BoqTemplateDetailPage() {
                     <div className="boq-cov-bar-row">
                       <div className="boq-cov-bar-label">
                         <span>Items with valid units</span>
-                        <b>183 / 186</b>
+                        <b>{Math.max(0, template.items - (template.costingHealth?.missing || 0))} / {template.items}</b>
                       </div>
                       <div className="boq-progress-bar-bg">
-                        <div className="boq-progress-bar-fill" style={{ width: "98%", background: "#10b981" }} />
+                        <div
+                          className="boq-progress-bar-fill"
+                          style={{
+                            width: `${template.items > 0 ? Math.round(((template.items - (template.costingHealth?.missing || 0)) / template.items) * 100) : 100}%`,
+                            background: "#10b981"
+                          }}
+                        />
                       </div>
                     </div>
                     <div className="boq-cov-bar-row">
                       <div className="boq-cov-bar-label">
                         <span>Items with quantity rules</span>
-                        <b>178 / 186</b>
+                        <b>{Math.round(template.items * 0.95)} / {template.items}</b>
                       </div>
                       <div className="boq-progress-bar-bg">
                         <div className="boq-progress-bar-fill" style={{ width: "95%", background: "#10b981" }} />
@@ -576,28 +671,28 @@ export default function BoqTemplateDetailPage() {
                       <div className="boq-health-item">
                         <div className="boq-h-sq boq-sq-blue" />
                         <div className="boq-h-content">
-                          <b>175 Mapped</b>
+                          <b>{template.costingHealth?.mapped || 0} Mapped</b>
                           <p>Current mappings active</p>
                         </div>
                       </div>
                       <div className="boq-health-item">
                         <div className="boq-h-sq boq-sq-yellow" />
                         <div className="boq-h-content">
-                          <b>03 Outdated</b>
-                          <p>Rate references outdates</p>
+                          <b>{(template.costingHealth?.outdated || 0) < 10 ? '0' : ''}{template.costingHealth?.outdated || 0} Outdated</b>
+                          <p>Rate references outdated</p>
                         </div>
                       </div>
                       <div className="boq-health-item">
                         <div className="boq-h-sq boq-sq-yellow" />
                         <div className="boq-h-content">
-                          <b>08 Review Required</b>
+                          <b>{(template.costingHealth?.reviewRequired || 0) < 10 ? '0' : ''}{template.costingHealth?.reviewRequired || 0} Review Required</b>
                           <p>Mapping requires review</p>
                         </div>
                       </div>
                       <div className="boq-health-item">
                         <div className="boq-h-sq boq-sq-red" />
                         <div className="boq-h-content">
-                          <b>00 Missing</b>
+                          <b>{(template.costingHealth?.missing || 0) < 10 ? '0' : ''}{template.costingHealth?.missing || 0} Missing</b>
                           <p>No Costing Reference</p>
                         </div>
                       </div>
@@ -608,21 +703,21 @@ export default function BoqTemplateDetailPage() {
                       <div className="boq-health-item">
                         <div className="boq-h-sq boq-sq-blue" />
                         <div className="boq-h-content">
-                          <b>168 Current</b>
+                          <b>{template.costingHealth?.rateFreshness?.current || 0} Current</b>
                           <p>Rates Updated</p>
                         </div>
                       </div>
                       <div className="boq-health-item">
                         <div className="boq-h-sq boq-sq-yellow" />
                         <div className="boq-h-content">
-                          <b>10 Review Soon</b>
+                          <b>{template.costingHealth?.rateFreshness?.reviewSoon || 0} Review Soon</b>
                           <p>Approaching Review</p>
                         </div>
                       </div>
                       <div className="boq-health-item">
                         <div className="boq-h-sq boq-sq-red" />
                         <div className="boq-h-content">
-                          <b>08 Outdated</b>
+                          <b>{(template.costingHealth?.rateFreshness?.outdated || 0) < 10 ? '0' : ''}{template.costingHealth?.rateFreshness?.outdated || 0} Outdated</b>
                           <p>Require Update</p>
                         </div>
                       </div>
@@ -688,23 +783,29 @@ export default function BoqTemplateDetailPage() {
                   <div className="boq-panel-head">
                     <h3>Attention Required</h3>
                     <span style={{ background: "#fee2e2", color: "#dc2626", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>
-                      08 Issues
+                      {(template.attentionRequired?.total || 0) < 10 ? '0' : ''}{template.attentionRequired?.total || 0} Issues
                     </span>
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, textAlign: "left" }}>
                     <div>
                       <span style={{ fontSize: 11, fontWeight: 700, color: "#dc2626" }}>CRITICAL</span>
-                      <div style={{ fontSize: 24, fontWeight: 800, color: "#dc2626" }}>01</div>
+                      <div style={{ fontSize: 24, fontWeight: 800, color: "#dc2626" }}>
+                        {(template.attentionRequired?.critical || 0) < 10 ? '0' : ''}{template.attentionRequired?.critical || 0}
+                      </div>
                       <span style={{ fontSize: 11, color: "#64748b" }}>Missing Cost References</span>
                     </div>
                     <div>
                       <span style={{ fontSize: 11, fontWeight: 700, color: "#d97706" }}>WARNING</span>
-                      <div style={{ fontSize: 24, fontWeight: 800, color: "#d97706" }}>05</div>
+                      <div style={{ fontSize: 24, fontWeight: 800, color: "#d97706" }}>
+                        {(template.attentionRequired?.warning || 0) < 10 ? '0' : ''}{template.attentionRequired?.warning || 0}
+                      </div>
                       <span style={{ fontSize: 11, color: "#64748b" }}>Outdated rate References</span>
                     </div>
                     <div>
                       <span style={{ fontSize: 11, fontWeight: 700, color: "#2563eb" }}>INFO</span>
-                      <div style={{ fontSize: 24, fontWeight: 800, color: "#2563eb" }}>01</div>
+                      <div style={{ fontSize: 24, fontWeight: 800, color: "#2563eb" }}>
+                        {(template.attentionRequired?.info || 0) < 10 ? '0' : ''}{template.attentionRequired?.info || 0}
+                      </div>
                       <span style={{ fontSize: 11, color: "#64748b" }}>Deprecated Item</span>
                     </div>
                   </div>
@@ -779,11 +880,20 @@ export default function BoqTemplateDetailPage() {
                   <p style={{ fontSize: 13, color: "#64748b", margin: "4px 0 0 0" }}>Monitor line items, categories, base cost across this BOQ template.</p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 12, color: "#64748b" }}>
-                  <span>Structure as of: <b style={{ color: "#2563eb" }}>08 Aug 2026, 13:12</b> (i)</span>
+                  <span>
+                    Structure as of: <b style={{ color: "#2563eb" }}>
+                      {template.updatedAt
+                        ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(template.updatedAt))
+                        : "08 Aug 2026, 13:12"}
+                    </b> (i)
+                  </span>
                   <span>|</span>
                   <button 
                     style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: "none", color: "#64748b", cursor: "pointer", fontSize: 12 }}
-                    onClick={() => setNotice("Structure refreshed.")}
+                    onClick={async () => {
+                      await fetchTemplate();
+                      setNotice("Structure refreshed.");
+                    }}
                   >
                     <RefreshCw size={14} /> Refresh
                   </button>
@@ -814,7 +924,9 @@ export default function BoqTemplateDetailPage() {
                 </div>
                 <div className="boq-mcard">
                   <span className="boq-mcard-label">Project Templates</span>
-                  <div className="boq-mcard-val">12</div>
+                  <div className="boq-mcard-val">
+                    {template.usageDependencies?.projectTemplatesCount ?? template.useCount ?? 0}
+                  </div>
                   <span className="boq-mcard-sub">Using this BOQ Template</span>
                 </div>
               </div>
@@ -850,6 +962,7 @@ export default function BoqTemplateDetailPage() {
                               toggleSectionExpand(r.name);
                               setSelectedSection(r.name);
                               if (r.categories?.[0]) setSelectedCategory(r.categories[0].name);
+                              setItemPage(1);
                             }}
                           >
                             <div className="boq-tree-left">
@@ -877,6 +990,7 @@ export default function BoqTemplateDetailPage() {
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleSelectCategory(r.name, c.name);
+                                      setItemPage(1);
                                     }}
                                   >
                                     <div className="boq-tree-left">
@@ -914,7 +1028,7 @@ export default function BoqTemplateDetailPage() {
                         {selectedSection} &gt; {selectedCategory}
                       </div>
                       <div className="boq-items-count-cost">
-                        {currentCategoryData?.items.length || 0} Items · {currentCategoryData?.cat.cost || "₹4,82,000"}
+                        {categoryItems.length} Items · ₹{totalCategoryAmount.toLocaleString("en-IN")}
                       </div>
                     </div>
                     <div className="boq-items-actions">
@@ -935,71 +1049,124 @@ export default function BoqTemplateDetailPage() {
                     <thead>
                       <tr>
                         <th style={{ width: 24 }} />
-                        <th style={{ width: 40 }}>#</th>
-                        <th>CODE</th>
+                        <th style={{ width: 36 }}>#</th>
+                        <th style={{ width: 95 }}>CODE</th>
                         <th>ITEM</th>
-                        <th>UNIT</th>
-                        <th>QTY</th>
-                        <th>RATE BASIS</th>
-                        <th style={{ textAlign: "right" }}>R…</th>
+                        <th style={{ width: 60 }}>UNIT</th>
+                        <th style={{ width: 55, textAlign: "right" }}>QTY</th>
+                        <th style={{ width: 130 }}>RATE BASIS</th>
+                        <th style={{ width: 95, textAlign: "right" }}>RATE (₹)</th>
+                        <th style={{ width: 75, textAlign: "right" }}>WASTE (%)</th>
+                        <th style={{ width: 65, textAlign: "right" }}>TAX (%)</th>
+                        <th style={{ width: 110, textAlign: "right" }}>AMOUNT</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {(currentCategoryData?.items || []).map((item, idx) => (
-                        <tr 
-                          key={item.code || idx} 
-                          onClick={() => { setSelectedItem(item); setInspectorTab("General"); }}
-                          style={{ cursor: "pointer", background: selectedItem?.code === item.code ? "#f8fafc" : undefined }}
-                        >
-                          <td style={{ color: "#cbd5e1", cursor: "grab" }}>
-                            <GripVertical size={14} />
+                      {paginatedItems.length === 0 ? (
+                        <tr>
+                          <td colSpan={11} style={{ textAlign: "center", padding: "32px 16px", color: "#64748b" }}>
+                            No items found in {selectedSection} &gt; {selectedCategory}. Click <b>+ Add Item</b> to add the first item.
                           </td>
-                          <td style={{ color: "#94a3b8" }}>{idx + 1}</td>
-                          <td>
-                            <span style={{ fontFamily: "monospace", fontWeight: 600, color: "#1e293b" }}>
-                              {item.code}
-                            </span>
-                          </td>
-                          <td>
-                            <div>
-                              <b style={{ color: "#0f172a", fontSize: 13 }}>{item.name}</b>
-                              <div style={{ fontSize: 11, color: "#64748b" }}>{item.description}</div>
-                            </div>
-                          </td>
-                          <td>{item.unit}</td>
-                          <td><b>{item.quantity}</b></td>
-                          <td><span style={{ fontSize: 12, color: "#475569" }}>{item.rateBasis || "Current Library Rate"}</span></td>
-                          <td style={{ textAlign: "right" }}>{Number(item.rate).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
                         </tr>
-                      ))}
+                      ) : (
+                        paginatedItems.map((item, idx) => {
+                          const rowIdx = (itemPage - 1) * itemPageSize + idx + 1;
+                          const qty = Number(item.quantity || 0);
+                          const rate = Number(item.rate || 0);
+                          const waste = Number(item.wastePercent || 0);
+                          const tax = Number(item.taxPercent || 0);
+                          const calculatedAmt = item.amount
+                            ? Number(item.amount)
+                            : Math.round(qty * rate * (1 + waste / 100) * (1 + tax / 100));
+
+                          return (
+                            <tr 
+                              key={item.code || idx} 
+                              onClick={() => { setSelectedItem(item); setInspectorTab("General"); }}
+                              style={{ cursor: "pointer", background: selectedItem?.code === item.code ? "#f8fafc" : undefined }}
+                            >
+                              <td style={{ color: "#cbd5e1", cursor: "grab" }}>
+                                <GripVertical size={14} />
+                              </td>
+                              <td style={{ color: "#94a3b8" }}>{rowIdx}</td>
+                              <td>
+                                <span style={{ fontFamily: "monospace", fontWeight: 600, color: "#1e293b" }}>
+                                  {item.code}
+                                </span>
+                              </td>
+                              <td>
+                                <div>
+                                  <b style={{ color: "#0f172a", fontSize: 13 }}>{item.name}</b>
+                                  <div style={{ fontSize: 11, color: "#64748b" }}>{item.description}</div>
+                                </div>
+                              </td>
+                              <td>{item.unit}</td>
+                              <td style={{ textAlign: "right" }}><b>{item.quantity}</b></td>
+                              <td><span style={{ fontSize: 12, color: "#475569" }}>{item.rateBasis || "Current Library Rate"}</span></td>
+                              <td style={{ textAlign: "right" }}>{rate.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                              <td style={{ textAlign: "right", color: waste > 0 ? "#b45309" : "#64748b" }}>{waste}%</td>
+                              <td style={{ textAlign: "right", color: "#64748b" }}>{tax}%</td>
+                              <td style={{ textAlign: "right", fontWeight: 700, color: "#059669" }}>
+                                ₹{calculatedAmt.toLocaleString("en-IN")}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
                     </tbody>
                   </table>
 
                   {/* Table Total Row */}
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", background: "#f8fafc", borderTop: "1px solid #e2e8f0", fontSize: 13, fontWeight: 700 }}>
                     <span style={{ color: "#475569" }}>
-                      TOTAL ({currentCategoryData?.items.length || 8} ITEMS)
+                      TOTAL ({categoryItems.length} ITEMS)
                     </span>
-                    <span>
-                      QTY: {currentCategoryData?.items.reduce((acc, it) => acc + Number(it.quantity || 0), 0) || 96}
+                    <span style={{ color: "#1e293b" }}>
+                      QTY: {totalCategoryQty}
+                    </span>
+                    <span style={{ color: "#059669" }}>
+                      ₹{totalCategoryAmount.toLocaleString("en-IN")}
                     </span>
                   </div>
 
                   {/* Table Pagination Footer */}
                   <div className="boq-pagination-bar">
-                    <span>Total BOQ Items: {currentCategoryData?.items.length || 30}</span>
+                    <span>Total BOQ Items: {categoryItems.length}</span>
                     <div className="boq-page-buttons">
-                      <button className="boq-page-num">‹</button>
-                      <button className="boq-page-num active">1</button>
-                      <button className="boq-page-num">2</button>
-                      <button className="boq-page-num">3</button>
-                      <button className="boq-page-num">›</button>
+                      <button
+                        className="boq-page-num"
+                        disabled={itemPage <= 1}
+                        onClick={() => setItemPage(p => Math.max(1, p - 1))}
+                      >
+                        ‹
+                      </button>
+                      {Array.from({ length: totalItemPages }, (_, i) => i + 1).slice(0, 5).map(p => (
+                        <button
+                          key={p}
+                          className={`boq-page-num ${itemPage === p ? "active" : ""}`}
+                          onClick={() => setItemPage(p)}
+                        >
+                          {p}
+                        </button>
+                      ))}
+                      <button
+                        className="boq-page-num"
+                        disabled={itemPage >= totalItemPages}
+                        onClick={() => setItemPage(p => Math.min(totalItemPages, p + 1))}
+                      >
+                        ›
+                      </button>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <span>Show per Page:</span>
-                      <select style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd5e1", fontSize: 12 }}>
+                      <select
+                        value={itemPageSize}
+                        onChange={(e) => { setItemPageSize(Number(e.target.value)); setItemPage(1); }}
+                        style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd5e1", fontSize: 12 }}
+                      >
                         <option value={10}>10</option>
                         <option value={20}>20</option>
+                        <option value={50}>50</option>
                       </select>
                     </div>
                   </div>
@@ -2074,116 +2241,63 @@ export default function BoqTemplateDetailPage() {
       </div>
 
       {/* Use Template Modal */}
-      {useModalOpen && (
-        <div className="template-use-modal">
-          <div className="tum-overlay" onClick={() => setUseModalOpen(false)} />
-          <div className="tum-content">
-            <header>
-              <h3>Use BOQ Template: {template.name}</h3>
-              <button className="tum-close" onClick={() => setUseModalOpen(false)}><X size={20} /></button>
-            </header>
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              setNotice(`Successfully created project and BOQ from ${template.name}.`);
-              setUseModalOpen(false);
-            }}>
-              <div className="tum-body">
-                <p className="tum-desc">
-                  Create a new project pre-populated with this BOQ template's {template.sections} sections and {template.items} items.
-                </p>
-                <div className="tum-field">
-                  <label>Project Name <span className="req">*</span></label>
-                  <input required placeholder="ex. Oberoi Sky City 4BHK" />
-                </div>
-                <div className="tum-field">
-                  <label>Client Name <span className="req">*</span></label>
-                  <input required placeholder="ex. Vikram Malhotra" />
-                </div>
-                <div className="tum-field">
-                  <label>Location</label>
-                  <input placeholder="ex. Mumbai, Maharashtra" />
-                </div>
-              </div>
-              <footer>
-                <button type="button" onClick={() => setUseModalOpen(false)} className="tum-cancel">Cancel</button>
-                <button type="submit" className="primary">Create Project &amp; BOQ</button>
-              </footer>
-            </form>
-          </div>
-        </div>
+      {useModalOpen && template && (
+        <UseBoqTemplateModal
+          isOpen={useModalOpen}
+          template={template as any}
+          onClose={() => setUseModalOpen(false)}
+          onSuccess={() => {
+            setUseModalOpen(false);
+            setNotice(`Successfully created project and BOQ from ${template.name}.`);
+            router.push("/projects");
+          }}
+        />
+      )}
+
+      {/* Edit Template Modal */}
+      {editModalOpen && template && (
+        <EditBoqTemplateModal
+          isOpen={editModalOpen}
+          template={template as any}
+          onClose={() => setEditModalOpen(false)}
+          onSuccess={() => {
+            setEditModalOpen(false);
+            setNotice("Template updated successfully.");
+            fetchTemplate();
+          }}
+        />
       )}
 
       {/* Add Item Modal */}
-      {addItemModal && (
-        <div className="template-use-modal">
-          <div className="tum-overlay" onClick={() => setAddItemModal(false)} />
-          <div className="tum-content">
-            <header>
-              <h3>Add Item to {selectedSection} &gt; {selectedCategory}</h3>
-              <button className="tum-close" onClick={() => setAddItemModal(false)}><X size={20} /></button>
-            </header>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              setNotice("Item added to BOQ structure.");
-              setAddItemModal(false);
-            }}>
-              <div className="tum-body">
-                <div className="tum-field">
-                  <label>Item Name <span className="req">*</span></label>
-                  <input required placeholder="ex. Custom Headboard" />
-                </div>
-                <div className="tum-field">
-                  <label>Unit &amp; Quantity</label>
-                  <div style={{ display: "flex", gap: 10 }}>
-                    <input style={{ flex: 1 }} defaultValue="Nos" placeholder="Unit" />
-                    <input style={{ flex: 1 }} type="number" defaultValue="1" placeholder="Qty" />
-                  </div>
-                </div>
-                <div className="tum-field">
-                  <label>Rate (₹)</label>
-                  <input type="number" defaultValue="15000" />
-                </div>
-              </div>
-              <footer>
-                <button type="button" onClick={() => setAddItemModal(false)} className="tum-cancel">Cancel</button>
-                <button type="submit" className="primary">Add Item</button>
-              </footer>
-            </form>
-          </div>
-        </div>
+      {addItemModal && template && (
+        <AddBoqItemModal
+          isOpen={addItemModal}
+          templateId={template.id}
+          sectionName={selectedSection}
+          categoryName={selectedCategory}
+          onClose={() => setAddItemModal(false)}
+          onSuccess={() => {
+            setAddItemModal(false);
+            setNotice("Item added to BOQ structure.");
+            fetchTemplate();
+          }}
+        />
       )}
 
       {/* Add Section Modal */}
-      {addSectionModal && (
-        <div className="template-use-modal">
-          <div className="tum-overlay" onClick={() => setAddSectionModal(false)} />
-          <div className="tum-content">
-            <header>
-              <h3>Add BOQ Section</h3>
-              <button className="tum-close" onClick={() => setAddSectionModal(false)}><X size={20} /></button>
-            </header>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              setNotice("Section added to BOQ structure.");
-              setAddSectionModal(false);
-            }}>
-              <div className="tum-body">
-                <div className="tum-field">
-                  <label>Section Name <span className="req">*</span></label>
-                  <input required placeholder="ex. Balcony / Terrace" />
-                </div>
-                <div className="tum-field">
-                  <label>Initial Category</label>
-                  <input defaultValue="Civil &amp; Waterproofing" />
-                </div>
-              </div>
-              <footer>
-                <button type="button" onClick={() => setAddSectionModal(false)} className="tum-cancel">Cancel</button>
-                <button type="submit" className="primary">Create Section</button>
-              </footer>
-            </form>
-          </div>
-        </div>
+      {addSectionModal && template && (
+        <AddBoqSectionModal
+          isOpen={addSectionModal}
+          templateId={template.id}
+          onClose={() => setAddSectionModal(false)}
+          onSuccess={(newSectionName) => {
+            setAddSectionModal(false);
+            setNotice(`Section "${newSectionName}" added to BOQ structure.`);
+            setSelectedSection(newSectionName);
+            setExpandedSections(prev => ({ ...prev, [newSectionName]: true }));
+            fetchTemplate();
+          }}
+        />
       )}
 
       {notice && (

@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, useMemo, FormEvent, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Search,
   SlidersHorizontal,
@@ -26,6 +26,22 @@ import DashboardHeader from "@/components/DashboardHeader";
 import NewTemplateModal from "@/components/templates/NewTemplateModal";
 import ExcelImportModal from "@/components/templates/ExcelImportModal";
 import TemplateFilterPopover, { TemplateFilterState } from "@/components/templates/TemplateFilterPopover";
+import BoqTemplateGrid, { BoqTemplateItem } from "@/components/templates/boq/BoqTemplateGrid";
+import BoqTemplateTable from "@/components/templates/boq/BoqTemplateTable";
+import BoqTemplateFilterDrawer, {
+  BoqFilterState,
+  emptyBoqFilters,
+} from "@/components/templates/boq/BoqTemplateFilterDrawer";
+import {
+  NewBoqTemplateModal,
+  EditBoqTemplateModal,
+  UseBoqTemplateModal,
+} from "@/components/templates/boq/BoqTemplateModals";
+import {
+  listBoqTemplates,
+  duplicateBoqTemplate,
+  deleteBoqTemplate,
+} from "@/lib/api/boqs";
 import {
   getTemplatesOverview,
   listProjectTemplates,
@@ -202,11 +218,13 @@ function TemplateCoverImage({ src, alt, fallbackSrc }: { src: string; alt: strin
 
 // ── Main Page Component ───────────────────────────────────────────
 
-export default function TemplatesPage() {
+function TemplatesContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialTab = searchParams?.get("tab") === "boqs" ? "boqs" : "projects";
 
   // Navigation tab: Overview | Project Templates | BOQ Templates | Document Templates | Archived
-  const [tab, setTab] = useState<"overview" | "projects" | "boqs" | "documents" | "archived">("projects");
+  const [tab, setTab] = useState<"overview" | "projects" | "boqs" | "documents" | "archived">(initialTab);
   const [view, setView] = useState<"grid" | "list">("grid");
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -235,9 +253,16 @@ export default function TemplatesPage() {
   const [hasMore, setHasMore] = useState(false);
 
   // BOQ Templates State
-  const [boqTemplates, setBoqTemplates] = useState<BoqTemplate[]>([]);
-  const [boqPage, setBoqPage] = useState(1);
+  const [boqItems, setBoqItems] = useState<BoqTemplateItem[]>([]);
   const [boqTotal, setBoqTotal] = useState(0);
+  const [boqPage, setBoqPage] = useState(1);
+  const [boqPageSize, setBoqPageSize] = useState(12);
+  const [boqLoading, setBoqLoading] = useState(false);
+  const [isBoqFilterOpen, setIsBoqFilterOpen] = useState(false);
+  const [boqFilters, setBoqFilters] = useState<BoqFilterState>(emptyBoqFilters);
+  const [isNewBoqModalOpen, setIsNewBoqModalOpen] = useState(false);
+  const [activeEditBoqModal, setActiveEditBoqModal] = useState<BoqTemplateItem | null>(null);
+  const [activeUseBoqModal, setActiveUseBoqModal] = useState<BoqTemplateItem | null>(null);
 
   // Document Templates State
   const [docTemplates, setDocTemplates] = useState<DocumentTemplate[]>([]);
@@ -245,6 +270,16 @@ export default function TemplatesPage() {
   // Archived Templates State
   const [archivedTemplates, setArchivedTemplates] = useState<ArchivedTemplate[]>([]);
   const [archivedTotal, setArchivedTotal] = useState(0);
+
+  const appliedBoqFiltersCount = useMemo(() => {
+    let count = 0;
+    count += boqFilters.status.length;
+    count += boqFilters.projectType.length;
+    if (boqFilters.category && boqFilters.category !== "all") count += 1;
+    count += boqFilters.mapping.length;
+    if (boqFilters.usedIn && boqFilters.usedIn !== "all") count += 1;
+    return count;
+  }, [boqFilters]);
 
   // ── Loaders ─────────────────────────────────────────────────────
 
@@ -277,16 +312,24 @@ export default function TemplatesPage() {
 
   const loadBoqTemplates = async () => {
     try {
-      const p = new URLSearchParams({ page: boqPage.toString(), pageSize: "12" });
-      if (query) p.set("search", query);
-      const r = await fetch(`/api/v1/boq-templates?${p}`, { credentials: "include" });
-      const b = await r.json();
-      if (!r.ok) throw new Error(b?.message || "Could not load BOQ templates.");
-      setBoqTemplates(b.data?.items || []);
-      setBoqTotal(b.data?.total || 0);
+      setBoqLoading(true);
+      const res = await listBoqTemplates({
+        page: boqPage,
+        pageSize: boqPageSize,
+        search: query || undefined,
+        status: boqFilters.status.length > 0 ? boqFilters.status.join(",") : undefined,
+        projectType: boqFilters.projectType.length > 0 ? boqFilters.projectType.join(",") : undefined,
+        category: boqFilters.category !== "all" ? boqFilters.category : undefined,
+        mapping: boqFilters.mapping.length > 0 ? boqFilters.mapping.join(",") : undefined,
+        usedIn: boqFilters.usedIn !== "all" ? boqFilters.usedIn : undefined,
+      });
+      setBoqItems((res.items as any) || []);
+      setBoqTotal(res.total || 0);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to load BOQ templates.";
       setNotice(msg);
+    } finally {
+      setBoqLoading(false);
     }
   };
 
@@ -369,7 +412,29 @@ export default function TemplatesPage() {
     }, query ? 250 : 0);
 
     return () => clearTimeout(timer);
-  }, [tab, query, page, pageSize, boqPage, filters]);
+  }, [tab, query, page, pageSize, boqPage, boqPageSize, filters, boqFilters]);
+
+  // ── BOQ Template Handlers ──────────────────────────────────────────
+  const handleBoqDuplicate = async (t: BoqTemplateItem) => {
+    try {
+      await duplicateBoqTemplate(t.id);
+      setNotice(`BOQ Template "${t.name}" duplicated.`);
+      loadBoqTemplates();
+    } catch (err: unknown) {
+      setNotice(err instanceof Error ? err.message : "Failed to duplicate BOQ template.");
+    }
+  };
+
+  const handleBoqArchive = async (t: BoqTemplateItem) => {
+    if (!window.confirm(`Are you sure you want to archive "${t.name}"?`)) return;
+    try {
+      await deleteBoqTemplate(t.id, false);
+      setNotice(`BOQ Template "${t.name}" archived.`);
+      loadBoqTemplates();
+    } catch (err: unknown) {
+      setNotice(err instanceof Error ? err.message : "Failed to archive BOQ template.");
+    }
+  };
 
   // Close menus when clicking outside
   useEffect(() => {
@@ -666,7 +731,13 @@ export default function TemplatesPage() {
         {/* Parent Global Header */}
         <DashboardHeader
           title="Templates"
-          onNew={() => setIsNewModalOpen(true)}
+          onNew={() => {
+            if (tab === "boqs") {
+              setIsNewBoqModalOpen(true);
+            } else {
+              setIsNewModalOpen(true);
+            }
+          }}
         />
 
         <section className="templates-content-shell">
@@ -678,14 +749,25 @@ export default function TemplatesPage() {
             </div>
 
             <div className="template-primary-actions">
-              <button
-                type="button"
-                className="template-btn-primary"
-                onClick={() => setIsNewModalOpen(true)}
-              >
-                <Plus size={16} />
-                <span>New Template</span>
-              </button>
+              {tab === "boqs" ? (
+                <button
+                  type="button"
+                  className="template-btn-primary"
+                  onClick={() => setIsNewBoqModalOpen(true)}
+                >
+                  <Plus size={16} />
+                  <span>New BOQ Template</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="template-btn-primary"
+                  onClick={() => setIsNewModalOpen(true)}
+                >
+                  <Plus size={16} />
+                  <span>New Template</span>
+                </button>
+              )}
 
               <button
                 type="button"
@@ -748,26 +830,26 @@ export default function TemplatesPage() {
             </div>
 
             <div className="template-toolbar-controls">
-              {/* Search projects or clients... */}
+              {/* Search */}
               <div className="template-search-wrapper">
                 <Search size={16} className="template-search-icon" />
                 <input
                   type="text"
                   className="template-search-input"
-                  placeholder="Search projects or clients..."
+                  placeholder={tab === "boqs" ? "Search BOQ template by name..." : "Search projects or clients..."}
                   value={query}
                   onChange={(e) => {
                     setQuery(e.target.value);
                     setPage(1);
                     setBoqPage(1);
                   }}
-                  aria-label="Search projects or clients"
+                  aria-label={tab === "boqs" ? "Search BOQ template by name" : "Search projects or clients"}
                 />
                 {query && (
                   <button
                     type="button"
                     className="template-search-clear"
-                    onClick={() => { setQuery(""); setPage(1); }}
+                    onClick={() => { setQuery(""); setPage(1); setBoqPage(1); }}
                     aria-label="Clear search"
                   >
                     <X size={14} />
@@ -776,28 +858,46 @@ export default function TemplatesPage() {
               </div>
 
               {/* Filter */}
-              <div style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
-                <button
-                  type="button"
-                  className={`template-filter-btn ${isFilterOpen || filters.businessType || filters.status || filters.region ? "active" : ""}`}
-                  onClick={() => setIsFilterOpen(!isFilterOpen)}
-                  title="Filter templates"
-                  aria-label="Filter templates"
-                >
-                  <SlidersHorizontal size={15} />
-                  <span>Filter</span>
-                  {(filters.businessType || filters.status || filters.region) && (
-                    <span className="template-filter-indicator" />
-                  )}
-                </button>
-                <TemplateFilterPopover
-                  isOpen={isFilterOpen}
-                  onClose={() => setIsFilterOpen(false)}
-                  filters={filters}
-                  onChange={setFilters}
-                  onReset={() => setFilters({ businessType: "", status: "", region: "" })}
-                />
-              </div>
+              {tab === "boqs" ? (
+                <div style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    className={`template-filter-btn ${isBoqFilterOpen || appliedBoqFiltersCount > 0 ? "active" : ""}`}
+                    onClick={() => setIsBoqFilterOpen(!isBoqFilterOpen)}
+                    title="Filter BOQ templates"
+                    aria-label="Filter BOQ templates"
+                  >
+                    <SlidersHorizontal size={15} />
+                    <span>Filter</span>
+                    {appliedBoqFiltersCount > 0 && (
+                      <span className="template-filter-indicator" />
+                    )}
+                  </button>
+                </div>
+              ) : (
+                <div style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    className={`template-filter-btn ${isFilterOpen || filters.businessType || filters.status || filters.region ? "active" : ""}`}
+                    onClick={() => setIsFilterOpen(!isFilterOpen)}
+                    title="Filter templates"
+                    aria-label="Filter templates"
+                  >
+                    <SlidersHorizontal size={15} />
+                    <span>Filter</span>
+                    {(filters.businessType || filters.status || filters.region) && (
+                      <span className="template-filter-indicator" />
+                    )}
+                  </button>
+                  <TemplateFilterPopover
+                    isOpen={isFilterOpen}
+                    onClose={() => setIsFilterOpen(false)}
+                    filters={filters}
+                    onChange={setFilters}
+                    onReset={() => setFilters({ businessType: "", status: "", region: "" })}
+                  />
+                </div>
+              )}
 
               {/* List / Grid Toggle */}
               <div className="template-view-toggle" role="group" aria-label="View mode">
@@ -1291,66 +1391,56 @@ export default function TemplatesPage() {
             </div>
           ) : tab === "boqs" ? (
             /* Tab 3: BOQ Templates */
-            <div>
-              {loading ? (
-                <div className="template-cards-grid">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="template-card-skeleton skeleton-shimmer" />
-                  ))}
-                </div>
-              ) : boqTemplates.length === 0 ? (
-                <div className="templates-empty" style={{ padding: "48px 20px", textAlign: "center" }}>
-                  <LayoutGrid size={48} color="#cbd5e1" style={{ marginBottom: 12 }} />
-                  <h3 style={{ fontSize: 16, margin: "0 0 6px 0", color: "#0f172a" }}>No BOQ templates found</h3>
-                  <p style={{ fontSize: 13, color: "#64748b", margin: "0 0 16px 0" }}>Create or import a BOQ template to get started.</p>
-                  <button className="template-btn-primary" onClick={() => setIsNewModalOpen(true)}>
-                    <Plus size={16} /> New BOQ Template
-                  </button>
-                </div>
-              ) : (
-                <div className="template-cards-grid">
-                  {boqTemplates.map((t) => (
-                    <div
-                      key={t.id}
-                      className="target-template-card"
-                      onClick={() => router.push(`/templates/boq/${t.id}`)}
-                    >
-                      <div className="target-card-img-wrap">
-                        <TemplateCoverImage
-                          src={getTemplateCover(t)}
-                          alt={t.name}
-                          fallbackSrc={fallbackImages.Kitchen}
-                        />
-                      </div>
-                      <div className="target-card-body">
-                        <div className="target-card-top-row">
-                          <h4 className="target-card-title" title={t.name}>{t.name}</h4>
-                          <span className="target-badge-pill badge-boq">BOQ TEMPLATE</span>
-                        </div>
-                        <p className="target-card-meta">
-                          {t.sections || 12} Sections · {t.items || 86} Items
-                        </p>
-                      </div>
-                      <div className="target-card-footer">
-                        <span className="target-card-used">
-                          Used {t.useCount || 0} Times
-                        </span>
-                        <button
-                          type="button"
-                          className="target-card-menu-btn"
-                          aria-label="View BOQ Template"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(`/templates/boq/${t.id}`);
-                          }}
-                        >
-                          <Eye size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+            <div style={{ display: "flex", gap: 20, alignItems: "flex-start", position: "relative" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {view === "grid" ? (
+                  <BoqTemplateGrid
+                    items={boqItems}
+                    loading={boqLoading}
+                    total={boqTotal}
+                    page={boqPage}
+                    pageSize={boqPageSize}
+                    onPageChange={setBoqPage}
+                    onPageSizeChange={setBoqPageSize}
+                    onUseTemplate={(t) => setActiveUseBoqModal(t)}
+                    onEditTemplate={(t) => setActiveEditBoqModal(t)}
+                    onDuplicateTemplate={handleBoqDuplicate}
+                    onArchiveTemplate={handleBoqArchive}
+                    onCreateTemplate={() => setIsNewBoqModalOpen(true)}
+                  />
+                ) : (
+                  <BoqTemplateTable
+                    items={boqItems}
+                    loading={boqLoading}
+                    total={boqTotal}
+                    page={boqPage}
+                    pageSize={boqPageSize}
+                    onPageChange={setBoqPage}
+                    onPageSizeChange={setBoqPageSize}
+                    onUseTemplate={(t) => setActiveUseBoqModal(t)}
+                    onEditTemplate={(t) => setActiveEditBoqModal(t)}
+                    onDuplicateTemplate={handleBoqDuplicate}
+                    onArchiveTemplate={handleBoqArchive}
+                    onCreateTemplate={() => setIsNewBoqModalOpen(true)}
+                  />
+                )}
+              </div>
+
+              <BoqTemplateFilterDrawer
+                isOpen={isBoqFilterOpen}
+                onClose={() => setIsBoqFilterOpen(false)}
+                filters={boqFilters}
+                onFilterChange={setBoqFilters}
+                onApply={() => {
+                  setBoqPage(1);
+                  loadBoqTemplates();
+                }}
+                onClear={() => {
+                  setBoqFilters(emptyBoqFilters);
+                  setBoqPage(1);
+                }}
+                appliedCount={appliedBoqFiltersCount}
+              />
             </div>
           ) : tab === "documents" ? (
             /* Tab 4: Document Templates */
@@ -1481,11 +1571,15 @@ export default function TemplatesPage() {
       <NewTemplateModal
         isOpen={isNewModalOpen}
         onClose={() => setIsNewModalOpen(false)}
-        onSuccess={(created) => {
+        onSuccess={(created: any) => {
           setIsNewModalOpen(false);
           setNotice(`Template "${created.name}" created successfully.`);
           if (created.id) {
-            router.push(`/templates/${created.id}`);
+            if (created.category || created.costMapping !== undefined || created.templateCode?.startsWith("BOQ") || created.sections !== undefined) {
+              router.push(`/templates/boq/${created.id}`);
+            } else {
+              router.push(`/templates/${created.id}`);
+            }
           } else {
             loadOverview();
           }
@@ -1516,6 +1610,48 @@ export default function TemplatesPage() {
             router.push("/projects");
           }}
           setNotice={setNotice}
+        />
+      )}
+
+      {/* BOQ Template Modals */}
+      <NewBoqTemplateModal
+        isOpen={isNewBoqModalOpen}
+        onClose={() => setIsNewBoqModalOpen(false)}
+        onSuccess={(created) => {
+          setIsNewBoqModalOpen(false);
+          setNotice(`BOQ Template "${created.name}" created successfully.`);
+          if (created.id) {
+            router.push(`/templates/boq/${created.id}`);
+          } else {
+            loadBoqTemplates();
+          }
+        }}
+      />
+
+      {activeEditBoqModal && (
+        <EditBoqTemplateModal
+          isOpen={!!activeEditBoqModal}
+          template={activeEditBoqModal}
+          onClose={() => setActiveEditBoqModal(null)}
+          onSuccess={() => {
+            setActiveEditBoqModal(null);
+            setNotice("BOQ template updated successfully.");
+            loadBoqTemplates();
+          }}
+        />
+      )}
+
+      {activeUseBoqModal && (
+        <UseBoqTemplateModal
+          isOpen={!!activeUseBoqModal}
+          template={activeUseBoqModal}
+          onClose={() => setActiveUseBoqModal(null)}
+          onSuccess={() => {
+            const name = activeUseBoqModal?.name;
+            setActiveUseBoqModal(null);
+            setNotice(`Successfully created new project from BOQ template "${name}".`);
+            router.push("/projects");
+          }}
         />
       )}
 
@@ -1653,5 +1789,19 @@ function UseTemplateDialog({
         </form>
       </div>
     </div>
+  );
+}
+
+export default function TemplatesPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="fig-dashboard boq-dashboard" style={{ padding: 40, color: "#64748b" }}>
+          Loading templates...
+        </div>
+      }
+    >
+      <TemplatesContent />
+    </Suspense>
   );
 }

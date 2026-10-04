@@ -92,8 +92,10 @@ export interface WorkflowRule {
   lastTriggered?: string;
   createdBy?: string;
   createdDate?: string;
+  createdAt?: string;
   lastUpdated?: string;
   lastUpdatedBy?: string;
+  updatedAt?: string;
 }
 
 export interface SimulationResult {

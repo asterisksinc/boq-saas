@@ -102,16 +102,91 @@ export async function deleteBoqItem(boqId: string, itemId: string): Promise<{ de
 }
 
 // Templates
-export async function listBoqTemplates(params?: { page?: number; pageSize?: number }): Promise<PaginatedResponse<BoqTemplate>> {
+export async function listBoqTemplates(params?: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    status?: string;
+    projectType?: string;
+    category?: string;
+    mapping?: string;
+    usedIn?: string;
+}): Promise<PaginatedResponse<any>> {
     const sp = new URLSearchParams();
     if (params?.page) sp.set("page", String(params.page));
     if (params?.pageSize) sp.set("pageSize", String(params.pageSize));
+    if (params?.search) sp.set("search", params.search);
+    if (params?.status) sp.set("status", params.status);
+    if (params?.projectType) sp.set("projectType", params.projectType);
+    if (params?.category) sp.set("category", params.category);
+    if (params?.mapping) sp.set("mapping", params.mapping);
+    if (params?.usedIn) sp.set("usedIn", params.usedIn);
     const q = sp.toString();
-    return fetchApi<PaginatedResponse<BoqTemplate>>(`/api/v1/boq-templates${q ? `?${q}` : ""}`);
+    return fetchApi<PaginatedResponse<any>>(`/api/v1/boq-templates${q ? `?${q}` : ""}`);
 }
 
-export async function createBoqTemplate(input: { boqId: string; name: string; description?: string; tags?: string[] }): Promise<BoqTemplate> {
+export async function getBoqTemplate(id: string): Promise<any> {
+    return fetchApi(`/api/v1/boq-templates/${id}`);
+}
+
+export async function createBoqTemplate(input: {
+    boqId?: string;
+    name: string;
+    description?: string;
+    tags?: string[];
+    category?: string;
+    projectType?: string;
+    businessType?: string;
+    imageUrl?: string;
+    rooms?: any[];
+    metadata?: Record<string, any>;
+}): Promise<BoqTemplate> {
     return fetchApi<BoqTemplate>("/api/v1/boq-templates", { method: "POST", body: JSON.stringify(input) });
+}
+
+export async function uploadBoqTemplateImage(file: File) {
+    const form = new FormData();
+    form.append("file", file);
+    return fetchApi<{ url: string; storagePath?: string }>("/api/v1/boq-templates/upload-image", {
+        method: "POST",
+        body: form,
+    });
+}
+
+export async function updateBoqTemplate(id: string, input: Record<string, any>): Promise<any> {
+    return fetchApi(`/api/v1/boq-templates/${id}`, { method: "PATCH", body: JSON.stringify(input) });
+}
+
+export async function deleteBoqTemplate(id: string, permanent = false): Promise<any> {
+    return fetchApi(`/api/v1/boq-templates/${id}${permanent ? "?permanent=true" : ""}`, { method: "DELETE" });
+}
+
+export async function duplicateBoqTemplate(id: string): Promise<any> {
+    return fetchApi(`/api/v1/boq-templates/${id}/duplicate`, { method: "POST" });
+}
+
+export async function useBoqTemplate(id: string, payload?: Record<string, any>): Promise<any> {
+    return fetchApi(`/api/v1/boq-templates/${id}/use`, { method: "POST", body: JSON.stringify(payload || {}) });
+}
+
+export async function addBoqTemplateSection(id: string, section: { name: string; category?: string }): Promise<any> {
+    return fetchApi(`/api/v1/boq-templates/${id}/sections`, { method: "POST", body: JSON.stringify(section) });
+}
+
+export async function addBoqTemplateItem(id: string, item: {
+    sectionName: string;
+    categoryName?: string;
+    code?: string;
+    name: string;
+    description?: string;
+    unit: string;
+    quantity: number;
+    rateBasis?: string;
+    rate: number;
+    wastePercent?: number;
+    taxPercent?: number;
+}): Promise<any> {
+    return fetchApi(`/api/v1/boq-templates/${id}/items`, { method: "POST", body: JSON.stringify(item) });
 }
 
 // Import
