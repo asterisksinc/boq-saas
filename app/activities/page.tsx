@@ -322,6 +322,19 @@ export default function ActivitiesPage() {
     const [headerSearch, setHeaderSearch] = useState("");
     const [notice, setNotice] = useState<string | null>(null);
 
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            const sp = new URLSearchParams(window.location.search);
+            const tab = sp.get("tab");
+            if (tab === "tasks") setActiveTab("tasks");
+            if (tab === "approvals") setActiveTab("approvals");
+            if (sp.get("create") === "true" || sp.get("new") === "true") {
+                if (tab === "tasks") setCreateTask(true);
+                else if (tab === "approvals") setCreateApproval(true);
+            }
+        }
+    }, []);
+
     const [filterOpen, setFilterOpen] = useState(false);
     const [filterOnlyOverdue, setFilterOnlyOverdue] = useState(false);
     const [filterOnlyPendingApproval, setFilterOnlyPendingApproval] = useState(false);

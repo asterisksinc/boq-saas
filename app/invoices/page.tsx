@@ -143,6 +143,15 @@ export default function InvoicesPage() {
     const [showCreate, setShowCreate] = useState(false);
     const [orgName, setOrgName] = useState<string>("");
 
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            const sp = new URLSearchParams(window.location.search);
+            if (sp.get("create") === "true" || sp.get("new") === "true") {
+                setShowCreate(true);
+            }
+        }
+    }, []);
+
     const load = useCallback(async (nextPage = 1, query = search, size = pageSize) => {
         setLoading(true);
         setError("");

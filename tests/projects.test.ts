@@ -31,6 +31,10 @@ describe("Project request contracts", () => {
 
   it("supports non-empty partial edits, lifecycle changes, and room dimensions", () => {
     expect(projectPatchSchema.parse({ approvedBudget: 4_500_000 })).toEqual({ approvedBudget: 4_500_000 });
+    expect(projectPatchSchema.parse({ imageUrl: "/api/v1/documents/test-doc-id/download" }))
+      .toEqual({ imageUrl: "/api/v1/documents/test-doc-id/download" });
+    expect(projectPatchSchema.parse({ coverImage: "https://example.com/cover.png" }))
+      .toEqual({ coverImage: "https://example.com/cover.png" });
     expect(() => projectPatchSchema.parse({})).toThrow();
     expect(projectStatusSchema.parse({ status: "in_progress" }).status).toBe("in_progress");
     expect(projectRoomCreateSchema.parse({ name: "Master Bedroom", roomType: "Bedroom", length: 12, width: 14 }).unit).toBe("ft");

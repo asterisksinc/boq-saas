@@ -71,6 +71,15 @@ export default function BoqsPage() {
     const [pendingApprovals, setPendingApprovals] = useState(0);
 
     useEffect(() => {
+        if (typeof window !== "undefined") {
+            const sp = new URLSearchParams(window.location.search);
+            if (sp.get("create") === "true" || sp.get("new") === "true") {
+                setShowCreateModal(true);
+            }
+        }
+    }, []);
+
+    useEffect(() => {
         const loadProj = async () => {
             try {
                 const res = await fetch("/api/v1/projects?pageSize=100", { credentials: "include" });

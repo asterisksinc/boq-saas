@@ -6,7 +6,7 @@ import {
     Search,
     SlidersHorizontal,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import LibraryTab from "./components/LibraryTab";
 import CategoriesTab from "./components/CategoriesTab";
 import AnalysisTab from "./components/AnalysisTab";
@@ -24,6 +24,16 @@ export default function CostsPage() {
     const [isNewCategoryOpen, setIsNewCategoryOpen] = useState(false);
     const [categorySearch, setCategorySearch] = useState("");
     const [isCategoryDetailActive, setIsCategoryDetailActive] = useState(false);
+
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            const sp = new URLSearchParams(window.location.search);
+            if (sp.get("create") === "true" || sp.get("new") === "true") {
+                setActiveTab("Library");
+                setIsAddOpen(true);
+            }
+        }
+    }, []);
 
     const tabs: MainTab[] = ["Library", "Categories", "Analysis", "Scenarios", "Margins", "Settings"];
 

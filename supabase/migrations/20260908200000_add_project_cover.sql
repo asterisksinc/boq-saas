@@ -1,1 +1,1 @@
-﻿ALTER TABLE projects ADD COLUMN cover_image text;
+﻿alter table if exists public.projects add column if not exists cover_image text;

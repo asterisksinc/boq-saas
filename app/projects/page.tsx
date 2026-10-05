@@ -18,6 +18,15 @@ export default function ProjectsPage() {
   const file = useRef<HTMLInputElement>(null);
   const load = async () => { setLoading(true); try { const p = new URLSearchParams({ pageSize: "100" }); if (query) p.set("search", query); if (filter !== "all") p.set("status", filter); const r = await fetch(`/api/v1/projects?${p}`, { credentials: "include" }); const b = await r.json(); if (!r.ok) throw new Error(message(b, "Projects could not be loaded.")); setProjects(b.data?.items || []); } catch (e) { setNotice(e instanceof Error ? e.message : "Projects could not be loaded."); } finally { setLoading(false); } };
   useEffect(() => { const id = setTimeout(load, query ? 250 : 0); return () => clearTimeout(id); }, [query, filter]);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.get("create") === "true" || sp.get("new") === "true") {
+        setCreateScreen("choice");
+        setCreate(true);
+      }
+    }
+  }, []);
   useEffect(() => { const close = () => { setMenu(null); setFilterOpen(false); }; document.addEventListener("click", close); return () => document.removeEventListener("click", close); }, []);
   useEffect(() => {
     fetch("/api/v1/users/me/preferences", { credentials: "include" })
@@ -171,7 +180,11 @@ function Create({ screen, setScreen, onClose, onCreated }: { screen: string; set
             const ur = await fetch("/api/v1/documents/upload", { method: "POST", credentials: "include", body: d });
             const ub = await ur.json();
             if (ur.ok && ub.data?.id) {
-              await fetch(`/api/v1/projects/${newProject.id}`, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imageUrl: `/api/v1/documents/${ub.data.id}/download` }) });
+              const pr = await fetch(`/api/v1/projects/${newProject.id}`, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imageUrl: `/api/v1/documents/${ub.data.id}/download` }) });
+              if (pr.ok) {
+                const pb = await pr.json();
+                if (pb.data) setProject(pb.data);
+              }
             }
           }
         } catch (e) {
@@ -186,6 +199,119 @@ function Create({ screen, setScreen, onClose, onCreated }: { screen: string; set
     }
   };
   const saveRooms = async () => { if (!project) return; setSaving(true); setError(""); try { for (const room of rooms.filter(r => r.name.trim())) { const r = await fetch(`/api/v1/projects/${project.id}/rooms`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: room.name.trim(), roomType: room.roomType.trim() || room.name.trim() }) }); if (!r.ok) throw new Error(message(await r.json(), "A room could not be saved.")); } setScreen("roomConfig"); } catch (x) { setError(x instanceof Error ? x.message : "Rooms could not be saved."); } finally { setSaving(false); } };
+  const saveAsDraft = async () => {
+    if (project) {
+      setSaving(true);
+      setError("");
+      try {
+        if (screen === "rooms") {
+          for (const room of rooms.filter(r => r.name.trim())) {
+            try {
+              await fetch(`/api/v1/projects/${project.id}/rooms`, {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: room.name.trim(), roomType: room.roomType.trim() || room.name.trim() })
+              });
+            } catch {
+              // Ignore room error on draft save
+            }
+          }
+        }
+        onCreated("Project saved as draft.");
+      } catch (x) {
+        setError(x instanceof Error ? x.message : "Failed to save draft.");
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    const name = form.name.trim();
+    if (!name) {
+      setError("Please enter a Project Name to save as draft.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+
+    const clientName = form.clientName.trim() || "Draft Client";
+    const projectType = form.projectType || "Residential";
+    const status = "planning";
+
+    const body = {
+      ...form,
+      name,
+      clientName,
+      projectType,
+      status,
+      clientContact: form.clientContact || null,
+      description: form.description || null,
+      location: form.location || undefined,
+      areaSqft: form.areaSqft ? Number(form.areaSqft) : null,
+      projectValue: form.projectValue ? Number(form.projectValue) : null,
+      startDate: form.startDate || null,
+      targetCompletionDate: form.targetCompletionDate || null,
+    };
+
+    try {
+      const r = await fetch("/api/v1/projects", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const b = await r.json();
+      if (!r.ok) throw new Error(message(b, "Project could not be created."));
+      const newProject = b.data;
+
+      if (coverFile && newProject?.id) {
+        try {
+          const fr = await fetch("/api/v1/document-folders", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: "Project Assets", parentId: null }),
+          });
+          const fb = await fr.json();
+          if (fr.ok && fb.data?.id) {
+            const d = new FormData();
+            d.append("file", coverFile);
+            d.append("folderId", fb.data.id);
+            d.append("projectId", newProject.id);
+            d.append("projectName", newProject.name);
+            const ur = await fetch("/api/v1/documents/upload", {
+              method: "POST",
+              credentials: "include",
+              body: d,
+            });
+            const ub = await ur.json();
+            if (ur.ok && ub.data?.id) {
+              const pr = await fetch(`/api/v1/projects/${newProject.id}`, {
+                method: "PATCH",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ imageUrl: `/api/v1/documents/${ub.data.id}/download` }),
+              });
+              if (pr.ok) {
+                const pb = await pr.json();
+                if (pb.data) setProject(pb.data);
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Cover upload failed", e);
+        }
+      }
+
+      onCreated("Project saved as draft.");
+    } catch (x) {
+      setError(x instanceof Error ? x.message : "Project could not be saved as draft.");
+    } finally {
+      setSaving(false);
+    }
+  };
   if (screen === "choice") return <Modal title="Create New Project" subtitle="Choose how you want to start this project." onClose={onClose}><div className="start-options">{[["scratch", "From Scratch", "Set up project details manually", <svg key="1" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5.87531 11.7679L4.10754 13.5357L6.46456 15.8927L15.8926 6.46461L13.5356 4.10758L11.7679 5.87535L12.9464 7.05386L11.7679 8.23237L10.5894 7.05386L9.41087 8.23237L10.5894 9.41088L9.41087 10.5894L8.23233 9.41088L7.05382 10.5894L8.23233 11.7679L7.05382 12.9464L5.87531 11.7679ZM14.1249 2.33981L17.6605 5.87535C17.9859 6.20079 17.9859 6.72842 17.6605 7.05386L7.05382 17.6605C6.72838 17.9859 6.20075 17.9859 5.87531 17.6605L2.33977 14.125C2.01434 13.7995 2.01434 13.2719 2.33977 12.9464L12.9464 2.33981C13.2718 2.01438 13.7995 2.01438 14.1249 2.33981ZM11.7679 15.303L12.9464 14.1245L14.8151 15.9933H15.9936V14.8148L14.1249 12.946L15.3034 11.7675L17.4998 13.9639V17.5H13.9649L11.7679 15.303ZM4.69668 8.23185L2.33966 5.87482C2.01422 5.54939 2.01422 5.02175 2.33966 4.69631L4.69668 2.33929C5.02211 2.01386 5.54976 2.01386 5.87519 2.33929L8.23221 4.69631L7.05371 5.87482L5.28594 4.10706L4.10742 5.28557L5.87519 7.05334L4.69668 8.23185Z" fill="#0F172A"/></svg>], ["template", "Use Template", "Start from a project template", <svg key="2" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3.33333 17.5C2.8731 17.5 2.5 17.1269 2.5 16.6667V3.33333C2.5 2.8731 2.8731 2.5 3.33333 2.5H16.6667C17.1269 2.5 17.5 2.8731 17.5 3.33333V16.6667C17.5 17.1269 17.1269 17.5 16.6667 17.5H3.33333ZM6.66667 8.33333H4.16667V15.8333H6.66667V8.33333ZM15.8333 8.33333H8.33333V15.8333H15.8333V8.33333ZM15.8333 4.16667H4.16667V6.66667H15.8333V4.16667Z" fill="#0F172A"/></svg>], ["import", "Import Excel/CSV", "Import existing project data", <svg key="3" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18.3333 3.33333C18.3333 2.8731 17.9602 2.5 17.5 2.5H2.49996C2.03973 2.5 1.66663 2.8731 1.66663 3.33333V16.6667C1.66663 17.1269 2.03973 17.5 2.49996 17.5H17.5C17.9602 17.5 18.3333 17.1269 18.3333 16.6667V3.33333ZM3.33329 12.5H6.17999C6.82296 13.9716 8.29136 15 9.99996 15C11.7085 15 13.177 13.9716 13.82 12.5H16.6666V15.8333H3.33329V12.5ZM3.33329 4.16667H16.6666V10.8333H12.5C12.5 12.2141 11.3807 13.3333 9.99996 13.3333C8.61921 13.3333 7.49996 12.2141 7.49996 10.8333H3.33329V4.16667ZM13.3333 9.16667H10.8333V11.6667H9.16663V9.16667H6.66663L9.99996 5.41667L13.3333 9.16667Z" fill="#0F172A"/></svg>], ["duplicate", "Duplicate Project", "Copy an existing project", <svg key="4" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5.83317 5.00033V2.50033C5.83317 2.04009 6.20627 1.66699 6.6665 1.66699H16.6665C17.1267 1.66699 17.4998 2.04009 17.4998 2.50033V14.167C17.4998 14.6272 17.1267 15.0003 16.6665 15.0003H14.1665V17.4996C14.1665 17.9602 13.7916 18.3337 13.3275 18.3337H3.33888C2.87549 18.3337 2.5 17.9632 2.5 17.4996L2.50217 5.83438C2.50225 5.37375 2.8772 5.00033 3.34118 5.00033H5.83317ZM4.16868 6.66699L4.16682 16.667H12.4998V6.66699H4.16868ZM7.49983 5.00033H14.1665V13.3337H15.8332V3.33366H7.49983V5.00033ZM5.83333 9.16699H10.8333V10.8337H5.83333V9.16699ZM5.83333 12.5003H10.8333V14.167H5.83333V12.5003Z" fill="#0F172A"/></svg>]].map(([id, title, text, icon]) => { return <button key={id as string} className={method === id ? "selected" : ""} onClick={() => setMethod(id as string)}>{icon as React.ReactNode}<b>{title as string}</b><span>{text as string}</span>{method === id && <Check />}</button>; })}</div><footer style={{ justifyContent: 'space-between', marginTop: '16px' }}><button onClick={onClose}>Cancel</button><button className="primary" onClick={() => method === "scratch" ? setScreen("details") : setError("Choose From Scratch, or use the matching action on the Projects page.")}>Continue</button></footer>{error && <p className="form-error">{error}</p>}</Modal>;
   if (screen === "details") return (
     <div className="create-page-wrapper">
@@ -199,7 +325,7 @@ function Create({ screen, setScreen, onClose, onCreated }: { screen: string; set
         </div>
         <div className="create-page-header-right">
           <button type="button" onClick={onClose}>Cancel</button>
-          <button type="button" onClick={onClose}>Save as Draft</button>
+          <button type="button" onClick={saveAsDraft} disabled={saving}>{saving ? "Saving…" : "Save as Draft"}</button>
           <button type="submit" form="create-details-form" className="primary" disabled={saving}>{saving ? "Creating…" : "Continue to Next"}</button>
         </div>
       </div>
@@ -249,7 +375,7 @@ function Create({ screen, setScreen, onClose, onCreated }: { screen: string; set
         </div>
         <div className="create-page-header-right">
           <button type="button" onClick={onClose}>Cancel</button>
-          <button type="button" onClick={onClose}>Save as Draft</button>
+          <button type="button" onClick={saveAsDraft} disabled={saving}>{saving ? "Saving…" : "Save as Draft"}</button>
           <button type="button" onClick={saveRooms} className="primary" disabled={saving}>{saving ? "Saving…" : "Continue to Next"}</button>
         </div>
       </div>
@@ -384,7 +510,7 @@ function Create({ screen, setScreen, onClose, onCreated }: { screen: string; set
         </div>
         <div className="create-page-header-right">
           <button type="button" onClick={onClose}>Cancel</button>
-          <button type="button" onClick={onClose}>Save as Draft</button>
+          <button type="button" onClick={saveAsDraft} disabled={saving}>{saving ? "Saving…" : "Save as Draft"}</button>
           <button type="button" onClick={() => setScreen("requirements")} className="primary">Continue to Next</button>
         </div>
       </div>
@@ -525,6 +651,7 @@ function Create({ screen, setScreen, onClose, onCreated }: { screen: string; set
           </div>
         </div>
       </div>
+      {error && <p className="form-error">{error}</p>}
     </div>
   );
 
@@ -540,8 +667,8 @@ function Create({ screen, setScreen, onClose, onCreated }: { screen: string; set
         </div>
         <div className="create-page-header-right">
           <button type="button" onClick={onClose}>Cancel</button>
-          <button type="button" onClick={onClose}>Save as Draft</button>
-          <button type="button" onClick={() => setScreen("success")} className="primary">Continue to Next</button>
+          <button type="button" onClick={saveAsDraft} disabled={saving}>{saving ? "Saving…" : "Save as Draft"}</button>
+          <button type="button" onClick={() => setScreen("materials")} className="primary">Continue to Next</button>
         </div>
       </div>
 
@@ -745,6 +872,7 @@ function Create({ screen, setScreen, onClose, onCreated }: { screen: string; set
           )}
         </div>
       </div>
+      {error && <p className="form-error">{error}</p>}
     </div>
   );
 
@@ -760,7 +888,7 @@ function Create({ screen, setScreen, onClose, onCreated }: { screen: string; set
         </div>
         <div className="create-page-header-right">
           <button type="button" onClick={onClose}>Cancel</button>
-          <button type="button" onClick={onClose}>Save as Draft</button>
+          <button type="button" onClick={saveAsDraft} disabled={saving}>{saving ? "Saving…" : "Save as Draft"}</button>
           <button type="button" onClick={() => setScreen("success")} className="primary">Continue to BOQ</button>
         </div>
       </div>
@@ -987,7 +1115,7 @@ function Create({ screen, setScreen, onClose, onCreated }: { screen: string; set
           </div>
         </div>
       )}
-
+      {error && <p className="form-error">{error}</p>}
     </div>
   );
 

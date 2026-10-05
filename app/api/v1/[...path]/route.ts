@@ -987,6 +987,8 @@ async function dashboardOverview(request: NextRequest, supabase: SupabaseClient,
   }, 200, id);
 }
 
+// Keep project APIs compatible with existing databases where the optional
+// cover-image migration has not yet been applied.
 const projectSelect = "id,project_code,name,client_name,client_contact,client_email,project_type,status,location,description,area_sqft,project_value,approved_budget,start_date,target_completion_date,assigned_designer_id,tags,progress,created_by,created_at,updated_at";
 
 function projectDto(row: Record<string, unknown>) {
@@ -999,6 +1001,8 @@ function projectDto(row: Record<string, unknown>) {
     approvedBudget: row.approved_budget == null ? null : Number(row.approved_budget),
     startDate: row.start_date, targetCompletionDate: row.target_completion_date,
     assignedDesignerId: row.assigned_designer_id, tags: row.tags ?? [], progress: Number(row.progress ?? 0),
+    imageUrl: null,
+    coverImage: null,
     createdBy: row.created_by, createdAt: row.created_at, updatedAt: row.updated_at,
   };
 }
@@ -1064,9 +1068,14 @@ async function getProject(supabase: SupabaseClient, id: string, projectId: strin
 async function updateProject(request: Request, supabase: SupabaseClient, id: string, projectId: string) {
   const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
   const input = await parsed(request, projectPatchSchema, id); if (input.response) return input.response;
-  const { data, error } = await supabase.from("projects").update(projectValues(input.data))
+  const values = projectValues(input.data);
+  if (Object.keys(values).length === 0) return fail("VALIDATION_ERROR", "At least one valid field must be provided.", 400, id);
+  const { data, error } = await supabase.from("projects").update(values)
     .eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).is("archived_at", null).select(projectSelect).maybeSingle();
-  if (error) return fail("VALIDATION_ERROR", "Project could not be updated.", 400, id);
+  if (error) {
+    console.error(JSON.stringify({ requestId: id, event: "project_update_failed", code: error.code, message: error.message }));
+    return fail("VALIDATION_ERROR", "Project could not be updated.", 400, id);
+  }
   if (!data) return fail("NOT_FOUND", "Project was not found.", 404, id);
   await audit(supabase, "project.updated", id);
   return ok(projectDto(data as Record<string, unknown>), 200, id);
@@ -1444,11 +1453,25 @@ async function dashboardList(request: NextRequest, supabase: SupabaseClient, id:
 
   if (name === "notifications") {
     const countQuery = supabase.from("notifications").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId);
+    const unreadQuery = supabase.from("notifications").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("read_at", null);
     const itemsQuery = supabase.from("notifications").select("id,type,title,priority,target_type,target_id,read_at,created_at").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).range(from, to);
-    const [count, items] = await Promise.all([countQuery, itemsQuery]);
+    const [count, unread, items] = await Promise.all([countQuery, unreadQuery, itemsQuery]);
     if (count.error || items.error) return fail("INTERNAL_ERROR", "Notifications could not be loaded.", 500, id);
     const total = count.count ?? 0;
-    return ok({ items: items.data ?? [], page, pageSize, total, hasMore: to + 1 < total }, 200, id);
+    const unreadCount = unread.count ?? 0;
+    const mapped = (items.data ?? []).map((r: Record<string, unknown>) => ({
+      id: r.id,
+      type: r.type,
+      title: r.title,
+      priority: r.priority,
+      targetType: r.target_type,
+      targetId: r.target_id,
+      readAt: r.read_at,
+      createdAt: r.created_at,
+      read_at: r.read_at,
+      created_at: r.created_at,
+    }));
+    return ok({ items: mapped, unreadCount, page, pageSize, total, hasMore: to + 1 < total }, 200, id);
   }
 
   return fail("NOT_FOUND", `Unknown dashboard list: ${name}`, 404, id);
@@ -1470,6 +1493,96 @@ async function workspaceAccess(supabase: SupabaseClient, id: string, write = fal
     return { response: fail("FORBIDDEN", "Your workspace role cannot perform this action.", 403, id) };
   }
   return { access: { userId: ctx.user.id, email: ctx.user.email ?? null, workspaceId, workspaceName: value?.workspace?.name ?? null, role, currency: value?.workspace?.currency ?? "INR" } satisfies WorkspaceAccess };
+}
+
+async function dashboardSearch(request: NextRequest, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id);
+  if ("response" in scoped) return scoped.response;
+  const q = request.nextUrl.searchParams.get("q")?.trim() || "";
+  if (!q) return ok({ items: [] }, 200, id);
+  const safe = q.replace(/[%_,()]/g, " ").slice(0, 100);
+
+  const [projectsRes, boqsRes, invoicesRes] = await Promise.all([
+    supabase
+      .from("projects")
+      .select("id, name, project_code, client_name, status, updated_at")
+      .eq("workspace_id", scoped.access.workspaceId)
+      .is("archived_at", null)
+      .or(`name.ilike.%${safe}%,project_code.ilike.%${safe}%,client_name.ilike.%${safe}%`)
+      .limit(6),
+    supabase
+      .from("boqs")
+      .select("id, boq_number, version, status, project_id, updated_at")
+      .eq("workspace_id", scoped.access.workspaceId)
+      .is("archived_at", null)
+      .or(`boq_number.ilike.%${safe}%,version.ilike.%${safe}%`)
+      .limit(6),
+    supabase
+      .from("invoices")
+      .select("id, invoice_code, manual_number, client_name, project_name, status, updated_at")
+      .eq("workspace_id", scoped.access.workspaceId)
+      .is("archived_at", null)
+      .or(`invoice_code.ilike.%${safe}%,manual_number.ilike.%${safe}%,client_name.ilike.%${safe}%`)
+      .limit(6),
+  ]);
+
+  const items = [
+    ...(projectsRes.data ?? []).map((p: Record<string, unknown>) => ({
+      id: String(p.id),
+      type: "project" as const,
+      title: String(p.name || p.project_code || "Untitled Project"),
+      subtitle: p.client_name ? `Client: ${String(p.client_name)}` : String(p.project_code || "Project"),
+      status: typeof p.status === "string" ? p.status : undefined,
+      url: `/projects/${p.id}`,
+    })),
+    ...(boqsRes.data ?? []).map((b: Record<string, unknown>) => ({
+      id: String(b.id),
+      type: "boq" as const,
+      title: String(b.boq_number || "BOQ"),
+      subtitle: b.version ? `Version: ${String(b.version)}` : "Bill of Quantities",
+      status: typeof b.status === "string" ? b.status : undefined,
+      url: `/boqs`,
+    })),
+    ...(invoicesRes.data ?? []).map((inv: Record<string, unknown>) => ({
+      id: String(inv.id),
+      type: "invoice" as const,
+      title: String(inv.invoice_code || inv.manual_number || "Invoice"),
+      subtitle: inv.client_name ? `Client: ${String(inv.client_name)}` : String(inv.project_name || "Invoice"),
+      status: typeof inv.status === "string" ? inv.status : undefined,
+      url: `/invoices`,
+    })),
+  ];
+
+  return ok({ items }, 200, id);
+}
+
+async function markNotificationsRead(request: Request, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id);
+  if ("response" in scoped) return scoped.response;
+  const body = (await request.json().catch(() => ({}))) as { id?: string; all?: boolean };
+  const now = new Date().toISOString();
+
+  if (body.all) {
+    const res = await supabase
+      .from("notifications")
+      .update({ read_at: now })
+      .eq("workspace_id", scoped.access.workspaceId)
+      .is("read_at", null);
+    if (res.error) return fail("INTERNAL_ERROR", "Could not mark all notifications as read.", 500, id);
+    return ok({ success: true, readAt: now }, 200, id);
+  }
+
+  if (body.id) {
+    const res = await supabase
+      .from("notifications")
+      .update({ read_at: now })
+      .eq("workspace_id", scoped.access.workspaceId)
+      .eq("id", body.id);
+    if (res.error) return fail("INTERNAL_ERROR", "Could not mark notification as read.", 500, id);
+    return ok({ success: true, readAt: now }, 200, id);
+  }
+
+  return fail("VALIDATION_ERROR", "Notification ID or all flag is required.", 400, id);
 }
 
 function proposalDto(row: Record<string, unknown>) {
@@ -8115,6 +8228,12 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (request.method === "GET" && route === "reports/analytics/pdf") return reportsPdf(request, supabase, id);
   const list = route.match(/^dashboard\/(recent-projects|recent-boqs|pending-actions|upcoming-deliverables|notifications)$/)?.[1];
   if (request.method === "GET" && list) return dashboardList(request, supabase, id, list);
+  if ((request.method === "POST" || request.method === "PATCH") && route === "dashboard/notifications/mark-read") {
+    return markNotificationsRead(request, supabase, id);
+  }
+  if (request.method === "GET" && route === "dashboard/search") {
+    return dashboardSearch(request, supabase, id);
+  }
   if (request.method === "GET" && route === "proposals") return listProposals(request, supabase, id);
   if (request.method === "GET" && route === "proposals/summary") return proposalSummary(supabase, id);
   if (request.method === "POST" && route === "proposals") return createProposal(request, supabase, id);

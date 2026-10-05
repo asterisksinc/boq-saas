@@ -35,6 +35,7 @@ export type DashboardNotification = {
     id: string;
     type: string;
     title: string;
+    description?: string | null;
     priority: string | null;
     createdAt: string;
     readAt: string | null;
@@ -144,6 +145,34 @@ export async function getDashboardNotifications(params?: { page?: number; pageSi
     if (params?.pageSize) query.set("pageSize", String(params.pageSize));
     const suffix = query.toString() ? `?${query.toString()}` : "";
     return request<{ unreadCount: number; items: DashboardNotification[] }>(`/api/v1/dashboard/notifications${suffix}`);
+}
+
+export async function markNotificationRead(id: string) {
+    return request<{ success: boolean; readAt: string }>("/api/v1/dashboard/notifications/mark-read", {
+        method: "POST",
+        body: JSON.stringify({ id }),
+    });
+}
+
+export async function markAllNotificationsRead() {
+    return request<{ success: boolean; readAt: string }>("/api/v1/dashboard/notifications/mark-read", {
+        method: "POST",
+        body: JSON.stringify({ all: true }),
+    });
+}
+
+export type DashboardSearchResultItem = {
+    id: string;
+    type: "project" | "boq" | "invoice";
+    title: string;
+    subtitle?: string | null;
+    status?: string | null;
+    url: string;
+};
+
+export async function searchDashboard(query: string) {
+    const suffix = query ? `?q=${encodeURIComponent(query)}` : "";
+    return request<{ items: DashboardSearchResultItem[] }>(`/api/v1/dashboard/search${suffix}`);
 }
 
 export async function createProject(input: { name: string; clientName: string; projectType: string; status: "active" | "on_hold" | "planning"; location?: string }) {

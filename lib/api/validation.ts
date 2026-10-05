@@ -164,7 +164,8 @@ const projectBaseSchema = z
     targetCompletionDate: z.string().date().nullable().optional(),
     assignedDesignerId: z.string().uuid().nullable().optional(),
     tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
-    imageUrl: z.string().url().max(2048).nullable().optional(),
+    imageUrl: z.string().trim().max(2048).nullable().optional(),
+    coverImage: z.string().trim().max(2048).nullable().optional(),
   })
   .strict();
 
