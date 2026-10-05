@@ -13,7 +13,7 @@ import {
   GripVertical,
   ChevronLeft,
 } from "lucide-react";
-import type { MockItem } from "@/lib/templates/mock-data";
+import type { MockItem } from "@/lib/templates/types";
 
 interface TemplateCostingBoqProps {
   templateId: string;
@@ -28,166 +28,14 @@ interface TreeRoom {
   subSections?: { id: string; name: string; count: number }[];
 }
 
-const defaultRooms: TreeRoom[] = [
-  { id: "rm-entrance", name: "Entrance", count: 8 },
-  { id: "rm-living", name: "Living Room", count: 16 },
-  { id: "rm-dining", name: "Dining", count: 10 },
-  { id: "rm-kitchen", name: "Kitchen", count: 24 },
-  {
-    id: "rm-master",
-    name: "Master Bedroom",
-    count: 18,
-    subSections: [
-      { id: "sec-fur", name: "Furniture", count: 8 },
-      { id: "sec-pnt", name: "Painting", count: 6 },
-      { id: "sec-ele", name: "Electrical", count: 4 },
-    ],
-  },
-  { id: "rm-bed2", name: "Bedroom 02", count: 16 },
-  { id: "rm-bed3", name: "Bedroom 03", count: 16 },
-  { id: "rm-baths", name: "Bathrooms", count: 12 },
-  { id: "rm-kit2", name: "Kitchen", count: 14 },
-  { id: "rm-flr", name: "Flooring", count: 12 },
-  { id: "rm-clg", name: "False Ceiling", count: 24 },
-];
-
-const sampleItems: MockItem[] = [
-  {
-    id: "itm-1",
-    name: "Full Height Wardrobe",
-    description: "19mm BWP ply, laminate finish",
-    unit: "Sq.ft",
-    quantity: 72,
-    baseCost: 2200,
-    sellingRate: 2875,
-    rate: 2875,
-    wastePercent: 5,
-    taxPercent: 18,
-    amount: 227736,
-    rateStatus: "MAPPED",
-    code: "MAT-BRD-001",
-    type: "Material",
-  },
-  {
-    id: "itm-2",
-    name: "King Size Bed",
-    description: "Upholstered headboard",
-    unit: "Nos",
-    quantity: 1,
-    baseCost: 38000,
-    sellingRate: 45800,
-    rate: 45800,
-    wastePercent: 0,
-    taxPercent: 18,
-    amount: 54044,
-    rateStatus: "MAPPED",
-    code: "MAT-BRD-002",
-    type: "Material",
-  },
-  {
-    id: "itm-3",
-    name: "Side Table",
-    description: "600mm W, laminate finish",
-    unit: "Nos",
-    quantity: 2,
-    baseCost: 5000,
-    sellingRate: 6250,
-    rate: 6250,
-    wastePercent: 5,
-    taxPercent: 18,
-    amount: 13125,
-    rateStatus: "MAPPED",
-    code: "MAT-BRD-003",
-    type: "Material",
-  },
-  {
-    id: "itm-4",
-    name: "Dressing Table",
-    description: "With mirror and drawers",
-    unit: "Nos",
-    quantity: 1,
-    baseCost: 20000,
-    sellingRate: 24500,
-    rate: 24500,
-    wastePercent: 5,
-    taxPercent: 18,
-    amount: 28783,
-    rateStatus: "OUTDATED",
-    code: "MAT-BRD-004",
-    type: "Material",
-  },
-  {
-    id: "itm-5",
-    name: "Study Table",
-    description: "Laminate top with storage",
-    unit: "Nos",
-    quantity: 1,
-    baseCost: 15000,
-    sellingRate: 18750,
-    rate: 18750,
-    wastePercent: 5,
-    taxPercent: 18,
-    amount: 22031,
-    rateStatus: "MAPPED",
-    code: "MAT-BRD-005",
-    type: "Material",
-  },
-  {
-    id: "itm-6",
-    name: "TV Unit",
-    description: "Floating unit, laminate finish",
-    unit: "Sq.ft",
-    quantity: 18,
-    baseCost: 2100,
-    sellingRate: 2650,
-    rate: 2650,
-    wastePercent: 5,
-    taxPercent: 18,
-    amount: 53667,
-    rateStatus: "MAPPED",
-    code: "MAT-BRD-006",
-    type: "Material",
-  },
-  {
-    id: "itm-7",
-    name: "Chest of Drawers",
-    description: "4 drawer unit",
-    unit: "Nos",
-    quantity: 1,
-    baseCost: 13000,
-    sellingRate: 16500,
-    rate: 16500,
-    wastePercent: 5,
-    taxPercent: 18,
-    amount: 19404,
-    rateStatus: "MISSING",
-    code: "MAT-BRD-007",
-    type: "Material",
-  },
-  {
-    id: "itm-8",
-    name: "Mirror with Frame",
-    description: "900mm x 1200mm",
-    unit: "Nos",
-    quantity: 1,
-    baseCost: 5500,
-    sellingRate: 7250,
-    rate: 7250,
-    wastePercent: 0,
-    taxPercent: 18,
-    amount: 8555,
-    rateStatus: "MAPPED",
-    code: "MAT-BRD-008",
-    type: "Material",
-  },
-];
+const defaultRooms: TreeRoom[] = [];
 
 export default function TemplateCostingBoq({
   templateId,
   initialItems,
   onUpdate,
 }: TemplateCostingBoqProps) {
-  const items = initialItems || [];
+  const items = initialItems ?? [];
 
   const [selectedSubSec, setSelectedSubSec] = useState("sec-fur");
   const [expandedRoomId, setExpandedRoomId] = useState<string>("rm-master");

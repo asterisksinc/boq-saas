@@ -162,30 +162,6 @@ type TeamMember = {
     role?: string;
 };
 
-const defaultTeamMembers: TeamMember[] = [
-    { id: "tm-1", name: "Rahul Sharma", role: "Project Manager" },
-    { id: "tm-2", name: "Ananya Rao", role: "Lead Designer" },
-    { id: "tm-3", name: "Neha Varma", role: "3D Visualizer" },
-    { id: "tm-4", name: "Priya Singh", role: "Interior Designer" },
-    { id: "tm-5", name: "Vikram Patel", role: "Client Relations" },
-    { id: "tm-6", name: "Rohit Sharma", role: "Site Engineer" },
-    { id: "tm-7", name: "Alex Chen", role: "Architect" },
-    { id: "tm-8", name: "Meera Joshi", role: "Cost Estimator" },
-    { id: "tm-9", name: "Amit Kumar", role: "Site Supervisor" },
-];
-
-const defaultApprovers: { id: string; name: string; role?: string }[] = [
-    { id: "appr-1", name: "Anand Rathi", role: "Client" },
-    { id: "appr-2", name: "Ar. Vikram Patel", role: "Client" },
-    { id: "appr-3", name: "Nikhil Oberoi", role: "Client" },
-    { id: "tm-1", name: "Rahul Sharma", role: "Project Manager" },
-    { id: "tm-2", name: "Ananya Rao", role: "Lead Designer" },
-    { id: "tm-3", name: "Neha Varma", role: "3D Visualizer" },
-    { id: "tm-4", name: "Priya Singh", role: "Interior Designer" },
-    { id: "tm-5", name: "Vikram Patel", role: "Client Relations" },
-    { id: "tm-7", name: "Alex Chen", role: "Architect" },
-];
-
 type ProjectItem = {
     id: string;
     projectCode: string | null;
@@ -200,20 +176,11 @@ type ProjectItem = {
     assignedDesignerId?: string | null;
     tags?: string[];
     designerName?: string;
-    demoOverdueTasks?: number;
-    demoPendingApprovals?: number;
 };
 
 const blankStage: StageForm = { name: "", color: "#2563eb", terminalType: "" };
 const blankTask: TaskForm = { name: "", projectId: "", stageId: "", description: "", ownerId: "", dueDate: "", priority: "medium", status: "not_started" };
 const blankApproval: ApprovalForm = { name: "", projectId: "", stageId: "", description: "", approverId: "", approverName: "", dueDate: "", status: "draft" };
-
-const defaultStages: ActivityStage[] = [
-    { id: "stage-initiation", name: "Initiation", color: "#DBEAFE", sortOrder: 1, terminalType: null, createdAt: "", updatedAt: "" },
-    { id: "stage-design", name: "Design", color: "#DBEAFE", sortOrder: 2, terminalType: null, createdAt: "", updatedAt: "" },
-    { id: "stage-estimation", name: "Estimation", color: "#FEF3C7", sortOrder: 3, terminalType: null, createdAt: "", updatedAt: "" },
-    { id: "stage-approval", name: "Approval", color: "#FEF3C7", sortOrder: 4, terminalType: null, createdAt: "", updatedAt: "" },
-];
 
 const today = () => new Date().toISOString().slice(0, 10);
 const money = (n?: number | null) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n || 0);
@@ -268,7 +235,7 @@ export default function ActivitiesPage() {
     const [taskCommentText, setTaskCommentText] = useState("");
     const [sendingTaskComment, setSendingTaskComment] = useState(false);
 
-    const [teamMembers, setTeamMembers] = useState<TeamMember[]>(defaultTeamMembers);
+    const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
     const [taskAttachments, setTaskAttachments] = useState<Array<{ name: string; size: number; type: string }>>([]);
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -316,7 +283,6 @@ export default function ActivitiesPage() {
 
     const approverOptions = useMemo(() => {
         return [
-            ...defaultApprovers,
             ...teamMembers.map(m => ({ id: m.id, name: m.name, role: m.role || "Team" })),
         ];
     }, [teamMembers]);
@@ -370,11 +336,10 @@ export default function ActivitiesPage() {
             const data = await listActivityStages();
             if (data.items && data.items.length > 0) {
                 setStages(data.items);
-            } else {
-                setStages(defaultStages);
-            }
+            } else setStages([]);
         } catch {
-            setStages(defaultStages);
+            setStages([]);
+            setNotice("Could not load activity stages");
         } finally {
             setLoadingStages(false);
         }
@@ -486,12 +451,13 @@ export default function ActivitiesPage() {
     const loadStagesForForms = useCallback(async () => {
         try {
             const data = await listActivityStages();
-            const items = data.items && data.items.length > 0 ? data.items : defaultStages;
+            const items = data.items || [];
             setTaskStages(items);
             setApprovalStages(items);
         } catch {
-            setTaskStages(defaultStages);
-            setApprovalStages(defaultStages);
+            setTaskStages([]);
+            setApprovalStages([]);
+            setNotice("Could not load activity stages");
         }
     }, []);
 
@@ -667,15 +633,15 @@ export default function ActivitiesPage() {
     };
 
     const getProjectName = (projectId?: string | null): string => {
-        if (!projectId) return "Parkview Residence";
+        if (!projectId) return "—";
         const proj = projects.find(p => p.id === projectId);
-        return proj ? proj.name : "Parkview Residence";
+        return proj?.name || "—";
     };
 
     const getProjectCode = (projectId?: string | null): string => {
-        if (!projectId) return "PRJ-2026-214";
+        if (!projectId) return "—";
         const proj = projects.find(p => p.id === projectId);
-        return proj?.projectCode || "PRJ-2026-214";
+        return proj?.projectCode || "—";
     };
 
     const getStageName = (stageId?: string | null): string => {
@@ -695,7 +661,7 @@ export default function ActivitiesPage() {
             if (found) return found.name;
             return task.ownerId;
         }
-        return "Rahul Sharma";
+        return "—";
     }, [teamMembers]);
 
     const getAssigneeInitials = (name: string): string => {
@@ -866,16 +832,12 @@ export default function ActivitiesPage() {
             if (!belongs) return false;
 
             if (filterOnlyOverdue) {
-                const overdueCount = (p.demoOverdueTasks && stage.name.toLowerCase().includes("design"))
-                    ? p.demoOverdueTasks
-                    : tasks.filter(t => t.projectId === p.id && t.stageId === stage.id && isOverdue(t.dueDate, t.status, "task")).length;
+                const overdueCount = tasks.filter(t => t.projectId === p.id && t.stageId === stage.id && isOverdue(t.dueDate, t.status, "task")).length;
                 if (overdueCount === 0) return false;
             }
 
             if (filterOnlyPendingApproval) {
-                const pendingCount = (p.demoPendingApprovals && stage.name.toLowerCase().includes("design"))
-                    ? p.demoPendingApprovals
-                    : approvals.filter(a => a.projectId === p.id && a.stageId === stage.id && ["draft", "sent", "in_review"].includes(a.status)).length;
+                const pendingCount = approvals.filter(a => a.projectId === p.id && a.stageId === stage.id && ["draft", "sent", "in_review"].includes(a.status)).length;
                 if (pendingCount === 0) return false;
             }
 
@@ -1401,7 +1363,7 @@ export default function ActivitiesPage() {
                 </td>
                 <td>
                     <span className="task-stage-pill" style={stageStyle}>
-                        {(stageName || "DESIGN").toUpperCase()}
+                        {(stageName || "—").toUpperCase()}
                     </span>
                 </td>
                 <td>
@@ -1514,8 +1476,8 @@ export default function ActivitiesPage() {
         const projectName = approval.project?.name || getProjectName(approval.projectId);
         const stageName = approval.stage?.name || getStageName(approval.stageId);
         const stageStyle = getStagePillStyle(stageName);
-        const approverName = approval.approverName || "Anand Mehta";
-        const requesterName = approval.requesterName || "Ananya Rao";
+        const approverName = approval.approverName || "—";
+        const requesterName = approval.requesterName || "—";
         const dueInfo = getApprovalDueSubtext(approval);
 
         return (
@@ -1532,7 +1494,7 @@ export default function ActivitiesPage() {
                 </td>
                 <td>
                     <span className="task-stage-pill" style={stageStyle}>
-                        {(stageName || "DESIGN").toUpperCase()}
+                        {(stageName || "—").toUpperCase()}
                     </span>
                 </td>
                 <td>
@@ -1646,25 +1608,18 @@ export default function ActivitiesPage() {
         const assigneeName = getAssigneeName(taskDetail);
         const initials = getAssigneeInitials(assigneeName);
         const dueInfo = getDueSubtext(taskDetail);
-        const createdOnFormatted = formatDateTime(taskDetail.createdAt || "2026-08-05T10:30:00Z");
-        const updatedOnFormatted = formatDateTime(taskDetail.updatedAt || "2026-08-05T16:15:00Z");
-
-        // Parse or provide attachments matching Image
-        const sampleAttachments = [
-            { name: "Design Concept Presentation.pdf", sizeFormatted: "2.4 MB", dateFormatted: "01 Sep 2026", type: "pdf" },
-            { name: "Floor Plan Layout Schematics.xlsx", sizeFormatted: "2.4 MB", dateFormatted: "01 Sep 2026", type: "sheet" },
-            { name: "3D Perspective Renderings.pdf", sizeFormatted: "2.4 MB", dateFormatted: "01 Sep 2026", type: "sheet" },
-        ];
+        const createdOnFormatted = formatDateTime(taskDetail.createdAt);
+        const updatedOnFormatted = formatDateTime(taskDetail.updatedAt);
 
         const attachmentsToRender = Array.isArray(taskDetail.attachments) && taskDetail.attachments.length > 0
             ? taskDetail.attachments.map((a: any) => ({
-                name: a.name || "Document.pdf",
-                sizeFormatted: a.size ? `${(a.size / (1024 * 1024)).toFixed(1)} MB` : "2.4 MB",
-                dateFormatted: a.updatedAt ? formatTableDate(a.updatedAt) : "01 Sep 2026",
+                name: a.name || "Attachment",
+                sizeFormatted: a.size ? `${(a.size / (1024 * 1024)).toFixed(1)} MB` : "—",
+                dateFormatted: a.updatedAt ? formatTableDate(a.updatedAt) : "—",
                 type: (a.name || "").toLowerCase().endsWith(".pdf") ? "pdf" : "sheet",
                 url: a.url,
             }))
-            : sampleAttachments;
+            : [];
 
         return (
             <div className="view-task-drawer-backdrop" onClick={() => setTaskDetail(null)}>
@@ -1909,42 +1864,22 @@ export default function ActivitiesPage() {
 
         const projectName = approvalDetail.project?.name || getProjectName(approvalDetail.projectId);
         const stageName = approvalDetail.stage?.name || getStageName(approvalDetail.stageId);
-        const approverName = approvalDetail.approverName || "Mehta Residence Group";
-        const requesterName = approvalDetail.requesterName || "Ananya Rao";
-        const requestedDateFormatted = formatTableDate(approvalDetail.requestedAt || approvalDetail.createdAt || "2026-09-01");
+        const approverName = approvalDetail.approverName || "—";
+        const requesterName = approvalDetail.requesterName || "—";
+        const requestedDateFormatted = formatTableDate(approvalDetail.requestedAt || approvalDetail.createdAt);
         const dueInfo = getApprovalDueSubtext(approvalDetail);
-
-        const sampleAttachments = [
-            { name: "Design Concept Presentation.pdf", sizeFormatted: "2.4 MB", dateFormatted: "01 Sep 2026", type: "pdf" },
-            { name: "Design Concept Presentation.pdf", sizeFormatted: "2.4 MB", dateFormatted: "01 Sep 2026", type: "sheet" },
-            { name: "Design Concept Presentation.pdf", sizeFormatted: "2.4 MB", dateFormatted: "01 Sep 2026", type: "sheet" },
-        ];
 
         const attachmentsToRender = Array.isArray(approvalDetail.attachments) && approvalDetail.attachments.length > 0
             ? approvalDetail.attachments.map((a: any, idx: number) => ({
-                name: a.name || "Document.pdf",
-                sizeFormatted: a.size ? `${(a.size / (1024 * 1024)).toFixed(1)} MB` : "2.4 MB",
-                dateFormatted: a.updatedAt ? formatTableDate(a.updatedAt) : "01 Sep 2026",
+                name: a.name || "Attachment",
+                sizeFormatted: a.size ? `${(a.size / (1024 * 1024)).toFixed(1)} MB` : "—",
+                dateFormatted: a.updatedAt ? formatTableDate(a.updatedAt) : "—",
                 type: (a.name || "").toLowerCase().endsWith(".pdf") ? "pdf" : (idx === 0 ? "pdf" : "sheet"),
                 url: a.url,
             }))
-            : sampleAttachments;
+            : [];
 
-        const approverInitials = getInitials(approverName) || "MR";
-
-        const baselineApproverComment = {
-            id: "baseline-approver-comment",
-            authorName: approverName || "Mehta Residence Group",
-            authorInitials: approverInitials,
-            timestamp: "03 Sep 2026 · 10:30 AM",
-            body: "Thank you for the concept. Overall looks good! We love the layout. Can we explore a different material option for kitchen countertop?",
-            attachment: {
-                name: "Kitchen_Reference.jpg",
-                sizeFormatted: "2.4 MB",
-            },
-        };
-
-        const totalCommentsCount = Math.max(2, 1 + approvalComments.length);
+        const totalCommentsCount = approvalComments.length;
 
         return (
             <div className="view-task-drawer-backdrop" onClick={() => setApprovalDetail(null)}>
@@ -2099,50 +2034,7 @@ export default function ActivitiesPage() {
                             </div>
 
                             <div className="view-approval-feedback-list">
-                                {/* Baseline comment from approver matching design */}
-                                <div className="view-approval-feedback-item">
-                                    <div className="view-approval-feedback-item-header">
-                                        <div className="view-approval-feedback-author-group">
-                                            <div className="view-approval-avatar">
-                                                {baselineApproverComment.authorInitials}
-                                            </div>
-                                            <span className="view-approval-author-name">
-                                                {baselineApproverComment.authorName}
-                                            </span>
-                                        </div>
-                                        <span className="view-approval-timestamp">
-                                            {baselineApproverComment.timestamp}
-                                        </span>
-                                    </div>
-                                    <p className="view-approval-feedback-body">
-                                        {baselineApproverComment.body}
-                                    </p>
-                                    <div
-                                        className="view-approval-comment-chip"
-                                        onClick={() => handleDownloadAttachment(baselineApproverComment.attachment)}
-                                        style={{ cursor: "pointer" }}
-                                    >
-                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="#2563eb">
-                                            <path d="M14 2H6C4.89543 2 4 2.89543 4 4V20C4 21.1046 4.89543 22 6 22H18C19.1046 22 20 21.1046 20 20V8L14 2Z" />
-                                            <path d="M14 2V8H20" />
-                                        </svg>
-                                        <span>{baselineApproverComment.attachment.name}</span>
-                                        <span className="size-tag">{baselineApproverComment.attachment.sizeFormatted}</span>
-                                        <button
-                                            type="button"
-                                            className="view-approval-comment-chip-dl"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDownloadAttachment(baselineApproverComment.attachment);
-                                            }}
-                                            aria-label="Download attachment"
-                                        >
-                                            <DownloadSvg />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Dynamic user/approver comments */}
+                                {/* Backend comments */}
                                 {approvalComments.map(c => {
                                     const cAtt = Array.isArray(c.attachments) && c.attachments.length > 0 ? (c.attachments[0] as any) : null;
                                     const isSelf = c.authorId === userInitials;
@@ -2151,7 +2043,7 @@ export default function ActivitiesPage() {
                                             <div className="view-approval-feedback-item-header">
                                                 <div className="view-approval-feedback-author-group">
                                                     <div className="view-approval-avatar">
-                                                        {c.authorId ? c.authorId.slice(0, 2).toUpperCase() : (isSelf ? userInitials : approverInitials)}
+                                                        {c.authorId ? c.authorId.slice(0, 2).toUpperCase() : userInitials}
                                                     </div>
                                                     <span className="view-approval-author-name">
                                                         {isSelf ? "You" : (approverName || "Approver")}
@@ -3070,17 +2962,13 @@ export default function ActivitiesPage() {
                                                         </div>
                                                     ) : (
                                                         stageProjects.map(proj => {
-                                                            const overdueCount = (proj.demoOverdueTasks !== undefined && stage.name.toLowerCase().includes("design"))
-                                                                ? proj.demoOverdueTasks
-                                                                : tasks.filter(t => t.projectId === proj.id && t.stageId === stage.id && isOverdue(t.dueDate, t.status, "task")).length;
+                                                            const overdueCount = tasks.filter(t => t.projectId === proj.id && t.stageId === stage.id && isOverdue(t.dueDate, t.status, "task")).length;
 
-                                                            const pendingCount = (proj.demoPendingApprovals !== undefined && stage.name.toLowerCase().includes("design"))
-                                                                ? proj.demoPendingApprovals
-                                                                : approvals.filter(a => a.projectId === proj.id && a.stageId === stage.id && ["draft", "sent", "in_review"].includes(a.status)).length;
+                                                            const pendingCount = approvals.filter(a => a.projectId === proj.id && a.stageId === stage.id && ["draft", "sent", "in_review"].includes(a.status)).length;
 
                                                             const dueText = formatCardDate(proj.targetCompletionDate);
-                                                            const budgetVal = proj.approvedBudget || proj.projectValue || 4500000;
-                                                            const assigneeName = proj.designerName || "Alex Chen";
+                                                            const budgetVal = proj.approvedBudget ?? proj.projectValue;
+                                                            const assigneeName = proj.designerName || "Unassigned";
                                                             const initials = getInitials(assigneeName);
 
                                                             return (
@@ -3090,7 +2978,7 @@ export default function ActivitiesPage() {
                                                                     onClick={() => router.push(`/projects`)}
                                                                 >
                                                                     <div className="stage-project-card-header">
-                                                                        <span className="stage-project-code">{proj.projectCode || "PRJ-001"}</span>
+                                                                        <span className="stage-project-code">{proj.projectCode || "—"}</span>
                                                                         <span className="stage-project-due">
                                                                             <Calendar size={13} />
                                                                             Due {dueText}
@@ -3099,10 +2987,10 @@ export default function ActivitiesPage() {
 
                                                                     <div className="stage-project-card-main">
                                                                         <h4 className="stage-project-name">{proj.name}</h4>
-                                                                        <span className="stage-project-amount">{money(budgetVal)}</span>
+                                                                        <span className="stage-project-amount">{budgetVal != null ? money(budgetVal) : "—"}</span>
                                                                     </div>
 
-                                                                    <div className="stage-project-client">{proj.clientName || "Client"}</div>
+                                                                    <div className="stage-project-client">{proj.clientName || "—"}</div>
 
                                                                     {(overdueCount > 0 || pendingCount > 0) && (
                                                                         <div className="stage-project-badges">

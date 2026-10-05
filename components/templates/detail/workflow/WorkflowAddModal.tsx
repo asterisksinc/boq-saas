@@ -7,7 +7,7 @@ import {
   MockMilestone,
   MockApprovalFlow,
   MockWorkflowRule,
-} from "@/lib/templates/mock-data";
+} from "@/lib/templates/types";
 
 type AddTargetType = "Task" | "Milestone" | "Approval" | "Rule" | "Stage";
 

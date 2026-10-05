@@ -2823,25 +2823,6 @@ async function boqTemplates(request: NextRequest, supabase: SupabaseClient, id: 
     let result = await query;
     let total = result.count ?? 0;
 
-    // If no templates exist yet in database, seed the standard library for this workspace
-    if (!result.error && (!result.data || result.data.length === 0) && !search) {
-      const inserts = defaultBoqTemplateFixtures.map(fixture => ({
-        workspace_id: scoped.access.workspaceId,
-        name: fixture.name,
-        description: fixture.description,
-        tags: fixture.tags,
-        use_count: fixture.use_count,
-        snapshot: {
-          metadata: fixture.metadata,
-          rooms: fixture.rooms
-        },
-        created_by: scoped.access.userId
-      }));
-      await supabase.from("boq_templates").insert(inserts);
-      result = await supabase.from("boq_templates").select(boqTemplateSelectFull, { count: "exact" }).eq("workspace_id", scoped.access.workspaceId).order("use_count", { ascending: false });
-      total = result.count ?? 0;
-    }
-
     if (result.error) return fail("INTERNAL_ERROR", "BOQ templates could not be loaded.", 500, id);
 
     let items = (result.data ?? []).map((r) => boqTemplateDto(r as Record<string, unknown>));

@@ -92,7 +92,7 @@ export default function TemplateOverview({
     ? String(template.version).startsWith("v")
       ? String(template.version)
       : `v${template.version}`
-    : "v3.2";
+    : "—";
 
   const status = (template.status || "ACTIVE").toUpperCase();
   const statusClass =
@@ -124,7 +124,7 @@ export default function TemplateOverview({
             <div className="td-summary-item">
               <span className="td-summary-label">Team</span>
               <span className="td-summary-value">
-                {template.team || "Residential Design"}
+                {template.team || "—"}
               </span>
             </div>
 

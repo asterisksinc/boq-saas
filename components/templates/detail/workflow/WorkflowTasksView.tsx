@@ -13,7 +13,7 @@ import {
   Plus,
   Check,
 } from "lucide-react";
-import type { MockWorkflowTask } from "@/lib/templates/mock-data";
+import type { MockWorkflowTask } from "@/lib/templates/types";
 
 interface WorkflowTasksViewProps {
   tasks?: MockWorkflowTask[];

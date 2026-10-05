@@ -15,7 +15,7 @@ import {
   Trash2,
   AlertCircle,
 } from "lucide-react";
-import type { MockMilestone } from "@/lib/templates/mock-data";
+import type { MockMilestone } from "@/lib/templates/types";
 
 interface WorkflowMilestonesViewProps {
   milestones?: MockMilestone[];

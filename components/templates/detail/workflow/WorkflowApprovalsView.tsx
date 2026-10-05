@@ -17,7 +17,7 @@ import {
 import type {
   MockApprovalFlow,
   MockApprover,
-} from "@/lib/templates/mock-data";
+} from "@/lib/templates/types";
 
 interface WorkflowApprovalsViewProps {
   approvals?: MockApprovalFlow[];

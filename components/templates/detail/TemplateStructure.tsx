@@ -14,7 +14,7 @@ import {
   Check,
 } from "lucide-react";
 import { updateTemplateSection } from "@/lib/api/templates";
-import type { MockArea } from "@/lib/templates/mock-data";
+import type { MockArea } from "@/lib/templates/types";
 
 interface TemplateStructureProps {
   templateId: string;
@@ -45,14 +45,14 @@ export default function TemplateStructure({
     areas.find((a) => a.id === selectedAreaId) || areas[0];
 
   const [inspectorName, setInspectorName] = useState(selectedArea?.name || "");
-  const [inspectorType, setInspectorType] = useState(selectedArea?.type || "Bedroom");
+  const [inspectorType, setInspectorType] = useState(selectedArea?.type || "");
   const [inspectorDimensions, setInspectorDimensions] = useState(
-    selectedArea?.dimensions || "16ft x 14ft"
+    selectedArea?.dimensions || ""
   );
-  const [inspectorCode, setInspectorCode] = useState(selectedArea?.code || "BED-MST");
+  const [inspectorCode, setInspectorCode] = useState(selectedArea?.code || "");
   const [inspectorDesc, setInspectorDesc] = useState(
     selectedArea?.description ||
-      "Master bedroom with attached walk-in wardrobe and ensuite bath."
+      ""
   );
   const [includedByDefault, setIncludedByDefault] = useState(
     selectedArea?.includedByDefault ?? true
@@ -72,12 +72,12 @@ export default function TemplateStructure({
   const handleSelectArea = (area: MockArea) => {
     setSelectedAreaId(area.id);
     setInspectorName(area.name);
-    setInspectorType(area.type || "Bedroom");
-    setInspectorDimensions(area.dimensions || "16ft x 14ft");
-    setInspectorCode(area.code || "BED-MST");
+    setInspectorType(area.type || "");
+    setInspectorDimensions(area.dimensions || "");
+    setInspectorCode(area.code || "");
     setInspectorDesc(
       area.description ||
-        "Master bedroom with attached walk-in wardrobe and ensuite bath."
+        ""
     );
     setIncludedByDefault(area.includedByDefault ?? true);
     setAllowRename(area.allowRename ?? true);
