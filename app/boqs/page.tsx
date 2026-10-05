@@ -60,7 +60,7 @@ export default function BoqsPage() {
     const [templates, setTemplates] = useState<{ id: string; name: string; description: string | null; tags: string[] | null; use_count: number }[]>([]);
 
     // Form inputs for creation
-    const [newBoqNumber, setNewBoqNumber] = useState("BOQ-0071");
+    const [newBoqNumber, setNewBoqNumber] = useState("");
     const [selectedProjId, setSelectedProjId] = useState("");
     const [selectedVersion, setSelectedVersion] = useState("v1");
 
@@ -662,13 +662,11 @@ export default function BoqsPage() {
                                         const templateId = createMode === "template"
                                             ? (document.getElementById("createBoqTemplateId") as HTMLSelectElement)?.value
                                             : undefined;
-                                        const boqNum = newBoqNumber.trim() || `BOQ-${Math.floor(Math.random() * 9000 + 1000)}`;
-
                                         const res = await fetch("/api/v1/boqs", {
                                             method: "POST",
                                             headers: { "Content-Type": "application/json" },
                                             body: JSON.stringify({
-                                                boqNumber: boqNum,
+                                                ...(newBoqNumber.trim() ? { boqNumber: newBoqNumber.trim() } : {}),
                                                 projectId: projId,
                                                 version,
                                                 method: createMode || "blank",

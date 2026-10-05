@@ -62,6 +62,10 @@ export type DashboardOverview = {
     upcomingDeliverables: unknown[];
     notifications: { unreadCount: number; items: DashboardNotification[] };
     permissions: { canViewFinancials?: boolean; [key: string]: boolean | undefined };
+    costOverview?: {
+        currency: string;
+        series: Array<{ label: string; estimated: number; actual: number }>;
+    } | null;
     unavailableSections: Array<{ section: string; reason: "DOMAIN_DEFERRED" }>;
 };
 

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { PermissionsProvider } from "@/components/PermissionsProvider";
 
 export const metadata: Metadata = {
   title: "BOQ-SAAS",
@@ -17,7 +18,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body><PermissionsProvider>{children}</PermissionsProvider></body>
     </html>
   );
 }

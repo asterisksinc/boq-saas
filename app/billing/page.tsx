@@ -229,15 +229,15 @@ export default function BillingPage() {
     const plan = sub?.subscriptionPlans || (sub as any)?.subscription_plans;
     const status = sub?.status || "active";
     const statusInfo = statusConfig[status] || statusConfig.active;
-    const currentPlanCode = sub?.planCode || (sub as any)?.plan_code || "professional";
+    const currentPlanCode = sub?.planCode || (sub as any)?.plan_code || "";
     const availablePlans = overview?.plans?.filter(p => planOrder.includes(p.code)) || [];
-    const billingContact = sub?.billingContact || (sub as any)?.billing_contact || contactEmail || "accounts@company.com";
+    const billingContact = sub?.billingContact || (sub as any)?.billing_contact || contactEmail || "";
     const billingFrequency = sub?.billingFrequency || (sub as any)?.billing_frequency || "monthly";
 
     // Next charge calculation
-    const planPrice = plan?.monthlyPrice || (plan as any)?.monthly_price || (currentPlanCode === "professional" ? 9999 : currentPlanCode === "business" ? 18000 : 2999);
-    const taxRate = 0.18;
-    const nextChargeAmount = Math.round(planPrice * (1 + taxRate));
+    const planPrice = plan?.monthlyPrice ?? (plan as any)?.monthly_price ?? null;
+    const taxRate = 0;
+    const nextChargeAmount = planPrice == null ? null : Math.round(planPrice * (1 + taxRate));
 
     return (
         <main className="fig-dashboard boq-dashboard billing-page">
@@ -327,7 +327,7 @@ export default function BillingPage() {
                         />
 
                         <NextChargeCard
-                            amount={nextChargeAmount}
+                            amount={nextChargeAmount ?? 0}
                             currency={plan?.currency || "INR"}
                             renewalDate={sub?.periodEnd || (sub as any)?.period_end || null}
                             paymentMethod={overview?.paymentMethod ?? null}
@@ -501,7 +501,7 @@ function CurrentPlanCard({
     const rawPeriodEnd = sub?.periodEnd || (sub as any)?.period_end;
     const periodEnd = rawPeriodEnd ? fmtDate(rawPeriodEnd) : (isTrial ? "Trial end date unavailable" : "Not available");
     const planName = isTrial ? "Trial — Choose a Plan" : (plan?.name || (currentPlanCode === "professional" ? "Professional Plan" : currentPlanCode === "business" ? "Business Plan" : "Starter Plan"));
-    const planPrice = plan?.monthlyPrice || (plan as any)?.monthly_price || (currentPlanCode === "professional" ? 9999 : currentPlanCode === "business" ? 18000 : 2999);
+    const planPrice = plan?.monthlyPrice ?? (plan as any)?.monthly_price ?? null;
     const currency = plan?.currency || "INR";
     const usedSeats = sub?.seatsUsed ?? (sub as any)?.seats_used ?? usage?.teamMembers?.used ?? 12;
     const seatLimit = plan?.limits?.users ?? (plan?.limits as any)?.seats ?? (currentPlanCode === "professional" ? 20 : currentPlanCode === "business" ? 50 : 3);
@@ -529,7 +529,7 @@ function CurrentPlanCard({
             <div className="bcp-price-row">
                 <span className="bcp-price-label">Plan Price</span>
                 <span className="bcp-price-value">
-                    {isTrial ? "Not billed" : `${money(planPrice, currency)} / ${(sub?.billingFrequency || (sub as any)?.billing_frequency) === "annual" ? "year" : "month"}`}
+                    {isTrial ? "Not billed" : planPrice == null ? "Plan price unavailable" : `${money(planPrice, currency)} / ${(sub?.billingFrequency || (sub as any)?.billing_frequency) === "annual" ? "year" : "month"}`}
                 </span>
             </div>
 

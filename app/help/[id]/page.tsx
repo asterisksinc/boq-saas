@@ -230,15 +230,9 @@ export default function ArticleDetailPage() {
                     return;
                 }
             } catch {
-                // Fallback to local default article by slug or id
-            }
-
-            if (isMounted) {
-                const fallback =
-                    DEFAULT_ARTICLES[idOrSlug] ||
-                    Object.values(DEFAULT_ARTICLES).find((a) => a.id === idOrSlug || a.slug === idOrSlug) ||
-                    DEFAULT_ARTICLES["how-to-import-an-excel-boq"];
-                setArticle(fallback);
+                if (isMounted) {
+                    setArticle(null);
+                }
             }
             if (isMounted) setLoading(false);
         }

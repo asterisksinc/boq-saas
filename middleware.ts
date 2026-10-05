@@ -21,6 +21,17 @@ function isPublicPath(pathname: string) {
     return publicPaths.has(pathname) || pathname.startsWith("/solutions/");
 }
 
+function isPlatformAdmin(user: { email?: string | null; app_metadata?: Record<string, unknown>; user_metadata?: Record<string, unknown> }) {
+    const configuredEmails = (process.env.PLATFORM_ADMIN_EMAILS || "")
+        .split(",")
+        .map((email) => email.trim().toLowerCase())
+        .filter(Boolean);
+    const email = user.email?.toLowerCase();
+    const appRole = user.app_metadata?.role;
+    const userRole = user.user_metadata?.role;
+    return appRole === "admin" || appRole === "platform_admin" || userRole === "platform_admin" || (!!email && configuredEmails.includes(email));
+}
+
 export async function middleware(request: NextRequest) {
     let response = NextResponse.next({ request });
     const supabase = createServerClient(
@@ -44,6 +55,12 @@ export async function middleware(request: NextRequest) {
         loginUrl.pathname = "/login";
         loginUrl.searchParams.set("next", request.nextUrl.pathname);
         return NextResponse.redirect(loginUrl);
+    }
+
+    if (user && (request.nextUrl.pathname === "/admin" || request.nextUrl.pathname.startsWith("/admin/"))) {
+        if (!isPlatformAdmin(user)) {
+            return NextResponse.redirect(new URL("/dashboard", request.url));
+        }
     }
 
     if (user && (request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/register")) {
