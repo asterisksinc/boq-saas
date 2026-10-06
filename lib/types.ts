@@ -27,18 +27,51 @@ export interface Project {
   updatedAt: string;
 }
 
+export interface ProjectRequirement {
+  id: string;
+  roomId: string;
+  name: string;
+  category: string;
+  length: number;
+  depth: number;
+  breadth?: number;
+  height: number;
+  unit: string;
+  quantity: number;
+  partitions: number;
+  notes?: string | null;
+  referenceImageUrl?: string | null;
+  materialId?: string | null;
+  materialName?: string | null;
+  materialRate?: number | null;
+  materialUnit?: string | null;
+  materialCategory?: string | null;
+  materialStatus?: "pending" | "selected";
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface ProjectRoom {
   id: string;
+  projectId?: string;
   name: string;
-  room_type: string | null;
+  roomType?: string | null;
+  room_type?: string | null;
   length: number | null;
   width: number | null;
   height: number | null;
   unit: string | null;
   notes: string | null;
-  sort_order: number | null;
-  created_at: string;
-  updated_at: string;
+  rawNotes?: string | null;
+  referenceImageUrl?: string | null;
+  sort_order?: number | null;
+  sortOrder?: number | null;
+  requirements?: ProjectRequirement[];
+  requirementsCount?: number;
+  status?: string;
+  isConfigured?: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface ProjectDetail extends Project {

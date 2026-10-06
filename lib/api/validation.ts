@@ -195,13 +195,49 @@ export const projectRoomCreateSchema = z.object({
   width: z.coerce.number().finite().positive().max(100_000).nullable().optional(),
   height: z.coerce.number().finite().positive().max(100_000).nullable().optional(),
   unit: z.enum(["ft", "m"]).default("ft"),
-  notes: z.string().trim().max(2000).nullable().optional(),
+  notes: z.string().trim().nullable().optional(),
+  referenceImageUrl: z.string().trim().nullable().optional(),
+  requirements: z.array(z.any()).optional(),
 }).strict();
 
 export const projectRoomPatchSchema = projectRoomCreateSchema.partial().strict().refine(
   (value) => Object.keys(value).length > 0,
   "At least one field is required.",
 );
+
+export const projectRoomRequirementCreateSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  category: z.string().trim().min(1).max(80).default("Storage"),
+  length: z.coerce.number().finite().positive().max(100_000),
+  depth: z.coerce.number().finite().positive().max(100_000).optional(),
+  breadth: z.coerce.number().finite().positive().max(100_000).optional(),
+  height: z.coerce.number().finite().positive().max(100_000),
+  unit: z.string().trim().default("ft"),
+  quantity: z.coerce.number().int().min(1).default(1),
+  partitions: z.coerce.number().int().min(0).default(0),
+  notes: z.string().trim().nullable().optional(),
+  referenceImageUrl: z.string().trim().nullable().optional(),
+  materialId: z.string().trim().nullable().optional(),
+  materialName: z.string().trim().nullable().optional(),
+  materialRate: z.coerce.number().finite().min(0).nullable().optional(),
+  materialUnit: z.string().trim().nullable().optional(),
+  materialCategory: z.string().trim().nullable().optional(),
+  materialStatus: z.enum(["pending", "selected"]).optional(),
+}).strict();
+
+export const projectRoomRequirementPatchSchema = projectRoomRequirementCreateSchema.partial().strict().refine(
+  (value) => Object.keys(value).length > 0,
+  "At least one field is required.",
+);
+
+export const projectRoomRequirementMaterialSchema = z.object({
+  materialId: z.string().trim().min(1),
+  materialName: z.string().trim().min(1),
+  materialRate: z.coerce.number().finite().min(0).optional(),
+  materialUnit: z.string().trim().optional(),
+  materialCategory: z.string().trim().optional(),
+  spec: z.string().trim().optional(),
+}).strict();
 
 const money = z.coerce.number().finite().min(0).max(999_999_999_999_999);
 const percent = z.coerce.number().finite().min(0).max(100);
@@ -978,6 +1014,20 @@ export const deleteAccountSchema = z
   .object({
     confirmation: z.string().trim().optional(),
     forceTransfer: z.boolean().optional(),
+  })
+  .strict();
+
+export const projectClientInviteSchema = z
+  .object({
+    email: z
+      .string()
+      .trim()
+      .email()
+      .max(254)
+      .transform((val) => val.toLowerCase())
+      .optional(),
+    clientName: z.string().trim().min(1).max(160).optional(),
+    message: z.string().trim().max(2000).optional(),
   })
   .strict();
 

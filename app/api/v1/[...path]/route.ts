@@ -1,8 +1,9 @@
 import { type SupabaseClient } from "@supabase/supabase-js";
 import { type NextRequest } from "next/server";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomUUID, randomBytes } from "node:crypto";
 import * as XLSX from "xlsx";
 import JSZip from "jszip";
+import nodemailer from "nodemailer";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { EmailOtpError, issueEmailOtp, verifyEmailOtp } from "@/lib/auth/email-otp";
@@ -31,7 +32,11 @@ import {
   projectPatchSchema,
   projectRoomCreateSchema,
   projectRoomPatchSchema,
+  projectRoomRequirementCreateSchema,
+  projectRoomRequirementPatchSchema,
+  projectRoomRequirementMaterialSchema,
   projectStatusSchema,
+  projectClientInviteSchema,
   boqImportSchema,
 
   // Friend's changes
@@ -1054,15 +1059,76 @@ async function createProject(request: Request, supabase: SupabaseClient, id: str
   return ok(projectDto(data as Record<string, unknown>), 201, id);
 }
 
+function parseRoomMeta(notesRaw: string | null | undefined) {
+  if (!notesRaw) return { userNotes: "", referenceImageUrl: null, requirements: [] as any[] };
+  try {
+    const obj = JSON.parse(notesRaw);
+    if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+      return {
+        userNotes: typeof obj.userNotes === "string" ? obj.userNotes : (typeof obj.notes === "string" ? obj.notes : ""),
+        referenceImageUrl: typeof obj.referenceImageUrl === "string" ? obj.referenceImageUrl : null,
+        requirements: Array.isArray(obj.requirements) ? obj.requirements : [],
+      };
+    }
+  } catch {}
+  return { userNotes: notesRaw || "", referenceImageUrl: null, requirements: [] as any[] };
+}
+
+function serializeRoomMeta(userNotes: string | null | undefined, referenceImageUrl: string | null | undefined, requirements: any[] | undefined) {
+  return JSON.stringify({
+    userNotes: userNotes || "",
+    referenceImageUrl: referenceImageUrl || null,
+    requirements: Array.isArray(requirements) ? requirements : [],
+  });
+}
+
+function formatRoom(row: Record<string, unknown>) {
+  const meta = parseRoomMeta(row.notes as string | null | undefined);
+  const length = row.length != null ? Number(row.length) : null;
+  const width = row.width != null ? Number(row.width) : null;
+  const height = row.height != null ? Number(row.height) : null;
+  const isConfigured = !!(length && width && height);
+  const reqs = meta.requirements;
+  
+  let status = "PENDING";
+  if (reqs.length > 0) {
+    const hasUnassignedMaterial = reqs.some((r: any) => !r.materialId && r.materialStatus !== "selected");
+    status = hasUnassignedMaterial ? "MATERIALS PENDING" : "CONFIGURED";
+  } else if (isConfigured) {
+    status = "CONFIGURED";
+  }
+
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    name: row.name,
+    roomType: row.room_type,
+    length,
+    width,
+    height,
+    unit: row.unit || "ft",
+    notes: meta.userNotes,
+    rawNotes: row.notes,
+    referenceImageUrl: meta.referenceImageUrl,
+    sortOrder: row.sort_order,
+    requirements: reqs,
+    requirementsCount: reqs.length,
+    status,
+    isConfigured,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 async function getProject(supabase: SupabaseClient, id: string, projectId: string) {
   const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
   const [project, rooms] = await Promise.all([
     supabase.from("projects").select(projectSelect).eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).is("archived_at", null).maybeSingle(),
-    supabase.from("project_rooms").select("id,name,room_type,length,width,height,unit,notes,sort_order,created_at,updated_at").eq("workspace_id", scoped.access.workspaceId).eq("project_id", projectId).order("sort_order"),
+    supabase.from("project_rooms").select("id,project_id,name,room_type,length,width,height,unit,notes,sort_order,created_at,updated_at").eq("workspace_id", scoped.access.workspaceId).eq("project_id", projectId).order("sort_order"),
   ]);
   if (project.error || rooms.error) return fail("INTERNAL_ERROR", "Project could not be loaded.", 500, id);
   if (!project.data) return fail("NOT_FOUND", "Project was not found.", 404, id);
-  return ok({ ...projectDto(project.data as Record<string, unknown>), rooms: rooms.data ?? [] }, 200, id);
+  return ok({ ...projectDto(project.data as Record<string, unknown>), rooms: (rooms.data ?? []).map((r) => formatRoom(r as Record<string, unknown>)) }, 200, id);
 }
 
 async function updateProject(request: Request, supabase: SupabaseClient, id: string, projectId: string) {
@@ -1123,11 +1189,454 @@ async function deleteProject(supabase: SupabaseClient, id: string, projectId: st
   return ok({ deleted: true, id: projectId }, 200, id);
 }
 
+async function archiveProject(supabase: SupabaseClient, id: string, projectId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const { data, error } = await supabase.from("projects").update({ archived_at: new Date().toISOString() })
+    .eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).is("archived_at", null).select(projectSelect).maybeSingle();
+  if (error) return fail("VALIDATION_ERROR", "Project could not be archived.", 400, id);
+  if (!data) return fail("NOT_FOUND", "Project was not found.", 404, id);
+  await audit(supabase, "project.archived", id);
+  return ok(projectDto(data as Record<string, unknown>), 200, id);
+}
+
+async function getProjectClientInvite(supabase: SupabaseClient, id: string, projectId: string) {
+  const scoped = await workspaceAccess(supabase, id);
+  if ("response" in scoped) return scoped.response;
+  const wid = scoped.access.workspaceId;
+
+  const project = await supabase
+    .from("projects")
+    .select("id, name, client_name, client_email")
+    .eq("workspace_id", wid)
+    .eq("id", projectId)
+    .is("archived_at", null)
+    .maybeSingle();
+
+  if (!project.data) return fail("NOT_FOUND", "Project was not found.", 404, id);
+
+  let invitation: any = null;
+  try {
+    const { data: inv, error: invErr } = await supabase
+      .from("project_client_invitations")
+      .select("id, project_id, email, client_name, role, status, token, message, expires_at, created_at, updated_at")
+      .eq("workspace_id", wid)
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!invErr && inv) {
+      invitation = {
+        id: inv.id,
+        projectId: inv.project_id,
+        email: inv.email,
+        clientName: inv.client_name,
+        role: inv.role,
+        status: inv.status,
+        message: inv.message,
+        expiresAt: inv.expires_at,
+        createdAt: inv.created_at,
+        updatedAt: inv.updated_at,
+      };
+    }
+  } catch {}
+
+  if (!invitation) {
+    try {
+      const { data: wsSettings } = await supabase
+        .from("workspace_settings")
+        .select("security")
+        .eq("workspace_id", wid)
+        .maybeSingle();
+      const sec = (wsSettings?.security as any) || {};
+      const invs = Array.isArray(sec.client_invitations) ? sec.client_invitations : [];
+      const match = invs
+        .filter((x: any) => x.projectId === projectId)
+        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+      if (match) {
+        invitation = match;
+      }
+    } catch {}
+  }
+
+  if (invitation && invitation.status === "pending" && new Date(invitation.expiresAt).getTime() < Date.now()) {
+    invitation.status = "expired";
+  }
+
+  return ok({
+    hasInvitation: !!invitation,
+    invitation,
+    clientEmail: project.data.client_email,
+    clientName: project.data.client_name,
+    projectName: project.data.name,
+  }, 200, id);
+}
+
+async function createProjectClientInvite(request: Request, supabase: SupabaseClient, id: string, projectId: string) {
+  const scoped = await workspaceAccess(supabase, id, true);
+  if ("response" in scoped) return scoped.response;
+  const wid = scoped.access.workspaceId;
+
+  const projectRes = await supabase
+    .from("projects")
+    .select("id, name, client_name, client_email")
+    .eq("workspace_id", wid)
+    .eq("id", projectId)
+    .is("archived_at", null)
+    .maybeSingle();
+
+  if (!projectRes.data) return fail("NOT_FOUND", "Project was not found.", 404, id);
+  const project = projectRes.data;
+
+  const input = await parsed(request, projectClientInviteSchema, id);
+  if (input.response) return input.response;
+
+  const clientEmail = (input.data.email || project.client_email || "").trim().toLowerCase();
+  const clientName = (input.data.clientName || project.client_name || "").trim();
+  const message = (input.data.message || "").trim();
+
+  if (!clientEmail) {
+    return fail("VALIDATION_ERROR", "Client email is required before sending an invitation.", 400, id, {
+      email: ["Client email is required before sending an invitation."],
+    });
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(clientEmail)) {
+    return fail("VALIDATION_ERROR", "Please enter a valid email address.", 400, id, {
+      email: ["Please enter a valid email address."],
+    });
+  }
+
+  if (clientEmail !== project.client_email || (clientName && clientName !== project.client_name)) {
+    try {
+      await supabase.from("projects").update({
+        client_email: clientEmail,
+        client_name: clientName || project.client_name,
+        updated_at: new Date().toISOString(),
+      }).eq("id", projectId);
+    } catch {}
+  }
+
+  let existingPending: any = null;
+  try {
+    const { data: invRow } = await supabase
+      .from("project_client_invitations")
+      .select("*")
+      .eq("workspace_id", wid)
+      .eq("project_id", projectId)
+      .eq("email", clientEmail)
+      .eq("status", "pending")
+      .maybeSingle();
+
+    if (invRow && new Date(invRow.expires_at).getTime() > Date.now()) {
+      existingPending = invRow;
+    }
+  } catch {}
+
+  if (!existingPending) {
+    try {
+      const { data: wsSettings } = await supabase
+        .from("workspace_settings")
+        .select("security")
+        .eq("workspace_id", wid)
+        .maybeSingle();
+      const sec = (wsSettings?.security as any) || {};
+      const invs = Array.isArray(sec.client_invitations) ? sec.client_invitations : [];
+      const match = invs.find((x: any) => x.projectId === projectId && x.email?.toLowerCase() === clientEmail && x.status === "pending");
+      if (match && new Date(match.expiresAt).getTime() > Date.now()) {
+        existingPending = match;
+      }
+    } catch {}
+  }
+
+  if (existingPending) {
+    return fail("CONFLICT", `An invitation has already been sent to ${clientEmail}.`, 409, id, {
+      email: [`An invitation has already been sent to ${clientEmail}.`],
+    });
+  }
+
+  const token = randomBytes(32).toString("hex");
+  const invId = randomUUID();
+  const nowIso = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const newInvitation = {
+    id: invId,
+    workspace_id: wid,
+    project_id: projectId,
+    email: clientEmail,
+    client_name: clientName,
+    role: "client",
+    status: "pending",
+    token,
+    message: message || null,
+    invited_by: scoped.access.userId,
+    expires_at: expiresAt,
+    created_at: nowIso,
+    updated_at: nowIso,
+  };
+
+  try {
+    await supabase.from("project_client_invitations").insert(newInvitation);
+  } catch {}
+
+  try {
+    const { data: wsSettings } = await supabase
+      .from("workspace_settings")
+      .select("security")
+      .eq("workspace_id", wid)
+      .maybeSingle();
+    const sec = (wsSettings?.security as any) || {};
+    const existingList: any[] = Array.isArray(sec.client_invitations) ? sec.client_invitations : [];
+    const filtered = existingList.filter((x: any) => !(x.projectId === projectId && x.email?.toLowerCase() === clientEmail && x.status === "pending"));
+    filtered.push({
+      id: invId,
+      workspaceId: wid,
+      projectId,
+      email: clientEmail,
+      clientName,
+      role: "client",
+      status: "pending",
+      token,
+      message: message || null,
+      invitedBy: scoped.access.userId,
+      expiresAt,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    });
+    await supabase.from("workspace_settings").update({
+      security: { ...sec, client_invitations: filtered },
+      updated_at: nowIso,
+      updated_by: scoped.access.userId,
+    }).eq("workspace_id", wid);
+  } catch {}
+
+  try {
+    await supabase.from("audit_logs").insert({
+      workspace_id: wid,
+      actor_user_id: scoped.access.userId,
+      action: "project.client_invitation_sent",
+      entity_type: "project",
+      entity_id: projectId,
+      metadata: {
+        client_name: clientName,
+        client_email: clientEmail,
+        invitation_id: invId,
+      },
+      request_id: id,
+    });
+  } catch {}
+
+  let emailDelivered = false;
+  let emailError: string | null = null;
+  try {
+    const smtpUser = process.env.GMAIL_SMTP_USER?.trim();
+    const smtpPass = process.env.GMAIL_SMTP_APP_PASSWORD?.trim();
+    if (smtpUser && smtpPass) {
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: { user: smtpUser, pass: smtpPass },
+      });
+      const appUrl = process.env.APP_URL || "http://localhost:3000";
+      const inviteUrl = `${appUrl}/projects/${projectId}?token=${token}`;
+
+      await transporter.sendMail({
+        from: `"BOQ Design Arena" <${smtpUser}>`,
+        to: clientEmail,
+        subject: `Invitation to collaborate on ${project.name}`,
+        text: `Hello ${clientName},\n\nYou have been invited to access the project workspace for "${project.name}".\n\n${message ? `Message: "${message}"\n\n` : ""}Access your workspace: ${inviteUrl}\n\nThis invitation expires in 7 days.`,
+        html: `
+          <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;">
+            <h2 style="color:#0f172a;margin-top:0;">Project Workspace Invitation</h2>
+            <p style="color:#334155;font-size:15px;">Hello <strong>${clientName}</strong>,</p>
+            <p style="color:#334155;font-size:15px;">You have been invited to access the project workspace for <strong>${project.name}</strong> on BOQ Design Arena.</p>
+            ${message ? `<div style="margin:16px 0;padding:12px 16px;background:#fff;border-left:4px solid #2563eb;border-radius:4px;color:#475569;font-style:italic;">"${message}"</div>` : ""}
+            <div style="margin:24px 0;">
+              <a href="${inviteUrl}" style="background:#2563eb;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block;">View Project Workspace</a>
+            </div>
+            <p style="color:#64748b;font-size:13px;">This invitation will expire in 7 days.</p>
+          </div>
+        `,
+      });
+      emailDelivered = true;
+    } else {
+      emailError = "Gmail SMTP not configured.";
+    }
+  } catch (err: any) {
+    console.error(JSON.stringify({ requestId: id, event: "client_invite_email_failed", error: err.message }));
+    emailError = err.message || "Failed to dispatch email.";
+  }
+
+  return ok({
+    invitation: {
+      id: invId,
+      email: clientEmail,
+      clientName,
+      status: "pending",
+      token,
+      expiresAt,
+      createdAt: nowIso,
+    },
+    emailDelivered,
+    emailError,
+    message: emailDelivered
+      ? "Client invitation sent successfully."
+      : "Client invitation created successfully. (Email delivery skipped or pending.)",
+  }, 201, id);
+}
+
+async function resendProjectClientInvite(request: Request, supabase: SupabaseClient, id: string, projectId: string) {
+  const scoped = await workspaceAccess(supabase, id, true);
+  if ("response" in scoped) return scoped.response;
+  const wid = scoped.access.workspaceId;
+
+  const projectRes = await supabase
+    .from("projects")
+    .select("id, name, client_name, client_email")
+    .eq("workspace_id", wid)
+    .eq("id", projectId)
+    .is("archived_at", null)
+    .maybeSingle();
+
+  if (!projectRes.data) return fail("NOT_FOUND", "Project was not found.", 404, id);
+  const project = projectRes.data;
+
+  let existing: any = null;
+  try {
+    const { data: invRow } = await supabase
+      .from("project_client_invitations")
+      .select("*")
+      .eq("workspace_id", wid)
+      .eq("project_id", projectId)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (invRow) existing = invRow;
+  } catch {}
+
+  if (!existing) {
+    try {
+      const { data: wsSettings } = await supabase
+        .from("workspace_settings")
+        .select("security")
+        .eq("workspace_id", wid)
+        .maybeSingle();
+      const sec = (wsSettings?.security as any) || {};
+      const invs = Array.isArray(sec.client_invitations) ? sec.client_invitations : [];
+      const match = invs.find((x: any) => x.projectId === projectId && x.status === "pending");
+      if (match) existing = match;
+    } catch {}
+  }
+
+  if (!existing) {
+    return fail("NOT_FOUND", "No pending invitation was found to resend.", 404, id);
+  }
+
+  const clientEmail = existing.email || existing.clientEmail;
+  const clientName = existing.client_name || existing.clientName || project.client_name;
+  const nowIso = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const token = existing.token || randomBytes(32).toString("hex");
+
+  try {
+    await supabase.from("project_client_invitations").update({
+      expires_at: expiresAt,
+      updated_at: nowIso,
+    }).eq("id", existing.id);
+  } catch {}
+
+  try {
+    const { data: wsSettings } = await supabase
+      .from("workspace_settings")
+      .select("security")
+      .eq("workspace_id", wid)
+      .maybeSingle();
+    const sec = (wsSettings?.security as any) || {};
+    const invs = Array.isArray(sec.client_invitations) ? sec.client_invitations : [];
+    const updatedInvs = invs.map((x: any) => (x.id === existing.id ? { ...x, expiresAt, updatedAt: nowIso } : x));
+    await supabase.from("workspace_settings").update({
+      security: { ...sec, client_invitations: updatedInvs },
+      updated_at: nowIso,
+      updated_by: scoped.access.userId,
+    }).eq("workspace_id", wid);
+  } catch {}
+
+  try {
+    await supabase.from("audit_logs").insert({
+      workspace_id: wid,
+      actor_user_id: scoped.access.userId,
+      action: "project.client_invitation_resent",
+      entity_type: "project",
+      entity_id: projectId,
+      metadata: {
+        client_name: clientName,
+        client_email: clientEmail,
+        invitation_id: existing.id,
+      },
+      request_id: id,
+    });
+  } catch {}
+
+  let emailDelivered = false;
+  let emailError: string | null = null;
+  try {
+    const smtpUser = process.env.GMAIL_SMTP_USER?.trim();
+    const smtpPass = process.env.GMAIL_SMTP_APP_PASSWORD?.trim();
+    if (smtpUser && smtpPass) {
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: { user: smtpUser, pass: smtpPass },
+      });
+      const appUrl = process.env.APP_URL || "http://localhost:3000";
+      const inviteUrl = `${appUrl}/projects/${projectId}?token=${token}`;
+
+      await transporter.sendMail({
+        from: `"BOQ Design Arena" <${smtpUser}>`,
+        to: clientEmail,
+        subject: `Reminder: Invitation to collaborate on ${project.name}`,
+        text: `Hello ${clientName},\n\nThis is a reminder about your invitation to access the project workspace for "${project.name}".\n\nAccess your workspace: ${inviteUrl}\n\nThis invitation expires in 7 days.`,
+        html: `
+          <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;">
+            <h2 style="color:#0f172a;margin-top:0;">Project Workspace Invitation (Reminder)</h2>
+            <p style="color:#334155;font-size:15px;">Hello <strong>${clientName}</strong>,</p>
+            <p style="color:#334155;font-size:15px;">This is a reminder that you have an active invitation to access the project workspace for <strong>${project.name}</strong> on BOQ Design Arena.</p>
+            <div style="margin:24px 0;">
+              <a href="${inviteUrl}" style="background:#2563eb;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block;">View Project Workspace</a>
+            </div>
+            <p style="color:#64748b;font-size:13px;">This invitation will expire in 7 days.</p>
+          </div>
+        `,
+      });
+      emailDelivered = true;
+    } else {
+      emailError = "Gmail SMTP not configured.";
+    }
+  } catch (err: any) {
+    emailError = err.message || "Failed to dispatch email.";
+  }
+
+  return ok({
+    invitation: {
+      id: existing.id,
+      email: clientEmail,
+      clientName,
+      status: "pending",
+      expiresAt,
+      updatedAt: nowIso,
+    },
+    emailDelivered,
+    emailError,
+    message: emailDelivered ? "Client invitation resent successfully." : "Invitation refreshed. (Email delivery skipped or pending.)",
+  }, 200, id);
+}
+
 async function listProjectRooms(supabase: SupabaseClient, id: string, projectId: string) {
   const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
-  const result = await supabase.from("project_rooms").select("id,name,room_type,length,width,height,unit,notes,sort_order,created_at,updated_at")
+  const result = await supabase.from("project_rooms").select("id,project_id,name,room_type,length,width,height,unit,notes,sort_order,created_at,updated_at")
     .eq("workspace_id", scoped.access.workspaceId).eq("project_id", projectId).order("sort_order").order("created_at");
-  return result.error ? fail("INTERNAL_ERROR", "Rooms could not be loaded.", 500, id) : ok({ items: result.data ?? [] }, 200, id);
+  return result.error ? fail("INTERNAL_ERROR", "Rooms could not be loaded.", 500, id) : ok({ items: (result.data ?? []).map((r) => formatRoom(r as Record<string, unknown>)) }, 200, id);
 }
 
 async function createProjectRoom(request: Request, supabase: SupabaseClient, id: string, projectId: string) {
@@ -1136,22 +1645,38 @@ async function createProjectRoom(request: Request, supabase: SupabaseClient, id:
   const project = await supabase.from("projects").select("id").eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).is("archived_at", null).maybeSingle();
   if (!project.data) return fail("NOT_FOUND", "Project was not found.", 404, id);
   const value = input.data;
-  const result = await supabase.from("project_rooms").insert({ workspace_id: scoped.access.workspaceId, project_id: projectId, created_by: scoped.access.userId,
-    name: value.name, room_type: value.roomType, length: value.length, width: value.width, height: value.height, unit: value.unit, notes: value.notes })
-    .select("id,name,room_type,length,width,height,unit,notes,sort_order,created_at,updated_at").single();
+  const rawNotes = serializeRoomMeta(value.notes || "", value.referenceImageUrl || null, Array.isArray(value.requirements) ? value.requirements : []);
+  const result = await supabase.from("project_rooms").insert({
+    workspace_id: scoped.access.workspaceId, project_id: projectId, created_by: scoped.access.userId,
+    name: value.name, room_type: value.roomType, length: value.length, width: value.width, height: value.height, unit: value.unit, notes: rawNotes
+  }).select("id,project_id,name,room_type,length,width,height,unit,notes,sort_order,created_at,updated_at").single();
   if (result.error) return fail(result.error.code === "23505" ? "CONFLICT" : "VALIDATION_ERROR", result.error.code === "23505" ? "A room with this name already exists." : "Room could not be created.", result.error.code === "23505" ? 409 : 400, id);
-  return ok(result.data, 201, id);
+  return ok(formatRoom(result.data as Record<string, unknown>), 201, id);
 }
 
 async function updateProjectRoom(request: Request, supabase: SupabaseClient, id: string, projectId: string, roomId: string) {
   const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
   const input = await parsed(request, projectRoomPatchSchema, id); if (input.response) return input.response;
-  const map: Record<string, string> = { name: "name", roomType: "room_type", length: "length", width: "width", height: "height", unit: "unit", notes: "notes" };
-  const values = Object.fromEntries(Object.entries(input.data).map(([key, value]) => [map[key], value]).filter(([key]) => key));
+  const existing = await supabase.from("project_rooms").select("notes").eq("workspace_id", scoped.access.workspaceId).eq("project_id", projectId).eq("id", roomId).maybeSingle();
+  if (!existing.data) return fail("NOT_FOUND", "Room was not found.", 404, id);
+
+  const existingMeta = parseRoomMeta(existing.data.notes);
+  const updatedUserNotes = input.data.notes !== undefined ? (input.data.notes || "") : existingMeta.userNotes;
+  const updatedRefImg = input.data.referenceImageUrl !== undefined ? input.data.referenceImageUrl : existingMeta.referenceImageUrl;
+  const updatedReqs = Array.isArray(input.data.requirements) ? input.data.requirements : existingMeta.requirements;
+  const rawNotes = serializeRoomMeta(updatedUserNotes, updatedRefImg, updatedReqs);
+
+  const map: Record<string, string> = { name: "name", roomType: "room_type", length: "length", width: "width", height: "height", unit: "unit" };
+  const values: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(input.data)) {
+    if (map[key] && val !== undefined) values[map[key]] = val;
+  }
+  values.notes = rawNotes;
+
   const result = await supabase.from("project_rooms").update(values).eq("workspace_id", scoped.access.workspaceId).eq("project_id", projectId).eq("id", roomId)
-    .select("id,name,room_type,length,width,height,unit,notes,sort_order,created_at,updated_at").maybeSingle();
+    .select("id,project_id,name,room_type,length,width,height,unit,notes,sort_order,created_at,updated_at").maybeSingle();
   if (result.error) return fail("VALIDATION_ERROR", "Room could not be updated.", 400, id);
-  return result.data ? ok(result.data, 200, id) : fail("NOT_FOUND", "Room was not found.", 404, id);
+  return result.data ? ok(formatRoom(result.data as Record<string, unknown>), 200, id) : fail("NOT_FOUND", "Room was not found.", 404, id);
 }
 
 async function deleteProjectRoom(supabase: SupabaseClient, id: string, projectId: string, roomId: string) {
@@ -1159,6 +1684,138 @@ async function deleteProjectRoom(supabase: SupabaseClient, id: string, projectId
   const result = await supabase.from("project_rooms").delete().eq("workspace_id", scoped.access.workspaceId).eq("project_id", projectId).eq("id", roomId).select("id").maybeSingle();
   if (result.error) return fail("VALIDATION_ERROR", "Room could not be deleted.", 400, id);
   return result.data ? ok({ deleted: true, id: roomId }, 200, id) : fail("NOT_FOUND", "Room was not found.", 404, id);
+}
+
+async function listProjectRoomRequirements(supabase: SupabaseClient, id: string, projectId: string, roomId: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const room = await supabase.from("project_rooms").select("notes").eq("workspace_id", scoped.access.workspaceId).eq("project_id", projectId).eq("id", roomId).maybeSingle();
+  if (!room.data) return fail("NOT_FOUND", "Room was not found.", 404, id);
+  const meta = parseRoomMeta(room.data.notes);
+  return ok({ items: meta.requirements }, 200, id);
+}
+
+async function createProjectRoomRequirement(request: Request, supabase: SupabaseClient, id: string, projectId: string, roomId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const input = await parsed(request, projectRoomRequirementCreateSchema, id); if (input.response) return input.response;
+  const room = await supabase.from("project_rooms").select("notes").eq("workspace_id", scoped.access.workspaceId).eq("project_id", projectId).eq("id", roomId).maybeSingle();
+  if (!room.data) return fail("NOT_FOUND", "Room was not found.", 404, id);
+  const meta = parseRoomMeta(room.data.notes);
+  const depth = input.data.depth ?? input.data.breadth ?? 0;
+  const newReq = {
+    id: randomUUID(),
+    roomId,
+    name: input.data.name,
+    category: input.data.category,
+    length: input.data.length,
+    depth,
+    breadth: depth,
+    height: input.data.height,
+    unit: input.data.unit,
+    quantity: input.data.quantity,
+    partitions: input.data.partitions,
+    notes: input.data.notes || null,
+    referenceImageUrl: input.data.referenceImageUrl || null,
+    materialId: input.data.materialId || null,
+    materialName: input.data.materialName || null,
+    materialRate: input.data.materialRate || null,
+    materialUnit: input.data.materialUnit || null,
+    materialCategory: input.data.materialCategory || null,
+    materialStatus: input.data.materialId ? "selected" : "pending",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  meta.requirements.push(newReq);
+  const rawNotes = serializeRoomMeta(meta.userNotes, meta.referenceImageUrl, meta.requirements);
+  const upd = await supabase.from("project_rooms").update({ notes: rawNotes }).eq("workspace_id", scoped.access.workspaceId).eq("project_id", projectId).eq("id", roomId).select("id").maybeSingle();
+  if (upd.error) return fail("VALIDATION_ERROR", "Requirement could not be saved.", 400, id);
+  return ok(newReq, 201, id);
+}
+
+async function updateProjectRoomRequirement(request: Request, supabase: SupabaseClient, id: string, projectId: string, roomId: string, reqId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const input = await parsed(request, projectRoomRequirementPatchSchema, id); if (input.response) return input.response;
+  const room = await supabase.from("project_rooms").select("notes").eq("workspace_id", scoped.access.workspaceId).eq("project_id", projectId).eq("id", roomId).maybeSingle();
+  if (!room.data) return fail("NOT_FOUND", "Room was not found.", 404, id);
+  const meta = parseRoomMeta(room.data.notes);
+  const index = meta.requirements.findIndex((r: any) => r.id === reqId);
+  if (index === -1) return fail("NOT_FOUND", "Requirement was not found.", 404, id);
+  const current = meta.requirements[index];
+  const depth = input.data.depth ?? input.data.breadth ?? current.depth ?? current.breadth;
+  const updatedReq = {
+    ...current,
+    ...input.data,
+    depth,
+    breadth: depth,
+    materialStatus: input.data.materialId ? "selected" : (input.data.materialStatus ?? current.materialStatus ?? "pending"),
+    updatedAt: new Date().toISOString(),
+  };
+  meta.requirements[index] = updatedReq;
+  const rawNotes = serializeRoomMeta(meta.userNotes, meta.referenceImageUrl, meta.requirements);
+  const upd = await supabase.from("project_rooms").update({ notes: rawNotes }).eq("workspace_id", scoped.access.workspaceId).eq("project_id", projectId).eq("id", roomId).select("id").maybeSingle();
+  if (upd.error) return fail("VALIDATION_ERROR", "Requirement could not be updated.", 400, id);
+  return ok(updatedReq, 200, id);
+}
+
+async function deleteProjectRoomRequirement(supabase: SupabaseClient, id: string, projectId: string, roomId: string, reqId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const room = await supabase.from("project_rooms").select("notes").eq("workspace_id", scoped.access.workspaceId).eq("project_id", projectId).eq("id", roomId).maybeSingle();
+  if (!room.data) return fail("NOT_FOUND", "Room was not found.", 404, id);
+  const meta = parseRoomMeta(room.data.notes);
+  const filtered = meta.requirements.filter((r: any) => r.id !== reqId);
+  if (filtered.length === meta.requirements.length) return fail("NOT_FOUND", "Requirement was not found.", 404, id);
+  meta.requirements = filtered;
+  const rawNotes = serializeRoomMeta(meta.userNotes, meta.referenceImageUrl, meta.requirements);
+  const upd = await supabase.from("project_rooms").update({ notes: rawNotes }).eq("workspace_id", scoped.access.workspaceId).eq("project_id", projectId).eq("id", roomId).select("id").maybeSingle();
+  if (upd.error) return fail("VALIDATION_ERROR", "Requirement could not be deleted.", 400, id);
+  return ok({ deleted: true, id: reqId }, 200, id);
+}
+
+async function duplicateProjectRoomRequirement(supabase: SupabaseClient, id: string, projectId: string, roomId: string, reqId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const room = await supabase.from("project_rooms").select("notes").eq("workspace_id", scoped.access.workspaceId).eq("project_id", projectId).eq("id", roomId).maybeSingle();
+  if (!room.data) return fail("NOT_FOUND", "Room was not found.", 404, id);
+  const meta = parseRoomMeta(room.data.notes);
+  const source = meta.requirements.find((r: any) => r.id === reqId);
+  if (!source) return fail("NOT_FOUND", "Requirement was not found.", 404, id);
+  const duplicatedReq = {
+    ...source,
+    id: randomUUID(),
+    name: `${source.name} (Copy)`,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  meta.requirements.push(duplicatedReq);
+  const rawNotes = serializeRoomMeta(meta.userNotes, meta.referenceImageUrl, meta.requirements);
+  const upd = await supabase.from("project_rooms").update({ notes: rawNotes }).eq("workspace_id", scoped.access.workspaceId).eq("project_id", projectId).eq("id", roomId).select("id").maybeSingle();
+  if (upd.error) return fail("VALIDATION_ERROR", "Requirement could not be duplicated.", 400, id);
+  return ok(duplicatedReq, 201, id);
+}
+
+async function assignProjectRoomRequirementMaterial(request: Request, supabase: SupabaseClient, id: string, projectId: string, roomId: string, reqId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const input = await parsed(request, projectRoomRequirementMaterialSchema, id); if (input.response) return input.response;
+  const room = await supabase.from("project_rooms").select("notes").eq("workspace_id", scoped.access.workspaceId).eq("project_id", projectId).eq("id", roomId).maybeSingle();
+  if (!room.data) return fail("NOT_FOUND", "Room was not found.", 404, id);
+  const meta = parseRoomMeta(room.data.notes);
+  const index = meta.requirements.findIndex((r: any) => r.id === reqId);
+  if (index === -1) return fail("NOT_FOUND", "Requirement was not found.", 404, id);
+  const current = meta.requirements[index];
+  const updatedReq = {
+    ...current,
+    materialId: input.data.materialId,
+    materialName: input.data.materialName,
+    materialRate: input.data.materialRate ?? current.materialRate ?? null,
+    materialUnit: input.data.materialUnit ?? current.materialUnit ?? "Sq.ft",
+    materialCategory: input.data.materialCategory ?? current.materialCategory ?? null,
+    spec: input.data.spec ?? current.spec ?? null,
+    materialStatus: "selected",
+    updatedAt: new Date().toISOString(),
+  };
+  meta.requirements[index] = updatedReq;
+  const rawNotes = serializeRoomMeta(meta.userNotes, meta.referenceImageUrl, meta.requirements);
+  const upd = await supabase.from("project_rooms").update({ notes: rawNotes }).eq("workspace_id", scoped.access.workspaceId).eq("project_id", projectId).eq("id", roomId).select("id").maybeSingle();
+  if (upd.error) return fail("VALIDATION_ERROR", "Material could not be assigned.", 400, id);
+  return ok(updatedReq, 200, id);
 }
 
 const projectImportHeaders: Record<string, string> = {
@@ -1294,10 +1951,13 @@ async function projectImportTemplate(supabase: SupabaseClient, id: string) {
     "Content-Disposition": "attachment; filename=project-import-template.xlsx", "Cache-Control": "private, no-store", "X-Request-Id": id } });
 }
 
-async function projectExport(supabase: SupabaseClient, id: string) {
+async function projectExport(request: Request, supabase: SupabaseClient, id: string) {
   const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
-  const result = await supabase.from("projects").select(projectSelect)
-    .eq("workspace_id", scoped.access.workspaceId).is("archived_at", null).order("updated_at", { ascending: false });
+  const url = new URL(request.url);
+  const projectId = url.searchParams.get("projectId") || url.searchParams.get("id");
+  let query = supabase.from("projects").select(projectSelect).eq("workspace_id", scoped.access.workspaceId).is("archived_at", null);
+  if (projectId) query = query.eq("id", projectId);
+  const result = await query.order("updated_at", { ascending: false });
   if (result.error) return fail("INTERNAL_ERROR", "Projects could not be exported.", 500, id);
   const rows = (result.data ?? []).map((row) => {
     const project = projectDto(row as Record<string, unknown>);
@@ -1310,8 +1970,9 @@ async function projectExport(supabase: SupabaseClient, id: string) {
   const sheet = XLSX.utils.json_to_sheet(rows);
   const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, sheet, "Projects");
   const output = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }) as Buffer;
+  const filename = projectId && rows.length ? `${rows[0].ProjectName || "project"}.xlsx` : "projects.xlsx";
   return new Response(new Uint8Array(output), { status: 200, headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "Content-Disposition": "attachment; filename=projects.xlsx", "Cache-Control": "private, no-store", "X-Request-Id": id } });
+    "Content-Disposition": `attachment; filename="${filename}"`, "Cache-Control": "private, no-store", "X-Request-Id": id } });
 }
 
 async function createBoqImport(request: Request, supabase: SupabaseClient, id: string) {
@@ -8143,7 +8804,7 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (request.method === "GET" && route === "projects") return listProjects(request, supabase, id);
   if (request.method === "POST" && route === "projects") return createProject(request, supabase, id);
   if (request.method === "GET" && route === "projects/import-template") return projectImportTemplate(supabase, id);
-  if (request.method === "GET" && route === "projects/export") return projectExport(supabase, id);
+  if (request.method === "GET" && route === "projects/export") return projectExport(request, supabase, id);
   if (request.method === "GET" && route === "projects/imports") return projectImportHistory(request, supabase, id);
   if (request.method === "POST" && route === "projects/imports/preview") return previewProjectImport(request, supabase, id);
   if (request.method === "POST" && route === "projects/imports") return importProjects(request, supabase, id);
@@ -8151,13 +8812,30 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (projectMatch && request.method === "GET") return getProject(supabase, id, projectMatch[1]);
   if (projectMatch && request.method === "PATCH") return updateProject(request, supabase, id, projectMatch[1]);
   if (projectMatch && request.method === "DELETE") return deleteProject(supabase, id, projectMatch[1]);
+  const projectClientInviteMatch = route.match(/^projects\/([0-9a-f-]{36})\/client-invite$/i);
+  if (projectClientInviteMatch && request.method === "GET") return getProjectClientInvite(supabase, id, projectClientInviteMatch[1]);
+  if (projectClientInviteMatch && request.method === "POST") return createProjectClientInvite(request, supabase, id, projectClientInviteMatch[1]);
+  const projectClientInviteResendMatch = route.match(/^projects\/([0-9a-f-]{36})\/client-invite\/resend$/i);
+  if (projectClientInviteResendMatch && request.method === "POST") return resendProjectClientInvite(request, supabase, id, projectClientInviteResendMatch[1]);
   const projectStatusMatch = route.match(/^projects\/([0-9a-f-]{36})\/status$/i);
   if (projectStatusMatch && request.method === "POST") return changeProjectStatus(request, supabase, id, projectStatusMatch[1]);
+  const projectArchiveMatch = route.match(/^projects\/([0-9a-f-]{36})\/archive$/i);
+  if (projectArchiveMatch && request.method === "POST") return archiveProject(supabase, id, projectArchiveMatch[1]);
   const projectDuplicateMatch = route.match(/^projects\/([0-9a-f-]{36})\/duplicate$/i);
   if (projectDuplicateMatch && request.method === "POST") return duplicateProject(supabase, id, projectDuplicateMatch[1]);
   const projectRoomsMatch = route.match(/^projects\/([0-9a-f-]{36})\/rooms$/i);
   if (projectRoomsMatch && request.method === "GET") return listProjectRooms(supabase, id, projectRoomsMatch[1]);
   if (projectRoomsMatch && request.method === "POST") return createProjectRoom(request, supabase, id, projectRoomsMatch[1]);
+  const projectRoomReqsMatch = route.match(/^projects\/([0-9a-f-]{36})\/rooms\/([0-9a-f-]{36})\/requirements$/i);
+  if (projectRoomReqsMatch && request.method === "GET") return listProjectRoomRequirements(supabase, id, projectRoomReqsMatch[1], projectRoomReqsMatch[2]);
+  if (projectRoomReqsMatch && request.method === "POST") return createProjectRoomRequirement(request, supabase, id, projectRoomReqsMatch[1], projectRoomReqsMatch[2]);
+  const projectRoomReqDupMatch = route.match(/^projects\/([0-9a-f-]{36})\/rooms\/([0-9a-f-]{36})\/requirements\/([0-9a-f-]{36})\/duplicate$/i);
+  if (projectRoomReqDupMatch && request.method === "POST") return duplicateProjectRoomRequirement(supabase, id, projectRoomReqDupMatch[1], projectRoomReqDupMatch[2], projectRoomReqDupMatch[3]);
+  const projectRoomReqMatMatch = route.match(/^projects\/([0-9a-f-]{36})\/rooms\/([0-9a-f-]{36})\/requirements\/([0-9a-f-]{36})\/material$/i);
+  if (projectRoomReqMatMatch && request.method === "POST") return assignProjectRoomRequirementMaterial(request, supabase, id, projectRoomReqMatMatch[1], projectRoomReqMatMatch[2], projectRoomReqMatMatch[3]);
+  const projectRoomReqMatch = route.match(/^projects\/([0-9a-f-]{36})\/rooms\/([0-9a-f-]{36})\/requirements\/([0-9a-f-]{36})$/i);
+  if (projectRoomReqMatch && request.method === "PATCH") return updateProjectRoomRequirement(request, supabase, id, projectRoomReqMatch[1], projectRoomReqMatch[2], projectRoomReqMatch[3]);
+  if (projectRoomReqMatch && request.method === "DELETE") return deleteProjectRoomRequirement(supabase, id, projectRoomReqMatch[1], projectRoomReqMatch[2], projectRoomReqMatch[3]);
   const projectRoomMatch = route.match(/^projects\/([0-9a-f-]{36})\/rooms\/([0-9a-f-]{36})$/i);
   if (projectRoomMatch && request.method === "PATCH") return updateProjectRoom(request, supabase, id, projectRoomMatch[1], projectRoomMatch[2]);
   if (projectRoomMatch && request.method === "DELETE") return deleteProjectRoom(supabase, id, projectRoomMatch[1], projectRoomMatch[2]);

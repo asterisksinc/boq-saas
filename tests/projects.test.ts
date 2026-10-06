@@ -5,6 +5,10 @@ import {
   projectPatchSchema,
   projectRoomCreateSchema,
   projectStatusSchema,
+  projectRoomRequirementCreateSchema,
+  projectRoomRequirementPatchSchema,
+  projectRoomRequirementMaterialSchema,
+  projectClientInviteSchema,
 } from "../lib/api/validation";
 
 describe("Project request contracts", () => {
@@ -39,10 +43,58 @@ describe("Project request contracts", () => {
     expect(projectStatusSchema.parse({ status: "in_progress" }).status).toBe("in_progress");
     expect(projectRoomCreateSchema.parse({ name: "Master Bedroom", roomType: "Bedroom", length: 12, width: 14 }).unit).toBe("ft");
   });
+
+  it("validates room requirements, dimensions, quantity, partitions, and material assignments", () => {
+    const req = projectRoomRequirementCreateSchema.parse({
+      name: "Wardrobe",
+      category: "Storage",
+      length: 8,
+      depth: 2,
+      height: 8,
+      unit: "Unit",
+      quantity: 1,
+      partitions: 4,
+      notes: "Master bedroom master wardrobe with full hanging space",
+    });
+    expect(req.name).toBe("Wardrobe");
+    expect(req.category).toBe("Storage");
+    expect(req.partitions).toBe(4);
+
+    const patch = projectRoomRequirementPatchSchema.parse({
+      quantity: 2,
+      partitions: 6,
+    });
+    expect(patch.quantity).toBe(2);
+    expect(patch.partitions).toBe(6);
+
+    const mat = projectRoomRequirementMaterialSchema.parse({
+      materialId: "mat-hdhmr-12",
+      materialName: "12mm HDHMR Board",
+      materialRate: 118,
+      materialUnit: "Sq.ft",
+      materialCategory: "HDHMR",
+    });
+    expect(mat.materialName).toBe("12mm HDHMR Board");
+    expect(mat.materialRate).toBe(118);
+  });
+
+  it("validates client invitation request schema", () => {
+    const valid = projectClientInviteSchema.parse({
+      email: "Client@Example.COM ",
+      clientName: "Jane Doe",
+      message: "Please review the project workspace.",
+    });
+    expect(valid.email).toBe("client@example.com");
+    expect(valid.clientName).toBe("Jane Doe");
+    expect(valid.message).toBe("Please review the project workspace.");
+
+    expect(() => projectClientInviteSchema.parse({ email: "not-an-email" })).toThrow();
+  });
 });
 
 describe("Project tenant and import implementation", () => {
   const migration = readFileSync("supabase/migrations/20260901170000_project_user_apis_excel_import.sql", "utf8");
+  const inviteMigration = readFileSync("supabase/migrations/20261006190000_project_client_invitations.sql", "utf8");
   const route = readFileSync("app/api/v1/[...path]/route.ts", "utf8");
   const collection = JSON.parse(readFileSync("postman/BOQ-Design-Arena-Complete.postman_collection.json", "utf8"));
 
@@ -51,6 +103,13 @@ describe("Project tenant and import implementation", () => {
     expect(migration).toContain("alter table public.project_imports enable row level security");
     expect(migration).toContain("projects_delete_admin");
     expect(migration).toContain("current_workspace_role(workspace_id) in ('owner','admin')");
+  });
+
+  it("provisions project_client_invitations with RLS and touch trigger", () => {
+    expect(inviteMigration).toContain("create table if not exists public.project_client_invitations");
+    expect(inviteMigration).toContain("alter table public.project_client_invitations enable row level security");
+    expect(inviteMigration).toContain("create policy project_client_invitations_select");
+    expect(inviteMigration).toContain("create trigger project_client_invitations_touch");
   });
 
   it("is safe to rerun after a partially committed SQL Editor execution", () => {
@@ -66,10 +125,44 @@ describe("Project tenant and import implementation", () => {
     expect(route).toContain("10 * 1024 * 1024");
     expect(route).toContain('route === "projects/imports/preview"');
     expect(route).toContain('route === "boq-imports/upload"');
+    expect(route).toContain('route.match(/^projects\\/([0-9a-f-]{36})\\/archive$/i)');
+    expect(route).toContain('route.match(/^projects\\/([0-9a-f-]{36})\\/client-invite$/i)');
+    expect(route).toContain('route.match(/^projects\\/([0-9a-f-]{36})\\/client-invite\\/resend$/i)');
+    expect(route).toContain('route.match(/^projects\\/([0-9a-f-]{36})\\/rooms\\/([0-9a-f-]{36})\\/requirements$/i)');
+    expect(route).toContain('route.match(/^projects\\/([0-9a-f-]{36})\\/rooms\\/([0-9a-f-]{36})\\/requirements\\/([0-9a-f-]{36})\\/duplicate$/i)');
+    expect(route).toContain('route.match(/^projects\\/([0-9a-f-]{36})\\/rooms\\/([0-9a-f-]{36})\\/requirements\\/([0-9a-f-]{36})\\/material$/i)');
   });
 
   it("ships an importable Postman collection for all project workflows", () => {
     expect(collection.info.schema).toContain("collection/v2.1.0");
     expect(collection.item.map((item: { name: string }) => item.name)).toContain("11 — Projects & Excel Import");
   });
+
+  it("handles client invitation lifecycle, token generation, and audit logging in API", () => {
+    expect(route).toContain("project_client_invitations");
+    expect(route).toContain("workspace_settings");
+    expect(route).toContain("client_invitations");
+    expect(route).toContain("audit_logs");
+    expect(route).toContain('randomBytes(32).toString("hex")');
+    expect(route).toContain("transporter.sendMail");
+  });
+
+  it("verifies boq page deep-linking supports projectId and create flags", () => {
+    const boqsPage = readFileSync("app/boqs/page.tsx", "utf8");
+    expect(boqsPage).toContain('sp.get("projectId")');
+    expect(boqsPage).toContain('sp.get("create")');
+    expect(boqsPage).toContain('sp.get("id")');
+    expect(boqsPage).toContain("Back to Project");
+  });
+
+  it("verifies project overview page has action buttons in exact specified order", () => {
+    const projectPage = readFileSync("app/projects/[id]/page.tsx", "utf8");
+    const reviewIdx = projectPage.indexOf("Review Pending Actions");
+    const inviteIdx = projectPage.indexOf("Send Invite to Client");
+    const editIdx = projectPage.indexOf("Edit Project");
+    expect(reviewIdx).toBeGreaterThan(-1);
+    expect(inviteIdx).toBeGreaterThan(reviewIdx);
+    expect(editIdx).toBeGreaterThan(inviteIdx);
+  });
 });
+

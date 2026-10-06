@@ -73,6 +73,15 @@ export default function BoqsPage() {
     useEffect(() => {
         if (typeof window !== "undefined") {
             const sp = new URLSearchParams(window.location.search);
+            const pId = sp.get("projectId");
+            if (pId) {
+                setSelectedProjId(pId);
+            }
+            const boqId = sp.get("id") || sp.get("boqId");
+            if (boqId) {
+                setSelectedBoqId(boqId);
+                setScreen("detail");
+            }
             if (sp.get("create") === "true" || sp.get("new") === "true") {
                 setShowCreateModal(true);
             }
@@ -92,7 +101,10 @@ export default function BoqsPage() {
                         clientName: p.clientName ?? null,
                     }));
                     setProjects(items);
-                    if (items.length > 0 && !selectedProjId) {
+                    const pIdFromUrl = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("projectId") : null;
+                    if (pIdFromUrl && items.some((p: { id: string }) => p.id === pIdFromUrl)) {
+                        setSelectedProjId(pIdFromUrl);
+                    } else if (items.length > 0 && !selectedProjId) {
                         setSelectedProjId(items[0].id);
                     }
                 }
@@ -160,7 +172,13 @@ export default function BoqsPage() {
             } else {
                 setPendingApprovals(mapped.filter((b) => b.status === "IN REVIEW").length);
             }
-            setSelectedBoqId((current) => current ?? mapped[0]?.id ?? null);
+            const bIdFromUrl = typeof window !== "undefined" ? (new URLSearchParams(window.location.search).get("id") || new URLSearchParams(window.location.search).get("boqId")) : null;
+            if (bIdFromUrl && mapped.some((b) => b.id === bIdFromUrl)) {
+                setSelectedBoqId(bIdFromUrl);
+                setScreen("detail");
+            } else {
+                setSelectedBoqId((current) => current ?? mapped[0]?.id ?? null);
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to load BOQs.");
         } finally {
@@ -1108,10 +1126,19 @@ function BoqDetail({ activeBoq, onBack }: { activeBoq: BoqListItem; onBack: () =
     return (
         <section className="boq-detail-shell">
             {/* Breadcrumb */}
-            <div className="boq-detail-breadcrumb">
+            <div className="boq-detail-breadcrumb" style={{ display: "flex", alignItems: "center" }}>
                 <span onClick={onBack} style={{ cursor: "pointer" }}>Bill of Quantities</span>
                 <ChevronRight size={15} />
                 <span className="active">{activeBoq.boqNumber}</span>
+                {activeBoq.projectId && (
+                    <button
+                        type="button"
+                        onClick={() => location.assign(`/projects/${activeBoq.projectId}`)}
+                        style={{ marginLeft: "auto", background: "none", border: "none", color: "#2563eb", fontWeight: 600, fontSize: "12px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "4px" }}
+                    >
+                        ← Back to Project
+                    </button>
+                )}
             </div>
 
             {/* Header row */}
