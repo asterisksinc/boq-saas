@@ -1,7 +1,6 @@
 "use client";
 
 import {
-    ChevronDown,
     Plus,
     Search,
     SlidersHorizontal,
@@ -15,6 +14,7 @@ import MarginsTab from "./components/MarginsTab";
 import SettingsTab from "./components/SettingsTab";
 import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
+import CostingExcelImportModal from "@/components/costing/CostingExcelImportModal";
 
 type MainTab = "Library" | "Categories" | "Analysis" | "Scenarios" | "Margins" | "Settings";
 
@@ -22,6 +22,7 @@ export default function CostsPage() {
     const [activeTab, setActiveTab] = useState<MainTab>("Library");
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [isNewCategoryOpen, setIsNewCategoryOpen] = useState(false);
+    const [isExcelImportOpen, setIsExcelImportOpen] = useState(false);
     const [categorySearch, setCategorySearch] = useState("");
     const [isCategoryDetailActive, setIsCategoryDetailActive] = useState(false);
 
@@ -54,26 +55,21 @@ export default function CostsPage() {
                             <p style={{ fontSize: "14px", color: "#6b7280", margin: 0 }}>Budget control | Vendor comparison | Variance analysis</p>
                         </div>
                         <div style={{ display: "flex", gap: "12px" }}>
-                            {activeTab !== "Library" && <button type="button" className="boq-ghost-button" style={{ 
-                                background: "#fff", 
-                                border: "1px solid #e5e7eb", 
-                                padding: "8px 16px", 
-                                borderRadius: "8px", 
-                                fontWeight: 500,
-                                cursor: "pointer"
-                            }}>
+                            <button
+                                type="button"
+                                onClick={() => setIsExcelImportOpen(true)}
+                                className="boq-ghost-button"
+                                style={{
+                                    background: "#fff",
+                                    border: "1px solid #e5e7eb",
+                                    padding: "8px 16px",
+                                    borderRadius: "8px",
+                                    fontWeight: 500,
+                                    cursor: "pointer"
+                                }}
+                            >
                                 Import Excel
-                            </button>}
-                            {activeTab === "Library" && <button type="button" className="boq-ghost-button" style={{ 
-                                background: "#fff", 
-                                border: "1px solid #e5e7eb", 
-                                padding: "8px 16px", 
-                                borderRadius: "8px", 
-                                fontWeight: 500,
-                                cursor: "pointer"
-                            }}>
-                                Import Excel
-                            </button>}
+                            </button>
                         </div>
                     </div>
 
@@ -101,24 +97,6 @@ export default function CostsPage() {
                         </div>
 
                         {/* Right Actions depending on active tab */}
-                        {activeTab === "Library" && (
-                            <div style={{ display: "flex", gap: "12px" }}>
-                                <label style={{ display: "flex", alignItems: "center", background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "0 12px" }}>
-                                    <Search size={16} color="#6b7280" />
-                                    <input placeholder="Search category by name..." style={{ border: "none", outline: "none", padding: "8px", fontSize: "14px", width: "200px" }} />
-                                </label>
-                                <button style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", width: "40px", cursor: "pointer" }}>
-                                    <SlidersHorizontal size={16} color="#4b5563" />
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsAddOpen(true)}
-                                    style={{ display: "flex", alignItems: "center", gap: "8px", background: "#2563eb", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "8px", fontWeight: 500, cursor: "pointer" }}
-                                >
-                                    <Plus size={16} /> New Item
-                                </button>
-                            </div>
-                        )}
                         {activeTab === "Categories" && !isCategoryDetailActive && (
                             <div style={{ display: "flex", gap: "12px" }}>
                                 <label style={{ display: "flex", alignItems: "center", background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "0 12px" }}>
@@ -130,22 +108,12 @@ export default function CostsPage() {
                                         style={{ border: "none", outline: "none", padding: "8px", fontSize: "14px", width: "200px" }}
                                     />
                                 </label>
-                                <button style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", width: "40px", cursor: "pointer" }}>
-                                    <SlidersHorizontal size={16} color="#4b5563" />
-                                </button>
                                 <button
                                     type="button"
                                     onClick={() => setIsNewCategoryOpen(true)}
                                     style={{ display: "flex", alignItems: "center", gap: "8px", background: "#2563eb", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "8px", fontWeight: 500, cursor: "pointer" }}
                                 >
                                     <Plus size={16} /> New Category
-                                </button>
-                            </div>
-                        )}
-                        {activeTab === "Analysis" && (
-                            <div style={{ display: "flex", gap: "12px" }}>
-                                <button style={{ display: "flex", alignItems: "center", gap: "8px", background: "#fff", border: "1px solid #e5e7eb", padding: "8px 16px", borderRadius: "8px", fontWeight: 500, cursor: "pointer" }}>
-                                    <SlidersHorizontal size={16} /> Filter
                                 </button>
                             </div>
                         )}
@@ -169,6 +137,17 @@ export default function CostsPage() {
                     </div>
                 </section>
             </div>
+
+            {/* Global Excel Import Modal */}
+            <CostingExcelImportModal
+                isOpen={isExcelImportOpen}
+                onClose={() => setIsExcelImportOpen(false)}
+                onSuccess={() => {
+                    if (typeof window !== "undefined") {
+                        window.location.reload();
+                    }
+                }}
+            />
         </main>
     );
 }

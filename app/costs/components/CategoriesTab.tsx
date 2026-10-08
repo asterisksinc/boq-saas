@@ -12,10 +12,12 @@ import {
     RefreshCw,
     ChevronLeft
 } from "lucide-react";
-import { getCostingCategories } from "@/lib/api/costing";
+import { getCostingCategories, deleteCostingCategory, duplicateCostingCategory } from "@/lib/api/costing";
 import type { CostingCategoryBackend } from "@/lib/types";
 import NewCategoryModal from "./NewCategoryModal";
 import CategoryDetail from "./CategoryDetail";
+import CostingMoreMenu from "@/components/costing/CostingMoreMenu";
+import CostingPagination from "@/components/costing/CostingPagination";
 
 interface CategoriesTabProps {
     searchQuery?: string;
@@ -617,18 +619,19 @@ export default function CategoriesTab({
                                     <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>
                                         UPDATED
                                     </th>
+                                    <th style={{ padding: "14px 16px", width: "48px" }}></th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={10} style={{ padding: "40px", textAlign: "center", color: "#9ca3af" }}>
+                                        <td colSpan={11} style={{ padding: "40px", textAlign: "center", color: "#9ca3af" }}>
                                             Loading categories...
                                         </td>
                                     </tr>
                                 ) : paginatedCategories.length === 0 ? (
                                     <tr>
-                                        <td colSpan={10} style={{ padding: "40px", textAlign: "center", color: "#9ca3af" }}>
+                                        <td colSpan={11} style={{ padding: "40px", textAlign: "center", color: "#9ca3af" }}>
                                             No categories match your criteria.
                                         </td>
                                     </tr>
@@ -740,6 +743,34 @@ export default function CategoriesTab({
                                                 <td style={{ padding: "14px 16px", color: "#64748b", fontSize: "13px" }}>
                                                     {formatDate(cat.updated_at)}
                                                 </td>
+
+                                                {/* Action Menu */}
+                                                <td style={{ padding: "14px 16px" }}>
+                                                    <CostingMoreMenu
+                                                        entityName="Category"
+                                                        onView={() => {
+                                                            setActiveDetailCategory(cat);
+                                                            onDetailViewChange?.(true);
+                                                        }}
+                                                        onDuplicate={async () => {
+                                                            try {
+                                                                await duplicateCostingCategory(cat.id);
+                                                                await loadData();
+                                                            } catch (err) {
+                                                                alert(err instanceof Error ? err.message : "Failed to duplicate category");
+                                                            }
+                                                        }}
+                                                        onDelete={async () => {
+                                                            if (!confirm(`Are you sure you want to delete category "${cat.name}"?`)) return;
+                                                            try {
+                                                                await deleteCostingCategory(cat.id);
+                                                                setCategories((prev) => prev.filter((c) => c.id !== cat.id));
+                                                            } catch (err) {
+                                                                alert(err instanceof Error ? err.message : "Failed to delete category");
+                                                            }
+                                                        }}
+                                                    />
+                                                </td>
                                             </tr>
                                         );
                                     })
@@ -748,129 +779,20 @@ export default function CategoriesTab({
                         </table>
                     </div>
 
-                    {/* Table Footer: Total Count + Pagination Controls */}
-                    <div
-                        style={{
-                            padding: "16px 20px",
-                            borderTop: "1px solid #e2e8f0",
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            background: "#ffffff"
-                        }}
-                    >
-                        {/* Total Count */}
-                        <div style={{ fontSize: "13px", color: "#475569", fontWeight: 500 }}>
-                            Total Categories: {filteredCategories.length}
-                        </div>
-
-                        {/* Page Numbers */}
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                            <button
-                                type="button"
-                                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                                disabled={currentPage === 1}
-                                style={{
-                                    width: "32px",
-                                    height: "32px",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    borderRadius: "6px",
-                                    border: "1px solid #e2e8f0",
-                                    background: "#fff",
-                                    cursor: currentPage === 1 ? "not-allowed" : "pointer",
-                                    color: currentPage === 1 ? "#cbd5e1" : "#475569"
-                                }}
-                            >
-                                <ChevronLeft size={16} />
-                            </button>
-
-                            {Array.from({ length: totalPages }, (_, i) => i + 1).slice(0, 5).map((page) => (
-                                <button
-                                    key={page}
-                                    type="button"
-                                    onClick={() => setCurrentPage(page)}
-                                    style={{
-                                        width: "32px",
-                                        height: "32px",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        borderRadius: "6px",
-                                        border: currentPage === page ? "1px solid #3b82f6" : "1px solid #e2e8f0",
-                                        background: currentPage === page ? "#eff6ff" : "#ffffff",
-                                        color: currentPage === page ? "#2563eb" : "#475569",
-                                        fontWeight: currentPage === page ? 600 : 500,
-                                        fontSize: "13px",
-                                        cursor: "pointer"
-                                    }}
-                                >
-                                    {page}
-                                </button>
-                            ))}
-
-                            <button
-                                type="button"
-                                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                                disabled={currentPage === totalPages}
-                                style={{
-                                    width: "32px",
-                                    height: "32px",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    borderRadius: "6px",
-                                    border: "1px solid #e2e8f0",
-                                    background: "#fff",
-                                    cursor: currentPage === totalPages ? "not-allowed" : "pointer",
-                                    color: currentPage === totalPages ? "#cbd5e1" : "#475569"
-                                }}
-                            >
-                                <ChevronRight size={16} />
-                            </button>
-                        </div>
-
-                        {/* Page Size Selector */}
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", color: "#475569" }}>
-                            <span>Show per Page:</span>
-                            <div style={{ position: "relative" }}>
-                                <select
-                                    value={pageSize}
-                                    onChange={(e) => {
-                                        setPageSize(Number(e.target.value));
-                                        setCurrentPage(1);
-                                    }}
-                                    style={{
-                                        padding: "6px 28px 6px 12px",
-                                        borderRadius: "6px",
-                                        border: "1px solid #e2e8f0",
-                                        fontSize: "13px",
-                                        fontWeight: 500,
-                                        color: "#1e293b",
-                                        background: "#fff",
-                                        appearance: "none",
-                                        cursor: "pointer"
-                                    }}
-                                >
-                                    <option value={10}>10</option>
-                                    <option value={20}>20</option>
-                                    <option value={50}>50</option>
-                                </select>
-                                <ChevronDown
-                                    size={14}
-                                    color="#64748b"
-                                    style={{
-                                        position: "absolute",
-                                        right: "8px",
-                                        top: "50%",
-                                        transform: "translateY(-50%)",
-                                        pointerEvents: "none"
-                                    }}
-                                />
-                            </div>
-                        </div>
-                    </div>
+                    {/* Table Footer: Pagination */}
+                    {filteredCategories.length > 0 && (
+                        <CostingPagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            totalItems={filteredCategories.length}
+                            pageSize={pageSize}
+                            onPageChange={setCurrentPage}
+                            onPageSizeChange={(newSize) => {
+                                setPageSize(newSize);
+                                setCurrentPage(1);
+                            }}
+                        />
+                    )}
                 </div>
             </div>
 

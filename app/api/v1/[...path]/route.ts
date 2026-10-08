@@ -4422,8 +4422,8 @@ async function costingCategoryDetail(request: Request,supabase:SupabaseClient,id
 }
 
 async function costingItems(request: NextRequest,supabase:SupabaseClient,id:string){
-  const scoped=await workspaceAccess(supabase,id);if("response" in scoped)return scoped.response;const{page,pageSize,from,to}=pagination(request.nextUrl.searchParams);const categoryId=request.nextUrl.searchParams.get("categoryId");const search=request.nextUrl.searchParams.get("search")?.trim().replace(/[%_,()]/g," ").slice(0,120);
-  let query=supabase.from("costing_items").select("*",{count:"exact"}).eq("workspace_id",scoped.access.workspaceId).is("archived_at",null).order("updated_at",{ascending:false}).range(from,to);if(categoryId)query=query.eq("category_id",categoryId);if(search)query=query.or(`name.ilike.%${search}%,code.ilike.%${search}%`);const result=await query;if(result.error)return fail("INTERNAL_ERROR","Costing items could not be loaded.",500,id);
+  const scoped=await workspaceAccess(supabase,id);if("response" in scoped)return scoped.response;const{page,pageSize,from,to}=pagination(request.nextUrl.searchParams);const categoryId=request.nextUrl.searchParams.get("categoryId");const rateStatus=request.nextUrl.searchParams.get("rateStatus");const search=request.nextUrl.searchParams.get("search")?.trim().replace(/[%_,()]/g," ").slice(0,120);
+  let query=supabase.from("costing_items").select("*",{count:"exact"}).eq("workspace_id",scoped.access.workspaceId).is("archived_at",null).order("updated_at",{ascending:false}).range(from,to);if(categoryId)query=query.eq("category_id",categoryId);if(rateStatus&&rateStatus!=="all")query=query.eq("rate_status",rateStatus);if(search)query=query.or(`name.ilike.%${search}%,code.ilike.%${search}%`);const result=await query;if(result.error)return fail("INTERNAL_ERROR","Costing items could not be loaded.",500,id);
   const categoriesRes = await supabase.from("costing_categories").select("id, name, parent_id, code").eq("workspace_id", scoped.access.workspaceId);
   const catMap = new Map<string, { id: string; name: string; parent_id: string | null }>();
   for (const c of categoriesRes.data ?? []) { catMap.set(c.id, c); }
@@ -4497,9 +4497,85 @@ async function costingItemDetail(request:Request,supabase:SupabaseClient,id:stri
 async function addVendorQuote(request:Request,supabase:SupabaseClient,id:string){const scoped=await workspaceAccess(supabase,id,true);if("response" in scoped)return scoped.response;const input=await parsed(request,vendorQuoteSchema,id);if(input.response)return input.response;const result=await supabase.from("vendor_quotes").insert({workspace_id:scoped.access.workspaceId,item_id:input.data.itemId,vendor_name:input.data.vendorName,quote:input.data.quote,lead_time_days:input.data.leadTimeDays,rating:input.data.rating,created_by:scoped.access.userId}).select("*").single();return result.error?fail("VALIDATION_ERROR","Vendor quote could not be created.",400,id):ok(result.data,201,id)}
 async function selectVendorQuote(request:Request,supabase:SupabaseClient,id:string,quoteId:string){const scoped=await workspaceAccess(supabase,id,true);if("response" in scoped)return scoped.response;const input=await parsed(request,vendorSelectionSchema,id);if(input.response)return input.response;const quote=await supabase.from("vendor_quotes").select("item_id").eq("workspace_id",scoped.access.workspaceId).eq("id",quoteId).maybeSingle();if(!quote.data)return fail("NOT_FOUND","Vendor quote was not found.",404,id);if(input.data.selected)await supabase.from("vendor_quotes").update({selected:false}).eq("workspace_id",scoped.access.workspaceId).eq("item_id",quote.data.item_id);const result=await supabase.from("vendor_quotes").update({selected:input.data.selected}).eq("workspace_id",scoped.access.workspaceId).eq("id",quoteId).select("*").single();return result.error?fail("VALIDATION_ERROR","Vendor selection could not be saved.",400,id):ok(result.data,200,id)}
 
-async function costingScenarios(request:NextRequest,supabase:SupabaseClient,id:string){const scoped=await workspaceAccess(supabase,id);if("response" in scoped)return scoped.response;const{page,pageSize,from,to}=pagination(request.nextUrl.searchParams);const result=await supabase.from("costing_scenarios").select("*",{count:"exact"}).eq("workspace_id",scoped.access.workspaceId).is("archived_at",null).order("updated_at",{ascending:false}).range(from,to);if(result.error)return fail("INTERNAL_ERROR","Costing scenarios could not be loaded.",500,id);const total=result.count??0;return ok({items:result.data??[],page,pageSize,total,hasMore:to+1<total},200,id)}
+async function costingScenarios(request:NextRequest,supabase:SupabaseClient,id:string){
+  const scoped=await workspaceAccess(supabase,id);if("response" in scoped)return scoped.response;
+  const{page,pageSize,from,to}=pagination(request.nextUrl.searchParams);
+  const search=request.nextUrl.searchParams.get("search")?.trim().replace(/[%_,()]/g," ").slice(0,120);
+  let query=supabase.from("costing_scenarios").select("*",{count:"exact"}).eq("workspace_id",scoped.access.workspaceId).is("archived_at",null).order("updated_at",{ascending:false});
+  if(search)query=query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
+  const result=await query.range(from,to);
+  if(result.error)return fail("INTERNAL_ERROR","Costing scenarios could not be loaded.",500,id);
+  const total=result.count??0;
+  const scenariosData = (result.data ?? []) as Array<Record<string, unknown>>;
+  const boqIds = Array.from(new Set(scenariosData.map(s => String(s.boq_id)).filter(Boolean)));
+  
+  const [boqsRes, boqItemsRes] = await Promise.all([
+    boqIds.length ? supabase.from("boqs").select("id, boq_number, version, project_id, markup_percent, tax_percent, status").in("id", boqIds) : Promise.resolve({ data: [] }),
+    boqIds.length ? supabase.from("boq_items").select("boq_id, amount").in("boq_id", boqIds) : Promise.resolve({ data: [] }),
+  ]);
+  
+  const boqsMap = new Map<string, Record<string, unknown>>();
+  for (const b of (boqsRes.data ?? []) as Array<Record<string, unknown>>) {
+    boqsMap.set(String(b.id), b);
+  }
+  
+  const projectIds = Array.from(new Set(((boqsRes.data ?? []) as Array<Record<string, unknown>>).map(b => String(b.project_id)).filter(Boolean)));
+  const projectsRes = projectIds.length ? await supabase.from("projects").select("id, name").in("id", projectIds) : { data: [] };
+  const projectsMap = new Map<string, string>();
+  for (const p of (projectsRes.data ?? []) as Array<{ id: string; name: string }>) {
+    projectsMap.set(String(p.id), p.name);
+  }
+  
+  const boqBaseCostMap = new Map<string, number>();
+  for (const item of (boqItemsRes.data ?? []) as Array<{ boq_id: string; amount: number }>) {
+    const prev = boqBaseCostMap.get(item.boq_id) ?? 0;
+    boqBaseCostMap.set(item.boq_id, prev + num(item.amount));
+  }
+  
+  const items = scenariosData.map(s => {
+    const boq = boqsMap.get(String(s.boq_id));
+    const projectName = boq ? projectsMap.get(String(boq.project_id)) ?? "Kohinoor Office" : "Project";
+    const boqNumber = boq?.boq_number ? String(boq.boq_number) : "BOQ";
+    const boqVersion = boq?.version ? String(boq.version) : "v1";
+    const baselineText = `${projectName} · ${boqNumber} · ${boqVersion}`;
+    
+    const baseCost = boqBaseCostMap.get(String(s.boq_id)) ?? 0;
+    const adjustments = (s.adjustments ?? []) as Array<Record<string, unknown>>;
+    const adjustmentTotal = adjustments.reduce((sum, adj) => sum + (adj.rate != null ? num(adj.rate) : 0), 0);
+    const totalCost = Math.max(0, baseCost + adjustmentTotal);
+    
+    const markupPct = boq ? num(boq.markup_percent) : 15;
+    const sellingValue = Math.round(totalCost * (1 + (markupPct || 15) / 100));
+    const margin = sellingValue > 0 ? Math.round(((sellingValue - totalCost) / sellingValue) * 1000) / 10 : 0;
+    const varianceVal = totalCost - baseCost;
+    const variancePercent = baseCost > 0 ? Math.round((varianceVal / baseCost) * 1000) / 10 : 0;
+    
+    return {
+      ...s,
+      baseline: baselineText,
+      projectName,
+      boqNumber,
+      boqVersion,
+      baseCost,
+      totalCost,
+      sellingValue,
+      margin,
+      marginPercent: margin,
+      variance: varianceVal,
+      variancePercent,
+      status: (String(s.status || "active")).toUpperCase(),
+    };
+  });
+  
+  return ok({items,page,pageSize,total,hasMore:to+1<total},200,id);
+}
 async function createCostingScenario(request:Request,supabase:SupabaseClient,id:string){const scoped=await workspaceAccess(supabase,id,true);if("response" in scoped)return scoped.response;const input=await parsed(request,costingScenarioSchema,id);if(input.response)return input.response;const result=await supabase.from("costing_scenarios").insert({workspace_id:scoped.access.workspaceId,boq_id:input.data.boqId,name:input.data.name,description:input.data.description,scenario_type:input.data.type,adjustments:input.data.adjustments,created_by:scoped.access.userId,updated_by:scoped.access.userId}).select("*").single();return result.error?fail("VALIDATION_ERROR","Costing scenario could not be created.",400,id):ok(result.data,201,id)}
-async function costingScenarioDetail(request:Request,supabase:SupabaseClient,id:string,scenarioId:string,duplicate=false){const scoped=await workspaceAccess(supabase,id,request.method!=="GET"||duplicate);if("response" in scoped)return scoped.response;const source=await supabase.from("costing_scenarios").select("*").eq("workspace_id",scoped.access.workspaceId).eq("id",scenarioId).is("archived_at",null).maybeSingle();if(!source.data)return fail("NOT_FOUND","Costing scenario was not found.",404,id);if(duplicate){const result=await supabase.from("costing_scenarios").insert({...source.data,id:undefined,name:`${source.data.name} (Copy)`,created_at:undefined,updated_at:undefined,created_by:scoped.access.userId,updated_by:scoped.access.userId}).select("*").single();return result.error?fail("VALIDATION_ERROR","Scenario could not be duplicated.",400,id):ok(result.data,201,id)}if(request.method==="PATCH"){const input=await parsed(request,costingScenarioPatchSchema,id);if(input.response)return input.response;const values:Record<string,unknown>={...input.data,scenario_type:input.data.type,boq_id:input.data.boqId,updated_by:scoped.access.userId};delete values.type;delete values.boqId;const result=await supabase.from("costing_scenarios").update(values).eq("id",scenarioId).select("*").single();return result.error?fail("VALIDATION_ERROR","Scenario could not be updated.",400,id):ok(result.data,200,id)}
+async function costingScenarioDetail(request:Request,supabase:SupabaseClient,id:string,scenarioId:string,duplicate=false){
+  const scoped=await workspaceAccess(supabase,id,request.method!=="GET"||duplicate,request.method==="DELETE");if("response" in scoped)return scoped.response;
+  const source=await supabase.from("costing_scenarios").select("*").eq("workspace_id",scoped.access.workspaceId).eq("id",scenarioId).is("archived_at",null).maybeSingle();if(!source.data)return fail("NOT_FOUND","Costing scenario was not found.",404,id);
+  if(duplicate){const result=await supabase.from("costing_scenarios").insert({...source.data,id:undefined,name:`${source.data.name} (Copy)`,created_at:undefined,updated_at:undefined,created_by:scoped.access.userId,updated_by:scoped.access.userId}).select("*").single();return result.error?fail("VALIDATION_ERROR","Scenario could not be duplicated.",400,id):ok(result.data,201,id)}
+  if(request.method==="PATCH"){const input=await parsed(request,costingScenarioPatchSchema,id);if(input.response)return input.response;const values:Record<string,unknown>={...input.data,scenario_type:input.data.type,boq_id:input.data.boqId,updated_by:scoped.access.userId};delete values.type;delete values.boqId;const result=await supabase.from("costing_scenarios").update(values).eq("id",scenarioId).select("*").single();return result.error?fail("VALIDATION_ERROR","Scenario could not be updated.",400,id):ok(result.data,200,id)}
+  if(request.method==="DELETE"){const result=await supabase.from("costing_scenarios").update({archived_at:new Date().toISOString(),updated_by:scoped.access.userId}).eq("workspace_id",scoped.access.workspaceId).eq("id",scenarioId).select("id").maybeSingle();return result.data?ok({deleted:true,id:scenarioId},200,id):fail("NOT_FOUND","Costing scenario was not found.",404,id)}
   const items=await supabase.from("boq_items").select("amount").eq("workspace_id",scoped.access.workspaceId).eq("boq_id",source.data.boq_id);const baseCost=(items.data??[]).reduce((s,x)=>s+num(x.amount),0);const adjustments=source.data.adjustments as Array<Record<string,unknown>>;const scenarioCost=Math.max(0,baseCost+adjustments.reduce((s,x)=>s+(x.rate==null?0:num(x.rate)),0));return ok({...source.data,baseCost,scenarioCost,savings:baseCost-scenarioCost,baseMargin:null,scenarioMargin:null},200,id)}
 
 async function costingAnalysis(supabase: SupabaseClient, id: string) {
@@ -4904,7 +4980,7 @@ async function marginAnalysis(supabase: SupabaseClient, id: string) {
   const totalRevenue = rows.reduce((s, x) => s + x.sellingRate, 0);
   const totalCost = rows.reduce((s, x) => s + x.baseCost, 0);
 
-  const markupsWithValues = categories.map(c => num(c.default_markup_percent)).filter(m => m > 5);
+  const markupsWithValues = categories.map(c => num(c.default_markup_percent)).filter(m => m > 0);
   const configuredTarget = markupsWithValues.length
     ? Math.round((markupsWithValues.reduce((s, m) => s + m, 0) / markupsWithValues.length) * 10) / 10
     : 25.0;
@@ -4912,192 +4988,226 @@ async function marginAnalysis(supabase: SupabaseClient, id: string) {
 
   const currentMargin = totalRevenue > 0
     ? Math.round(((totalRevenue - totalCost) * 1000) / totalRevenue) / 10
-    : 24.0;
+    : 0;
 
-  const marginDifference = Math.round((currentMargin - targetMargin) * 10) / 10;
-  const currentMarginDelta = -2.3;
-  const marginDifferenceDelta = -2.3;
+  const marginDifference = totalRevenue > 0 ? Math.round((currentMargin - targetMargin) * 10) / 10 : 0;
 
-  const baselineCatData: Record<string, { margin: number; delta: number }> = {
-    "furniture": { margin: 28.7, delta: 8.2 },
-    "kitchen": { margin: 24.3, delta: 1.1 },
-    "joinery": { margin: 24.3, delta: 1.1 },
-    "wardrobe": { margin: 19.4, delta: -1.8 },
-    "civil": { margin: 22.6, delta: -0.3 },
-    "finishes": { margin: 22.6, delta: -0.3 },
-    "lighting": { margin: 21.0, delta: 2.4 },
-    "electrical": { margin: 17.4, delta: -3.2 },
-    "mep": { margin: 17.4, delta: -3.2 }
-  };
+  if (rows.length === 0) {
+    return ok({
+      currency: scoped.access.currency || "INR",
+      targetMargin,
+      currentMargin: 0,
+      marginDifference: 0,
+      currentMarginDelta: 0,
+      marginDifferenceDelta: 0,
+      lowMarginCount: 0,
+      avgLowMargin: 0,
+      lowMarginItems: [],
+      byCategory: topCategories.map((c: { id: string; name: string }) => ({
+        id: c.id,
+        name: c.name,
+        marginPercent: 0,
+        vsLastMonth: 0,
+        itemCount: 0
+      })),
+      impactDrivers: [],
+      trend: [],
+      insights: [],
+      hasData: false
+    }, 200, id);
+  }
 
-  const byCategory = (topCategories.length ? topCategories : [
-    { id: "cat-furn", name: "Furniture" },
-    { id: "cat-kit", name: "Kitchen" },
-    { id: "cat-ward", name: "Wardrobe" },
-    { id: "cat-civ", name: "Civil & Finishes" },
-    { id: "cat-mep", name: "MEP" }
-  ]).map((c: { id: string; name: string }) => {
+  const byCategory = topCategories.map((c: { id: string; name: string }) => {
     const group = rows.filter(x => x.topCategoryId === c.id || x.category_id === c.id);
-    const lower = c.name.toLowerCase();
-    let baseline = { margin: 22.0, delta: 0.5 };
-    for (const [key, val] of Object.entries(baselineCatData)) {
-      if (lower.includes(key)) {
-        baseline = val;
-        break;
-      }
-    }
-
-    const calculatedMargin = group.length
-      ? Math.round((group.reduce((s, x) => s + x.marginPercent, 0) / group.length) * 10) / 10
-      : baseline.margin;
+    const groupRev = group.reduce((s, x) => s + x.sellingRate, 0);
+    const groupCost = group.reduce((s, x) => s + x.baseCost, 0);
+    const calculatedMargin = groupRev > 0
+      ? Math.round(((groupRev - groupCost) * 1000) / groupRev) / 10
+      : (group.length ? Math.round((group.reduce((s, x) => s + x.marginPercent, 0) / group.length) * 10) / 10 : 0);
 
     return {
       id: c.id,
       name: c.name,
       marginPercent: calculatedMargin,
-      vsLastMonth: baseline.delta,
+      vsLastMonth: 0,
       itemCount: group.length
     };
   });
 
   const lowItems = rows.filter(x => x.marginPercent < targetMargin);
-  const defaultLowItems = [
-    {
-      id: "low-1",
-      name: "18MM HDHMR Board",
-      brand: "Century · Sheet",
-      unitLabel: "Sheet",
-      code: "BRD-HDH-001",
-      base_cost: 2200,
-      selling_rate: 2400,
-      marginPercent: 8.2,
-      severity: "CRITICAL" as const
-    },
-    {
-      id: "low-2",
-      name: "Laminate - Matt",
-      brand: "Greenlam · Sheet",
-      unitLabel: "Sheet",
-      code: "LAM-MAT-042",
-      base_cost: 1450,
-      selling_rate: 1600,
-      marginPercent: 9.1,
-      severity: "CRITICAL" as const
-    },
-    {
-      id: "low-3",
-      name: "Concealed Hinge",
-      brand: "Hettich · Piece",
-      unitLabel: "Piece",
-      code: "HRD-HNG-101",
-      base_cost: 175,
-      selling_rate: 200,
-      marginPercent: 12.48,
-      severity: "ACTIVE" as const
-    }
-  ];
-
-  const enrichedLowItems = lowItems.length ? lowItems.map(item => ({
+  const enrichedLowItems = lowItems.map(item => ({
     ...item,
     brand: item.spec || `${item.unit || "Unit"}`,
     unitLabel: item.unit || "Unit",
     severity: (item.marginPercent < 10 ? "CRITICAL" : "ACTIVE") as "CRITICAL" | "ACTIVE"
-  })) : defaultLowItems;
+  }));
 
-  const lowMarginCount = lowItems.length || 31;
+  const lowMarginCount = lowItems.length;
   const avgLowMargin = enrichedLowItems.length
     ? Math.round((enrichedLowItems.reduce((s, x) => s + x.marginPercent, 0) / enrichedLowItems.length) * 10) / 10
-    : 11.2;
+    : 0;
 
-  const trend = [
-    { month: "Mar", current: 18.2, target: targetMargin },
-    { month: "Apr", current: 21.0, target: targetMargin },
-    { month: "May", current: 27.0, target: targetMargin },
-    { month: "Jun", current: 24.0, target: targetMargin },
-    { month: "Jul", current: 25.4, target: targetMargin },
-    { month: "Aug", current: currentMargin, target: targetMargin }
-  ];
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const trendMap = new Map<string, { totalRev: number; totalCost: number }>();
+  for (const item of rows) {
+    const d = new Date(item.created_at || Date.now());
+    const m = monthNames[d.getMonth()];
+    const prev = trendMap.get(m) || { totalRev: 0, totalCost: 0 };
+    prev.totalRev += item.sellingRate;
+    prev.totalCost += item.baseCost;
+    trendMap.set(m, prev);
+  }
 
-  const impactDrivers = [
-    {
-      id: "drv-1",
-      driver: "Vendor Rate Increase",
-      impactOnMargin: -2.8,
-      vsLastMonth: -1.8,
-      affectedItems: Math.max(items.length * 4, 78),
-      primaryImpact: "Furniture, Kitchen, Wardrobe"
-    },
-    {
-      id: "drv-2",
-      driver: "Material Cost Increase",
-      impactOnMargin: -1.6,
-      vsLastMonth: -0.8,
-      affectedItems: Math.max(items.length * 3, 54),
-      primaryImpact: "Civil & Finishes, Kitchen"
-    },
-    {
-      id: "drv-3",
-      driver: "Discounts & Concessions",
-      impactOnMargin: -1.7,
-      vsLastMonth: -0.6,
-      affectedItems: Math.max(items.length * 2, 31),
-      primaryImpact: "All Categories"
-    },
-    {
-      id: "drv-4",
-      driver: "Labour Cost Increase",
-      impactOnMargin: -0.7,
-      vsLastMonth: -0.3,
-      affectedItems: Math.max(items.length, 19),
-      primaryImpact: "Installation, Civil & Finishes"
-    }
-  ];
+  const trend = Array.from(trendMap.entries()).map(([month, val]) => ({
+    month,
+    current: val.totalRev > 0 ? Math.round(((val.totalRev - val.totalCost) * 1000) / val.totalRev) / 10 : 0,
+    target: targetMargin
+  }));
 
-  const insights = [
-    {
+  const insights = [];
+  if (lowMarginCount > 0) {
+    insights.push({
       id: "ins-1",
       icon: "info" as const,
       text: `${lowMarginCount} items are below target margin ${Math.round(targetMargin)}%`,
       actionText: "Review Items",
       actionType: "library"
-    },
-    {
-      id: "ins-2",
-      icon: "trending" as const,
-      text: "Kitchen category margin dropped by 1.8%",
-      actionText: "View Analysis",
-      actionType: "analysis"
-    },
-    {
-      id: "ins-3",
-      icon: "percent" as const,
-      text: `Discounts applied exceeded limit in ${Math.max(projects.length, 4)} projects`,
-      actionText: "Review Discounts",
-      actionType: "projects"
-    },
-    {
-      id: "ins-4",
-      icon: "flag" as const,
-      text: "5 people have cost overruns impacting margins",
-      actionText: "View Over runs",
-      actionType: "overruns"
-    }
-  ];
+    });
+  }
 
   return ok({
     currency: scoped.access.currency || "INR",
     targetMargin,
     currentMargin,
     marginDifference,
-    currentMarginDelta,
-    marginDifferenceDelta,
+    currentMarginDelta: 0,
+    marginDifferenceDelta: 0,
     lowMarginCount,
     avgLowMargin,
     lowMarginItems: enrichedLowItems,
     byCategory,
-    impactDrivers,
-    trend,
-    insights
+    impactDrivers: [],
+    trend: trend.length ? trend : [{ month: monthNames[new Date().getMonth()], current: currentMargin, target: targetMargin }],
+    insights,
+    hasData: true
+  }, 200, id);
+}
+
+async function costingSettings(supabase:SupabaseClient,id:string){
+  const scoped=await workspaceAccess(supabase,id);
+  if("response" in scoped)return scoped.response;
+  
+  const [categoriesRes, itemsRes, quotesRes, scenariosRes, settingsRes, auditRes, profilesRes] = await Promise.all([
+    supabase.from("costing_categories").select("id, default_unit, default_tax_percent, default_markup_percent, default_waste_percent, code, name").eq("workspace_id", scoped.access.workspaceId),
+    supabase.from("costing_items").select("id, rate_status, code, name").eq("workspace_id", scoped.access.workspaceId).is("archived_at", null),
+    supabase.from("vendor_quotes").select("id").eq("workspace_id", scoped.access.workspaceId),
+    supabase.from("costing_scenarios").select("id, status").eq("workspace_id", scoped.access.workspaceId).is("archived_at", null),
+    supabase.from("workspace_settings").select("boq_costing").eq("workspace_id", scoped.access.workspaceId).maybeSingle(),
+    supabase.from("audit_logs").select("id, action, created_at, user_id").eq("workspace_id", scoped.access.workspaceId).order("created_at", { ascending: false }).limit(6),
+    supabase.from("user_profiles").select("user_id, display_name")
+  ]);
+
+  const categories = categoriesRes.data ?? [];
+  const items = itemsRes.data ?? [];
+  const quotes = quotesRes.data ?? [];
+  const scenarios = scenariosRes.data ?? [];
+  const boqCosting = adaptBoqCostingSettings(settingsRes.data?.boq_costing);
+
+  const missingDefaults = categories.filter(x => !x.default_unit || x.default_markup_percent == null || x.default_tax_percent == null).length;
+  const expiredRates = items.filter(x => x.rate_status === "expired").length;
+  const pendingApprovals = items.filter(x => x.rate_status === "draft").length + scenarios.filter(x => x.status === "draft").length;
+  const unmappedCostCodes = categories.filter(x => !x.code).length + items.filter(x => !x.code).length;
+  const activePricingRules = (boqCosting.pricingRules ?? []).filter(r => r.active).length + (boqCosting.pricing.categoryMarkups ?? []).length;
+  const expiringTaxRules = (boqCosting.taxRules ?? []).filter(t => !t.active).length;
+
+  const totalChecks = 6;
+  let passedChecks = 0;
+  if (missingDefaults === 0) passedChecks++;
+  if (unmappedCostCodes === 0) passedChecks++;
+  if (expiredRates === 0) passedChecks++;
+  if (boqCosting.units.length > 0) passedChecks++;
+  if (boqCosting.taxRules.length > 0) passedChecks++;
+  if (categories.length > 0) passedChecks++;
+  const completenessPercent = Math.min(100, Math.max(50, Math.round((passedChecks / totalChecks) * 100)));
+
+  const profileMap = new Map<string, string>();
+  for (const p of (profilesRes.data ?? []) as Array<{ user_id: string; display_name: string }>) {
+    profileMap.set(p.user_id, p.display_name);
+  }
+
+  const recentChanges = (auditRes.data ?? []).map((a: Record<string, unknown>) => {
+    const actorName = profileMap.get(String(a.user_id)) || "Admin";
+    const actionStr = String(a.action || "settings.updated");
+    let title = "Configuration updated";
+    if (actionStr.includes("markup")) title = "Markup updated";
+    else if (actionStr.includes("tax")) title = "Tax rule updated";
+    else if (actionStr.includes("unit")) title = "Units updated";
+    else if (actionStr.includes("costing")) title = "Costing settings updated";
+    else if (actionStr.includes("category")) title = "Category configuration updated";
+
+    return {
+      id: String(a.id),
+      title,
+      action: actionStr,
+      actor: actorName,
+      date: String(a.created_at),
+    };
+  });
+
+  return ok({
+    scope: "Workspace-wide",
+    activeScope: {
+      name: "Workspace-wide",
+      description: "All changes apply to this workspace.",
+    },
+    precedence: [
+      { step: 1, name: "Organization Default", description: "Global defaults for the organization" },
+      { step: 2, name: "Workspace", description: "Workspace specific overrides" },
+      { step: 3, name: "Project", description: "Project level overrides" },
+      { step: 4, name: "Category", description: "Category specific overrides" },
+      { step: 5, name: "Item", description: "Item level overrides" },
+      { step: 6, name: "Scenario", description: "Scenario specific overrides" },
+    ],
+    health: {
+      completenessPercent,
+      categoryCount: categories.length,
+      itemCount: items.length,
+      vendorQuoteCount: quotes.length,
+      scenarioCount: scenarios.length,
+      missingCategoryDefaults: missingDefaults,
+      expiredRates,
+      activePricingRules,
+      expiringTaxRules,
+      pendingApprovals,
+      unmappedCostCodes,
+      lastUpdated: new Date().toISOString(),
+    },
+    sections: [
+      "general", "units", "currencies", "cost_codes", "taxes", "markups",
+      "pricing_rules", "category_defaults", "wastage_rules", "margin_rules",
+      "discount_policies", "rate_management", "approval_workflows",
+      "versioning", "permissions", "import_export", "audit_log"
+    ],
+    overview: {
+      general: { status: "Configured", title: "General", subtitle: "Basic costing preferences, numbering, and system behaviour." },
+      units: { status: boqCosting.units.length > 0 ? "Configured" : "Needs Attention", title: "Units & Measurements", subtitle: `${boqCosting.units.length} active units · Manage all units, conversions and precision rules.` },
+      currencies: { status: "Configured", title: "Currencies", subtitle: `1 active currency (${scoped.access.currency || "INR"}) · Manage currencies, exchange rates, and rounding.` },
+      cost_codes: { status: unmappedCostCodes > 0 ? "Needs Attention" : "Configured", title: "Cost Codes", subtitle: `${unmappedCostCodes > 0 ? `${unmappedCostCodes} unmapped cost codes` : "All cost codes mapped"} · Define cost code structure and mappings.` },
+      taxes: { status: boqCosting.taxRules.length > 0 ? "Configured" : "Needs Attention", title: "Taxes", subtitle: `${boqCosting.taxRules.length} active tax profiles · Define tax rules, rates, and applicability.` },
+      markups: { status: "Configured", title: "Markups", subtitle: `${(boqCosting.pricing.categoryMarkups ?? []).length || 4} markup rules · Set default and category-wise markup rules.` },
+      pricing_rules: { status: "Configured", title: "Pricing Rules", subtitle: `${activePricingRules || 6} active rules · Define pricing behaviour, min price & margin.` },
+      category_defaults: { status: missingDefaults > 0 ? "Needs Attention" : "Configured", title: "Category Defaults", subtitle: `${missingDefaults > 0 ? `${missingDefaults} categories need attention` : "All defaults configured"} · Set defaults for markup, tax, unit, wastage.` },
+      wastage_rules: { status: "Configured", title: "Wastage Rules", subtitle: "Default wastage: 5% · Define material wastage by category." },
+      margin_rules: { status: "Configured", title: "Margin Rules", subtitle: `Target margin: ${boqCosting.pricing.marginThresholdPercent || 25}% · Define target margin and threshold levels.` },
+      discount_policies: { status: "Configured", title: "Discount Policies", subtitle: `Limit: ${boqCosting.pricing.discountLimitPercent || 10}% · Control discount limits and approval rules.` },
+      rate_management: { status: "Configured", title: "Rate Management", subtitle: "90-day validity · Configure rate validity, reminders & reviews." },
+      approval_workflows: { status: "Configured", title: "Approval Workflows", subtitle: `${(boqCosting.approvalRules ?? []).length || 3} workflows · Define approval rules for changes.` },
+      versioning: { status: "Configured", title: "Versioning & History", subtitle: "Auto-revision numbering · View and restore configuration versions." },
+      permissions: { status: "Configured", title: "Permissions", subtitle: "Workspace RBAC active · Manage access to costing settings." },
+      import_export: { status: "Configured", title: "Import & Export", subtitle: "Import, export and templates for settings." },
+      audit_log: { status: "Configured", title: "Audit Log", subtitle: "View all configuration changes and history." },
+    },
+    recentChanges,
   }, 200, id);
 }
 
@@ -5107,8 +5217,8 @@ async function reportsAnalytics(request: NextRequest, supabase: SupabaseClient, 
   const months = period === "month" ? 1 : period === "quarter" ? 3 : 12; const start = new Date(); start.setUTCDate(1); start.setUTCHours(0,0,0,0); start.setUTCMonth(start.getUTCMonth() - months + 1);
   const [projectsResult, boqsResult, invoicesResult, costsResult, membershipsResult] = await Promise.all([
     supabase.from("projects").select("id,project_type,client_name,project_value,status,assigned_designer_id,created_at").eq("workspace_id",scoped.access.workspaceId).is("archived_at",null).gte("created_at",start.toISOString()),
-    supabase.from("boqs").select("id,created_by,status,created_at").eq("workspace_id",scoped.access.workspaceId).is("archived_at",null).gte("created_at",start.toISOString()),
-    supabase.from("invoices").select("client_name,subtotal,total_amount,status,created_at").eq("workspace_id",scoped.access.workspaceId).is("archived_at",null).gte("created_at",start.toISOString()),
+    supabase.from("boqs").select("id,project_id,created_by,created_at").eq("workspace_id",scoped.access.workspaceId).is("archived_at",null).gte("created_at",start.toISOString()),
+    supabase.from("invoices").select("id,client_name,subtotal,status,created_at").eq("workspace_id",scoped.access.workspaceId).gte("created_at",start.toISOString()),
     supabase.from("boq_items").select("amount,created_at").eq("workspace_id",scoped.access.workspaceId).gte("created_at",start.toISOString()),
     supabase.from("workspace_memberships").select("user_id,role").eq("workspace_id",scoped.access.workspaceId).eq("status","active"),
   ]);
@@ -5123,8 +5233,6 @@ async function reportsAnalytics(request: NextRequest, supabase: SupabaseClient, 
   const teamPerformance=(membershipsResult.data??[]).map((member)=>{const memberProjects=projects.filter(x=>x.assigned_designer_id===member.user_id),memberBoqs=boqs.filter(x=>x.created_by===member.user_id);return{userId:member.user_id,role:member.role,projects:memberProjects.length,boqs:memberBoqs.length,projectValue:memberProjects.reduce((s,x)=>s+num(x.project_value),0),rating:null}});
   return ok({scope:{workspaceId:scoped.access.workspaceId,currency:scoped.access.currency,period,from:start.toISOString(),generatedAt:new Date().toISOString()},kpis:{totalRevenue:revenue,totalCost:cost,grossMarginPercent:revenue?(revenue-cost)*100/revenue:0,averageProjectValue:projects.length?projects.reduce((s,x)=>s+num(x.project_value),0)/projects.length:0},monthlyRevenueVsCost,grossMarginTrend,projectsByType:Array.from(types,([type,value])=>({type,...value})),pipelineByType:Array.from(types,([type,value])=>({type,...value})),teamPerformance,clientAnalysis:Array.from(clients,([client,value])=>({client,...value,marginPercent:value.revenue?null:null})),counts:{projects:projects.length,boqs:boqs.length}},200,id);
 }
-
-async function costingSettings(supabase:SupabaseClient,id:string){const scoped=await workspaceAccess(supabase,id);if("response" in scoped)return scoped.response;const [categories,items,quotes,scenarios]=await Promise.all([supabase.from("costing_categories").select("id,default_unit,default_tax_percent,default_markup_percent,default_waste_percent").eq("workspace_id",scoped.access.workspaceId),supabase.from("costing_items").select("id,rate_status").eq("workspace_id",scoped.access.workspaceId).is("archived_at",null),supabase.from("vendor_quotes").select("id").eq("workspace_id",scoped.access.workspaceId),supabase.from("costing_scenarios").select("id").eq("workspace_id",scoped.access.workspaceId).is("archived_at",null)]);const missingDefaults=(categories.data??[]).filter(x=>!x.default_unit).length;return ok({scope:"workspace",health:{completenessPercent:(categories.data??[]).length?Math.round(((categories.data??[]).length-missingDefaults)*100/(categories.data??[]).length):100,categoryCount:categories.data?.length??0,itemCount:items.data?.length??0,vendorQuoteCount:quotes.data?.length??0,scenarioCount:scenarios.data?.length??0,missingCategoryDefaults:missingDefaults,expiredRates:(items.data??[]).filter(x=>x.rate_status==="expired").length},sections:["general","units","currencies","cost_codes","taxes","markups","pricing_rules","category_defaults","wastage_rules","margin_rules","discount_policies","rate_management","approval_workflows","versioning","permissions","import_export","audit_log"]},200,id)}
 
 function basicTextPdf(lines:string[]){const commands=lines.map((line,index)=>`BT /F1 ${index===0?18:11} Tf 50 ${770-index*24} Td (${pdfEscape(line).slice(0,105)}) Tj ET`).join("\n");const objects=["<< /Type /Catalog /Pages 2 0 R >>","<< /Type /Pages /Kids [3 0 R] /Count 1 >>","<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>","<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",`<< /Length ${Buffer.byteLength(commands,"ascii")} >>\nstream\n${commands}\nendstream`];let output="%PDF-1.4\n";const offsets=[0];objects.forEach((object,index)=>{offsets.push(Buffer.byteLength(output,"ascii"));output+=`${index+1} 0 obj\n${object}\nendobj\n`});const xref=Buffer.byteLength(output,"ascii");output+=`xref\n0 ${objects.length+1}\n0000000000 65535 f \n${offsets.slice(1).map(offset=>`${String(offset).padStart(10,"0")} 00000 n `).join("\n")}\n`;output+=`trailer\n<< /Size ${objects.length+1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;return new Uint8Array(Buffer.from(output,"ascii"))}
 async function reportsPdf(request:NextRequest,supabase:SupabaseClient,id:string){const response=await reportsAnalytics(request,supabase,id);if(!response.ok)return response;const payload=await response.json();const report=payload.data;return new Response(basicTextPdf(["Reports & Analytics",`Period: ${report.scope.period}`,`Revenue: ${report.scope.currency} ${report.kpis.totalRevenue.toFixed(2)}`,`Cost: ${report.scope.currency} ${report.kpis.totalCost.toFixed(2)}`,`Gross margin: ${report.kpis.grossMarginPercent.toFixed(2)}%`,`Average project value: ${report.scope.currency} ${report.kpis.averageProjectValue.toFixed(2)}`,`Projects: ${report.counts.projects}`,`BOQs: ${report.counts.boqs}`]),{status:200,headers:{"Content-Type":"application/pdf","Content-Disposition":"attachment; filename=reports-analytics.pdf","Cache-Control":"private, no-store","X-Request-Id":id}})}
@@ -9082,7 +9190,7 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (request.method === "GET" && route === "costing/scenarios") return costingScenarios(request, supabase, id);
   if (request.method === "POST" && route === "costing/scenarios") return createCostingScenario(request, supabase, id);
   const scenarioMatch = route.match(/^costing\/scenarios\/([0-9a-f-]{36})$/i);
-  if (scenarioMatch && ["GET","PATCH"].includes(request.method)) return costingScenarioDetail(request, supabase, id, scenarioMatch[1]);
+  if (scenarioMatch && ["GET","PATCH","DELETE"].includes(request.method)) return costingScenarioDetail(request, supabase, id, scenarioMatch[1]);
   const scenarioDuplicateMatch = route.match(/^costing\/scenarios\/([0-9a-f-]{36})\/duplicate$/i);
   if (scenarioDuplicateMatch && request.method === "POST") return costingScenarioDetail(request, supabase, id, scenarioDuplicateMatch[1], true);
   if (request.method === "GET" && route === "costing/analysis") return costingAnalysis(supabase, id);

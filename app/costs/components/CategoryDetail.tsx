@@ -1,11 +1,24 @@
 "use client";
 
-import { ArrowLeft, ChevronDown, ChevronLeft, Filter, MoreHorizontal, Plus, Search, Folder, RefreshCw, Layers, ExternalLink, Calendar, User, Tag } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronLeft, Filter, MoreHorizontal, Plus, Search, Folder, RefreshCw, Layers, ExternalLink, Calendar, User, Tag, Copy, Trash2, Edit } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
-import { getCostingCategoryDetail } from "@/lib/api/costing";
+import {
+    getCostingCategoryDetail,
+    deleteCostingCategory,
+    duplicateCostingCategory,
+    deleteCostingItem,
+    duplicateCostingItem
+} from "@/lib/api/costing";
 import type { CostingCategoryBackend, CostingCategoryDetail as CostingCategoryDetailType, CostingItemBackend } from "@/lib/types";
 import NewCategoryModal from "./NewCategoryModal";
+import NewSubCategoryModal from "./NewSubCategoryModal";
+import SubCategoryDetail from "./SubCategoryDetail";
 import AddItemModal from "./AddItemModal";
+import RateStatusDropdown from "@/components/costing/RateStatusDropdown";
+import CostingMoreMenu from "@/components/costing/CostingMoreMenu";
+import CostingFilterPopover from "@/components/costing/CostingFilterPopover";
+import CostingPagination from "@/components/costing/CostingPagination";
+import CostingExcelImportModal from "@/components/costing/CostingExcelImportModal";
 
 type SubTab = "Overview" | "Sub Categories" | "Items" | "Pricing Defaults" | "Activity";
 
@@ -21,13 +34,26 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
+    // Active Sub-Category drilldown state
+    const [activeSubCategory, setActiveSubCategory] = useState<CostingCategoryBackend | null>(null);
+
     // Modals
+    const [isEditCategoryOpen, setIsEditCategoryOpen] = useState(false);
     const [isSubCategoryModalOpen, setIsSubCategoryModalOpen] = useState(false);
     const [isItemModalOpen, setIsItemModalOpen] = useState(false);
+    const [isExcelImportOpen, setIsExcelImportOpen] = useState(false);
 
-    // Sub-category search/filter
+    // Sub-category search/filter & pagination
     const [subCatSearch, setSubCatSearch] = useState("");
+    const [subCatStatus, setSubCatStatus] = useState("all");
+    const [subCatPage, setSubCatPage] = useState(1);
+    const [subCatPageSize, setSubCatPageSize] = useState(10);
+
+    // Item search/filter & pagination
     const [itemSearch, setItemSearch] = useState("");
+    const [itemStatus, setItemStatus] = useState("all");
+    const [itemPage, setItemPage] = useState(1);
+    const [itemPageSize, setItemPageSize] = useState(10);
 
     // Load full dynamic detail from API
     const loadDetail = async () => {
@@ -60,13 +86,13 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
     const tabs: SubTab[] = ["Overview", "Sub Categories", "Items", "Pricing Defaults", "Activity"];
 
     const formatDate = (dateStr?: string) => {
-        if (!dateStr) return "05 Aug 2026";
+        if (!dateStr) return "-";
         try {
             const d = new Date(dateStr);
-            if (isNaN(d.getTime())) return "05 Aug 2026";
+            if (isNaN(d.getTime())) return "-";
             return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
         } catch {
-            return "05 Aug 2026";
+            return "-";
         }
     };
 
@@ -75,34 +101,45 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
         return new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
     };
 
-    // Filter subcategories by search
-    const filteredSubCategories = subCategoriesList.filter((s) =>
-        !subCatSearch || s.name.toLowerCase().includes(subCatSearch.toLowerCase()) || (s.code && s.code.toLowerCase().includes(subCatSearch.toLowerCase()))
-    );
+    // Filter subcategories by search and status
+    const filteredSubCategories = useMemo(() => {
+        return subCategoriesList.filter((s) => {
+            const matchesSearch =
+                !subCatSearch ||
+                s.name.toLowerCase().includes(subCatSearch.toLowerCase()) ||
+                (s.code && s.code.toLowerCase().includes(subCatSearch.toLowerCase()));
+            const matchesStatus =
+                subCatStatus === "all" || (s.status || "ACTIVE").toLowerCase() === subCatStatus.toLowerCase();
+            return matchesSearch && matchesStatus;
+        });
+    }, [subCategoriesList, subCatSearch, subCatStatus]);
 
-    // Filter items by search
-    const filteredItems = itemsList.filter((it) =>
-        !itemSearch || it.name.toLowerCase().includes(itemSearch.toLowerCase()) || (it.code && it.code.toLowerCase().includes(itemSearch.toLowerCase()))
-    );
+    const paginatedSubCategories = useMemo(() => {
+        const start = (subCatPage - 1) * subCatPageSize;
+        return filteredSubCategories.slice(start, start + subCatPageSize);
+    }, [filteredSubCategories, subCatPage, subCatPageSize]);
+
+    // Filter items by search and status
+    const filteredItems = useMemo(() => {
+        return itemsList.filter((it) => {
+            const matchesSearch =
+                !itemSearch ||
+                it.name.toLowerCase().includes(itemSearch.toLowerCase()) ||
+                (it.code && it.code.toLowerCase().includes(itemSearch.toLowerCase()));
+            const matchesStatus =
+                itemStatus === "all" || (it.rate_status || "active").toLowerCase() === itemStatus.toLowerCase();
+            return matchesSearch && matchesStatus;
+        });
+    }, [itemsList, itemSearch, itemStatus]);
+
+    const paginatedItems = useMemo(() => {
+        const start = (itemPage - 1) * itemPageSize;
+        return filteredItems.slice(start, start + itemPageSize);
+    }, [filteredItems, itemPage, itemPageSize]);
 
     // Activity state & pagination
     const [activityPage, setActivityPage] = useState(1);
     const [activityPageSize, setActivityPageSize] = useState(10);
-
-    const formatDateTime = (dateStr?: string) => {
-        if (!dateStr) return "5 Aug 2024, 10:23 AM";
-        try {
-            const d = new Date(dateStr);
-            if (isNaN(d.getTime())) return "5 Aug 2024, 10:23 AM";
-            const day = d.getDate();
-            const month = d.toLocaleDateString("en-GB", { month: "short" });
-            const year = d.getFullYear();
-            const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
-            return `${day} ${month} ${year}, ${time}`;
-        } catch {
-            return "5 Aug 2024, 10:23 AM";
-        }
-    };
 
     const dynamicActivities = useMemo(() => {
         if (detail?.activityLog && detail.activityLog.length > 0) {
@@ -113,8 +150,8 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
             list.push({
                 id: `act-markup-${activeCat.id}`,
                 action: "Markup Updated",
-                details: `Default Markup Changed from 20% to ${activeCat.default_markup_percent}%`,
-                by: "Pradhyumn D",
+                details: `Default Markup Changed to ${activeCat.default_markup_percent}%`,
+                by: "Admin",
                 date: activeCat.updated_at || activeCat.created_at
             });
         }
@@ -122,8 +159,8 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
             list.push({
                 id: `act-sub-${sub.id}`,
                 action: "Sub Category Added",
-                details: `Sub category ${sub.name} Added`,
-                by: "Pradhyumn D",
+                details: `Sub category "${sub.name}" added`,
+                by: "Admin",
                 date: sub.created_at || sub.updated_at || activeCat.updated_at
             });
         }
@@ -131,109 +168,121 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
             list.push({
                 id: `act-item-${itm.id}`,
                 action: "Item Added",
-                details: `${itm.name} Added`,
-                by: "Pradhyumn D",
+                details: `Item "${itm.name}" added`,
+                by: "Admin",
                 date: itm.created_at || itm.updated_at || activeCat.updated_at
             });
         }
         list.push({
-            id: `act-pricing-${activeCat.id}`,
-            action: "Pricing Defaults Updated",
-            details: `Default changed from GST 12% to ${activeCat.default_tax_percent || 18}%`,
-            by: "Pradhyumn D",
-            date: activeCat.created_at
-        });
-        list.push({
             id: `act-created-${activeCat.id}`,
             action: "Category Created",
-            details: `Category "${activeCat.name}" was registered`,
-            by: "Pradhyumn D",
+            details: `Category "${activeCat.name}" registered`,
+            by: "Admin",
             date: activeCat.created_at
         });
         return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [detail?.activityLog, activeCat, subCategoriesList, itemsList]);
 
-    const activityTotalPages = Math.max(1, Math.ceil(dynamicActivities.length / activityPageSize));
-    const paginatedActivities = useMemo(() => {
-        const start = (activityPage - 1) * activityPageSize;
-        return dynamicActivities.slice(start, start + activityPageSize);
-    }, [dynamicActivities, activityPage, activityPageSize]);
+    // Handlers for deleting/duplicating
+    const handleDeleteSubCategory = async (subId: string) => {
+        if (!confirm("Are you sure you want to delete this sub-category?")) return;
+        try {
+            await deleteCostingCategory(subId);
+            await loadDetail();
+        } catch (err) {
+            alert(err instanceof Error ? err.message : "Failed to delete sub-category");
+        }
+    };
+
+    const handleDuplicateSubCategory = async (subId: string) => {
+        try {
+            await duplicateCostingCategory(subId);
+            await loadDetail();
+        } catch (err) {
+            alert(err instanceof Error ? err.message : "Failed to duplicate sub-category");
+        }
+    };
+
+    const handleDeleteItem = async (itemId: string) => {
+        if (!confirm("Are you sure you want to delete this item?")) return;
+        try {
+            await deleteCostingItem(itemId);
+            await loadDetail();
+        } catch (err) {
+            alert(err instanceof Error ? err.message : "Failed to delete item");
+        }
+    };
+
+    const handleDuplicateItem = async (itemId: string) => {
+        try {
+            await duplicateCostingItem(itemId);
+            await loadDetail();
+        } catch (err) {
+            alert(err instanceof Error ? err.message : "Failed to duplicate item");
+        }
+    };
+
+    const handleDuplicateCategory = async () => {
+        try {
+            await duplicateCostingCategory(activeCat.id);
+            alert("Category duplicated successfully");
+            onBack();
+        } catch (err) {
+            alert(err instanceof Error ? err.message : "Failed to duplicate category");
+        }
+    };
+
+    // If viewing a Sub-Category detail
+    if (activeSubCategory) {
+        return (
+            <SubCategoryDetail
+                subCategory={activeSubCategory}
+                parentCategory={activeCat}
+                onBack={() => setActiveSubCategory(null)}
+                onDeleteSuccess={() => {
+                    setActiveSubCategory(null);
+                    void loadDetail();
+                }}
+            />
+        );
+    }
 
     return (
-        <div className="category-detail-container" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-            <style>{`
-                @media (max-width: 1024px) {
-                    .cat-detail-summary-grid {
-                        grid-template-columns: repeat(2, 1fr) !important;
-                    }
-                    .cat-detail-overview-grid {
-                        grid-template-columns: 1fr !important;
-                    }
-                }
-                @media (max-width: 640px) {
-                    .cat-detail-summary-grid {
-                        grid-template-columns: 1fr !important;
-                    }
-                    .cat-detail-header-actions {
-                        flex-direction: column;
-                        align-items: flex-start !important;
-                        gap: 12px !important;
-                    }
-                }
-            `}</style>
-
-            {/* Back Button */}
-            <div
-                style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    color: "#6b7280",
-                    cursor: "pointer",
-                    fontSize: "14px",
-                    fontWeight: 500,
-                    transition: "color 0.15s ease",
-                    width: "fit-content"
-                }}
-                onClick={onBack}
-                className="hover:text-blue-600"
-            >
-                <ArrowLeft size={16} /> Back to Categories
-            </div>
-
-            {/* Header: Title, Status, Description & Action Buttons */}
-            <div
-                className="cat-detail-header-actions"
-                style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                    gap: "24px"
-                }}
-            >
-                <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" }}>
-                        <h2
-                            style={{
-                                fontSize: "24px",
-                                fontWeight: 700,
-                                color: "#111827",
-                                margin: 0,
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "10px"
-                            }}
-                        >
-                            <Folder size={24} color="#475569" />
-                            <span>{activeCat.name}</span>
+        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+            {/* Top Back Navigation & Action Bar */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                    <button
+                        type="button"
+                        onClick={onBack}
+                        style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            background: "transparent",
+                            border: "none",
+                            color: "#2563eb",
+                            fontWeight: 600,
+                            fontSize: "14px",
+                            cursor: "pointer",
+                            padding: 0
+                        }}
+                        className="hover:underline"
+                    >
+                        <ArrowLeft size={16} /> Back to Categories
+                    </button>
+                    <div style={{ width: "1px", height: "16px", background: "#e2e8f0" }} />
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <h2 style={{ fontSize: "24px", fontWeight: 700, color: "#111827", margin: 0 }}>
+                            {activeCat.name}
                         </h2>
                         <span
                             style={{
                                 background: "#ecfdf5",
                                 color: "#10b981",
-                                padding: "4px 10px",
+                                padding: "3px 10px",
                                 borderRadius: "12px",
-                                fontSize: "12px",
+                                fontSize: "11px",
                                 fontWeight: 600,
                                 letterSpacing: "0.04em",
                                 textTransform: "uppercase"
@@ -241,15 +290,27 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                         >
                             {activeCat.status || "ACTIVE"}
                         </span>
+                        {activeCat.code && (
+                            <span
+                                style={{
+                                    background: "#f1f5f9",
+                                    color: "#475569",
+                                    padding: "3px 8px",
+                                    borderRadius: "6px",
+                                    fontSize: "12px",
+                                    fontWeight: 500
+                                }}
+                            >
+                                {activeCat.code}
+                            </span>
+                        )}
                     </div>
-                    <p style={{ color: "#6b7280", margin: 0, fontSize: "14px", maxWidth: "700px", lineHeight: "1.5" }}>
-                        {activeCat.description || "Board and panel products used in interior construction and furniture manufacturing."}
-                    </p>
                 </div>
 
                 <div style={{ display: "flex", gap: "12px", flexShrink: 0 }}>
                     <button
                         type="button"
+                        onClick={handleDuplicateCategory}
                         style={{
                             background: "#fff",
                             border: "1px solid #e5e7eb",
@@ -267,7 +328,7 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                     </button>
                     <button
                         type="button"
-                        onClick={() => setIsSubCategoryModalOpen(true)}
+                        onClick={() => setIsEditCategoryOpen(true)}
                         style={{
                             background: "#fff",
                             border: "1px solid #e5e7eb",
@@ -318,9 +379,8 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                 </div>
             )}
 
-            {/* Top 4 Summary Cards (Responsive Grid matching Figma) */}
+            {/* Dynamic Summary Cards matching Image 1 */}
             <div
-                className="cat-detail-summary-grid"
                 style={{
                     display: "grid",
                     gridTemplateColumns: "repeat(4, 1fr)",
@@ -338,7 +398,7 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                     }}
                 >
                     <div style={{ color: "#6b7280", fontSize: "13px", fontWeight: 500, marginBottom: "8px" }}>Items</div>
-                    <div style={{ fontSize: "28px", fontWeight: 700, color: "#111827", marginBottom: "8px", letterSpacing: "-0.02em" }}>
+                    <div style={{ fontSize: "28px", fontWeight: 700, color: "#111827", marginBottom: "8px" }}>
                         {itemsCount}
                     </div>
                     <button
@@ -351,14 +411,10 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                             color: "#2563eb",
                             fontSize: "13px",
                             fontWeight: 600,
-                            cursor: "pointer",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "4px"
+                            cursor: "pointer"
                         }}
-                        className="hover:underline"
                     >
-                        View Items →
+                        View Items &rarr;
                     </button>
                 </div>
 
@@ -373,7 +429,7 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                     }}
                 >
                     <div style={{ color: "#6b7280", fontSize: "13px", fontWeight: 500, marginBottom: "8px" }}>Sub-Categories</div>
-                    <div style={{ fontSize: "28px", fontWeight: 700, color: "#111827", marginBottom: "8px", letterSpacing: "-0.02em" }}>
+                    <div style={{ fontSize: "28px", fontWeight: 700, color: "#111827", marginBottom: "8px" }}>
                         {subCategoriesCount}
                     </div>
                     <button
@@ -386,14 +442,10 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                             color: "#2563eb",
                             fontSize: "13px",
                             fontWeight: 600,
-                            cursor: "pointer",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "4px"
+                            cursor: "pointer"
                         }}
-                        className="hover:underline"
                     >
-                        View Sub-Categories →
+                        View Sub-Categories &rarr;
                     </button>
                 </div>
 
@@ -408,7 +460,7 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                     }}
                 >
                     <div style={{ color: "#6b7280", fontSize: "13px", fontWeight: 500, marginBottom: "8px" }}>Used in BOQs</div>
-                    <div style={{ fontSize: "28px", fontWeight: 700, color: "#111827", marginBottom: "8px", letterSpacing: "-0.02em" }}>
+                    <div style={{ fontSize: "28px", fontWeight: 700, color: "#111827", marginBottom: "8px" }}>
                         {usedInBoqsCount}
                     </div>
                     <a
@@ -417,14 +469,10 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                             color: "#2563eb",
                             fontSize: "13px",
                             fontWeight: 600,
-                            textDecoration: "none",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "4px"
+                            textDecoration: "none"
                         }}
-                        className="hover:underline"
                     >
-                        View BOQs →
+                        View BOQs &rarr;
                     </a>
                 </div>
 
@@ -439,7 +487,7 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                     }}
                 >
                     <div style={{ color: "#6b7280", fontSize: "13px", fontWeight: 500, marginBottom: "8px" }}>Used in Projects</div>
-                    <div style={{ fontSize: "28px", fontWeight: 700, color: "#111827", marginBottom: "8px", letterSpacing: "-0.02em" }}>
+                    <div style={{ fontSize: "28px", fontWeight: 700, color: "#111827", marginBottom: "8px" }}>
                         {usedInProjectsCount}
                     </div>
                     <a
@@ -448,14 +496,10 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                             color: "#2563eb",
                             fontSize: "13px",
                             fontWeight: 600,
-                            textDecoration: "none",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "4px"
+                            textDecoration: "none"
                         }}
-                        className="hover:underline"
                     >
-                        View Projects →
+                        View Projects &rarr;
                     </a>
                 </div>
             </div>
@@ -496,8 +540,7 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                                 borderRadius: "6px",
                                 cursor: "pointer",
                                 fontSize: "14px",
-                                whiteSpace: "nowrap",
-                                transition: "all 0.15s ease"
+                                whiteSpace: "nowrap"
                             }}
                         >
                             {tab}
@@ -505,7 +548,7 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                     ))}
                 </div>
 
-                {/* Actions on right when in Sub Categories tab */}
+                {/* Sub Categories toolbar: Search, Filter, Import Excel, + Sub-Category */}
                 {activeTab === "Sub Categories" && (
                     <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
                         <label
@@ -526,12 +569,15 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                                 style={{ border: "none", outline: "none", padding: "8px", fontSize: "13px", width: "160px" }}
                             />
                         </label>
+                        <CostingFilterPopover
+                            currentStatus={subCatStatus}
+                            onApply={({ status }) => setSubCatStatus(status)}
+                            onReset={() => setSubCatStatus("all")}
+                        />
                         <button
                             type="button"
+                            onClick={() => setIsExcelImportOpen(true)}
                             style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px",
                                 background: "#fff",
                                 border: "1px solid #e5e7eb",
                                 padding: "8px 14px",
@@ -542,7 +588,7 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                                 color: "#374151"
                             }}
                         >
-                            <Filter size={15} /> Filter
+                            Import Excel
                         </button>
                         <button
                             type="button"
@@ -566,7 +612,7 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                     </div>
                 )}
 
-                {/* Actions on right when in Items tab */}
+                {/* Items toolbar: Search, Filter, Import Excel, + New Item */}
                 {activeTab === "Items" && (
                     <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
                         <label
@@ -587,6 +633,27 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                                 style={{ border: "none", outline: "none", padding: "8px", fontSize: "13px", width: "160px" }}
                             />
                         </label>
+                        <CostingFilterPopover
+                            currentStatus={itemStatus}
+                            onApply={({ status }) => setItemStatus(status)}
+                            onReset={() => setItemStatus("all")}
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setIsExcelImportOpen(true)}
+                            style={{
+                                background: "#fff",
+                                border: "1px solid #e5e7eb",
+                                padding: "8px 14px",
+                                borderRadius: "8px",
+                                fontWeight: 500,
+                                fontSize: "13px",
+                                cursor: "pointer",
+                                color: "#374151"
+                            }}
+                        >
+                            Import Excel
+                        </button>
                         <button
                             type="button"
                             onClick={() => setIsItemModalOpen(true)}
@@ -612,9 +679,9 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
 
             {/* Sub-Tabs Content Area */}
             <div>
+                {/* 1. Overview Tab */}
                 {activeTab === "Overview" && (
                     <div
-                        className="cat-detail-overview-grid"
                         style={{
                             display: "grid",
                             gridTemplateColumns: "1.4fr 1fr 1fr",
@@ -622,7 +689,7 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                             alignItems: "stretch"
                         }}
                     >
-                        {/* Column 1: Category Information */}
+                        {/* Category Information */}
                         <div
                             style={{
                                 background: "#fff",
@@ -669,27 +736,19 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                                     <div style={{ color: "#111827", fontSize: "14px", fontWeight: 500 }}>{formatDate(activeCat.created_at)}</div>
                                 </div>
                                 <div>
-                                    <div style={{ color: "#6b7280", fontSize: "12px", marginBottom: "4px" }}>Created By</div>
-                                    <div style={{ color: "#111827", fontSize: "14px", fontWeight: 500 }}>Admin</div>
-                                </div>
-                                <div>
                                     <div style={{ color: "#6b7280", fontSize: "12px", marginBottom: "4px" }}>Updated On</div>
                                     <div style={{ color: "#111827", fontSize: "14px", fontWeight: 500 }}>{formatDate(activeCat.updated_at)}</div>
-                                </div>
-                                <div>
-                                    <div style={{ color: "#6b7280", fontSize: "12px", marginBottom: "4px" }}>Updated By</div>
-                                    <div style={{ color: "#111827", fontSize: "14px", fontWeight: 500 }}>Admin</div>
                                 </div>
                                 <div style={{ gridColumn: "1 / -1" }}>
                                     <div style={{ color: "#6b7280", fontSize: "12px", marginBottom: "4px" }}>Description</div>
                                     <div style={{ color: "#374151", fontSize: "14px", lineHeight: "1.5" }}>
-                                        {activeCat.description || "Includes plywood, MDF, particle board, HDHMR, and other board materials used for furniture and interior works."}
+                                        {activeCat.description || "Category for organizing items, rates, and margins."}
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Column 2: Hierarchy Card + Pricing Details Card */}
+                        {/* Hierarchy Card + Pricing Details Card */}
                         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
                             {/* Hierarchy Card */}
                             <div
@@ -711,7 +770,7 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                                         textTransform: "uppercase"
                                     }}
                                 >
-                                    HEIRARCHY
+                                    HIERARCHY
                                 </div>
                                 <div
                                     style={{
@@ -749,7 +808,12 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                                     {subCategoriesList.length > 0 && (
                                         <div style={{ paddingLeft: activeCat.parentName ? "32px" : "16px", display: "flex", flexDirection: "column", gap: "6px" }}>
                                             {subCategoriesList.slice(0, 3).map((s) => (
-                                                <div key={s.id} style={{ display: "flex", alignItems: "center", gap: "6px", color: "#64748b", fontSize: "12px" }}>
+                                                <div
+                                                    key={s.id}
+                                                    onClick={() => setActiveSubCategory(s)}
+                                                    style={{ display: "flex", alignItems: "center", gap: "6px", color: "#64748b", fontSize: "12px", cursor: "pointer" }}
+                                                    className="hover:text-blue-600"
+                                                >
                                                     <Layers size={13} color="#94a3b8" />
                                                     <span>{s.name}</span>
                                                 </div>
@@ -792,7 +856,7 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                                         <span style={{ color: "#111827", fontSize: "14px", fontWeight: 600 }}>
                                             {activeCat.default_markup_percent !== null && activeCat.default_markup_percent !== undefined
                                                 ? `${activeCat.default_markup_percent}%`
-                                                : "22%"}
+                                                : "20%"}
                                         </span>
                                     </div>
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -844,38 +908,13 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                                 RECENT ACTIVITY
                             </div>
 
-                            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-                                {[
-                                    {
-                                        title: "Markup Updated",
-                                        desc: `From 20% to ${activeCat.default_markup_percent || 22}% by Pradhyumn`,
-                                        date: formatDate(activeCat.updated_at),
-                                        time: "10:24 AM"
-                                    },
-                                    {
-                                        title: "Sub_Category Added",
-                                        desc: subCategoriesList[0] ? `${subCategoriesList[0].name} added by Admin` : "HDHMR Added by Sai Kiran",
-                                        date: formatDate(activeCat.updated_at),
-                                        time: "10:24 AM"
-                                    },
-                                    {
-                                        title: "Category Created",
-                                        desc: `${activeCat.name} created by Pradhyumn`,
-                                        date: formatDate(activeCat.created_at),
-                                        time: "10:24 AM"
-                                    },
-                                    {
-                                        title: "Defaults Configured",
-                                        desc: `Tax ${activeCat.default_tax_percent || 18}% and Unit ${activeCat.default_unit || "Nos"} set`,
-                                        date: formatDate(activeCat.created_at),
-                                        time: "10:24 AM"
-                                    }
-                                ].map((act, i) => (
-                                    <div key={i} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                                {dynamicActivities.slice(0, 5).map((act) => (
+                                    <div key={act.id} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
                                         <div
                                             style={{
-                                                width: "34px",
-                                                height: "34px",
+                                                width: "32px",
+                                                height: "32px",
                                                 background: "#f1f5f9",
                                                 borderRadius: "50%",
                                                 display: "flex",
@@ -887,17 +926,16 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                                                 flexShrink: 0
                                             }}
                                         >
-                                            {act.title[0]}
+                                            {act.action[0]}
                                         </div>
                                         <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ fontSize: "13px", fontWeight: 600, color: "#111827" }}>{act.title}</div>
-                                            <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                                {act.desc}
+                                            <div style={{ fontSize: "13px", fontWeight: 600, color: "#111827" }}>{act.action}</div>
+                                            <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "2px" }}>
+                                                {act.details}
                                             </div>
                                         </div>
                                         <div style={{ textAlign: "right", flexShrink: 0 }}>
-                                            <div style={{ fontSize: "11px", color: "#6b7280", fontWeight: 500 }}>{act.date}</div>
-                                            <div style={{ fontSize: "11px", color: "#9ca3af" }}>{act.time}</div>
+                                            <div style={{ fontSize: "11px", color: "#9ca3af" }}>{formatDate(act.date)}</div>
                                         </div>
                                     </div>
                                 ))}
@@ -906,7 +944,7 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                     </div>
                 )}
 
-                {/* Sub Categories Tab Content */}
+                {/* 2. Sub Categories Tab */}
                 {activeTab === "Sub Categories" && (
                     <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
                         <div style={{ overflowX: "auto" }}>
@@ -920,21 +958,25 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                                         <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em", textAlign: "center" }}>USED IN PROJECTS</th>
                                         <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>STATUS</th>
                                         <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>UPDATED</th>
-                                        <th style={{ padding: "14px 16px" }}></th>
+                                        <th style={{ padding: "14px 16px", width: "48px" }}></th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {filteredSubCategories.length === 0 ? (
+                                    {paginatedSubCategories.length === 0 ? (
                                         <tr>
                                             <td colSpan={8} style={{ padding: "48px", textAlign: "center", color: "#9ca3af" }}>
                                                 No sub-categories found under {activeCat.name}.
                                             </td>
                                         </tr>
                                     ) : (
-                                        filteredSubCategories.map((sub) => (
+                                        paginatedSubCategories.map((sub) => (
                                             <tr key={sub.id} style={{ borderBottom: "1px solid #f1f5f9" }} className="hover:bg-slate-50">
                                                 <td style={{ padding: "14px 16px", color: "#111827", fontWeight: 600 }}>
-                                                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                                    <div
+                                                        onClick={() => setActiveSubCategory(sub)}
+                                                        style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}
+                                                        className="hover:text-blue-600"
+                                                    >
                                                         <Folder size={15} color="#475569" />
                                                         <span>{sub.name}</span>
                                                     </div>
@@ -965,9 +1007,14 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                                                         {sub.status || "ACTIVE"}
                                                     </span>
                                                 </td>
-                                                <td style={{ padding: "14px 16px", color: "#64748b" }}>{formatDate(sub.updated_at || sub.updated)}</td>
-                                                <td style={{ padding: "14px 16px", color: "#9ca3af", textAlign: "right" }}>
-                                                    <MoreHorizontal size={18} style={{ cursor: "pointer" }} />
+                                                <td style={{ padding: "14px 16px", color: "#64748b" }}>{formatDate(sub.updated_at || sub.created_at)}</td>
+                                                <td style={{ padding: "14px 16px" }}>
+                                                    <CostingMoreMenu
+                                                        entityName="Sub-Category"
+                                                        onView={() => setActiveSubCategory(sub)}
+                                                        onDuplicate={() => handleDuplicateSubCategory(sub.id)}
+                                                        onDelete={() => handleDeleteSubCategory(sub.id)}
+                                                    />
                                                 </td>
                                             </tr>
                                         ))
@@ -976,41 +1023,23 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                             </table>
                         </div>
 
-                        {/* Footer / Pagination */}
-                        <div
-                            style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                padding: "16px 20px",
-                                borderTop: "1px solid #e2e8f0",
-                                fontSize: "13px",
-                                color: "#475569"
-                            }}
-                        >
-                            <div>Total Sub Categories: {filteredSubCategories.length}</div>
-                            <div style={{ display: "flex", gap: "6px" }}>
-                                <button style={{ padding: "6px 12px", border: "1px solid #e2e8f0", borderRadius: "6px", background: "#fff", color: "#94a3b8", cursor: "pointer" }}>
-                                    &lt;
-                                </button>
-                                <button style={{ padding: "6px 12px", border: "1px solid #3b82f6", borderRadius: "6px", background: "#eff6ff", color: "#2563eb", fontWeight: 600 }}>
-                                    1
-                                </button>
-                                <button style={{ padding: "6px 12px", border: "1px solid #e2e8f0", borderRadius: "6px", background: "#fff", color: "#64748b", cursor: "pointer" }}>
-                                    &gt;
-                                </button>
-                            </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                                <span>Show per Page:</span>
-                                <div style={{ border: "1px solid #e2e8f0", borderRadius: "6px", padding: "4px 8px", background: "#fff" }}>
-                                    10 <ChevronDown size={13} style={{ display: "inline" }} />
-                                </div>
-                            </div>
-                        </div>
+                        {filteredSubCategories.length > 0 && (
+                            <CostingPagination
+                                currentPage={subCatPage}
+                                totalPages={Math.max(1, Math.ceil(filteredSubCategories.length / subCatPageSize))}
+                                totalItems={filteredSubCategories.length}
+                                pageSize={subCatPageSize}
+                                onPageChange={setSubCatPage}
+                                onPageSizeChange={(newSize) => {
+                                    setSubCatPageSize(newSize);
+                                    setSubCatPage(1);
+                                }}
+                            />
+                        )}
                     </div>
                 )}
 
-                {/* Items Tab Content */}
+                {/* 3. Items Tab */}
                 {activeTab === "Items" && (
                     <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
                         <div style={{ overflowX: "auto" }}>
@@ -1026,17 +1055,18 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                                         <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>PREFERRED VENDOR</th>
                                         <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>RATE STATUS</th>
                                         <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>UPDATED</th>
+                                        <th style={{ padding: "14px 16px", width: "48px" }}></th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {filteredItems.length === 0 ? (
+                                    {paginatedItems.length === 0 ? (
                                         <tr>
-                                            <td colSpan={9} style={{ padding: "48px", textAlign: "center", color: "#9ca3af" }}>
+                                            <td colSpan={10} style={{ padding: "48px", textAlign: "center", color: "#9ca3af" }}>
                                                 No items under {activeCat.name} yet.
                                             </td>
                                         </tr>
                                     ) : (
-                                        filteredItems.map((item) => {
+                                        paginatedItems.map((item) => {
                                             const base = Number(item.base_cost ?? item.baseCost ?? 0);
                                             const sell = Number(item.selling_rate ?? item.sellingRate ?? 0);
                                             const margin = sell > 0 ? Math.round(((sell - base) * 100) / sell) : 0;
@@ -1085,22 +1115,21 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                                                         {item.preferred_vendor || item.preferredVendor || "-"}
                                                     </td>
                                                     <td style={{ padding: "14px 16px" }}>
-                                                        <span
-                                                            style={{
-                                                                background: item.rate_status === "active" ? "#ecfdf5" : "#fef3c7",
-                                                                color: item.rate_status === "active" ? "#10b981" : "#d97706",
-                                                                padding: "2px 8px",
-                                                                borderRadius: "10px",
-                                                                fontSize: "11px",
-                                                                fontWeight: 600,
-                                                                textTransform: "uppercase"
+                                                        <RateStatusDropdown
+                                                            itemId={item.id}
+                                                            currentStatus={item.rate_status || "active"}
+                                                            onStatusChange={(newStatus) => {
+                                                                void loadDetail();
                                                             }}
-                                                        >
-                                                            {item.rate_status || "ACTIVE"}
-                                                        </span>
+                                                        />
                                                     </td>
-                                                    <td style={{ padding: "14px 16px", color: "#64748b" }}>
-                                                        {formatDate(item.updated_at || item.updatedAt)}
+                                                    <td style={{ padding: "14px 16px", color: "#64748b" }}>{formatDate(item.updated_at || item.created_at)}</td>
+                                                    <td style={{ padding: "14px 16px" }}>
+                                                        <CostingMoreMenu
+                                                            entityName="Item"
+                                                            onDuplicate={() => handleDuplicateItem(item.id)}
+                                                            onDelete={() => handleDeleteItem(item.id)}
+                                                        />
                                                     </td>
                                                 </tr>
                                             );
@@ -1110,305 +1139,84 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                             </table>
                         </div>
 
-                        {/* Footer */}
-                        <div
-                            style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                padding: "16px 20px",
-                                borderTop: "1px solid #e2e8f0",
-                                fontSize: "13px",
-                                color: "#475569"
-                            }}
-                        >
-                            <div>Total Items: {filteredItems.length}</div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Pricing Defaults Tab Content */}
-                {activeTab === "Pricing Defaults" && (
-                    <div
-                        className="cat-detail-overview-grid"
-                        style={{
-                            display: "grid",
-                            gridTemplateColumns: "2fr 1fr",
-                            gap: "24px"
-                        }}
-                    >
-                        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "24px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-                            <div style={{ color: "#6b7280", fontSize: "12px", fontWeight: 700, letterSpacing: "0.05em", marginBottom: "20px", textTransform: "uppercase" }}>
-                                Pricing Defaults
-                            </div>
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px 32px", background: "#f8fafc", padding: "24px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
-                                <div>
-                                    <div style={{ color: "#6b7280", fontSize: "12px", marginBottom: "4px" }}>Default Markup</div>
-                                    <div style={{ color: "#111827", fontSize: "16px", fontWeight: 600 }}>{activeCat.default_markup_percent ?? 22}%</div>
-                                </div>
-                                <div>
-                                    <div style={{ color: "#6b7280", fontSize: "12px", marginBottom: "4px" }}>Default Tax</div>
-                                    <div style={{ color: "#111827", fontSize: "16px", fontWeight: 600 }}>GST {activeCat.default_tax_percent ?? 18}%</div>
-                                </div>
-                                <div>
-                                    <div style={{ color: "#6b7280", fontSize: "12px", marginBottom: "4px" }}>Default Wastage</div>
-                                    <div style={{ color: "#111827", fontSize: "16px", fontWeight: 600 }}>{activeCat.default_waste_percent ?? 5}%</div>
-                                </div>
-                                <div>
-                                    <div style={{ color: "#6b7280", fontSize: "12px", marginBottom: "4px" }}>Default Unit</div>
-                                    <div style={{ color: "#111827", fontSize: "16px", fontWeight: 600 }}>{activeCat.default_unit || "Nos"}</div>
-                                </div>
-                                <div>
-                                    <div style={{ color: "#6b7280", fontSize: "12px", marginBottom: "4px" }}>Transportation Included</div>
-                                    <div style={{ color: "#111827", fontSize: "16px", fontWeight: 600 }}>{activeCat.transport_included ? "Yes" : "No"}</div>
-                                </div>
-                                <div>
-                                    <div style={{ color: "#6b7280", fontSize: "12px", marginBottom: "4px" }}>Labour Included</div>
-                                    <div style={{ color: "#111827", fontSize: "16px", fontWeight: 600 }}>{activeCat.labour_included ? "Yes" : "No"}</div>
-                                </div>
-                                <div>
-                                    <div style={{ color: "#6b7280", fontSize: "12px", marginBottom: "4px" }}>Cost Code</div>
-                                    <div style={{ color: "#111827", fontSize: "16px", fontWeight: 600 }}>{activeCat.code || "-"}</div>
-                                </div>
-                                <div>
-                                    <div style={{ color: "#6b7280", fontSize: "12px", marginBottom: "4px" }}>Rate Effected From</div>
-                                    <div style={{ color: "#111827", fontSize: "16px", fontWeight: 600 }}>{formatDate(activeCat.updated_at)}</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-                            <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "24px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-                                <div style={{ color: "#6b7280", fontSize: "12px", fontWeight: 700, letterSpacing: "0.05em", marginBottom: "20px", textTransform: "uppercase" }}>
-                                    Inherited From
-                                </div>
-                                <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                                    <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                        <span style={{ color: "#6b7280", fontSize: "13px" }}>Parent Category</span>
-                                        <span style={{ color: "#111827", fontSize: "14px", fontWeight: 600 }}>{activeCat.parentName || "-"}</span>
-                                    </div>
-                                    <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                        <span style={{ color: "#6b7280", fontSize: "13px" }}>Organisation Defaults</span>
-                                        <span style={{ color: "#111827", fontSize: "14px", fontWeight: 600 }}>Org Default V2.3</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "24px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-                                <div style={{ color: "#6b7280", fontSize: "12px", fontWeight: 700, letterSpacing: "0.05em", marginBottom: "20px", textTransform: "uppercase" }}>
-                                    Last Updated
-                                </div>
-                                <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                                    <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                        <span style={{ color: "#6b7280", fontSize: "13px" }}>Updated On</span>
-                                        <span style={{ color: "#111827", fontSize: "14px", fontWeight: 600 }}>{formatDate(activeCat.updated_at)}</span>
-                                    </div>
-                                    <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                        <span style={{ color: "#6b7280", fontSize: "13px" }}>Updated By</span>
-                                        <span style={{ color: "#111827", fontSize: "14px", fontWeight: 600 }}>Admin</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Activity Tab Content */}
-                {activeTab === "Activity" && (
-                    <div
-                        style={{
-                            background: "#fff",
-                            borderRadius: "12px",
-                            border: "1px solid #e5e7eb",
-                            overflow: "hidden",
-                            boxShadow: "0 1px 3px rgba(0,0,0,0.04)"
-                        }}
-                    >
-                        <div style={{ overflowX: "auto" }}>
-                            <table
-                                style={{
-                                    width: "100%",
-                                    borderCollapse: "collapse",
-                                    textAlign: "left",
-                                    fontSize: "13px",
-                                    minWidth: "800px"
+                        {filteredItems.length > 0 && (
+                            <CostingPagination
+                                currentPage={itemPage}
+                                totalPages={Math.max(1, Math.ceil(filteredItems.length / itemPageSize))}
+                                totalItems={filteredItems.length}
+                                pageSize={itemPageSize}
+                                onPageChange={setItemPage}
+                                onPageSizeChange={(newSize) => {
+                                    setItemPageSize(newSize);
+                                    setItemPage(1);
                                 }}
-                            >
-                                <thead>
-                                    <tr
-                                        style={{
-                                            background: "#f8fafc",
-                                            color: "#64748b",
-                                            borderBottom: "1px solid #e2e8f0"
-                                        }}
-                                    >
-                                        <th style={{ padding: "14px 24px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                                            ACTION
-                                        </th>
-                                        <th style={{ padding: "14px 24px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                                            DETAILS
-                                        </th>
-                                        <th style={{ padding: "14px 24px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                                            BY
-                                        </th>
-                                        <th style={{ padding: "14px 24px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                                            DATE
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {paginatedActivities.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={4} style={{ padding: "48px", textAlign: "center", color: "#9ca3af" }}>
-                                                No activity recorded for this category yet.
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        paginatedActivities.map((act) => (
-                                            <tr
-                                                key={act.id}
-                                                style={{ borderBottom: "1px solid #f1f5f9" }}
-                                                className="hover:bg-slate-50"
-                                            >
-                                                <td style={{ padding: "16px 24px", fontWeight: 600, color: "#111827", fontSize: "13px" }}>
-                                                    {act.action}
-                                                </td>
-                                                <td style={{ padding: "16px 24px", color: "#475569", fontSize: "13px" }}>
-                                                    {act.details}
-                                                </td>
-                                                <td style={{ padding: "16px 24px", color: "#475569", fontSize: "13px" }}>
-                                                    {act.by}
-                                                </td>
-                                                <td style={{ padding: "16px 24px", color: "#64748b", fontSize: "13px" }}>
-                                                    {formatDateTime(act.date)}
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                            />
+                        )}
+                    </div>
+                )}
 
-                        {/* Table Footer / Pagination */}
-                        <div
-                            style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                padding: "16px 24px",
-                                borderTop: "1px solid #e2e8f0",
-                                fontSize: "13px",
-                                color: "#475569",
-                                background: "#fff"
-                            }}
-                        >
-                            <div>Total Activity: {dynamicActivities.length}</div>
-                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                                <button
-                                    type="button"
-                                    onClick={() => setActivityPage((p) => Math.max(1, p - 1))}
-                                    disabled={activityPage === 1}
-                                    style={{
-                                        width: "32px",
-                                        height: "32px",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        border: "1px solid #e2e8f0",
-                                        borderRadius: "6px",
-                                        background: "#fff",
-                                        color: activityPage === 1 ? "#cbd5e1" : "#475569",
-                                        cursor: activityPage === 1 ? "not-allowed" : "pointer"
-                                    }}
-                                >
-                                    &lt;
-                                </button>
-                                {Array.from({ length: activityTotalPages }, (_, i) => i + 1).slice(0, 5).map((p) => (
-                                    <button
-                                        key={p}
-                                        type="button"
-                                        onClick={() => setActivityPage(p)}
-                                        style={{
-                                            width: "32px",
-                                            height: "32px",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            border: p === activityPage ? "1px solid #3b82f6" : "1px solid #e2e8f0",
-                                            borderRadius: "6px",
-                                            background: p === activityPage ? "#eff6ff" : "#fff",
-                                            color: p === activityPage ? "#2563eb" : "#475569",
-                                            fontWeight: p === activityPage ? 600 : 500,
-                                            cursor: "pointer"
-                                        }}
-                                    >
-                                        {p}
-                                    </button>
-                                ))}
-                                <button
-                                    type="button"
-                                    onClick={() => setActivityPage((p) => Math.min(activityTotalPages, p + 1))}
-                                    disabled={activityPage === activityTotalPages}
-                                    style={{
-                                        width: "32px",
-                                        height: "32px",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        border: "1px solid #e2e8f0",
-                                        borderRadius: "6px",
-                                        background: "#fff",
-                                        color: activityPage === activityTotalPages ? "#cbd5e1" : "#475569",
-                                        cursor: activityPage === activityTotalPages ? "not-allowed" : "pointer"
-                                    }}
-                                >
-                                    &gt;
-                                </button>
-                            </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                <span>Show per Page:</span>
-                                <div style={{ position: "relative" }}>
-                                    <select
-                                        value={activityPageSize}
-                                        onChange={(e) => {
-                                            setActivityPageSize(Number(e.target.value));
-                                            setActivityPage(1);
-                                        }}
-                                        style={{
-                                            padding: "6px 28px 6px 12px",
-                                            borderRadius: "6px",
-                                            border: "1px solid #e2e8f0",
-                                            fontSize: "13px",
-                                            color: "#1e293b",
-                                            background: "#fff",
-                                            appearance: "none",
-                                            cursor: "pointer"
-                                        }}
-                                    >
-                                        <option value={10}>10</option>
-                                        <option value={20}>20</option>
-                                        <option value={50}>50</option>
-                                    </select>
-                                    <ChevronDown
-                                        size={13}
-                                        color="#64748b"
-                                        style={{
-                                            position: "absolute",
-                                            right: "8px",
-                                            top: "50%",
-                                            transform: "translateY(-50%)",
-                                            pointerEvents: "none"
-                                        }}
-                                    />
+                {/* 4. Pricing Defaults Tab */}
+                {activeTab === "Pricing Defaults" && (
+                    <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", padding: "24px" }}>
+                        <h4 style={{ margin: "0 0 16px 0", fontSize: "16px", fontWeight: 600, color: "#111827" }}>
+                            Pricing Defaults for {activeCat.name}
+                        </h4>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px" }}>
+                            <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "8px" }}>
+                                <div style={{ fontSize: "12px", color: "#64748b" }}>Default Markup</div>
+                                <div style={{ fontSize: "20px", fontWeight: 700, color: "#1e293b", marginTop: "4px" }}>
+                                    {activeCat.default_markup_percent ?? 20}%
                                 </div>
                             </div>
+                            <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "8px" }}>
+                                <div style={{ fontSize: "12px", color: "#64748b" }}>Default Tax (GST)</div>
+                                <div style={{ fontSize: "20px", fontWeight: 700, color: "#1e293b", marginTop: "4px" }}>
+                                    {activeCat.default_tax_percent ?? 18}%
+                                </div>
+                            </div>
+                            <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "8px" }}>
+                                <div style={{ fontSize: "12px", color: "#64748b" }}>Default Wastage</div>
+                                <div style={{ fontSize: "20px", fontWeight: 700, color: "#1e293b", marginTop: "4px" }}>
+                                    {activeCat.default_waste_percent ?? 5}%
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* 5. Activity Tab */}
+                {activeTab === "Activity" && (
+                    <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", padding: "24px" }}>
+                        <h4 style={{ margin: "0 0 16px 0", fontSize: "16px", fontWeight: 600, color: "#111827" }}>
+                            Activity History
+                        </h4>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                            {dynamicActivities.map((act) => (
+                                <div key={act.id} style={{ display: "flex", justifyContent: "space-between", padding: "12px", background: "#f8fafc", borderRadius: "8px" }}>
+                                    <div>
+                                        <div style={{ fontWeight: 600, color: "#1e293b", fontSize: "13px" }}>{act.action}</div>
+                                        <div style={{ color: "#64748b", fontSize: "12px" }}>{act.details}</div>
+                                    </div>
+                                    <div style={{ color: "#94a3b8", fontSize: "12px" }}>{formatDate(act.date)}</div>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* Create Subcategory Modal */}
+            {/* Create / Edit Category Modal */}
             <NewCategoryModal
+                isOpen={isEditCategoryOpen}
+                onClose={() => setIsEditCategoryOpen(false)}
+                onSuccess={() => {
+                    void loadDetail();
+                }}
+                categories={allCategories.length ? allCategories : [category]}
+            />
+
+            {/* Create Subcategory Modal (Uses dedicated NewSubCategoryModal with 3 fields!) */}
+            <NewSubCategoryModal
                 isOpen={isSubCategoryModalOpen}
                 onClose={() => setIsSubCategoryModalOpen(false)}
                 onSuccess={() => {
@@ -1425,7 +1233,15 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                 onSuccess={() => {
                     void loadDetail();
                 }}
-                existingVendors={[]}
+            />
+
+            {/* Excel Import Modal */}
+            <CostingExcelImportModal
+                isOpen={isExcelImportOpen}
+                onClose={() => setIsExcelImportOpen(false)}
+                onSuccess={() => {
+                    void loadDetail();
+                }}
             />
         </div>
     );

@@ -1,10 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { ChevronDown, MoreHorizontal, Copy, Edit2, Trash2, Plus, RefreshCw } from "lucide-react";
-import { getCostingItems } from "@/lib/api/costing";
+import { useState, useEffect, useMemo } from "react";
+import { Plus, RefreshCw, Search, SlidersHorizontal, Tag } from "lucide-react";
+import { getCostingItems, deleteCostingItem, duplicateCostingItem } from "@/lib/api/costing";
 import type { CostingItemBackend } from "@/lib/types";
 import AddItemModal from "./AddItemModal";
+import RateStatusDropdown from "@/components/costing/RateStatusDropdown";
+import CostingMoreMenu from "@/components/costing/CostingMoreMenu";
+import CostingFilterPopover from "@/components/costing/CostingFilterPopover";
+import CostingPagination from "@/components/costing/CostingPagination";
+import CostingExcelImportModal from "@/components/costing/CostingExcelImportModal";
 
 interface LibraryTabProps {
     isAddOpen?: boolean;
@@ -16,17 +21,28 @@ export default function LibraryTab({ isAddOpen, setIsAddOpen }: LibraryTabProps)
     const showAddModal = isAddOpen !== undefined ? isAddOpen : internalAddOpen;
     const setShowAddModal = setIsAddOpen || setInternalAddOpen;
 
-    const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+    const [isImportOpen, setIsImportOpen] = useState(false);
     const [items, setItems] = useState<CostingItemBackend[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+
+    // Filter & Pagination states
+    const [searchQuery, setSearchQuery] = useState("");
+    const [rateStatusFilter, setRateStatusFilter] = useState("all");
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
 
     const loadData = async () => {
         setLoading(true);
         setError("");
         try {
-            const res = await getCostingItems();
-            setItems(res.items);
+            const res = await getCostingItems({
+                page: 1,
+                pageSize: 200,
+                search: searchQuery.trim() || undefined,
+                rateStatus: rateStatusFilter !== "all" ? rateStatusFilter : undefined
+            });
+            setItems(res.items || []);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to load items");
         } finally {
@@ -36,11 +52,64 @@ export default function LibraryTab({ isAddOpen, setIsAddOpen }: LibraryTabProps)
 
     useEffect(() => {
         void loadData();
-    }, []);
+    }, [rateStatusFilter]);
+
+    // Client-side search & status filtering for responsive responsiveness
+    const filteredItems = useMemo(() => {
+        return items.filter((item) => {
+            const matchesSearch =
+                !searchQuery ||
+                item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (item.code && item.code.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                (item.category && item.category.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                (item.preferred_vendor && item.preferred_vendor.toLowerCase().includes(searchQuery.toLowerCase()));
+
+            const currentStatus = (item.rate_status || item.rateStatus || "active").toLowerCase();
+            const matchesStatus = rateStatusFilter === "all" || currentStatus === rateStatusFilter.toLowerCase();
+
+            return matchesSearch && matchesStatus;
+        });
+    }, [items, searchQuery, rateStatusFilter]);
+
+    // Paginate
+    const paginatedItems = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filteredItems.slice(start, start + pageSize);
+    }, [filteredItems, currentPage, pageSize]);
 
     const formatMoney = (val: number | null | undefined) => {
         const num = Number(val || 0);
         return new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
+    };
+
+    const formatDate = (dateStr?: string) => {
+        if (!dateStr) return "-";
+        try {
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return "-";
+            return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+        } catch {
+            return "-";
+        }
+    };
+
+    const handleDeleteItem = async (itemId: string) => {
+        if (!confirm("Are you sure you want to delete this item?")) return;
+        try {
+            await deleteCostingItem(itemId);
+            setItems((prev) => prev.filter((i) => i.id !== itemId));
+        } catch (err) {
+            alert(err instanceof Error ? err.message : "Failed to delete item");
+        }
+    };
+
+    const handleDuplicateItem = async (itemId: string) => {
+        try {
+            await duplicateCostingItem(itemId);
+            await loadData();
+        } catch (err) {
+            alert(err instanceof Error ? err.message : "Failed to duplicate item");
+        }
     };
 
     const existingVendors = Array.from(
@@ -52,9 +121,86 @@ export default function LibraryTab({ isAddOpen, setIsAddOpen }: LibraryTabProps)
     );
 
     return (
-        <div style={{ position: "relative" }}>
+        <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: "16px" }}>
+            {/* Toolbar: Search, Filter, Import Excel, + New Item */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <label
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            background: "#fff",
+                            border: "1px solid #e5e7eb",
+                            borderRadius: "8px",
+                            padding: "0 12px"
+                        }}
+                    >
+                        <Search size={16} color="#6b7280" />
+                        <input
+                            placeholder="Search item, code, vendor..."
+                            value={searchQuery}
+                            onChange={(e) => {
+                                setSearchQuery(e.target.value);
+                                setCurrentPage(1);
+                            }}
+                            style={{ border: "none", outline: "none", padding: "8px", fontSize: "14px", width: "240px" }}
+                        />
+                    </label>
+                    <CostingFilterPopover
+                        currentStatus={rateStatusFilter}
+                        onApply={({ status }) => {
+                            setRateStatusFilter(status);
+                            setCurrentPage(1);
+                        }}
+                        onReset={() => {
+                            setRateStatusFilter("all");
+                            setCurrentPage(1);
+                        }}
+                    />
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <button
+                        type="button"
+                        onClick={() => setIsImportOpen(true)}
+                        style={{
+                            background: "#fff",
+                            border: "1px solid #e5e7eb",
+                            padding: "8px 16px",
+                            borderRadius: "8px",
+                            fontWeight: 500,
+                            fontSize: "13px",
+                            cursor: "pointer",
+                            color: "#374151"
+                        }}
+                    >
+                        Import Excel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setShowAddModal(true)}
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            background: "#2563eb",
+                            color: "#fff",
+                            border: "none",
+                            padding: "8px 18px",
+                            borderRadius: "8px",
+                            fontWeight: 600,
+                            fontSize: "13px",
+                            cursor: "pointer",
+                            boxShadow: "0 1px 2px rgba(37,99,235,0.2)"
+                        }}
+                    >
+                        <Plus size={16} /> New Item
+                    </button>
+                </div>
+            </div>
+
             {error && (
-                <div style={{ padding: "16px", background: "#fef2f2", color: "#b91c1c", borderRadius: "10px", marginBottom: "16px", display: "flex", justifyContent: "space-between", alignItems: "center", border: "1px solid #fecaca" }}>
+                <div style={{ padding: "16px", background: "#fef2f2", color: "#b91c1c", borderRadius: "10px", display: "flex", justifyContent: "space-between", alignItems: "center", border: "1px solid #fecaca" }}>
                     <span>{error}</span>
                     <button onClick={loadData} style={{ background: "none", border: "none", color: "#b91c1c", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px", fontWeight: 600 }}>
                         <RefreshCw size={16} /> Retry
@@ -62,37 +208,39 @@ export default function LibraryTab({ isAddOpen, setIsAddOpen }: LibraryTabProps)
                 </div>
             )}
 
+            {/* Table Container */}
             <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
                 <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "14px", minWidth: "900px" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "14px", minWidth: "980px" }}>
                         <thead>
                             <tr style={{ background: "#f8fafc", color: "#64748b", borderBottom: "1px solid #e2e8f0" }}>
-                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "12px", letterSpacing: "0.05em" }}>ITEM</th>
-                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "12px", letterSpacing: "0.05em" }}>TYPE</th>
-                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "12px", letterSpacing: "0.05em" }}>CATEGORY</th>
-                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "12px", letterSpacing: "0.05em" }}>UNIT</th>
-                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "12px", letterSpacing: "0.05em" }}>BASE COST (₹)</th>
-                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "12px", letterSpacing: "0.05em" }}>SELLING RATE (₹)</th>
-                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "12px", letterSpacing: "0.05em" }}>MARGIN</th>
-                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "12px", letterSpacing: "0.05em" }}>PREFERRED VENDOR</th>
-                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "12px", letterSpacing: "0.05em" }}>RATE STATUS</th>
-                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "12px", letterSpacing: "0.05em" }}>UPDATED</th>
-                                <th style={{ padding: "14px 16px" }}></th>
+                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>ITEM</th>
+                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>CATEGORY</th>
+                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>UNIT</th>
+                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>BASE COST (₹)</th>
+                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>SELLING RATE (₹)</th>
+                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>MARGIN</th>
+                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>PREFERRED VENDOR</th>
+                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>RATE STATUS</th>
+                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>UPDATED</th>
+                                <th style={{ padding: "14px 16px", width: "48px" }}></th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={11} style={{ textAlign: "center", padding: "48px", color: "#64748b" }}>
+                                    <td colSpan={10} style={{ textAlign: "center", padding: "48px", color: "#64748b" }}>
                                         <RefreshCw size={24} className="animate-spin" style={{ margin: "0 auto 8px", display: "block", color: "#3b82f6" }} />
                                         Loading items...
                                     </td>
                                 </tr>
-                            ) : items.length === 0 ? (
+                            ) : filteredItems.length === 0 ? (
                                 <tr>
-                                    <td colSpan={11} style={{ textAlign: "center", padding: "48px 24px", color: "#64748b" }}>
-                                        <div style={{ fontSize: "16px", fontWeight: 600, color: "#1e293b", marginBottom: "6px" }}>No items found in library</div>
-                                        <p style={{ margin: "0 0 16px 0", fontSize: "13.5px", color: "#94a3b8" }}>Get started by adding materials, furniture, or custom costing items.</p>
+                                    <td colSpan={10} style={{ textAlign: "center", padding: "48px 24px", color: "#64748b" }}>
+                                        <div style={{ fontSize: "16px", fontWeight: 600, color: "#1e293b", marginBottom: "6px" }}>No items found</div>
+                                        <p style={{ margin: "0 0 16px 0", fontSize: "13.5px", color: "#94a3b8" }}>
+                                            {searchQuery || rateStatusFilter !== "all" ? "No items match your filters." : "Get started by adding items or importing from Excel."}
+                                        </p>
                                         <button
                                             type="button"
                                             onClick={() => setShowAddModal(true)}
@@ -107,7 +255,7 @@ export default function LibraryTab({ isAddOpen, setIsAddOpen }: LibraryTabProps)
                                                 cursor: "pointer",
                                                 display: "inline-flex",
                                                 alignItems: "center",
-                                                gap: "6px",
+                                                gap: "6px"
                                             }}
                                         >
                                             <Plus size={16} /> Add Your First Item
@@ -115,16 +263,16 @@ export default function LibraryTab({ isAddOpen, setIsAddOpen }: LibraryTabProps)
                                     </td>
                                 </tr>
                             ) : (
-                                items.map((item) => {
+                                paginatedItems.map((item) => {
                                     const base = Number(item.baseCost ?? item.base_cost ?? 0);
                                     const selling = Number(item.sellingRate ?? item.selling_rate ?? 0);
-                                    const marginVal = item.marginPercent ?? (selling > 0 ? ((selling - base) / selling) * 100 : 0);
+                                    const marginVal = selling > 0 ? ((selling - base) / selling) * 100 : 0;
                                     const vendorName = item.preferredVendor || item.vendor || item.preferred_vendor || "-";
-                                    const statusLabel = (item.rateStatus || item.rate_status || "active").toUpperCase();
                                     const itemImage = item.imageUrl || item.image_url;
 
                                     return (
                                         <tr key={item.id} style={{ borderBottom: "1px solid #f1f5f9", transition: "background 0.15s" }} className="hover:bg-gray-50">
+                                            {/* Item */}
                                             <td style={{ padding: "14px 16px" }}>
                                                 <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                                                     {itemImage ? (
@@ -140,39 +288,31 @@ export default function LibraryTab({ isAddOpen, setIsAddOpen }: LibraryTabProps)
                                                     )}
                                                     <div>
                                                         <div style={{ fontWeight: 600, color: "#0f172a", fontSize: "14px" }}>{item.name}</div>
-                                                        <div style={{ color: "#94a3b8", fontSize: "12px" }}>{item.code}</div>
+                                                        <div style={{ color: "#94a3b8", fontSize: "12px" }}>{item.code || "-"}</div>
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td style={{ padding: "14px 16px" }}>
-                                                <span style={{
-                                                    background: statusLabel === "ACTIVE" || statusLabel === "APPROVED" ? "#ecfdf5" : "#f1f5f9",
-                                                    color: statusLabel === "ACTIVE" || statusLabel === "APPROVED" ? "#10b981" : "#475569",
-                                                    padding: "4px 10px",
-                                                    borderRadius: "12px",
-                                                    fontSize: "12px",
-                                                    fontWeight: 600,
-                                                    display: "inline-block",
-                                                }}>
-                                                    {statusLabel === "ACTIVE" ? "APPROVED" : statusLabel}
-                                                </span>
-                                            </td>
+
+                                            {/* Category */}
                                             <td style={{ padding: "14px 16px", color: "#334155" }}>
-                                                {(item.category ?? item.category_id ?? "-").split(" > ").map((p: string, i: number) => (
-                                                    <span key={i}>
-                                                        {i > 0 && <br />}
-                                                        <span style={{ color: i === 0 ? "#0f172a" : "#64748b", fontWeight: i === 0 ? 500 : 400, fontSize: i === 0 ? "13.5px" : "12px" }}>
-                                                            {i > 0 && "> "}{p}
-                                                        </span>
-                                                    </span>
-                                                ))}
+                                                {item.category || item.category_id || "-"}
                                             </td>
-                                            <td style={{ padding: "14px 16px", color: "#475569" }}>{item.unit}</td>
+
+                                            {/* Unit */}
+                                            <td style={{ padding: "14px 16px", color: "#475569" }}>{item.unit || "Nos"}</td>
+
+                                            {/* Base Cost */}
                                             <td style={{ padding: "14px 16px", color: "#0f172a", fontWeight: 500 }}>{formatMoney(base)}</td>
+
+                                            {/* Selling Rate */}
                                             <td style={{ padding: "14px 16px", color: "#0f172a", fontWeight: 500 }}>{formatMoney(selling)}</td>
+
+                                            {/* Margin */}
                                             <td style={{ padding: "14px 16px", color: marginVal >= 0 ? "#10b981" : "#ef4444", fontWeight: 600 }}>
                                                 {marginVal.toFixed(1)}%
                                             </td>
+
+                                            {/* Vendor */}
                                             <td style={{ padding: "14px 16px" }}>
                                                 <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#334155" }}>
                                                     {vendorName !== "-" && (
@@ -183,39 +323,32 @@ export default function LibraryTab({ isAddOpen, setIsAddOpen }: LibraryTabProps)
                                                     <span>{vendorName}</span>
                                                 </div>
                                             </td>
-                                            <td style={{ padding: "14px 16px" }}>
-                                                <div style={{ display: "flex", alignItems: "center", gap: "4px", color: "#64748b", fontSize: "13px" }}>
-                                                    <span style={{ textTransform: "capitalize" }}>{item.rateStatus || item.rate_status || "Active"}</span>
-                                                    <ChevronDown size={14} />
-                                                </div>
-                                            </td>
-                                            <td style={{ padding: "14px 16px", color: "#64748b", fontSize: "13px" }}>
-                                                {item.updatedAt ? new Date(item.updatedAt).toLocaleDateString("en-IN") : item.updated_at ? new Date(item.updated_at).toLocaleDateString("en-IN") : "-"}
-                                            </td>
-                                            <td style={{ padding: "14px 16px", position: "relative" }}>
-                                                <button
-                                                    style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", padding: "4px", borderRadius: "4px" }}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setActiveDropdown(activeDropdown === item.id ? null : item.id);
-                                                    }}
-                                                >
-                                                    <MoreHorizontal size={18} />
-                                                </button>
 
-                                                {activeDropdown === item.id && (
-                                                    <div style={{ position: "absolute", right: "20px", top: "40px", background: "#fff", borderRadius: "10px", boxShadow: "0 10px 25px rgba(0,0,0,0.12)", zIndex: 10, width: "160px", border: "1px solid #e2e8f0", overflow: "hidden" }}>
-                                                        <button style={{ width: "100%", textAlign: "left", padding: "10px 14px", background: "none", border: "none", display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", color: "#334155", fontSize: "13.5px" }}>
-                                                            <Edit2 size={15} /> Edit Item
-                                                        </button>
-                                                        <button style={{ width: "100%", textAlign: "left", padding: "10px 14px", background: "none", border: "none", display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", color: "#334155", fontSize: "13.5px" }}>
-                                                            <Copy size={15} /> Duplicate Item
-                                                        </button>
-                                                        <button style={{ width: "100%", textAlign: "left", padding: "10px 14px", background: "none", border: "none", display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", color: "#ef4444", fontSize: "13.5px" }}>
-                                                            <Trash2 size={15} /> Delete Item
-                                                        </button>
-                                                    </div>
-                                                )}
+                                            {/* Rate Status Dropdown */}
+                                            <td style={{ padding: "14px 16px" }}>
+                                                <RateStatusDropdown
+                                                    itemId={item.id}
+                                                    currentStatus={item.rate_status || item.rateStatus || "active"}
+                                                    onStatusChange={(newStatus) => {
+                                                        setItems((prev) =>
+                                                            prev.map((i) => (i.id === item.id ? { ...i, rate_status: newStatus, rateStatus: newStatus } : i))
+                                                        );
+                                                    }}
+                                                />
+                                            </td>
+
+                                            {/* Updated */}
+                                            <td style={{ padding: "14px 16px", color: "#64748b", fontSize: "13px" }}>
+                                                {formatDate(item.updated_at || item.updatedAt)}
+                                            </td>
+
+                                            {/* Action More Menu */}
+                                            <td style={{ padding: "14px 16px" }}>
+                                                <CostingMoreMenu
+                                                    entityName="Item"
+                                                    onDuplicate={() => handleDuplicateItem(item.id)}
+                                                    onDelete={() => handleDeleteItem(item.id)}
+                                                />
                                             </td>
                                         </tr>
                                     );
@@ -226,47 +359,38 @@ export default function LibraryTab({ isAddOpen, setIsAddOpen }: LibraryTabProps)
                 </div>
 
                 {/* Pagination */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderTop: "1px solid #e2e8f0", background: "#f8fafc", flexWrap: "wrap", gap: "12px" }}>
-                    <div style={{ color: "#64748b", fontSize: "13.5px", fontWeight: 500 }}>Total Items: {items.length}</div>
-                    <div style={{ display: "flex", gap: "6px" }}>
-                        <button style={{ padding: "5px 10px", border: "1px solid #e2e8f0", borderRadius: "6px", background: "#fff", color: "#94a3b8", cursor: "pointer", fontSize: "13px" }}>&lt;</button>
-                        {[1, 2, 3, 4, 5].map((p) => (
-                            <button
-                                key={p}
-                                style={{
-                                    padding: "5px 11px",
-                                    border: p === 1 ? "1px solid #2563eb" : "1px solid #e2e8f0",
-                                    borderRadius: "6px",
-                                    background: p === 1 ? "#eff6ff" : "#fff",
-                                    color: p === 1 ? "#2563eb" : "#64748b",
-                                    cursor: "pointer",
-                                    fontWeight: p === 1 ? 700 : 500,
-                                    fontSize: "13px",
-                                }}
-                            >
-                                {p}
-                            </button>
-                        ))}
-                        <button style={{ padding: "5px 10px", border: "1px solid #e2e8f0", borderRadius: "6px", background: "#fff", color: "#64748b", cursor: "pointer", fontSize: "13px" }}>&gt;</button>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#0f172a", fontSize: "13.5px", fontWeight: 500 }}>
-                        Show per Page:
-                        <div style={{ display: "flex", alignItems: "center", gap: "4px", border: "1px solid #e2e8f0", borderRadius: "6px", padding: "5px 10px", background: "#fff" }}>
-                            10 <ChevronDown size={14} color="#64748b" />
-                        </div>
-                    </div>
-                </div>
+                {filteredItems.length > 0 && (
+                    <CostingPagination
+                        currentPage={currentPage}
+                        totalPages={Math.max(1, Math.ceil(filteredItems.length / pageSize))}
+                        totalItems={filteredItems.length}
+                        pageSize={pageSize}
+                        onPageChange={setCurrentPage}
+                        onPageSizeChange={(newSize) => {
+                            setPageSize(newSize);
+                            setCurrentPage(1);
+                        }}
+                    />
+                )}
             </div>
 
-            {/* Dedicated Add Item Modal Matching Figma Design */}
+            {/* Add Item Modal */}
             <AddItemModal
                 isOpen={showAddModal}
                 onClose={() => setShowAddModal(false)}
-                onSuccess={(newItem) => {
-                    setItems((prev) => [newItem, ...prev]);
+                onSuccess={() => {
                     void loadData();
                 }}
                 existingVendors={existingVendors}
+            />
+
+            {/* Excel Import Modal */}
+            <CostingExcelImportModal
+                isOpen={isImportOpen}
+                onClose={() => setIsImportOpen(false)}
+                onSuccess={() => {
+                    void loadData();
+                }}
             />
         </div>
     );

@@ -308,12 +308,19 @@ export interface CostingScenario {
   created_at: string;
   updated_at: string;
   archived_at: string | null;
-  // Populated on GET detail
+  // Populated on GET detail / calculated list
   baseCost?: number;
   scenarioCost?: number;
   savings?: number;
   baseMargin?: number | null;
   scenarioMargin?: number | null;
+  baseline?: string;
+  boqTitle?: string;
+  totalCost?: number;
+  sellingValue?: number;
+  margin?: number;
+  variance?: number;
+  status?: string;
 }
 
 export interface VarianceCategory {
@@ -420,8 +427,32 @@ export interface MarginAnalysisResponse {
   insights?: MarginInsight[];
 }
 
+export interface CostingSettingCard {
+  id: string;
+  title: string;
+  status: "CONFIGURED" | "NEEDS ATTENTION" | string;
+  description: string;
+  subtitle?: string;
+  link?: string;
+}
+
+export interface CostingSettingsRecentChange {
+  id: string;
+  action: string;
+  details: string;
+  user?: string;
+  timestamp?: string;
+  actor?: string;
+  date?: string;
+}
+
 export interface CostingSettingsResponse {
   scope: string;
+  activeScope?: {
+    name: string;
+    description: string;
+  };
+  precedence?: Array<{ step: number; name: string; description: string }>;
   health: {
     completenessPercent: number;
     categoryCount: number;
@@ -430,8 +461,16 @@ export interface CostingSettingsResponse {
     scenarioCount: number;
     missingCategoryDefaults: number;
     expiredRates: number;
+    activePricingRules?: number;
+    expiringTaxRules?: number;
+    pendingApprovals?: number;
+    unmappedCostCodes?: number;
+    lastUpdated?: string;
   };
   sections: string[];
+  cards?: CostingSettingCard[];
+  recentChanges?: CostingSettingsRecentChange[];
+  overview?: Record<string, { status: string; title: string; subtitle: string }>;
 }
 
 // ── Proposals ───────────────────────────────────────────────────────────────

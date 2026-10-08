@@ -34,12 +34,13 @@ async function fetchApi<T>(path: string, options: RequestInit = {}): Promise<T> 
 
 // ── Items ───────────────────────────────────────────────────────────────────
 
-export async function getCostingItems(params?: { page?: number; pageSize?: number; search?: string; categoryId?: string }): Promise<PaginatedResponse<CostingItemBackend>> {
+export async function getCostingItems(params?: { page?: number; pageSize?: number; search?: string; categoryId?: string; rateStatus?: string }): Promise<PaginatedResponse<CostingItemBackend>> {
     const searchParams = new URLSearchParams();
     if (params?.page) searchParams.set("page", String(params.page));
     if (params?.pageSize) searchParams.set("pageSize", String(params.pageSize));
     if (params?.search) searchParams.set("search", params.search);
     if (params?.categoryId) searchParams.set("categoryId", params.categoryId);
+    if (params?.rateStatus) searchParams.set("rateStatus", params.rateStatus);
     const query = searchParams.toString();
     return fetchApi<PaginatedResponse<CostingItemBackend>>(`/api/v1/costing/items${query ? `?${query}` : ""}`);
 }
@@ -190,6 +191,7 @@ export async function createCostingScenario(input: {
     name: string;
     description?: string;
     type?: string;
+    scenarioType?: string;
     adjustments?: Array<{ name?: string; rate?: number | null }>;
 }): Promise<CostingScenario> {
     return fetchApi<CostingScenario>("/api/v1/costing/scenarios", {
@@ -212,6 +214,42 @@ export async function updateCostingScenario(scenarioId: string, input: Record<st
 export async function duplicateCostingScenario(scenarioId: string): Promise<CostingScenario> {
     return fetchApi<CostingScenario>(`/api/v1/costing/scenarios/${scenarioId}/duplicate`, {
         method: "POST",
+    });
+}
+
+export async function duplicateCostingItem(itemId: string): Promise<CostingItemBackend> {
+    const detail = await getCostingItemDetail(itemId);
+    return createCostingItem({
+        name: `${detail.name} (Copy)`,
+        categoryId: detail.category_id || "",
+        unit: detail.unit || "Nos",
+        baseCost: Number(detail.base_cost ?? detail.baseCost ?? 0),
+        sellingRate: Number(detail.selling_rate ?? detail.sellingRate ?? 0),
+        preferredVendor: detail.preferred_vendor || detail.preferredVendor,
+        spec: detail.spec,
+        rateStatus: detail.rate_status || detail.rateStatus || "active",
+        imageUrl: detail.image_url || detail.imageUrl,
+    });
+}
+
+export async function duplicateCostingCategory(categoryId: string): Promise<CostingCategoryBackend> {
+    const detail = await getCostingCategoryDetail(categoryId);
+    return createCostingCategory({
+        name: `${detail.name} (Copy)`,
+        parentId: detail.parent_id || undefined,
+        defaultUnit: detail.default_unit || "Nos",
+        defaultTaxPercent: detail.default_tax_percent ?? 18,
+        defaultMarkupPercent: detail.default_markup_percent ?? 0,
+        defaultWastePercent: detail.default_waste_percent ?? 0,
+        transportIncluded: detail.transport_included,
+        labourIncluded: detail.labour_included,
+        description: detail.description || undefined,
+    });
+}
+
+export async function deleteCostingScenario(scenarioId: string): Promise<{ deleted: true; id: string }> {
+    return fetchApi<{ deleted: true; id: string }>(`/api/v1/costing/scenarios/${scenarioId}`, {
+        method: "DELETE",
     });
 }
 
