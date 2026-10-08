@@ -30,8 +30,10 @@ export default function SearchPopover({
     const [recents, setRecents] = useState<string[]>([]);
     const [results, setResults] = useState<DashboardSearchResultItem[]>([]);
     const [loading, setLoading] = useState(false);
+    const [searchError, setSearchError] = useState<string | null>(null);
     const [selectedIndex, setSelectedIndex] = useState<number>(-1);
     const popoverRef = useRef<HTMLDivElement>(null);
+    const searchRequestRef = useRef(0);
 
     // Load recent searches from localStorage
     useEffect(() => {
@@ -39,9 +41,17 @@ export default function SearchPopover({
             const raw = localStorage.getItem(STORAGE_KEY);
             if (raw) {
                 const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                    const validRecents = parsed.filter(
+                        (item): item is string => typeof item === "string" && item.trim().length > 0
+                    );
+                    if (validRecents.length > 0) {
+                        setRecents(validRecents.slice(0, 8));
+                        return;
+                    }
+                }
                 if (Array.isArray(parsed) && parsed.length > 0) {
-                    setRecents(parsed);
-                    return;
+                    localStorage.removeItem(STORAGE_KEY);
                 }
             }
         } catch {
@@ -79,26 +89,33 @@ export default function SearchPopover({
         if (!isOpen) return;
         const trimmed = query.trim();
         if (!trimmed) {
+            searchRequestRef.current += 1;
             setResults([]);
             setLoading(false);
+            setSearchError(null);
             setSelectedIndex(-1);
             return;
         }
 
+        const requestId = ++searchRequestRef.current;
         let isCurrent = true;
         setLoading(true);
+        setSearchError(null);
+        setSelectedIndex(-1);
         const timer = setTimeout(async () => {
             try {
                 const res = await searchDashboard(trimmed);
-                if (isCurrent) {
+                if (isCurrent && requestId === searchRequestRef.current) {
                     setResults(res.items || []);
                     setLoading(false);
-                    setSelectedIndex(-1);
                 }
-            } catch {
-                if (isCurrent) {
+            } catch (error) {
+                if (isCurrent && requestId === searchRequestRef.current) {
                     setResults([]);
                     setLoading(false);
+                    setSearchError(
+                        error instanceof Error ? error.message : "Search could not be completed."
+                    );
                 }
             }
         }, 220);
@@ -203,7 +220,11 @@ export default function SearchPopover({
                         {loading && <Loader2 size={13} className="fig-search-spinner" />}
                     </div>
 
-                    {loading && results.length === 0 ? (
+                    {searchError ? (
+                        <div className="fig-search-empty" role="alert">
+                            {searchError}
+                        </div>
+                    ) : loading && results.length === 0 ? (
                         <div className="fig-search-loading">
                             <Loader2 size={18} className="fig-search-spinner" />
                             <span>Searching projects, BOQs, and invoices...</span>

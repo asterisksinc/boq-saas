@@ -7406,8 +7406,8 @@ input {
 }
 
 .boq-status-pill.draft {
-    background: rgba(148, 163, 184, 0.15);
-    color: #475569;
+    background: #475569;
+    color: #ffffff;
 }
 
 .boq-status-pill.in-review {
@@ -7582,14 +7582,20 @@ input {
 }
 
 .boq-detail-layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 290px;
+    display: flex;
     gap: 24px;
+    align-items: flex-start;
 }
 
-.boq-main-panel,
-.boq-summary-panel {
+.boq-main-panel {
+    flex: 1 1 0%;
     min-width: 0;
+}
+
+.boq-summary-panel {
+    width: 280px;
+    min-width: 280px;
+    flex-shrink: 0;
 }
 
 .boq-panel-toolbar {
@@ -7699,7 +7705,8 @@ input {
     background: #ffffff;
     border: 1px solid #e2e8f0;
     border-radius: 12px;
-    overflow: visible;
+    overflow-x: auto;
+    max-width: 100%;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
@@ -7709,7 +7716,7 @@ input {
 }
 
 .boq-room-table thead th {
-    background: #f1f5f9;
+    background: #eef4fb;
     color: #475569;
     font-size: 0.72rem;
     font-weight: 600;
@@ -7738,7 +7745,7 @@ input {
 }
 
 .boq-room-name {
-    font-weight: 600;
+    font-weight: 500;
     color: #0f172a;
 }
 
@@ -7749,16 +7756,18 @@ input {
 
 .boq-room-unit {
     color: #64748b;
+    font-size: 0.85rem;
 }
 
 .boq-room-amount {
-    font-weight: 600;
-    color: #0f172a;
+    font-weight: 500;
+    color: #334155;
 }
 
 .boq-room-desc {
+    display: block;
     color: #64748b;
-    max-width: 260px;
+    max-width: 240px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -7766,8 +7775,8 @@ input {
 }
 
 .boq-dots-button {
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -7782,6 +7791,52 @@ input {
 .boq-dots-button:hover {
     background: #e2e8f0;
     color: #0f172a;
+}
+
+.boq-row-dropdown {
+    position: absolute;
+    right: 8px;
+    top: calc(100% + 2px);
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+    z-index: 50;
+    min-width: 160px;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+}
+
+.boq-row-dropdown button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    text-align: left;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #334155;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.boq-row-dropdown button:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.boq-row-dropdown button.delete-action {
+    color: #dc2626;
+}
+
+.boq-row-dropdown button.delete-action:hover {
+    background: #fef2f2;
+    color: #b91c1c;
 }
 
 .boq-summary-panel {
@@ -8897,99 +8952,7 @@ input {
     justify-content: flex-end;
 }
 
-.boq-detail-layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 320px;
-    gap: 26px;
-    margin-top: 22px;
-}
-
-.boq-detail-main,
-.boq-summary-panel {
-    min-width: 0;
-}
-
-.boq-detail-toolbar {
-    margin-bottom: 18px;
-}
-
-.boq-toolbar-actions {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-}
-
-.boq-room-title {
-    margin-bottom: 10px;
-    color: #0f172a;
-    font-size: 1.05rem;
-    font-weight: 700;
-}
-
-.boq-item-table-wrap {
-    overflow-x: auto;
-    border-radius: 18px;
-    border: 1px solid rgba(148, 163, 184, 0.18);
-    background: rgba(255, 255, 255, 0.8);
-}
-
-.boq-summary-card,
-.boq-metric-card {
-    padding: 18px 18px 16px;
-    border-radius: 18px;
-    border: 1px solid rgba(148, 163, 184, 0.18);
-    background: rgba(255, 255, 255, 0.82);
-}
-
-.boq-summary-card h3 {
-    margin: 0 0 18px;
-    font-size: 0.9rem;
-    letter-spacing: 0.12em;
-    color: #64748b;
-}
-
-.summary-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 10px 0;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.12);
-    color: #334155;
-}
-
-.summary-row.total {
-    font-size: 1.05rem;
-    font-weight: 700;
-    color: #0f172a;
-}
-
-.boq-metric-card {
-    margin-top: 18px;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-}
-
-.metric-box {
-    padding: 16px 14px;
-    border-radius: 12px;
-    background: rgba(37, 99, 235, 0.05);
-}
-
-.metric-box span {
-    display: block;
-    color: #64748b;
-    font-size: 12px;
-    margin-bottom: 8px;
-}
-
-.metric-box strong {
-    font-size: 1.35rem;
-    letter-spacing: -0.04em;
-}
+/* Legacy boq detail overrides removed to prevent layout and metric card breakage */
 
 .boq-modal-backdrop,
 .boq-template-backdrop {

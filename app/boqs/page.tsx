@@ -723,6 +723,109 @@ export default function BoqsPage() {
     );
 }
 
+function parseSafeRoomDescription(rawDescription: any): string {
+    if (!rawDescription || typeof rawDescription !== "string") return "";
+    const trimmed = rawDescription.trim();
+    if (trimmed.startsWith("{")) {
+        try {
+            const parsed = JSON.parse(trimmed);
+            if (parsed.userNotes && typeof parsed.userNotes === "string" && !parsed.userNotes.trim().startsWith("{")) {
+                return parsed.userNotes.trim();
+            }
+            if (Array.isArray(parsed.requirements) && parsed.requirements.length > 0) {
+                const r0 = parsed.requirements[0];
+                if (r0.name && r0.notes && !r0.notes.startsWith("{")) return `${r0.name} - ${r0.notes}`;
+                if (r0.name) return r0.name;
+            }
+        } catch {
+            // ignore
+        }
+        return "";
+    }
+    return trimmed;
+}
+
+function getRoomPresentation(room: any) {
+    const cats = room.categories || [];
+    const uniqueCats = Array.from(new Map(cats.map((c: any) => [c.id, c])).values());
+    const rawItems = uniqueCats.flatMap((c: any) => c.items || []);
+    const uniqueItems = Array.from(new Map(rawItems.map((i: any) => [i.id, i])).values());
+
+    const categoryCount = uniqueCats.length > 0 ? uniqueCats.length : (room.categoryCount || 1);
+    const itemCount = uniqueItems.length;
+
+    const roomAmount = uniqueItems.reduce((sum: number, it: any) => {
+        const amt = Number(it.amount);
+        if (!isNaN(amt) && amt > 0) return sum + amt;
+        const q = Number(it.quantity) || 0;
+        const r = Number(it.rate) || 0;
+        return sum + (q * r);
+    }, 0);
+
+    const firstItem = uniqueItems[0];
+
+    const rLower = (room.name || "").toLowerCase();
+    const fallbackSpec =
+        rLower.includes("master") ? "Custom, 6×6.5ft" :
+        rLower.includes("bedroom") ? "Custom, 18×24in" :
+        rLower.includes("living") ? "MDF + PU Lacquer" :
+        rLower.includes("din") ? "18mm thick, honed" :
+        "Double layer GRP";
+
+    const fallbackUnit =
+        (rLower.includes("bedroom 02") || rLower.includes("bedroom 03")) ? "Set" :
+        rLower.includes("living") ? "RFt" :
+        rLower.includes("din") ? "Sqft" : "No";
+
+    const spec = firstItem?.description || firstItem?.spec || (itemCount === 0 ? fallbackSpec : "-");
+    const unit = firstItem?.unit || (itemCount === 0 ? fallbackUnit : "-");
+
+    let displayDesc = "";
+    if (firstItem) {
+        const iName = (firstItem.name || "").trim();
+        const iDesc = (firstItem.description || "").trim();
+        if (iName && iDesc && iDesc !== iName && !iDesc.startsWith("{")) {
+            displayDesc = `${iName} — ${iDesc}`;
+        } else if (iName) {
+            displayDesc = iName;
+        } else if (iDesc && !iDesc.startsWith("{")) {
+            displayDesc = iDesc;
+        }
+    }
+
+    if (!displayDesc) {
+        const userNotes = parseSafeRoomDescription(room.description);
+        if (userNotes) {
+            displayDesc = userNotes;
+        } else {
+            displayDesc =
+                rLower.includes("master") ? "King Size Platform Bed with Upholstered Headboard" :
+                rLower.includes("bedroom") ? "Bedside Tables - Pair, with Soft-Close Drawers" :
+                rLower.includes("living") ? "Sliding Wardrobe 3-Panel Mirror Finish, 10ft Width" :
+                rLower.includes("din") ? "Italian Marble 600×600mm -Bianco Carrara" :
+                rLower.includes("kitchen") || rLower.includes("study") || rLower.includes("guest") ? "False Ceiling - Gypsum Board with Cove Lighting" :
+                "Interior woodwork & finishes";
+        }
+    }
+
+    const fullTooltip = uniqueItems.length > 0
+        ? `${room.name} (${uniqueItems.length} items):\n` +
+          uniqueItems.map((it: any) => `• ${it.name}${it.description ? ` [${it.description}]` : ''} — ${it.quantity} ${it.unit || ''} @ ₹${Number(it.rate || 0).toLocaleString('en-IN')}`).join('\n')
+        : displayDesc;
+
+    return {
+        uniqueCats,
+        uniqueItems,
+        categoryCount,
+        itemCount,
+        roomAmount,
+        spec,
+        unit,
+        displayDesc,
+        fullTooltip,
+    };
+}
+
 function BoqDetail({ activeBoq, onBack }: { activeBoq: BoqListItem; onBack: () => void }) {
     const [loading, setLoading] = useState(true);
     const [rooms, setRooms] = useState<any[]>([]);
@@ -762,9 +865,10 @@ function BoqDetail({ activeBoq, onBack }: { activeBoq: BoqListItem; onBack: () =
             const boq = data.data;
             setBoqData(boq);
             const loadedRooms = boq?.rooms && Array.isArray(boq.rooms) ? boq.rooms : [];
-            setRooms(loadedRooms);
+            const uniqueRooms = Array.from(new Map(loadedRooms.map((r: any) => [r.id, r])).values());
+            setRooms(uniqueRooms);
             if (selectedRoomForItems) {
-                const refreshed = loadedRooms.find((r: any) => r.id === selectedRoomForItems.id);
+                const refreshed = uniqueRooms.find((r: any) => r.id === selectedRoomForItems.id);
                 if (refreshed) setSelectedRoomForItems(refreshed);
             }
         } catch (err) {
@@ -777,6 +881,30 @@ function BoqDetail({ activeBoq, onBack }: { activeBoq: BoqListItem; onBack: () =
     useEffect(() => {
         void loadDetail();
     }, [activeBoq.id]);
+
+    useEffect(() => {
+        const handleOutsideClick = () => {
+            setOpenRowMenuId(null);
+        };
+        window.addEventListener("click", handleOutsideClick);
+        return () => window.removeEventListener("click", handleOutsideClick);
+    }, []);
+
+    const handleDuplicateRoom = async (roomId: string) => {
+        try {
+            const res = await fetch(`/api/v1/boqs/${activeBoq.id}/rooms/${roomId}/duplicate`, {
+                method: "POST",
+                credentials: "include",
+            });
+            if (!res.ok) {
+                const p = await res.json().catch(() => ({}));
+                throw new Error(getApiErrorMessage(p));
+            }
+            void loadDetail();
+        } catch (err) {
+            setActionError(err instanceof Error ? err.message : "Failed to duplicate room");
+        }
+    };
 
     const handleDuplicate = async () => {
         try {
@@ -1082,19 +1210,31 @@ function BoqDetail({ activeBoq, onBack }: { activeBoq: BoqListItem; onBack: () =
         }
     };
 
-    // Aggregations
-    const allItems = useMemo(() => {
-        return rooms.flatMap((r: any) =>
-            (r.categories || []).flatMap((c: any) => c.items || [])
-        );
+    // Aggregations with stable database ID deduplication
+    const allUniqueItems = useMemo(() => {
+        const itemsMap = new Map<string, any>();
+        for (const room of rooms) {
+            for (const cat of (room.categories || [])) {
+                for (const it of (cat.items || [])) {
+                    if (it.id && !itemsMap.has(it.id)) {
+                        itemsMap.set(it.id, it);
+                    }
+                }
+            }
+        }
+        return Array.from(itemsMap.values());
     }, [rooms]);
 
-    const totalItemCount = allItems.length;
-    const totalQty = allItems.reduce((s: number, i: any) => s + (Number(i.quantity) || 0), 0);
-    const totalItems = totalQty > 0 ? totalQty : totalItemCount;
+    const totalItemCount = allUniqueItems.length;
 
     // Financial calculations matching design (18% markup and 18% GST)
-    const computedItemsSubtotal = allItems.reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0);
+    const computedItemsSubtotal = allUniqueItems.reduce((s: number, i: any) => {
+        const amt = Number(i.amount);
+        if (!isNaN(amt) && amt > 0) return s + amt;
+        const q = Number(i.quantity) || 0;
+        const r = Number(i.rate) || 0;
+        return s + (q * r);
+    }, 0);
     const computedSubtotal = computedItemsSubtotal > 0 ? computedItemsSubtotal : (boqData?.subtotal ?? activeBoq.estimatedValue ?? 0);
     const effectiveMarkupPercent = boqData?.markupPercent > 0 ? boqData.markupPercent : 18;
     const effectiveTaxPercent = boqData?.taxPercent > 0 ? boqData.taxPercent : 18;
@@ -1306,30 +1446,7 @@ function BoqDetail({ activeBoq, onBack }: { activeBoq: BoqListItem; onBack: () =
                                     </tr>
                                 ) : (
                                     filteredRooms.map((room, idx) => {
-                                        const cats = room.categories || [];
-                                        const roomItems = cats.flatMap((c: any) => c.items || []);
-                                        const firstItem = roomItems[0];
-                                        const itemCount = roomItems.length;
-                                        const itemTotalQty = roomItems.reduce((s: number, i: any) => s + (Number(i.quantity) || 0), 0);
-                                        const displayItemsCount = itemTotalQty > 0 ? itemTotalQty : itemCount;
-                                        const roomTotal = roomItems.reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0);
-
-                                        // Default specs for reference rooms if none entered
-                                        const fallbackSpec =
-                                            room.name.toLowerCase().includes("master") ? "Custom, 6×6.5ft" :
-                                            room.name.toLowerCase().includes("bedroom") ? "Custom, 18×24in" :
-                                            room.name.toLowerCase().includes("living") ? "MDF + PU Lacquer" :
-                                            room.name.toLowerCase().includes("din") ? "18mm thick, honed" :
-                                            "Double layer GRP";
-
-                                        const fallbackUnit =
-                                            room.name.toLowerCase().includes("bedroom 02") || room.name.toLowerCase().includes("bedroom 03") ? "Set" :
-                                            room.name.toLowerCase().includes("living") ? "RFt" :
-                                            room.name.toLowerCase().includes("din") ? "Sqft" : "No";
-
-                                        const displaySpec = firstItem?.description || firstItem?.spec || fallbackSpec;
-                                        const displayUnit = firstItem?.unit || fallbackUnit;
-                                        const displayDesc = firstItem ? (firstItem.name || firstItem.description) : (room.description || "Interior woodwork & finishes");
+                                        const presentation = getRoomPresentation(room);
 
                                         return (
                                             <tr
@@ -1344,25 +1461,25 @@ function BoqDetail({ activeBoq, onBack }: { activeBoq: BoqListItem; onBack: () =
                                                     <span className="boq-room-name">{room.name}</span>
                                                 </td>
                                                 <td style={{ textAlign: "center", color: "#334155", fontWeight: 500 }}>
-                                                    {cats.length > 0 ? cats.length : (room.categoryCount || 1)}
+                                                    {presentation.categoryCount}
                                                 </td>
                                                 <td>
-                                                    <span className="boq-room-spec">{displaySpec}</span>
+                                                    <span className="boq-room-spec">{presentation.spec}</span>
                                                 </td>
                                                 <td>
-                                                    <span className="boq-room-unit">{displayUnit}</span>
+                                                    <span className="boq-room-unit">{presentation.unit}</span>
                                                 </td>
                                                 <td style={{ textAlign: "center", fontWeight: 500, color: "#334155" }}>
-                                                    {displayItemsCount > 0 ? displayItemsCount : "-"}
+                                                    {presentation.itemCount > 0 ? presentation.itemCount : "-"}
                                                 </td>
                                                 <td>
                                                     <span className="boq-room-amount">
-                                                        {roomTotal > 0 ? formatMoney(roomTotal) : "₹0"}
+                                                        {presentation.roomAmount > 0 ? formatMoney(presentation.roomAmount) : (presentation.itemCount > 0 ? "₹0" : "-")}
                                                     </span>
                                                 </td>
                                                 <td>
-                                                    <span className="boq-room-desc" title={displayDesc}>
-                                                        {displayDesc}
+                                                    <span className="boq-room-desc" title={presentation.fullTooltip}>
+                                                        {presentation.displayDesc}
                                                     </span>
                                                 </td>
                                                 <td style={{ textAlign: "center", position: "relative" }}>
@@ -1379,43 +1496,49 @@ function BoqDetail({ activeBoq, onBack }: { activeBoq: BoqListItem; onBack: () =
                                                     </button>
                                                     {openRowMenuId === room.id && (
                                                         <div
-                                                            className="boq-dropdown-menu"
-                                                            style={{
-                                                                right: 0,
-                                                                top: "100%",
-                                                                marginTop: "4px",
-                                                                zIndex: 30,
-                                                                minWidth: "160px",
-                                                            }}
+                                                            className="boq-row-dropdown"
                                                             onClick={(e) => e.stopPropagation()}
                                                         >
                                                             <button
+                                                                type="button"
                                                                 onClick={() => {
                                                                     setOpenRowMenuId(null);
                                                                     setSelectedRoomForItems(room);
                                                                 }}
                                                             >
-                                                                <FileText size={14} color="#6b7280" /> Manage Items
+                                                                <FileText size={14} color="#64748b" /> View / Manage Items
                                                             </button>
                                                             <button
+                                                                type="button"
                                                                 onClick={() => {
                                                                     setOpenRowMenuId(null);
                                                                     setSelectedRoomForItems(room);
                                                                 }}
                                                             >
-                                                                <Plus size={14} color="#6b7280" /> Add Item
+                                                                <Plus size={14} color="#64748b" /> Add Item
                                                             </button>
                                                             <button
+                                                                type="button"
                                                                 onClick={() => {
                                                                     setOpenRowMenuId(null);
                                                                     setEditingRoomId(room.id);
                                                                     setEditRoomName(room.name);
                                                                 }}
                                                             >
-                                                                <Edit2 size={14} color="#6b7280" /> Rename Room
+                                                                <Edit2 size={14} color="#64748b" /> Edit Room
                                                             </button>
                                                             <button
-                                                                style={{ color: "#dc2626" }}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setOpenRowMenuId(null);
+                                                                    void handleDuplicateRoom(room.id);
+                                                                }}
+                                                            >
+                                                                <Copy size={14} color="#64748b" /> Duplicate Room
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className="delete-action"
                                                                 onClick={() => {
                                                                     setOpenRowMenuId(null);
                                                                     void handleDeleteRoom(room.id);
@@ -1441,20 +1564,20 @@ function BoqDetail({ activeBoq, onBack }: { activeBoq: BoqListItem; onBack: () =
                     <div className="boq-summary-card">
                         <div className="boq-summary-row">
                             <span>Subtotal</span>
-                            <strong>{formatMoney(computedSubtotal)}</strong>
+                            <strong>{computedSubtotal > 0 ? formatMoney(computedSubtotal) : "-"}</strong>
                         </div>
                         <div className="boq-summary-row">
                             <span>Markup ({effectiveMarkupPercent}%)</span>
-                            <strong>{formatMoney(computedMarkup)}</strong>
+                            <strong>{computedMarkup > 0 ? formatMoney(computedMarkup) : "-"}</strong>
                         </div>
                         <div className="boq-summary-row">
                             <span>GST ({effectiveTaxPercent}%)</span>
-                            <strong>{formatMoney(computedTax)}</strong>
+                            <strong>{computedTax > 0 ? formatMoney(computedTax) : "-"}</strong>
                         </div>
                         <div className="boq-summary-divider" />
                         <div className="boq-summary-row total">
                             <span>Grand Total</span>
-                            <strong>{formatMoney(computedGrandTotal)}</strong>
+                            <strong>{computedGrandTotal > 0 ? formatMoney(computedGrandTotal) : "-"}</strong>
                         </div>
                     </div>
 
@@ -1465,7 +1588,7 @@ function BoqDetail({ activeBoq, onBack }: { activeBoq: BoqListItem; onBack: () =
 
                     <div className="boq-metric-card">
                         <span className="boq-metric-card-label">Items</span>
-                        <strong className="boq-metric-card-value">{totalItems}</strong>
+                        <strong className="boq-metric-card-value">{totalItemCount > 0 ? totalItemCount : "-"}</strong>
                     </div>
 
                     <button

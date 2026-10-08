@@ -2756,11 +2756,68 @@ async function createBoq(request: Request, supabase: SupabaseClient, id: string)
       await supabase.from("boq_templates").update({ use_count: num(template.data.use_count) + 1 }).eq("id", input.data.templateId);
     }
   } else if (input.data.method === "blank") {
-    const projectRooms = await supabase.from("project_rooms").select("name, notes, sort_order").eq("project_id", input.data.projectId).eq("workspace_id", scoped.access.workspaceId).order("sort_order");
+    const projectRooms = await supabase.from("project_rooms").select("id, name, notes, sort_order").eq("project_id", input.data.projectId).eq("workspace_id", scoped.access.workspaceId).order("sort_order");
     if (projectRooms.data?.length) {
       for (const pr of projectRooms.data) {
-        await supabase.from("boq_rooms").insert({ workspace_id: scoped.access.workspaceId, boq_id: inserted.data.id, name: pr.name, description: pr.notes, sort_order: pr.sort_order });
+        const meta = parseRoomMeta(pr.notes);
+        const room = await supabase.from("boq_rooms").insert({
+          workspace_id: scoped.access.workspaceId,
+          boq_id: inserted.data.id,
+          name: pr.name,
+          description: meta.userNotes || null,
+          sort_order: pr.sort_order ?? 0,
+        }).select("id").single();
+        if (!room.data) continue;
         initialRoomCount++;
+
+        if (meta.requirements && meta.requirements.length > 0) {
+          const byCat = new Map<string, any[]>();
+          for (const req of meta.requirements) {
+            const catName = req.category || "General";
+            if (!byCat.has(catName)) byCat.set(catName, []);
+            byCat.get(catName)!.push(req);
+          }
+
+          for (const [catName, reqList] of byCat.entries()) {
+            const catRes = await supabase.from("boq_categories").insert({
+              workspace_id: scoped.access.workspaceId,
+              boq_id: inserted.data.id,
+              room_id: room.data.id,
+              name: catName,
+              sort_order: 0,
+            }).select("id").single();
+            if (!catRes.data) continue;
+
+            const itemsToInsert = reqList.map((req, rIdx) => {
+              const qty = Number(req.quantity) || 1;
+              const rate = Number(req.materialRate) || Number(req.rate) || 0;
+              const unit = req.materialUnit || req.unit || "No";
+              const spec = (req.length && req.breadth && req.height)
+                ? `${req.length}×${req.breadth}×${req.height} ${req.unit || 'ft'}`
+                : (req.length && (req.breadth || req.depth))
+                ? `${req.length}×${req.breadth || req.depth} ${req.unit || 'ft'}`
+                : req.spec || req.materialName || null;
+              const desc = req.notes || (req.materialName ? `${req.name} - ${req.materialName}` : req.name);
+
+              return {
+                workspace_id: scoped.access.workspaceId,
+                boq_id: inserted.data.id,
+                room_id: room.data.id,
+                category_id: catRes.data.id,
+                name: req.name,
+                description: desc,
+                unit,
+                quantity: qty,
+                rate,
+                sort_order: rIdx,
+              };
+            });
+
+            if (itemsToInsert.length > 0) {
+              await supabase.from("boq_items").insert(itemsToInsert);
+            }
+          }
+        }
       }
     }
   }
@@ -2786,26 +2843,102 @@ async function getBoq(supabase: SupabaseClient, id: string, boqId: string) {
   if (boq.error || rooms.error || categories.error || items.error) return fail("INTERNAL_ERROR", "BOQ could not be loaded.", 500, id);
   if (!boq.data) return fail("NOT_FOUND", "BOQ was not found.", 404, id);
 
+  const categoryRows = [...(categories.data ?? [])];
+  const itemRows = [...(items.data ?? [])];
+
+  // Self-heal / migrate any room where description has raw JSON with requirements
+  for (const room of (rooms.data ?? [])) {
+    if (room.description && typeof room.description === "string" && room.description.trim().startsWith("{")) {
+      const meta = parseRoomMeta(room.description);
+      const existingRoomCats = categoryRows.filter((c: any) => c.room_id === room.id);
+      const existingRoomItems = itemRows.filter((i: any) => i.room_id === room.id);
+
+      if (existingRoomCats.length === 0 && existingRoomItems.length === 0 && meta.requirements.length > 0) {
+        const byCat = new Map<string, any[]>();
+        for (const req of meta.requirements) {
+          const catName = req.category || "General";
+          if (!byCat.has(catName)) byCat.set(catName, []);
+          byCat.get(catName)!.push(req);
+        }
+
+        for (const [catName, reqList] of byCat.entries()) {
+          const catRes = await supabase.from("boq_categories").insert({
+            workspace_id: scoped.access.workspaceId,
+            boq_id: boqId,
+            room_id: room.id,
+            name: catName,
+            sort_order: 0,
+          }).select("id,room_id,name,description,sort_order").single();
+
+          if (catRes.data) {
+            categoryRows.push(catRes.data);
+            const itemsToInsert = reqList.map((req, rIdx) => {
+              const qty = Number(req.quantity) || 1;
+              const rate = Number(req.materialRate) || Number(req.rate) || 0;
+              const unit = req.materialUnit || req.unit || "No";
+              const spec = (req.length && req.breadth && req.height)
+                ? `${req.length}×${req.breadth}×${req.height} ${req.unit || 'ft'}`
+                : (req.length && (req.breadth || req.depth))
+                ? `${req.length}×${req.breadth || req.depth} ${req.unit || 'ft'}`
+                : req.spec || req.materialName || null;
+              const desc = req.notes || (req.materialName ? `${req.name} - ${req.materialName}` : req.name);
+
+              return {
+                workspace_id: scoped.access.workspaceId,
+                boq_id: boqId,
+                room_id: room.id,
+                category_id: catRes.data.id,
+                name: req.name,
+                description: desc,
+                unit,
+                quantity: qty,
+                rate,
+                sort_order: rIdx,
+              };
+            });
+
+            if (itemsToInsert.length > 0) {
+              const ins = await supabase.from("boq_items").insert(itemsToInsert).select("id,room_id,category_id,name,description,unit,quantity,rate,waste_percent,tax_percent,amount,sort_order");
+              if (ins.data) {
+                itemRows.push(...ins.data);
+              }
+            }
+          }
+        }
+      }
+
+      // Always sanitize the room description so raw JSON is NEVER returned by the API
+      room.description = meta.userNotes || null;
+      await supabase.from("boq_rooms").update({ description: meta.userNotes || null }).eq("id", room.id);
+    }
+  }
+
+  // Deduplicate using stable database IDs
+  const uniqueCatRows = Array.from(new Map(categoryRows.map((c: any) => [c.id, c])).values());
+  const uniqueItemRows = Array.from(new Map(itemRows.map((i: any) => [i.id, i])).values());
+  const uniqueRooms = Array.from(new Map((rooms.data ?? []).map((r: any) => [r.id, r])).values());
+
+  const subtotal = uniqueItemRows.reduce((sum, row) => sum + num((row as any).amount), 0);
+
   const [projectRes, profileRes] = await Promise.all([
     boq.data.project_id ? supabase.from("projects").select("name").eq("id", boq.data.project_id).maybeSingle() : Promise.resolve({ data: null }),
     boq.data.assigned_to ? supabase.from("user_profiles").select("display_name").eq("user_id", boq.data.assigned_to).maybeSingle() : Promise.resolve({ data: null }),
   ]);
 
-  const itemRows = items.data ?? []; const subtotal = itemRows.reduce((sum, row) => sum + num(row.amount), 0);
   return ok({
     ...boqDto(
       boq.data as Record<string, unknown>,
-      rooms.data?.length ?? 0,
-      itemRows.length,
+      uniqueRooms.length,
+      uniqueItemRows.length,
       subtotal,
       projectRes.data?.name ?? null,
       profileRes.data?.display_name ?? null
     ),
-    rooms: (rooms.data ?? []).map((room) => ({
+    rooms: uniqueRooms.map((room: any) => ({
       ...room,
-      categories: (categories.data ?? []).filter((cat) => cat.room_id === room.id).map((category) => ({
+      categories: uniqueCatRows.filter((cat: any) => cat.room_id === room.id).map((category: any) => ({
         ...category,
-        items: itemRows.filter((item) => item.category_id === category.id),
+        items: uniqueItemRows.filter((item: any) => item.category_id === category.id),
       })),
     })),
   }, 200, id);
@@ -2861,6 +2994,57 @@ async function duplicateBoq(supabase: SupabaseClient, id: string, boqId: string)
     }
   }
   return ok(boqDto(created.data as Record<string, unknown>, (source.rooms as unknown[])?.length ?? 0, num(source.itemCount), num(source.subtotal), String(source.projectName ?? ""), String(source.assignedToName ?? "")), 201, id);
+}
+
+async function duplicateBoqRoom(supabase: SupabaseClient, id: string, boqId: string, roomId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const [sourceRoom, sourceCats, sourceItems] = await Promise.all([
+    supabase.from("boq_rooms").select("*").eq("workspace_id", scoped.access.workspaceId).eq("boq_id", boqId).eq("id", roomId).maybeSingle(),
+    supabase.from("boq_categories").select("*").eq("workspace_id", scoped.access.workspaceId).eq("boq_id", boqId).eq("room_id", roomId),
+    supabase.from("boq_items").select("*").eq("workspace_id", scoped.access.workspaceId).eq("boq_id", boqId).eq("room_id", roomId),
+  ]);
+  if (!sourceRoom.data) return fail("NOT_FOUND", "Room not found.", 404, id);
+
+  const newRoom = await supabase.from("boq_rooms").insert({
+    workspace_id: scoped.access.workspaceId,
+    boq_id: boqId,
+    name: `${sourceRoom.data.name} (Copy)`,
+    description: sourceRoom.data.description,
+    sort_order: (sourceRoom.data.sort_order ?? 0) + 1,
+  }).select("*").single();
+  if (newRoom.error) return fail("VALIDATION_ERROR", "Room could not be duplicated.", 400, id);
+
+  for (const cat of sourceCats.data ?? []) {
+    const newCat = await supabase.from("boq_categories").insert({
+      workspace_id: scoped.access.workspaceId,
+      boq_id: boqId,
+      room_id: newRoom.data.id,
+      name: cat.name,
+      description: cat.description,
+      sort_order: cat.sort_order,
+    }).select("*").single();
+    if (!newCat.data) continue;
+
+    const catItems = (sourceItems.data ?? []).filter((it) => it.category_id === cat.id).map((it) => ({
+      workspace_id: scoped.access.workspaceId,
+      boq_id: boqId,
+      room_id: newRoom.data.id,
+      category_id: newCat.data.id,
+      name: it.name,
+      description: it.description,
+      unit: it.unit,
+      quantity: it.quantity,
+      rate: it.rate,
+      waste_percent: it.waste_percent,
+      tax_percent: it.tax_percent,
+      sort_order: it.sort_order,
+    }));
+    if (catItems.length > 0) {
+      await supabase.from("boq_items").insert(catItems);
+    }
+  }
+
+  return ok(newRoom.data, 201, id);
 }
 
 function basicBoqPdf(boq: Record<string, any>) {
@@ -8873,6 +9057,8 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (boqRoomsMatch && request.method === "POST") return boqChild(request, supabase, id, boqRoomsMatch[1], "room");
   const boqRoomMatch = route.match(/^boqs\/([0-9a-f-]{36})\/rooms\/([0-9a-f-]{36})$/i);
   if (boqRoomMatch && ["PATCH","DELETE"].includes(request.method)) return boqChild(request, supabase, id, boqRoomMatch[1], "room", undefined, boqRoomMatch[2]);
+  const boqRoomDuplicateMatch = route.match(/^boqs\/([0-9a-f-]{36})\/rooms\/([0-9a-f-]{36})\/duplicate$/i);
+  if (boqRoomDuplicateMatch && request.method === "POST") return duplicateBoqRoom(supabase, id, boqRoomDuplicateMatch[1], boqRoomDuplicateMatch[2]);
   const boqCategoriesMatch = route.match(/^boqs\/([0-9a-f-]{36})\/rooms\/([0-9a-f-]{36})\/categories$/i);
   if (boqCategoriesMatch && request.method === "POST") return boqChild(request, supabase, id, boqCategoriesMatch[1], "category", boqCategoriesMatch[2]);
   const boqCategoryMatch = route.match(/^boqs\/([0-9a-f-]{36})\/categories\/([0-9a-f-]{36})$/i);
