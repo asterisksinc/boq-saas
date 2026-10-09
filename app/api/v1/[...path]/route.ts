@@ -5143,11 +5143,25 @@ async function costingSettings(supabase:SupabaseClient,id:string){
     supabase.from("vendor_quotes").select("id").eq("workspace_id", scoped.access.workspaceId),
     supabase.from("costing_scenarios").select("id, status").eq("workspace_id", scoped.access.workspaceId).is("archived_at", null),
     supabase.from("workspace_settings").select("boq_costing,updated_at").eq("workspace_id", scoped.access.workspaceId).maybeSingle(),
-    supabase.from("audit_logs").select("id, action, created_at, user_id").eq("workspace_id", scoped.access.workspaceId).order("created_at", { ascending: false }).limit(6),
+    supabase.from("audit_logs").select("id, action, created_at, actor_user_id").eq("workspace_id", scoped.access.workspaceId).order("created_at", { ascending: false }).limit(6),
     supabase.from("user_profiles").select("user_id, display_name")
   ]);
-  if ([categoriesRes, itemsRes, quotesRes, scenariosRes, settingsRes, auditRes, profilesRes].some((result) => result.error)) {
-    console.error(JSON.stringify({ requestId: id, event: "costing_settings_load_failed" }));
+  const queryResults = [
+    ["categories", categoriesRes],
+    ["items", itemsRes],
+    ["quotes", quotesRes],
+    ["scenarios", scenariosRes],
+    ["settings", settingsRes],
+    ["audit", auditRes],
+    ["profiles", profilesRes],
+  ] as const;
+  const failedQueries = queryResults.filter(([, result]) => result.error);
+  if (failedQueries.length > 0) {
+    console.error(JSON.stringify({
+      requestId: id,
+      event: "costing_settings_load_failed",
+      failedQueries: failedQueries.map(([name, result]) => ({ name, code: result.error?.code, message: result.error?.message })),
+    }));
     return fail("INTERNAL_ERROR", "Costing settings could not be verified.", 500, id);
   }
 
@@ -5180,7 +5194,7 @@ async function costingSettings(supabase:SupabaseClient,id:string){
   }
 
   const recentChanges = (auditRes.data ?? []).map((a: Record<string, unknown>) => {
-    const actorName = profileMap.get(String(a.user_id)) || "Admin";
+    const actorName = profileMap.get(String(a.actor_user_id)) || "Admin";
     const actionStr = String(a.action || "settings.updated");
     let title = "Configuration updated";
     if (actionStr.includes("markup")) title = "Markup updated";
