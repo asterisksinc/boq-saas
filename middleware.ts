@@ -18,7 +18,7 @@ const publicPaths = new Set([
 ]);
 
 function isPublicPath(pathname: string) {
-    return publicPaths.has(pathname) || pathname.startsWith("/solutions/");
+    return publicPaths.has(pathname) || pathname.startsWith("/solutions/") || pathname.startsWith("/invite/");
 }
 
 function isPlatformAdmin(user: { email?: string | null; app_metadata?: Record<string, unknown>; user_metadata?: Record<string, unknown> }) {

@@ -1,347 +1,155 @@
 "use client";
 
-import React, { useState } from "react";
-import {
-  Folder,
-  FolderOpen,
-  ChevronRight,
-  ChevronDown,
-  Search,
-  Plus,
-  Edit3,
-  MoreHorizontal,
-  GripVertical,
-  ChevronLeft,
-} from "lucide-react";
-import type { MockItem } from "@/lib/templates/types";
+import React, { useEffect, useMemo, useState } from "react";
+import { ChevronDown, ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
+import { updateTemplateSection } from "@/lib/api/templates";
+
+interface TemplateItem {
+  id: string;
+  name: string;
+  unit?: string | null;
+  quantity?: number | null;
+  rate?: number | null;
+  sellingRate?: number | null;
+  wastePercent?: number | null;
+  taxPercent?: number | null;
+  amount?: number | null;
+  rateStatus?: string | null;
+  description?: string | null;
+}
 
 interface TemplateCostingBoqProps {
   templateId: string;
-  initialItems?: MockItem[];
+  initialItems?: TemplateItem[];
   onUpdate?: () => void;
 }
 
-interface TreeRoom {
-  id: string;
-  name: string;
-  count: number;
-  subSections?: { id: string; name: string; count: number }[];
-}
-
-const defaultRooms: TreeRoom[] = [];
-
-export default function TemplateCostingBoq({
-  templateId,
-  initialItems,
-  onUpdate,
-}: TemplateCostingBoqProps) {
-  const items = initialItems ?? [];
-
-  const [selectedSubSec, setSelectedSubSec] = useState("sec-fur");
-  const [expandedRoomId, setExpandedRoomId] = useState<string>("rm-master");
+export default function TemplateCostingBoq({ templateId, initialItems = [], onUpdate }: TemplateCostingBoqProps) {
+  const [items, setItems] = useState<TemplateItem[]>(initialItems);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [actionMenuId, setActionMenuId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  const totalQuantity = items.reduce((acc, itm) => acc + (itm.quantity || 1), 0);
-  const totalAmount = items.reduce((acc, itm) => acc + (itm.amount || 0), 0);
+  useEffect(() => setItems(initialItems), [initialItems]);
 
-  const toggleRoomExpand = (roomId: string) => {
-    setExpandedRoomId(expandedRoomId === roomId ? "" : roomId);
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+  const visibleItems = useMemo(
+    () => items.slice((page - 1) * pageSize, page * pageSize),
+    [items, page, pageSize],
+  );
+  useEffect(() => setPage((current) => Math.min(current, totalPages)), [totalPages]);
+
+  const totalQuantity = items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+  const totalAmount = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+
+  const persist = async (nextItems: TemplateItem[]) => {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await updateTemplateSection(templateId, "costing-boq", { items: nextItems, itemCount: nextItems.length });
+      setItems(nextItems);
+      onUpdate?.();
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "The BOQ could not be updated.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const editItem = async (item: TemplateItem) => {
+    const name = window.prompt("Item name", item.name);
+    if (name === null || !name.trim()) return;
+    const rateText = window.prompt("Rate", String(item.rate ?? item.sellingRate ?? ""));
+    if (rateText === null) return;
+    const rate = Number(rateText);
+    if (!Number.isFinite(rate) || rate < 0) {
+      setSaveError("Rate must be a non-negative number.");
+      return;
+    }
+    await persist(items.map((candidate) => candidate.id === item.id
+      ? { ...candidate, name: name.trim(), rate, sellingRate: rate }
+      : candidate));
+    setActionMenuId(null);
+  };
+
+  const duplicateItem = async (item: TemplateItem) => {
+    await persist([...items, { ...item, id: crypto.randomUUID(), name: `${item.name} (Copy)` }]);
+    setActionMenuId(null);
+  };
+
+  const deleteItem = async (item: TemplateItem) => {
+    if (!window.confirm(`Delete "${item.name}"?`)) return;
+    await persist(items.filter((candidate) => candidate.id !== item.id));
+    setActionMenuId(null);
   };
 
   return (
-    <div className="td-costing-layout">
-      {/* ── Left BOQ Structure Sidebar ────────────────────────────── */}
-      <aside className="td-costing-sidebar">
-        <div className="td-costing-sidebar-header">
-          <div className="td-costing-title-group">
-            <span className="td-costing-sidebar-title">BOQ STRUCTURE</span>
-            <span className="td-costing-sidebar-sub">18 Sections · 186 Items</span>
-          </div>
-          <button type="button" className="td-sidebar-search-btn" title="Search BOQ">
-            <Search size={15} />
-          </button>
+    <section className="td-costing-main">
+      <div className="td-costing-main-header">
+        <div className="td-costing-main-title-col">
+          <h2 className="title">Costing &amp; BOQ</h2>
+          <span className="sub">Persisted template BOQ</span>
+          <span className="meta">{items.length} Items · ₹{totalAmount.toLocaleString("en-IN")}</span>
         </div>
+      </div>
 
-        <div className="td-costing-tree-list">
-          {defaultRooms.map((room) => {
-            const isExpanded = expandedRoomId === room.id;
-            const hasSubs = !!room.subSections && room.subSections.length > 0;
-
-            return (
-              <div key={room.id} className="td-costing-tree-item-group">
-                <div
-                  className="td-costing-tree-room-row"
-                  onClick={() => toggleRoomExpand(room.id)}
-                >
-                  <div className="left">
-                    {hasSubs ? (
-                      isExpanded ? (
-                        <ChevronDown size={14} className="chev" />
-                      ) : (
-                        <ChevronRight size={14} className="chev" />
-                      )
-                    ) : (
-                      <ChevronRight size={14} className="chev" />
-                    )}
-                    {isExpanded ? (
-                      <FolderOpen size={15} className="folder-icon" />
-                    ) : (
-                      <Folder size={15} className="folder-icon" />
-                    )}
-                    <span className="room-name">{room.name}</span>
-                  </div>
-                  <span className="count-badge">{room.count}</span>
-                </div>
-
-                {/* Subsections if expanded */}
-                {isExpanded && room.subSections && (
-                  <div className="td-costing-subsections-list">
-                    {room.subSections.map((sub) => {
-                      const isSelected = selectedSubSec === sub.id;
-                      return (
-                        <div
-                          key={sub.id}
-                          className={`td-costing-sub-row ${isSelected ? "selected" : ""}`}
-                          onClick={() => setSelectedSubSec(sub.id)}
-                        >
-                          <div className="left">
-                            <GripVertical size={13} className="grip" />
-                            <span className="file-icon">📋</span>
-                            <span className="sub-name">{sub.name}</span>
-                          </div>
-                          <span className="count-badge">{sub.count}</span>
+      {saveError && <div role="alert" className="td-inspector-alert error">{saveError}</div>}
+      <div className="td-costing-table-wrap">
+        <table className="td-costing-table">
+          <thead>
+            <tr>
+              <th>ITEM</th><th>UNIT</th><th>QTY</th><th>RATE (₹)</th><th>WASTE (%)</th>
+              <th>TAX (%)</th><th>AMOUNT (₹)</th><th>RATE STATUS</th><th />
+            </tr>
+          </thead>
+          <tbody>
+            {visibleItems.map((item) => {
+              const status = item.rateStatus || "UNMAPPED";
+              const statusClass = status === "MAPPED" ? "status-mapped" : status === "OUTDATED" ? "status-outdated" : "status-missing";
+              return (
+                <tr key={item.id} className="td-costing-row">
+                  <td><div className="item-text-group"><span className="name">{item.name}</span><span className="desc">{item.description || "No description"}</span></div></td>
+                  <td><span className="unit-txt">{item.unit || "-"}</span></td>
+                  <td><span className="qty-txt">{item.quantity ?? 0}</span></td>
+                  <td><span className="rate-txt">{Number(item.rate ?? item.sellingRate ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></td>
+                  <td><span className="pct-txt">{item.wastePercent ?? 0}%</span></td>
+                  <td><span className="pct-txt">{item.taxPercent ?? 0}%</span></td>
+                  <td><span className="amount-txt">{Number(item.amount ?? 0).toLocaleString("en-IN")}</span></td>
+                  <td><div className={`td-rate-status-pill ${statusClass}`}><span>{status}</span><ChevronDown size={11} /></div></td>
+                  <td onClick={(event) => event.stopPropagation()}>
+                    <div className="td-row-kebab-wrap">
+                      <button type="button" className="td-row-kebab-btn" aria-label={`Actions for ${item.name}`} onClick={() => setActionMenuId(actionMenuId === item.id ? null : item.id)}><MoreHorizontal size={14} /></button>
+                      {actionMenuId === item.id && (
+                        <div className="td-row-kebab-dropdown">
+                          <button disabled={saving} onClick={() => void editItem(item)}>Edit Item</button>
+                          <button disabled={saving} onClick={() => void duplicateItem(item)}>Duplicate</button>
+                          <button disabled={saving} className="danger" onClick={() => void deleteItem(item)}>Delete</button>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {items.length === 0 && <div className="td-costing-empty">No BOQ items configured.</div>}
+        <div className="td-costing-total-bar"><span className="total-label">TOTAL ({items.length} ITEMS)</span><span className="total-qty">{totalQuantity}</span><span className="total-amount">₹{totalAmount.toLocaleString("en-IN")}</span></div>
+      </div>
+
+      <div className="target-table-pagination-row">
+        <div className="target-table-total-count">Total Items: {items.length}</div>
+        <div className="target-table-page-nav" role="navigation" aria-label="Pagination">
+          <button type="button" className="target-table-page-btn arrow" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}><ChevronLeft size={15} /></button>
+          {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => (
+            <button key={pageNumber} type="button" className={`target-table-page-btn ${page === pageNumber ? "active" : ""}`} onClick={() => setPage(pageNumber)}>{pageNumber}</button>
+          ))}
+          <button type="button" className="target-table-page-btn arrow" disabled={page >= totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))}><ChevronRight size={15} /></button>
         </div>
-
-        <div className="td-costing-sidebar-footer">
-          <button type="button" className="td-add-boq-structure-btn">
-            <Plus size={15} />
-            <span>Add BOQ Structure</span>
-          </button>
-        </div>
-      </aside>
-
-      {/* ── Center / Main BOQ Table ───────────────────────────────── */}
-      <section className="td-costing-main">
-        {/* Section Header */}
-        <div className="td-costing-main-header">
-          <div className="td-costing-main-title-col">
-            <h2 className="title">Furniture</h2>
-            <span className="sub">Master Bedroom · BOQ Section</span>
-            <span className="meta">
-              {items.length} Items · ₹{totalAmount.toLocaleString("en-IN")} Illustrative Template Value
-            </span>
-          </div>
-
-          <div className="td-costing-main-actions">
-            <button type="button" className="td-icon-box-btn" title="Edit Section">
-              <Edit3 size={15} />
-            </button>
-            <button type="button" className="td-icon-box-btn" title="Add item">
-              <Plus size={15} />
-            </button>
-            <button type="button" className="td-icon-box-btn" title="More options">
-              <MoreHorizontal size={15} />
-            </button>
-          </div>
-        </div>
-
-        {/* Costing Table */}
-        <div className="td-costing-table-wrap">
-          <table className="td-costing-table">
-            <thead>
-              <tr>
-                <th style={{ width: "26%" }}>ITEM</th>
-                <th style={{ width: "8%" }}>UNIT</th>
-                <th style={{ width: "7%" }}>QTY</th>
-                <th style={{ width: "11%" }}>RATE (₹)</th>
-                <th style={{ width: "9%" }}>WASTE (%)</th>
-                <th style={{ width: "8%" }}>TAX (%)</th>
-                <th style={{ width: "13%" }}>AMOUNT(₹)</th>
-                <th style={{ width: "13%" }}>RATE STATUS</th>
-                <th style={{ width: "5%" }} />
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => {
-                const status = item.rateStatus || "MAPPED";
-                const statusClass =
-                  status === "MAPPED"
-                    ? "status-mapped"
-                    : status === "OUTDATED"
-                    ? "status-outdated"
-                    : "status-missing";
-
-                return (
-                  <tr key={item.id} className="td-costing-row">
-                    <td>
-                      <div className="td-costing-item-cell">
-                        <GripVertical size={13} className="drag-grip" />
-                        <div className="item-text-group">
-                          <span className="name">{item.name}</span>
-                          <span className="desc">
-                            {item.description || "19mm BWP ply, laminate finish"}
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <span className="unit-txt">{item.unit || "Nos"}</span>
-                    </td>
-                    <td>
-                      <span className="qty-txt">{item.quantity ?? 1}</span>
-                    </td>
-                    <td>
-                      <span className="rate-txt">
-                        {Number(item.rate || item.sellingRate || 2875).toLocaleString(
-                          "en-IN",
-                          { minimumFractionDigits: 2, maximumFractionDigits: 2 }
-                        )}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="pct-txt">{item.wastePercent ?? 5}%</span>
-                    </td>
-                    <td>
-                      <span className="pct-txt">{item.taxPercent ?? 18}%</span>
-                    </td>
-                    <td>
-                      <span className="amount-txt">
-                        {Number(item.amount || 227736).toLocaleString("en-IN")}
-                      </span>
-                    </td>
-                    <td>
-                      <div className={`td-rate-status-pill ${statusClass}`}>
-                        <span>{status}</span>
-                        <ChevronDown size={11} />
-                      </div>
-                    </td>
-                    <td onClick={(e) => e.stopPropagation()}>
-                      <div className="td-row-kebab-wrap">
-                        <button
-                          type="button"
-                          className="td-row-kebab-btn"
-                          onClick={() =>
-                            setActionMenuId(actionMenuId === item.id ? null : item.id)
-                          }
-                        >
-                          <MoreHorizontal size={14} />
-                        </button>
-                        {actionMenuId === item.id && (
-                          <div className="td-row-kebab-dropdown">
-                            <button onClick={() => setActionMenuId(null)}>Edit Item</button>
-                            <button onClick={() => setActionMenuId(null)}>Duplicate</button>
-                            <button className="danger" onClick={() => setActionMenuId(null)}>Delete</button>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-
-          {/* Table Total Bar */}
-          <div className="td-costing-total-bar">
-            <span className="total-label">TOTAL ({items.length} ITEMS)</span>
-            <span className="total-qty">{totalQuantity}</span>
-            <span className="total-amount">
-              ₹{totalAmount.toLocaleString("en-IN")}
-            </span>
-          </div>
-        </div>
-
-        {/* Bottom Pagination Bar */}
-        <div className="target-table-pagination-row">
-          <div className="target-table-total-count">
-            Total Items: {items.length}
-          </div>
-
-          <div className="target-table-page-nav" role="navigation" aria-label="Pagination">
-            <button
-              type="button"
-              className="target-table-page-btn arrow"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              aria-label="Previous page"
-            >
-              <ChevronLeft size={15} />
-            </button>
-
-            <button
-              type="button"
-              className={`target-table-page-btn ${page === 1 ? "active" : ""}`}
-              onClick={() => setPage(1)}
-            >
-              1
-            </button>
-            <button
-              type="button"
-              className={`target-table-page-btn ${page === 2 ? "active" : ""}`}
-              onClick={() => setPage(2)}
-            >
-              2
-            </button>
-            <button
-              type="button"
-              className={`target-table-page-btn ${page === 3 ? "active" : ""}`}
-              onClick={() => setPage(3)}
-            >
-              3
-            </button>
-            <button
-              type="button"
-              className={`target-table-page-btn ${page === 4 ? "active" : ""}`}
-              onClick={() => setPage(4)}
-            >
-              4
-            </button>
-            <button
-              type="button"
-              className={`target-table-page-btn ${page === 5 ? "active" : ""}`}
-              onClick={() => setPage(5)}
-            >
-              5
-            </button>
-
-            <button
-              type="button"
-              className="target-table-page-btn arrow"
-              onClick={() => setPage((p) => Math.min(5, p + 1))}
-              aria-label="Next page"
-            >
-              <ChevronRight size={15} />
-            </button>
-          </div>
-
-          <div className="target-table-page-size-wrap">
-            <span className="target-table-page-size-label">Show per Page:</span>
-            <div className="target-table-page-size-select-wrap">
-              <select
-                className="target-table-page-size-select"
-                value={pageSize}
-                onChange={(e) => setPageSize(Number(e.target.value))}
-                aria-label="Items per page"
-              >
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-              </select>
-              <ChevronDown size={14} className="target-table-select-arrow" />
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
+        <label className="target-table-page-size-wrap"><span className="target-table-page-size-label">Show per Page:</span><select className="target-table-page-size-select" value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }} aria-label="Items per page"><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option></select></label>
+      </div>
+    </section>
   );
 }

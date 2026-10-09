@@ -962,6 +962,61 @@ async function onboarding(request: Request, supabase: SupabaseClient, id: string
   return ok(data, 200, id);
 }
 
+async function inspectProjectClientInvite(request: NextRequest, id: string, token: string) {
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("project_client_invitations")
+    .select("id, project_id, email, client_name, role, status, expires_at, projects(name)")
+    .eq("token", token)
+    .maybeSingle();
+  if (error) {
+    console.error(JSON.stringify({ requestId: id, event: "client_invitation_lookup_failed", code: error.code }));
+    return fail("INTERNAL_ERROR", "The invitation could not be checked.", 500, id);
+  }
+  if (!data) return fail("NOT_FOUND", "This invitation is invalid.", 404, id);
+  if (data.status !== "pending") return fail("CONFLICT", `This invitation is already ${data.status}.`, 409, id);
+  if (new Date(data.expires_at).getTime() <= Date.now()) {
+    await admin.from("project_client_invitations").update({ status: "expired" }).eq("id", data.id).eq("status", "pending");
+    return fail("NOT_FOUND", "This invitation has expired.", 410, id);
+  }
+  const project = Array.isArray(data.projects) ? data.projects[0] : data.projects;
+  return ok({ invitation: { id: data.id, projectId: data.project_id, email: data.email, clientName: data.client_name, role: data.role, expiresAt: data.expires_at, projectName: project?.name ?? "Project" } }, 200, id);
+}
+
+async function acceptProjectClientInvite(request: NextRequest, supabase: SupabaseClient, id: string, token: string) {
+  const auth = await requireUser(supabase, id);
+  if (auth.response) return auth.response;
+  const admin = createSupabaseAdminClient();
+  const invitation = await admin
+    .from("project_client_invitations")
+    .select("id, workspace_id, project_id, email, role, status, expires_at")
+    .eq("token", token)
+    .maybeSingle();
+  if (invitation.error) return fail("INTERNAL_ERROR", "The invitation could not be accepted.", 500, id);
+  const row = invitation.data;
+  if (!row) return fail("NOT_FOUND", "This invitation is invalid.", 404, id);
+  if (row.status !== "pending") return fail("CONFLICT", `This invitation is already ${row.status}.`, 409, id);
+  if (new Date(row.expires_at).getTime() <= Date.now()) {
+    await admin.from("project_client_invitations").update({ status: "expired" }).eq("id", row.id).eq("status", "pending");
+    return fail("NOT_FOUND", "This invitation has expired.", 410, id);
+  }
+  if ((auth.user.email ?? "").trim().toLowerCase() !== row.email.trim().toLowerCase()) {
+    return fail("FORBIDDEN", "Sign in with the email address that received this invitation.", 403, id);
+  }
+  const membership = await admin.from("workspace_memberships").upsert({
+    workspace_id: row.workspace_id, user_id: auth.user.id, role: "client", status: "active",
+  }, { onConflict: "workspace_id,user_id" });
+  if (membership.error) {
+    console.error(JSON.stringify({ requestId: id, event: "client_invitation_membership_failed", code: membership.error.code }));
+    return fail("INTERNAL_ERROR", "Your project access could not be created.", 500, id);
+  }
+  const consumed = await admin.from("project_client_invitations").update({
+    status: "accepted", accepted_at: new Date().toISOString(),
+  }).eq("id", row.id).eq("status", "pending").select("id").maybeSingle();
+  if (consumed.error || !consumed.data) return fail("CONFLICT", "This invitation was already accepted. Please refresh and try again.", 409, id);
+  return ok({ accepted: true, projectId: row.project_id }, 200, id);
+}
+
 async function dashboardOverview(request: NextRequest, supabase: SupabaseClient, id: string) {
   const auth = await requireUser(supabase, id); if (auth.response) return auth.response;
   const [{ data, error }, profileResult, projectsResult] = await Promise.all([
@@ -973,6 +1028,7 @@ async function dashboardOverview(request: NextRequest, supabase: SupabaseClient,
     console.error(JSON.stringify({ requestId: id, event: "dashboard_overview_failed", code: error.code }));
     return fail("INTERNAL_ERROR", "Dashboard overview is temporarily unavailable.", 500, id);
   }
+
   const base = (data ?? {}) as Record<string, unknown>;
   const counts = { active: 0, planning: 0, onHold: 0, completed: 0 };
   for (const row of projectsResult.data ?? []) {
@@ -1377,9 +1433,11 @@ async function createProjectClientInvite(request: Request, supabase: SupabaseCli
     updated_at: nowIso,
   };
 
-  try {
-    await supabase.from("project_client_invitations").insert(newInvitation);
-  } catch {}
+  const invitationInsert = await supabase.from("project_client_invitations").insert(newInvitation);
+  if (invitationInsert.error) {
+    console.error(JSON.stringify({ requestId: id, event: "client_invitation_insert_failed", code: invitationInsert.error.code }));
+    return fail("INTERNAL_ERROR", "The invitation could not be created.", 500, id);
+  }
 
   try {
     const { data: wsSettings } = await supabase
@@ -1439,7 +1497,7 @@ async function createProjectClientInvite(request: Request, supabase: SupabaseCli
         auth: { user: smtpUser, pass: smtpPass },
       });
       const appUrl = process.env.APP_URL || "http://localhost:3000";
-      const inviteUrl = `${appUrl}/projects/${projectId}?token=${token}`;
+      const inviteUrl = `${appUrl}/invite/${token}`;
 
       await transporter.sendMail({
         from: `"BOQ Design Arena" <${smtpUser}>`,
@@ -1474,7 +1532,6 @@ async function createProjectClientInvite(request: Request, supabase: SupabaseCli
       email: clientEmail,
       clientName,
       status: "pending",
-      token,
       expiresAt,
       createdAt: nowIso,
     },
@@ -1482,7 +1539,7 @@ async function createProjectClientInvite(request: Request, supabase: SupabaseCli
     emailError,
     message: emailDelivered
       ? "Client invitation sent successfully."
-      : "Client invitation created successfully. (Email delivery skipped or pending.)",
+      : "Client invitation created, but the email could not be delivered.",
   }, 201, id);
 }
 
@@ -1540,28 +1597,35 @@ async function resendProjectClientInvite(request: Request, supabase: SupabaseCli
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
   const token = existing.token || randomBytes(32).toString("hex");
 
-  try {
-    await supabase.from("project_client_invitations").update({
-      expires_at: expiresAt,
-      updated_at: nowIso,
-    }).eq("id", existing.id);
-  } catch {}
+  const invitationUpdate = await supabase.from("project_client_invitations").update({
+    expires_at: expiresAt,
+    updated_at: nowIso,
+  }).eq("id", existing.id);
+  if (invitationUpdate.error) {
+    console.error(JSON.stringify({ requestId: id, event: "client_invitation_resend_update_failed", code: invitationUpdate.error.code }));
+    return fail("INTERNAL_ERROR", "The invitation could not be refreshed.", 500, id);
+  }
 
-  try {
-    const { data: wsSettings } = await supabase
+  const { data: wsSettings, error: settingsReadError } = await supabase
       .from("workspace_settings")
       .select("security")
       .eq("workspace_id", wid)
       .maybeSingle();
-    const sec = (wsSettings?.security as any) || {};
+  if (settingsReadError) {
+    console.error(JSON.stringify({ requestId: id, event: "client_invitation_settings_read_failed", code: settingsReadError.code }));
+  } else if (wsSettings) {
+    const sec = (wsSettings.security as any) || {};
     const invs = Array.isArray(sec.client_invitations) ? sec.client_invitations : [];
     const updatedInvs = invs.map((x: any) => (x.id === existing.id ? { ...x, expiresAt, updatedAt: nowIso } : x));
-    await supabase.from("workspace_settings").update({
+    const settingsUpdate = await supabase.from("workspace_settings").update({
       security: { ...sec, client_invitations: updatedInvs },
       updated_at: nowIso,
       updated_by: scoped.access.userId,
     }).eq("workspace_id", wid);
-  } catch {}
+    if (settingsUpdate.error) {
+      console.error(JSON.stringify({ requestId: id, event: "client_invitation_settings_update_failed", code: settingsUpdate.error.code }));
+    }
+  }
 
   try {
     await supabase.from("audit_logs").insert({
@@ -1590,7 +1654,7 @@ async function resendProjectClientInvite(request: Request, supabase: SupabaseCli
         auth: { user: smtpUser, pass: smtpPass },
       });
       const appUrl = process.env.APP_URL || "http://localhost:3000";
-      const inviteUrl = `${appUrl}/projects/${projectId}?token=${token}`;
+      const inviteUrl = `${appUrl}/invite/${token}`;
 
       await transporter.sendMail({
         from: `"BOQ Design Arena" <${smtpUser}>`,
@@ -2716,6 +2780,13 @@ async function nextBoqIdentity(supabase: SupabaseClient, workspaceId: string, of
   return { boqNumber: `BOQ-${sequence}`, version: "v1" };
 }
 
+async function cleanupCreatedBoq(supabase: SupabaseClient, workspaceId: string, boqId: string, requestId: string) {
+  const { error } = await supabase.from("boqs").delete().eq("workspace_id", workspaceId).eq("id", boqId);
+  if (error) {
+    console.error(JSON.stringify({ requestId, event: "boq_cleanup_failed", code: error.code }));
+  }
+}
+
 async function createBoq(request: Request, supabase: SupabaseClient, id: string) {
   const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
   const input = await parsed(request, boqCreateSchema, id); if (input.response) return input.response;
@@ -2744,16 +2815,32 @@ async function createBoq(request: Request, supabase: SupabaseClient, id: string)
     if (template?.data && Array.isArray(template.data.snapshot)) {
       for (const sourceRoom of template.data.snapshot as Array<Record<string, unknown>>) {
         const room = await supabase.from("boq_rooms").insert({ workspace_id: scoped.access.workspaceId, boq_id: inserted.data.id, name: sourceRoom.name, description: sourceRoom.description }).select("id").single();
-        if (!room.data) continue;
+        if (room.error || !room.data) {
+          await cleanupCreatedBoq(supabase, scoped.access.workspaceId, inserted.data.id, id);
+          return fail("INTERNAL_ERROR", "BOQ rooms could not be created.", 500, id);
+        }
         initialRoomCount++;
         for (const sourceCategory of (sourceRoom.categories as Array<Record<string, unknown>> | undefined) ?? []) {
           const category = await supabase.from("boq_categories").insert({ workspace_id: scoped.access.workspaceId, boq_id: inserted.data.id, room_id: room.data.id, name: sourceCategory.name, description: sourceCategory.description }).select("id").single();
-          if (!category.data) continue;
+          if (category.error || !category.data) {
+            await cleanupCreatedBoq(supabase, scoped.access.workspaceId, inserted.data.id, id);
+            return fail("INTERNAL_ERROR", "BOQ categories could not be created.", 500, id);
+          }
           const items = ((sourceCategory.items as Array<Record<string, unknown>> | undefined) ?? []).map((item) => ({ ...item, id: undefined, amount: undefined, workspace_id: scoped.access.workspaceId, boq_id: inserted.data.id, room_id: room.data.id, category_id: category.data.id }));
-          if (items.length) await supabase.from("boq_items").insert(items);
+          if (items.length) {
+            const itemResult = await supabase.from("boq_items").insert(items);
+            if (itemResult.error) {
+              await cleanupCreatedBoq(supabase, scoped.access.workspaceId, inserted.data.id, id);
+              return fail("INTERNAL_ERROR", "BOQ items could not be created.", 500, id);
+            }
+          }
         }
       }
-      await supabase.from("boq_templates").update({ use_count: num(template.data.use_count) + 1 }).eq("id", input.data.templateId);
+      const templateUpdate = await supabase.from("boq_templates").update({ use_count: num(template.data.use_count) + 1 }).eq("id", input.data.templateId);
+      if (templateUpdate.error) {
+        await cleanupCreatedBoq(supabase, scoped.access.workspaceId, inserted.data.id, id);
+        return fail("INTERNAL_ERROR", "The BOQ template usage could not be recorded.", 500, id);
+      }
     }
   } else if (input.data.method === "blank") {
     const projectRooms = await supabase.from("project_rooms").select("id, name, notes, sort_order").eq("project_id", input.data.projectId).eq("workspace_id", scoped.access.workspaceId).order("sort_order");
@@ -2767,7 +2854,10 @@ async function createBoq(request: Request, supabase: SupabaseClient, id: string)
           description: meta.userNotes || null,
           sort_order: pr.sort_order ?? 0,
         }).select("id").single();
-        if (!room.data) continue;
+        if (room.error || !room.data) {
+          await cleanupCreatedBoq(supabase, scoped.access.workspaceId, inserted.data.id, id);
+          return fail("INTERNAL_ERROR", "BOQ rooms could not be created.", 500, id);
+        }
         initialRoomCount++;
 
         if (meta.requirements && meta.requirements.length > 0) {
@@ -2786,7 +2876,10 @@ async function createBoq(request: Request, supabase: SupabaseClient, id: string)
               name: catName,
               sort_order: 0,
             }).select("id").single();
-            if (!catRes.data) continue;
+            if (catRes.error || !catRes.data) {
+              await cleanupCreatedBoq(supabase, scoped.access.workspaceId, inserted.data.id, id);
+              return fail("INTERNAL_ERROR", "BOQ categories could not be created.", 500, id);
+            }
 
             const itemsToInsert = reqList.map((req, rIdx) => {
               const qty = Number(req.quantity) || 1;
@@ -2797,7 +2890,8 @@ async function createBoq(request: Request, supabase: SupabaseClient, id: string)
                 : (req.length && (req.breadth || req.depth))
                 ? `${req.length}×${req.breadth || req.depth} ${req.unit || 'ft'}`
                 : req.spec || req.materialName || null;
-              const desc = req.notes || (req.materialName ? `${req.name} - ${req.materialName}` : req.name);
+              const baseDescription = req.notes || (req.materialName ? `${req.name} - ${req.materialName}` : req.name);
+              const desc = spec ? `${baseDescription}\nSpecification: ${spec}` : baseDescription;
 
               return {
                 workspace_id: scoped.access.workspaceId,
@@ -2814,7 +2908,11 @@ async function createBoq(request: Request, supabase: SupabaseClient, id: string)
             });
 
             if (itemsToInsert.length > 0) {
-              await supabase.from("boq_items").insert(itemsToInsert);
+              const itemResult = await supabase.from("boq_items").insert(itemsToInsert);
+              if (itemResult.error) {
+                await cleanupCreatedBoq(supabase, scoped.access.workspaceId, inserted.data.id, id);
+                return fail("INTERNAL_ERROR", "BOQ items could not be created.", 500, id);
+              }
             }
           }
         }
@@ -2846,70 +2944,12 @@ async function getBoq(supabase: SupabaseClient, id: string, boqId: string) {
   const categoryRows = [...(categories.data ?? [])];
   const itemRows = [...(items.data ?? [])];
 
-  // Self-heal / migrate any room where description has raw JSON with requirements
+  // Reads must not create derived records. Legacy requirement JSON is only
+  // sanitized for the response; backfills belong in an explicit migration.
   for (const room of (rooms.data ?? [])) {
     if (room.description && typeof room.description === "string" && room.description.trim().startsWith("{")) {
       const meta = parseRoomMeta(room.description);
-      const existingRoomCats = categoryRows.filter((c: any) => c.room_id === room.id);
-      const existingRoomItems = itemRows.filter((i: any) => i.room_id === room.id);
-
-      if (existingRoomCats.length === 0 && existingRoomItems.length === 0 && meta.requirements.length > 0) {
-        const byCat = new Map<string, any[]>();
-        for (const req of meta.requirements) {
-          const catName = req.category || "General";
-          if (!byCat.has(catName)) byCat.set(catName, []);
-          byCat.get(catName)!.push(req);
-        }
-
-        for (const [catName, reqList] of byCat.entries()) {
-          const catRes = await supabase.from("boq_categories").insert({
-            workspace_id: scoped.access.workspaceId,
-            boq_id: boqId,
-            room_id: room.id,
-            name: catName,
-            sort_order: 0,
-          }).select("id,room_id,name,description,sort_order").single();
-
-          if (catRes.data) {
-            categoryRows.push(catRes.data);
-            const itemsToInsert = reqList.map((req, rIdx) => {
-              const qty = Number(req.quantity) || 1;
-              const rate = Number(req.materialRate) || Number(req.rate) || 0;
-              const unit = req.materialUnit || req.unit || "No";
-              const spec = (req.length && req.breadth && req.height)
-                ? `${req.length}×${req.breadth}×${req.height} ${req.unit || 'ft'}`
-                : (req.length && (req.breadth || req.depth))
-                ? `${req.length}×${req.breadth || req.depth} ${req.unit || 'ft'}`
-                : req.spec || req.materialName || null;
-              const desc = req.notes || (req.materialName ? `${req.name} - ${req.materialName}` : req.name);
-
-              return {
-                workspace_id: scoped.access.workspaceId,
-                boq_id: boqId,
-                room_id: room.id,
-                category_id: catRes.data.id,
-                name: req.name,
-                description: desc,
-                unit,
-                quantity: qty,
-                rate,
-                sort_order: rIdx,
-              };
-            });
-
-            if (itemsToInsert.length > 0) {
-              const ins = await supabase.from("boq_items").insert(itemsToInsert).select("id,room_id,category_id,name,description,unit,quantity,rate,waste_percent,tax_percent,amount,sort_order");
-              if (ins.data) {
-                itemRows.push(...ins.data);
-              }
-            }
-          }
-        }
-      }
-
-      // Always sanitize the room description so raw JSON is NEVER returned by the API
       room.description = meta.userNotes || null;
-      await supabase.from("boq_rooms").update({ description: meta.userNotes || null }).eq("id", room.id);
     }
   }
 
@@ -5102,10 +5142,14 @@ async function costingSettings(supabase:SupabaseClient,id:string){
     supabase.from("costing_items").select("id, rate_status, code, name").eq("workspace_id", scoped.access.workspaceId).is("archived_at", null),
     supabase.from("vendor_quotes").select("id").eq("workspace_id", scoped.access.workspaceId),
     supabase.from("costing_scenarios").select("id, status").eq("workspace_id", scoped.access.workspaceId).is("archived_at", null),
-    supabase.from("workspace_settings").select("boq_costing").eq("workspace_id", scoped.access.workspaceId).maybeSingle(),
+    supabase.from("workspace_settings").select("boq_costing,updated_at").eq("workspace_id", scoped.access.workspaceId).maybeSingle(),
     supabase.from("audit_logs").select("id, action, created_at, user_id").eq("workspace_id", scoped.access.workspaceId).order("created_at", { ascending: false }).limit(6),
     supabase.from("user_profiles").select("user_id, display_name")
   ]);
+  if ([categoriesRes, itemsRes, quotesRes, scenariosRes, settingsRes, auditRes, profilesRes].some((result) => result.error)) {
+    console.error(JSON.stringify({ requestId: id, event: "costing_settings_load_failed" }));
+    return fail("INTERNAL_ERROR", "Costing settings could not be verified.", 500, id);
+  }
 
   const categories = categoriesRes.data ?? [];
   const items = itemsRes.data ?? [];
@@ -5128,7 +5172,7 @@ async function costingSettings(supabase:SupabaseClient,id:string){
   if (boqCosting.units.length > 0) passedChecks++;
   if (boqCosting.taxRules.length > 0) passedChecks++;
   if (categories.length > 0) passedChecks++;
-  const completenessPercent = Math.min(100, Math.max(50, Math.round((passedChecks / totalChecks) * 100)));
+  const completenessPercent = Math.min(100, Math.round((passedChecks / totalChecks) * 100));
 
   const profileMap = new Map<string, string>();
   for (const p of (profilesRes.data ?? []) as Array<{ user_id: string; display_name: string }>) {
@@ -5180,7 +5224,7 @@ async function costingSettings(supabase:SupabaseClient,id:string){
       expiringTaxRules,
       pendingApprovals,
       unmappedCostCodes,
-      lastUpdated: new Date().toISOString(),
+      lastUpdated: auditRes.data?.[0]?.created_at ?? settingsRes.data?.updated_at ?? null,
     },
     sections: [
       "general", "units", "currencies", "cost_codes", "taxes", "markups",
@@ -5189,23 +5233,23 @@ async function costingSettings(supabase:SupabaseClient,id:string){
       "versioning", "permissions", "import_export", "audit_log"
     ],
     overview: {
-      general: { status: "Configured", title: "General", subtitle: "Basic costing preferences, numbering, and system behaviour." },
+      general: { status: boqCosting ? "Configured" : "Missing configuration", title: "General", subtitle: "Basic costing preferences, numbering, and system behaviour." },
       units: { status: boqCosting.units.length > 0 ? "Configured" : "Needs Attention", title: "Units & Measurements", subtitle: `${boqCosting.units.length} active units · Manage all units, conversions and precision rules.` },
-      currencies: { status: "Configured", title: "Currencies", subtitle: `1 active currency (${scoped.access.currency || "INR"}) · Manage currencies, exchange rates, and rounding.` },
+      currencies: { status: scoped.access.currency ? "Configured" : "Missing configuration", title: "Currencies", subtitle: scoped.access.currency ? `Active currency (${scoped.access.currency}) · Manage currencies, exchange rates, and rounding.` : "No workspace currency is configured." },
       cost_codes: { status: unmappedCostCodes > 0 ? "Needs Attention" : "Configured", title: "Cost Codes", subtitle: `${unmappedCostCodes > 0 ? `${unmappedCostCodes} unmapped cost codes` : "All cost codes mapped"} · Define cost code structure and mappings.` },
       taxes: { status: boqCosting.taxRules.length > 0 ? "Configured" : "Needs Attention", title: "Taxes", subtitle: `${boqCosting.taxRules.length} active tax profiles · Define tax rules, rates, and applicability.` },
-      markups: { status: "Configured", title: "Markups", subtitle: `${(boqCosting.pricing.categoryMarkups ?? []).length || 4} markup rules · Set default and category-wise markup rules.` },
-      pricing_rules: { status: "Configured", title: "Pricing Rules", subtitle: `${activePricingRules || 6} active rules · Define pricing behaviour, min price & margin.` },
+      markups: { status: (boqCosting.pricing.categoryMarkups ?? []).length > 0 ? "Configured" : "Missing configuration", title: "Markups", subtitle: `${(boqCosting.pricing.categoryMarkups ?? []).length} markup rules · Set default and category-wise markup rules.` },
+      pricing_rules: { status: activePricingRules > 0 ? "Configured" : "Missing configuration", title: "Pricing Rules", subtitle: `${activePricingRules} active rules · Define pricing behaviour, min price & margin.` },
       category_defaults: { status: missingDefaults > 0 ? "Needs Attention" : "Configured", title: "Category Defaults", subtitle: `${missingDefaults > 0 ? `${missingDefaults} categories need attention` : "All defaults configured"} · Set defaults for markup, tax, unit, wastage.` },
-      wastage_rules: { status: "Configured", title: "Wastage Rules", subtitle: "Default wastage: 5% · Define material wastage by category." },
-      margin_rules: { status: "Configured", title: "Margin Rules", subtitle: `Target margin: ${boqCosting.pricing.marginThresholdPercent || 25}% · Define target margin and threshold levels.` },
-      discount_policies: { status: "Configured", title: "Discount Policies", subtitle: `Limit: ${boqCosting.pricing.discountLimitPercent || 10}% · Control discount limits and approval rules.` },
-      rate_management: { status: "Configured", title: "Rate Management", subtitle: "90-day validity · Configure rate validity, reminders & reviews." },
-      approval_workflows: { status: "Configured", title: "Approval Workflows", subtitle: `${(boqCosting.approvalRules ?? []).length || 3} workflows · Define approval rules for changes.` },
-      versioning: { status: "Configured", title: "Versioning & History", subtitle: "Auto-revision numbering · View and restore configuration versions." },
-      permissions: { status: "Configured", title: "Permissions", subtitle: "Workspace RBAC active · Manage access to costing settings." },
-      import_export: { status: "Configured", title: "Import & Export", subtitle: "Import, export and templates for settings." },
-      audit_log: { status: "Configured", title: "Audit Log", subtitle: "View all configuration changes and history." },
+      wastage_rules: { status: categories.some((category) => category.default_waste_percent != null) ? "Configured" : "Missing configuration", title: "Wastage Rules", subtitle: "Configure material wastage by category." },
+      margin_rules: { status: boqCosting.pricing.marginThresholdPercent != null ? "Configured" : "Missing configuration", title: "Margin Rules", subtitle: boqCosting.pricing.marginThresholdPercent != null ? `Target margin: ${boqCosting.pricing.marginThresholdPercent}% · Define target margin and threshold levels.` : "No target margin is configured." },
+      discount_policies: { status: boqCosting.pricing.discountLimitPercent != null ? "Configured" : "Missing configuration", title: "Discount Policies", subtitle: boqCosting.pricing.discountLimitPercent != null ? `Limit: ${boqCosting.pricing.discountLimitPercent}% · Control discount limits and approval rules.` : "No discount limit is configured." },
+      rate_management: { status: items.length > 0 ? "Configured" : "Missing configuration", title: "Rate Management", subtitle: `${items.length} costing items · Configure rate validity, reminders & reviews.` },
+      approval_workflows: { status: (boqCosting.approvalRules ?? []).length > 0 ? "Configured" : "Missing configuration", title: "Approval Workflows", subtitle: `${(boqCosting.approvalRules ?? []).length} workflows · Define approval rules for changes.` },
+      versioning: { status: "Unable to verify", title: "Versioning & History", subtitle: "Versioning configuration is not available in the workspace settings." },
+      permissions: { status: "Unable to verify", title: "Permissions", subtitle: "Permissions configuration is managed by workspace access controls." },
+      import_export: { status: "Unable to verify", title: "Import & Export", subtitle: "Import and export configuration is not persisted in costing settings." },
+      audit_log: { status: recentChanges.length > 0 ? "Configured" : "Missing configuration", title: "Audit Log", subtitle: `${recentChanges.length} recent configuration changes available.` },
     },
     recentChanges,
   }, 200, id);
@@ -9001,6 +9045,9 @@ async function dispatch(request: NextRequest, path: string[]) {
   }
   if ((request.method === "GET" || request.method === "PATCH") && route === "onboarding/me") return onboarding(request, supabase, id);
   if (request.method === "GET" && route === "dashboard/overview") return dashboardOverview(request, supabase, id);
+  const invitationTokenMatch = route.match(/^invitations\/([^/]+)$/);
+  if (invitationTokenMatch && request.method === "GET") return inspectProjectClientInvite(request, id, invitationTokenMatch[1]);
+  if (invitationTokenMatch && request.method === "POST") return acceptProjectClientInvite(request, supabase, id, invitationTokenMatch[1]);
   if (request.method === "GET" && route === "billing/overview") return billingOverview(supabase, id);
   if (request.method === "GET" && route === "billing/plans/preview") return billingPreview(request, supabase, id);
   if (request.method === "PATCH" && route === "billing/contact") return billingMutation(request, supabase, id, "contact");
