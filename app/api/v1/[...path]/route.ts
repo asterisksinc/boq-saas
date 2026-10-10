@@ -1770,6 +1770,786 @@ async function getClientDashboardData(request: NextRequest, supabase: SupabaseCl
   }, 200, id);
 }
 
+async function getClientAccessibleProjectIds(admin: SupabaseClient, userEmail: string, userId: string): Promise<string[]> {
+  const normalizedEmail = (userEmail || "").toLowerCase();
+  const [invitesRes, projectsRes, onboardRes, memberRes] = await Promise.all([
+    admin.from("project_client_invitations").select("project_id").ilike("email", normalizedEmail),
+    admin.from("projects").select("id").ilike("client_email", normalizedEmail).is("archived_at", null),
+    admin.from("client_onboarding").select("project_id").eq("user_id", userId),
+    admin.from("workspace_memberships").select("workspace_id").eq("user_id", userId).limit(10),
+  ]);
+
+  const ids = new Set<string>();
+  (invitesRes.data || []).forEach((r) => { if (r.project_id) ids.add(r.project_id); });
+  (projectsRes.data || []).forEach((r) => { if (r.id) ids.add(r.id); });
+  (onboardRes.data || []).forEach((r) => { if (r.project_id) ids.add(r.project_id); });
+
+  if (ids.size === 0 && memberRes.data && memberRes.data.length > 0) {
+    const wsIds = memberRes.data.map((m) => m.workspace_id).filter(Boolean);
+    const { data: wsProjects } = await admin.from("projects").select("id").in("workspace_id", wsIds).is("archived_at", null);
+    (wsProjects || []).forEach((p) => ids.add(p.id));
+  }
+
+  return Array.from(ids);
+}
+
+async function getClientProjectsList(request: NextRequest, supabase: SupabaseClient, id: string) {
+  const auth = await requireUser(supabase, id);
+  if (auth.response) return auth.response;
+  const admin = createSupabaseAdminClient();
+  const userEmail = (auth.user.email ?? "").toLowerCase();
+  const accessibleProjectIds = await getClientAccessibleProjectIds(admin, userEmail, auth.user.id);
+
+  if (accessibleProjectIds.length === 0) {
+    return ok({ items: [] }, 200, id);
+  }
+
+  const { data: projects, error } = await admin
+    .from("projects")
+    .select("id, project_code, name, client_name, status, location, project_type, project_value, approved_budget, start_date, target_completion_date, created_at, updated_at, workspaces(name)")
+    .in("id", accessibleProjectIds)
+    .is("archived_at", null)
+    .order("updated_at", { ascending: false });
+
+  if (error) return fail("INTERNAL_ERROR", "Projects could not be loaded.", 500, id);
+
+  return ok({
+    items: (projects || []).map((p) => {
+      const ws = Array.isArray(p.workspaces) ? p.workspaces[0] : p.workspaces;
+      return {
+        id: p.id,
+        projectCode: p.project_code,
+        name: p.name,
+        clientName: p.client_name,
+        status: p.status,
+        location: p.location,
+        projectType: p.project_type,
+        companyName: ws?.name ?? "Meridian Build Co.",
+        startDate: p.start_date,
+        targetCompletionDate: p.target_completion_date,
+        createdAt: p.created_at,
+        updatedAt: p.updated_at,
+      };
+    }),
+  }, 200, id);
+}
+
+async function getClientBoqsList(request: NextRequest, supabase: SupabaseClient, id: string) {
+  const auth = await requireUser(supabase, id);
+  if (auth.response) return auth.response;
+  const admin = createSupabaseAdminClient();
+  const userEmail = (auth.user.email ?? "").toLowerCase();
+  const accessibleProjectIds = await getClientAccessibleProjectIds(admin, userEmail, auth.user.id);
+
+  if (accessibleProjectIds.length === 0) {
+    return ok({ items: [], page: 1, pageSize: 20, total: 0, hasMore: false, pendingApprovals: 0 }, 200, id);
+  }
+
+  const { page, pageSize, from, to } = pagination(request.nextUrl.searchParams);
+  const status = request.nextUrl.searchParams.get("status");
+  const projectIdParam = request.nextUrl.searchParams.get("projectId");
+  const search = request.nextUrl.searchParams.get("search")?.trim().replace(/[%_,()]/g, " ").slice(0, 120);
+
+  let targetProjectIds = accessibleProjectIds;
+  if (projectIdParam) {
+    if (!accessibleProjectIds.includes(projectIdParam)) {
+      return fail("FORBIDDEN", "You do not have access to this project.", 403, id);
+    }
+    targetProjectIds = [projectIdParam];
+  }
+
+  let query = admin
+    .from("boqs")
+    .select("id, project_id, boq_number, version, status, grand_total, subtotal, markup_percent, tax_percent, created_at, updated_at", { count: "exact" })
+    .in("project_id", targetProjectIds)
+    .is("archived_at", null)
+    .order("updated_at", { ascending: false })
+    .range(from, to);
+
+  if (status && status !== "ALL") {
+    query = query.eq("status", status.toLowerCase().replace(/\s/g, "_"));
+  }
+  if (search) {
+    query = query.or(`boq_number.ilike.%${search}%,version.ilike.%${search}%`);
+  }
+
+  const [res, pendingRes] = await Promise.all([
+    query,
+    admin
+      .from("boqs")
+      .select("id", { count: "exact", head: true })
+      .in("project_id", targetProjectIds)
+      .is("archived_at", null)
+      .eq("status", "in_review"),
+  ]);
+
+  if (res.error) return fail("INTERNAL_ERROR", "BOQs could not be loaded.", 500, id);
+
+  const rows = res.data ?? [];
+  const boqIds = rows.map((r) => r.id);
+
+  const { data: projs } = await admin.from("projects").select("id, name").in("id", targetProjectIds);
+  const projMap = new Map((projs || []).map((p) => [p.id, p.name]));
+
+  let roomMap = new Map<string, number>();
+  let itemMap = new Map<string, number>();
+  if (boqIds.length > 0) {
+    const { data: rooms } = await admin.from("boq_rooms").select("id, boq_id").in("boq_id", boqIds);
+    (rooms || []).forEach((rm) => {
+      roomMap.set(rm.boq_id, (roomMap.get(rm.boq_id) || 0) + 1);
+    });
+    const roomIds = (rooms || []).map((rm) => rm.id);
+    if (roomIds.length > 0) {
+      const { data: cats } = await admin.from("boq_categories").select("id, room_id").in("room_id", roomIds);
+      const catIds = (cats || []).map((c) => c.id);
+      const catToRoom = new Map((cats || []).map((c) => [c.id, c.room_id]));
+      const roomToBoq = new Map((rooms || []).map((rm) => [rm.id, rm.boq_id]));
+      if (catIds.length > 0) {
+        const { data: items } = await admin.from("boq_items").select("id, category_id").in("category_id", catIds);
+        (items || []).forEach((it) => {
+          const rId = catToRoom.get(it.category_id);
+          if (rId) {
+            const bId = roomToBoq.get(rId);
+            if (bId) {
+              itemMap.set(bId, (itemMap.get(bId) || 0) + 1);
+            }
+          }
+        });
+      }
+    }
+  }
+
+  const total = res.count ?? 0;
+  return ok({
+    items: rows.map((b) => ({
+      id: b.id,
+      projectId: b.project_id,
+      projectName: projMap.get(b.project_id) || "Project",
+      boqNumber: b.boq_number || "BOQ-001",
+      version: b.version || "v1.0",
+      status: (b.status || "draft").toUpperCase().replace(/_/g, " "),
+      roomsCount: roomMap.get(b.id) || 0,
+      itemsCount: itemMap.get(b.id) || 0,
+      estimatedValue: Number(b.grand_total ?? b.subtotal ?? 0),
+      grandTotal: Number(b.grand_total ?? b.subtotal ?? 0),
+      subtotal: Number(b.subtotal ?? 0),
+      date: new Date(b.updated_at).toISOString().slice(0, 10),
+      updatedAt: b.updated_at,
+    })),
+    page,
+    pageSize,
+    total,
+    hasMore: to + 1 < total,
+    pendingApprovals: pendingRes.count ?? 0,
+  }, 200, id);
+}
+
+async function getClientBoqDetail(request: NextRequest, supabase: SupabaseClient, id: string, boqId: string) {
+  const auth = await requireUser(supabase, id);
+  if (auth.response) return auth.response;
+  const admin = createSupabaseAdminClient();
+  const userEmail = (auth.user.email ?? "").toLowerCase();
+  const accessibleProjectIds = await getClientAccessibleProjectIds(admin, userEmail, auth.user.id);
+
+  const { data: boq, error: boqErr } = await admin
+    .from("boqs")
+    .select("id, workspace_id, project_id, boq_number, version, status, markup_percent, tax_percent, subtotal, grand_total, created_at, updated_at")
+    .eq("id", boqId)
+    .is("archived_at", null)
+    .maybeSingle();
+
+  if (boqErr || !boq) return fail("NOT_FOUND", "BOQ was not found.", 404, id);
+
+  if (!accessibleProjectIds.includes(boq.project_id)) {
+    return fail("FORBIDDEN", "You do not have access to view this BOQ.", 403, id);
+  }
+
+  const { data: proj } = await admin.from("projects").select("id, name, project_code, client_name").eq("id", boq.project_id).maybeSingle();
+
+  const { data: rooms } = await admin.from("boq_rooms").select("id, name, description, sort_order").eq("boq_id", boqId).order("sort_order");
+  const roomIds = (rooms || []).map((r) => r.id);
+
+  let categories: any[] = [];
+  let items: any[] = [];
+  if (roomIds.length > 0) {
+    const catRes = await admin.from("boq_categories").select("id, room_id, name, description, sort_order").in("room_id", roomIds).order("sort_order");
+    categories = catRes.data || [];
+    const catIds = categories.map((c) => c.id);
+    if (catIds.length > 0) {
+      const itRes = await admin.from("boq_items").select("id, category_id, name, description, unit, quantity, rate, amount, waste_percent, tax_percent, sort_order").in("category_id", catIds).order("sort_order");
+      items = itRes.data || [];
+    }
+  }
+
+  const itemsByCat = new Map<string, any[]>();
+  items.forEach((it) => {
+    const list = itemsByCat.get(it.category_id) || [];
+    list.push({
+      id: it.id,
+      name: it.name,
+      description: it.description,
+      unit: it.unit || "nos",
+      quantity: Number(it.quantity) || 0,
+      rate: Number(it.rate) || 0,
+      amount: Number(it.amount) || ((Number(it.quantity) || 0) * (Number(it.rate) || 0)),
+    });
+    itemsByCat.set(it.category_id, list);
+  });
+
+  const catsByRoom = new Map<string, any[]>();
+  categories.forEach((c) => {
+    const list = catsByRoom.get(c.room_id) || [];
+    list.push({
+      id: c.id,
+      name: c.name,
+      description: c.description,
+      items: itemsByCat.get(c.id) || [],
+    });
+    catsByRoom.set(c.room_id, list);
+  });
+
+  const structuredRooms = (rooms || []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    description: r.description,
+    categories: catsByRoom.get(r.id) || [],
+  }));
+
+  const computedSubtotal = items.reduce((sum, it) => sum + (Number(it.amount) || ((Number(it.quantity) || 0) * (Number(it.rate) || 0))), 0) || Number(boq.subtotal || 0);
+  const markupPercent = Number(boq.markup_percent) || 0;
+  const taxPercent = Number(boq.tax_percent) || 18;
+  const markupAmount = Math.round(computedSubtotal * (markupPercent / 100));
+  const taxAmount = Math.round((computedSubtotal + markupAmount) * (taxPercent / 100) * 100) / 100;
+  const grandTotal = computedSubtotal + markupAmount + taxAmount;
+
+  return ok({
+    id: boq.id,
+    projectId: boq.project_id,
+    projectName: proj?.name || "Project",
+    projectCode: proj?.project_code || "",
+    clientName: proj?.client_name || "",
+    boqNumber: boq.boq_number,
+    version: boq.version,
+    status: (boq.status || "draft").toUpperCase().replace(/_/g, " "),
+    subtotal: computedSubtotal,
+    markupPercent,
+    markupAmount,
+    taxPercent,
+    taxAmount,
+    grandTotal,
+    rooms: structuredRooms,
+    updatedAt: boq.updated_at,
+  }, 200, id);
+}
+
+async function getClientBoqPdf(request: NextRequest, supabase: SupabaseClient, id: string, boqId: string) {
+  const auth = await requireUser(supabase, id);
+  if (auth.response) return auth.response;
+  const admin = createSupabaseAdminClient();
+  const userEmail = (auth.user.email ?? "").toLowerCase();
+  const accessibleProjectIds = await getClientAccessibleProjectIds(admin, userEmail, auth.user.id);
+
+  const { data: boq } = await admin.from("boqs").select("id, project_id, boq_number").eq("id", boqId).maybeSingle();
+  if (!boq || !accessibleProjectIds.includes(boq.project_id)) {
+    return fail("FORBIDDEN", "You do not have access to this BOQ.", 403, id);
+  }
+  return boqPdf(admin, id, boqId);
+}
+
+async function getClientBoqExcel(request: NextRequest, supabase: SupabaseClient, id: string, boqId: string) {
+  const auth = await requireUser(supabase, id);
+  if (auth.response) return auth.response;
+  const admin = createSupabaseAdminClient();
+  const userEmail = (auth.user.email ?? "").toLowerCase();
+  const accessibleProjectIds = await getClientAccessibleProjectIds(admin, userEmail, auth.user.id);
+
+  const { data: boq } = await admin.from("boqs").select("id, project_id").eq("id", boqId).maybeSingle();
+  if (!boq || !accessibleProjectIds.includes(boq.project_id)) {
+    return fail("FORBIDDEN", "You do not have access to this BOQ.", 403, id);
+  }
+  return boqExcel(admin, id, boqId);
+}
+
+async function getClientDocumentsList(request: NextRequest, supabase: SupabaseClient, id: string) {
+  const auth = await requireUser(supabase, id);
+  if (auth.response) return auth.response;
+  const admin = createSupabaseAdminClient();
+  const userEmail = (auth.user.email ?? "").toLowerCase();
+  const accessibleProjectIds = await getClientAccessibleProjectIds(admin, userEmail, auth.user.id);
+
+  if (accessibleProjectIds.length === 0) {
+    return ok({ items: [] }, 200, id);
+  }
+
+  const projectIdParam = request.nextUrl.searchParams.get("projectId");
+  let targetProjectIds = accessibleProjectIds;
+  if (projectIdParam) {
+    if (!accessibleProjectIds.includes(projectIdParam)) {
+      return fail("FORBIDDEN", "You do not have access to this project.", 403, id);
+    }
+    targetProjectIds = [projectIdParam];
+  }
+
+  const [projsRes, propsRes, docsRes, sigsRes] = await Promise.all([
+    admin.from("projects").select("id, name").in("id", targetProjectIds),
+    admin.from("proposals").select("id, project_id, proposal_code, project_name, status, proposed_value, updated_at").in("project_id", targetProjectIds).is("archived_at", null),
+    admin.from("documents").select("id, project_id, name, storage_path, mime_type, size_bytes, updated_at").in("project_id", targetProjectIds),
+    admin.from("client_document_signatures").select("document_id, document_title, document_reference, status, signed_at, signer_name, project_id").in("project_id", targetProjectIds).eq("user_id", auth.user.id),
+  ]);
+
+  const projMap = new Map((projsRes.data || []).map((p) => [p.id, p.name]));
+  const sigMap = new Map((sigsRes.data || []).map((s) => [s.document_id, s]));
+
+  const items: any[] = [];
+
+  for (const prop of propsRes.data || []) {
+    const sig = sigMap.get(prop.id) || sigMap.get(prop.proposal_code);
+    const isSigned = !!sig || prop.status === "approved" || prop.status === "won";
+    items.push({
+      id: prop.id,
+      projectId: prop.project_id,
+      projectName: projMap.get(prop.project_id) || prop.project_name || "Project",
+      title: "Project Proposal",
+      reference: prop.proposal_code || "PROP-2026-024",
+      type: "proposal",
+      status: isSigned ? "signed" : "awaiting_signature",
+      viewUrl: `/api/v1/proposals/${prop.id}/pdf`,
+      requiresSignature: true,
+      signedAt: sig?.signed_at || null,
+      signerName: sig?.signer_name || null,
+      updatedAt: prop.updated_at,
+    });
+  }
+
+  for (const doc of docsRes.data || []) {
+    const sig = sigMap.get(doc.id);
+    const isSigned = !!sig;
+    items.push({
+      id: doc.id,
+      projectId: doc.project_id,
+      projectName: projMap.get(doc.project_id) || "Project",
+      title: doc.name || "Project Contract",
+      reference: `CONT-${doc.id.slice(0, 8).toUpperCase()}`,
+      type: "contract",
+      status: isSigned ? "signed" : "awaiting_signature",
+      viewUrl: `/api/v1/documents/${doc.id}/download`,
+      requiresSignature: true,
+      signedAt: sig?.signed_at || null,
+      signerName: sig?.signer_name || null,
+      fileSize: doc.size_bytes ? `${Math.round(doc.size_bytes / 1024)} KB` : undefined,
+      updatedAt: doc.updated_at,
+    });
+  }
+
+  for (const s of sigsRes.data || []) {
+    if (!items.some((it) => it.id === s.document_id)) {
+      items.push({
+        id: s.document_id,
+        projectId: s.project_id,
+        projectName: projMap.get(s.project_id) || "Project",
+        title: s.document_title || "Project Contract",
+        reference: s.document_reference || "CONT-2026-011",
+        type: "contract",
+        status: "signed",
+        viewUrl: `/api/v1/client/projects/${s.project_id}/documents/${s.document_id}/view`,
+        requiresSignature: false,
+        signedAt: s.signed_at,
+        signerName: s.signer_name,
+        updatedAt: s.signed_at,
+      });
+    }
+  }
+
+  const search = request.nextUrl.searchParams.get("search")?.toLowerCase().trim();
+  const typeFilter = request.nextUrl.searchParams.get("type");
+  const statusFilter = request.nextUrl.searchParams.get("status");
+
+  let filtered = items;
+  if (search) {
+    filtered = filtered.filter((i) => i.title.toLowerCase().includes(search) || i.reference.toLowerCase().includes(search) || i.projectName.toLowerCase().includes(search));
+  }
+  if (typeFilter && typeFilter !== "all") {
+    filtered = filtered.filter((i) => i.type === typeFilter);
+  }
+  if (statusFilter && statusFilter !== "all") {
+    filtered = filtered.filter((i) => i.status === statusFilter);
+  }
+
+  return ok({ items: filtered }, 200, id);
+}
+
+async function getClientInvoicesList(request: NextRequest, supabase: SupabaseClient, id: string) {
+  const auth = await requireUser(supabase, id);
+  if (auth.response) return auth.response;
+  const admin = createSupabaseAdminClient();
+  const userEmail = (auth.user.email ?? "").toLowerCase();
+  const accessibleProjectIds = await getClientAccessibleProjectIds(admin, userEmail, auth.user.id);
+
+  if (accessibleProjectIds.length === 0) {
+    return ok({ items: [], summary: { totalInvoiced: 0, collected: 0, outstanding: 0, totalCount: 0 }, page: 1, pageSize: 20, total: 0, hasMore: false }, 200, id);
+  }
+
+  const { page, pageSize, from, to } = pagination(request.nextUrl.searchParams);
+  const status = request.nextUrl.searchParams.get("status");
+  const projectIdParam = request.nextUrl.searchParams.get("projectId");
+  const search = request.nextUrl.searchParams.get("search")?.trim().replace(/[%_,()]/g, " ").slice(0, 120);
+
+  let targetProjectIds = accessibleProjectIds;
+  if (projectIdParam) {
+    if (!accessibleProjectIds.includes(projectIdParam)) {
+      return fail("FORBIDDEN", "You do not have access to this project.", 403, id);
+    }
+    targetProjectIds = [projectIdParam];
+  }
+
+  let query = admin
+    .from("invoices")
+    .select("id, workspace_id, invoice_code, manual_number, document_type, client_name, project_id, project_name, issue_date, due_date, milestone, tax_rate, subtotal, tax_amount, total_amount, total_paid, currency, status, created_at, updated_at", { count: "exact" })
+    .in("project_id", targetProjectIds)
+    .is("archived_at", null)
+    .order("issue_date", { ascending: false })
+    .range(from, to);
+
+  if (status && status !== "ALL") {
+    query = query.eq("status", status.toLowerCase());
+  }
+  if (search) {
+    query = query.or(`invoice_code.ilike.%${search}%,manual_number.ilike.%${search}%,project_name.ilike.%${search}%`);
+  }
+
+  const { data: rows, count, error } = await query;
+  if (error) return fail("INTERNAL_ERROR", "Invoices could not be loaded.", 500, id);
+
+  const { data: allInvoices } = await admin
+    .from("invoices")
+    .select("total_amount, total_paid, status")
+    .in("project_id", targetProjectIds)
+    .is("archived_at", null);
+
+  const totalInvoiced = (allInvoices || []).reduce((s, r) => s + Number(r.total_amount || 0), 0);
+  const collected = (allInvoices || []).reduce((s, r) => s + Number(r.total_paid || 0), 0);
+  const outstanding = totalInvoiced - collected;
+
+  const total = count ?? 0;
+  return ok({
+    items: (rows || []).map((inv) => ({
+      id: inv.id,
+      invoiceNumber: inv.manual_number || inv.invoice_code || "INV-0001",
+      systemCode: inv.invoice_code,
+      manualNumber: inv.manual_number,
+      documentType: inv.document_type,
+      clientName: inv.client_name,
+      projectId: inv.project_id,
+      projectName: inv.project_name,
+      issueDate: inv.issue_date,
+      dueDate: inv.due_date,
+      milestone: inv.milestone,
+      taxRate: Number(inv.tax_rate || 0),
+      subtotal: Number(inv.subtotal || 0),
+      taxAmount: Number(inv.tax_amount || 0),
+      totalAmount: Number(inv.total_amount || 0),
+      totalPaid: Number(inv.total_paid || 0),
+      outstanding: Math.max(0, Number(inv.total_amount || 0) - Number(inv.total_paid || 0)),
+      currency: inv.currency || "INR",
+      status: inv.status,
+      updatedAt: inv.updated_at,
+    })),
+    summary: {
+      totalInvoiced,
+      collected,
+      outstanding,
+      totalCount: (allInvoices || []).length,
+    },
+    page,
+    pageSize,
+    total,
+    hasMore: to + 1 < total,
+  }, 200, id);
+}
+
+async function getClientInvoiceDetail(request: NextRequest, supabase: SupabaseClient, id: string, invoiceId: string) {
+  const auth = await requireUser(supabase, id);
+  if (auth.response) return auth.response;
+  const admin = createSupabaseAdminClient();
+  const userEmail = (auth.user.email ?? "").toLowerCase();
+  const accessibleProjectIds = await getClientAccessibleProjectIds(admin, userEmail, auth.user.id);
+
+  const { data: inv, error: invErr } = await admin
+    .from("invoices")
+    .select("id, workspace_id, invoice_code, manual_number, document_type, client_id, client_name, billing_address, project_id, project_name, issue_date, due_date, milestone, reference, additional_notes, bank_details, tax_rate, subtotal, tax_amount, total_amount, total_paid, currency, status, created_at, updated_at")
+    .eq("id", invoiceId)
+    .is("archived_at", null)
+    .maybeSingle();
+
+  if (invErr || !inv) return fail("NOT_FOUND", "Invoice was not found.", 404, id);
+
+  if (!accessibleProjectIds.includes(inv.project_id)) {
+    return fail("FORBIDDEN", "You do not have access to view this invoice.", 403, id);
+  }
+
+  const [itemsRes, paymentsRes] = await Promise.all([
+    admin.from("invoice_items").select("id, position, description, quantity, rate, amount").eq("invoice_id", invoiceId).order("position"),
+    admin.from("invoice_payments").select("id, amount, paid_at, method, reference, notes, created_at").eq("invoice_id", invoiceId).order("paid_at", { ascending: false }),
+  ]);
+
+  return ok({
+    id: inv.id,
+    invoiceNumber: inv.manual_number || inv.invoice_code || "INV-0001",
+    manualNumber: inv.manual_number,
+    systemCode: inv.invoice_code,
+    type: inv.document_type,
+    projectName: inv.project_name,
+    projectId: inv.project_id,
+    clientName: inv.client_name,
+    billingAddress: inv.billing_address,
+    milestone: inv.milestone,
+    reference: inv.reference,
+    additionalNotes: inv.additional_notes,
+    bankDetails: inv.bank_details,
+    taxRate: Number(inv.tax_rate || 0),
+    subtotal: Number(inv.subtotal || 0),
+    taxAmount: Number(inv.tax_amount || 0),
+    totalAmount: Number(inv.total_amount || 0),
+    totalPaid: Number(inv.total_paid || 0),
+    outstanding: Math.max(0, Number(inv.total_amount || 0) - Number(inv.total_paid || 0)),
+    currency: inv.currency || "INR",
+    status: inv.status,
+    issueDate: inv.issue_date,
+    dueDate: inv.due_date,
+    items: itemsRes.data || [],
+    payments: paymentsRes.data || [],
+    createdAt: inv.created_at,
+    updatedAt: inv.updated_at,
+  }, 200, id);
+}
+
+async function getClientInvoicePdf(request: NextRequest, supabase: SupabaseClient, id: string, invoiceId: string) {
+  const auth = await requireUser(supabase, id);
+  if (auth.response) return auth.response;
+  const admin = createSupabaseAdminClient();
+  const userEmail = (auth.user.email ?? "").toLowerCase();
+  const accessibleProjectIds = await getClientAccessibleProjectIds(admin, userEmail, auth.user.id);
+
+  const { data: inv } = await admin.from("invoices").select("id, workspace_id, project_id").eq("id", invoiceId).maybeSingle();
+  if (!inv || !accessibleProjectIds.includes(inv.project_id)) {
+    return fail("FORBIDDEN", "You do not have access to this invoice.", 403, id);
+  }
+
+  const invoice = await loadInvoice(admin, inv.workspace_id, invoiceId);
+  if (!invoice) return fail("NOT_FOUND", "Invoice could not be loaded.", 404, id);
+
+  return new Response(basicInvoicePdf(invoice as typeof invoice & Record<string, unknown>), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="${pdfEscape(invoice.invoiceNumber)}.pdf"`,
+      "Cache-Control": "private, no-store",
+      "X-Request-Id": id,
+    },
+  });
+}
+
+async function getClientApprovalsList(request: NextRequest, supabase: SupabaseClient, id: string) {
+  const auth = await requireUser(supabase, id);
+  if (auth.response) return auth.response;
+  const admin = createSupabaseAdminClient();
+  const userEmail = (auth.user.email ?? "").toLowerCase();
+  const accessibleProjectIds = await getClientAccessibleProjectIds(admin, userEmail, auth.user.id);
+
+  if (accessibleProjectIds.length === 0) {
+    return ok({ items: [], pendingCount: 0, decidedCount: 0 }, 200, id);
+  }
+
+  const projectIdParam = request.nextUrl.searchParams.get("projectId");
+  let targetProjectIds = accessibleProjectIds;
+  if (projectIdParam) {
+    if (!accessibleProjectIds.includes(projectIdParam)) {
+      return fail("FORBIDDEN", "You do not have access to this project.", 403, id);
+    }
+    targetProjectIds = [projectIdParam];
+  }
+
+  const [approvalsRes, projsRes] = await Promise.all([
+    admin
+      .from("activity_approvals")
+      .select("id, workspace_id, project_id, stage_id, name, description, due_date, status, attachments, requested_by, requested_at, decided_at, created_at, updated_at")
+      .in("project_id", targetProjectIds)
+      .order("created_at", { ascending: false }),
+    admin.from("projects").select("id, name, project_code").in("id", targetProjectIds),
+  ]);
+
+  const projMap = new Map((projsRes.data || []).map((p) => [p.id, p]));
+
+  const approvalIds = (approvalsRes.data || []).map((a) => a.id);
+  let commentsMap = new Map<string, any[]>();
+  if (approvalIds.length > 0) {
+    const { data: comments } = await admin
+      .from("activity_comments")
+      .select("id, entity_id, body, attachments, author_id, created_at")
+      .eq("entity_type", "approval")
+      .in("entity_id", approvalIds)
+      .order("created_at");
+    (comments || []).forEach((c) => {
+      const list = commentsMap.get(c.entity_id) || [];
+      list.push(c);
+      commentsMap.set(c.entity_id, list);
+    });
+  }
+
+  const { data: pendingProps } = await admin
+    .from("proposals")
+    .select("id, project_id, proposal_code, project_name, status, proposed_value, updated_at")
+    .in("project_id", targetProjectIds)
+    .in("status", ["sent", "in_review"])
+    .is("archived_at", null);
+
+  const items: any[] = (approvalsRes.data || []).map((appr) => {
+    const p = projMap.get(appr.project_id);
+    return {
+      id: appr.id,
+      title: appr.name || "Approval Request",
+      type: "approval",
+      description: appr.description || "",
+      projectId: appr.project_id,
+      projectName: p?.name || "Project",
+      projectCode: p?.project_code || "",
+      status: appr.status,
+      dueDate: appr.due_date || null,
+      requestedAt: appr.requested_at || appr.created_at,
+      decidedAt: appr.decided_at || null,
+      attachments: appr.attachments || [],
+      comments: commentsMap.get(appr.id) || [],
+    };
+  });
+
+  for (const prop of pendingProps || []) {
+    const p = projMap.get(prop.project_id);
+    const existing = items.some((it) => it.description.includes(prop.proposal_code) || it.title.includes(prop.proposal_code));
+    if (!existing) {
+      items.push({
+        id: `prop-${prop.id}`,
+        title: `Proposal Review: ${prop.proposal_code}`,
+        type: "proposal_review",
+        description: `Review and approve proposal ${prop.proposal_code} for ${p?.name || prop.project_name} (Value: INR ${prop.proposed_value?.toLocaleString() || "0"}).`,
+        projectId: prop.project_id,
+        projectName: p?.name || prop.project_name || "Project",
+        projectCode: p?.project_code || "",
+        status: "in_review",
+        dueDate: null,
+        requestedAt: prop.updated_at,
+        decidedAt: null,
+        attachments: [{ name: "Proposal PDF", url: `/api/v1/proposals/${prop.id}/pdf`, type: "application/pdf" }],
+        comments: [],
+        proposalId: prop.id,
+      });
+    }
+  }
+
+  const pendingCount = items.filter((i) => ["draft", "sent", "in_review", "pending"].includes(i.status)).length;
+  const decidedCount = items.length - pendingCount;
+
+  return ok({
+    items,
+    pendingCount,
+    decidedCount,
+  }, 200, id);
+}
+
+async function clientApprovalDecision(request: Request, supabase: SupabaseClient, id: string, approvalId: string) {
+  const auth = await requireUser(supabase, id);
+  if (auth.response) return auth.response;
+  const admin = createSupabaseAdminClient();
+  const userEmail = (auth.user.email ?? "").toLowerCase();
+  const accessibleProjectIds = await getClientAccessibleProjectIds(admin, userEmail, auth.user.id);
+
+  const input = await parsed(request, approvalDecisionSchema, id);
+  if (input.response) return input.response;
+
+  if (approvalId.startsWith("prop-")) {
+    const propId = approvalId.slice(5);
+    const { data: prop } = await admin.from("proposals").select("id, project_id, status").eq("id", propId).maybeSingle();
+    if (!prop || !accessibleProjectIds.includes(prop.project_id)) {
+      return fail("FORBIDDEN", "You do not have access to this proposal.", 403, id);
+    }
+    const newStatus = input.data.decision === "approved" ? "approved" : "rejected";
+    await admin.from("proposals").update({ status: newStatus, updated_at: new Date().toISOString() }).eq("id", propId);
+    return ok({ id: approvalId, status: input.data.decision, decidedAt: new Date().toISOString() }, 200, id);
+  }
+
+  const { data: currentApproval } = await admin
+    .from("activity_approvals")
+    .select("id, project_id, workspace_id, status")
+    .eq("id", approvalId)
+    .maybeSingle();
+
+  if (!currentApproval) return fail("NOT_FOUND", "Approval was not found.", 404, id);
+
+  if (!accessibleProjectIds.includes(currentApproval.project_id)) {
+    return fail("FORBIDDEN", "You do not have access to this approval request.", 403, id);
+  }
+
+  if (["approved", "rejected", "cancelled"].includes(currentApproval.status)) {
+    return fail("CONFLICT", `This approval has already been ${currentApproval.status}.`, 409, id);
+  }
+
+  const now = new Date().toISOString();
+  const { data: updated, error: updateErr } = await admin
+    .from("activity_approvals")
+    .update({ status: input.data.decision, decided_at: now })
+    .eq("id", approvalId)
+    .select()
+    .single();
+
+  if (updateErr) return fail("INTERNAL_ERROR", "Approval status could not be updated.", 500, id);
+
+  if (input.data.comment) {
+    await admin.from("activity_comments").insert({
+      workspace_id: currentApproval.workspace_id,
+      entity_type: "approval",
+      entity_id: approvalId,
+      body: input.data.comment,
+      author_id: auth.user.id,
+    });
+  }
+
+  return ok(updated, 200, id);
+}
+
+async function clientApprovalComment(request: Request, supabase: SupabaseClient, id: string, approvalId: string) {
+  const auth = await requireUser(supabase, id);
+  if (auth.response) return auth.response;
+  const admin = createSupabaseAdminClient();
+  const userEmail = (auth.user.email ?? "").toLowerCase();
+  const accessibleProjectIds = await getClientAccessibleProjectIds(admin, userEmail, auth.user.id);
+
+  const input = await parsed(request, activityCommentSchema, id);
+  if (input.response) return input.response;
+
+  const { data: currentApproval } = await admin
+    .from("activity_approvals")
+    .select("id, project_id, workspace_id")
+    .eq("id", approvalId)
+    .maybeSingle();
+
+  if (!currentApproval) return fail("NOT_FOUND", "Approval was not found.", 404, id);
+
+  if (!accessibleProjectIds.includes(currentApproval.project_id)) {
+    return fail("FORBIDDEN", "You do not have access to this approval request.", 403, id);
+  }
+
+  const { data: comment, error } = await admin.from("activity_comments").insert({
+    workspace_id: currentApproval.workspace_id,
+    entity_type: "approval",
+    entity_id: approvalId,
+    body: input.data.body,
+    attachments: input.data.attachments || [],
+    author_id: auth.user.id,
+  }).select().single();
+
+  if (error) return fail("VALIDATION_ERROR", "Comment could not be added.", 400, id);
+  return ok(comment, 201, id);
+}
+
 async function dashboardOverview(request: NextRequest, supabase: SupabaseClient, id: string) {
   const auth = await requireUser(supabase, id); if (auth.response) return auth.response;
   const [{ data, error }, profileResult, projectsResult] = await Promise.all([
@@ -10308,6 +11088,28 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (clientOnboardingMatch && request.method === "PATCH") return updateClientOnboardingProgress(request, supabase, id, clientOnboardingMatch[1]);
 
   if (route === "client/dashboard" && request.method === "GET") return getClientDashboardData(request, supabase, id);
+  if (route === "client/projects" && request.method === "GET") return getClientProjectsList(request, supabase, id);
+  if (route === "client/boqs" && request.method === "GET") return getClientBoqsList(request, supabase, id);
+  const clientBoqMatch = route.match(/^client\/boqs\/([0-9a-f-]{36})$/i);
+  if (clientBoqMatch && request.method === "GET") return getClientBoqDetail(request, supabase, id, clientBoqMatch[1]);
+  const clientBoqPdfMatch = route.match(/^client\/boqs\/([0-9a-f-]{36})\/pdf$/i);
+  if (clientBoqPdfMatch && request.method === "GET") return getClientBoqPdf(request, supabase, id, clientBoqPdfMatch[1]);
+  const clientBoqExcelMatch = route.match(/^client\/boqs\/([0-9a-f-]{36})\/excel$/i);
+  if (clientBoqExcelMatch && request.method === "GET") return getClientBoqExcel(request, supabase, id, clientBoqExcelMatch[1]);
+
+  if (route === "client/documents" && request.method === "GET") return getClientDocumentsList(request, supabase, id);
+
+  if (route === "client/invoices" && request.method === "GET") return getClientInvoicesList(request, supabase, id);
+  const clientInvoiceMatch = route.match(/^client\/invoices\/([0-9a-f-]{36})$/i);
+  if (clientInvoiceMatch && request.method === "GET") return getClientInvoiceDetail(request, supabase, id, clientInvoiceMatch[1]);
+  const clientInvoicePdfMatch = route.match(/^client\/invoices\/([0-9a-f-]{36})\/pdf$/i);
+  if (clientInvoicePdfMatch && request.method === "GET") return getClientInvoicePdf(request, supabase, id, clientInvoicePdfMatch[1]);
+
+  if (route === "client/approvals" && request.method === "GET") return getClientApprovalsList(request, supabase, id);
+  const clientApprovalDecisionMatch = route.match(/^client\/approvals\/([^/]+)\/decision$/i);
+  if (clientApprovalDecisionMatch && request.method === "POST") return clientApprovalDecision(request, supabase, id, clientApprovalDecisionMatch[1]);
+  const clientApprovalCommentMatch = route.match(/^client\/approvals\/([0-9a-f-]{36})\/comments$/i);
+  if (clientApprovalCommentMatch && request.method === "POST") return clientApprovalComment(request, supabase, id, clientApprovalCommentMatch[1]);
   if (request.method === "GET" && route === "billing/overview") return billingOverview(supabase, id);
   if (request.method === "GET" && route === "billing/plans/preview") return billingPreview(request, supabase, id);
   if (request.method === "PATCH" && route === "billing/contact") return billingMutation(request, supabase, id, "contact");

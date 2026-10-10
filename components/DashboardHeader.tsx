@@ -17,6 +17,7 @@ import NotificationsPopover from "./header/NotificationsPopover";
 interface DashboardHeaderProps {
     title?: string;
     onNew?: () => void;
+    hideNew?: boolean;
     onSearch?: (query: string) => void;
     avatarUrl?: string | null;
     userInitials?: string;
@@ -28,6 +29,7 @@ type ActiveOverlay = "none" | "search" | "new" | "notifications";
 export default function DashboardHeader({
     title = "Overview",
     onNew,
+    hideNew = false,
     onSearch,
     avatarUrl: propAvatarUrl,
     userInitials: propUserInitials,
@@ -261,33 +263,35 @@ export default function DashboardHeader({
                 </div>
 
                 {/* 2. + NEW TRIGGER & POPOVER */}
-                <div className="fig-dashboard-header-item fig-dashboard-new-container">
-                    <div className="fig-dashboard-new">
-                        <button
-                            type="button"
-                            onClick={handleNewButtonClick}
-                            className="flex items-center gap-2"
-                        >
-                            <Plus size={20} />
-                            <span>New</span>
-                        </button>
-                        <i />
-                        <button
-                            type="button"
-                            aria-label="Open new menu"
-                            aria-expanded={activeOverlay === "new"}
-                            onClick={handleNewChevronClick}
-                        >
-                            <ChevronDown size={20} />
-                        </button>
-                    </div>
+                {!hideNew && (
+                    <div className="fig-dashboard-header-item fig-dashboard-new-container">
+                        <div className="fig-dashboard-new">
+                            <button
+                                type="button"
+                                onClick={handleNewButtonClick}
+                                className="flex items-center gap-2"
+                            >
+                                <Plus size={20} />
+                                <span>New</span>
+                            </button>
+                            <i />
+                            <button
+                                type="button"
+                                aria-label="Open new menu"
+                                aria-expanded={activeOverlay === "new"}
+                                onClick={handleNewChevronClick}
+                            >
+                                <ChevronDown size={20} />
+                            </button>
+                        </div>
 
-                    <NewMenuPopover
-                        isOpen={activeOverlay === "new"}
-                        onClose={() => setActiveOverlay("none")}
-                        onNew={onNew}
-                    />
-                </div>
+                        <NewMenuPopover
+                            isOpen={activeOverlay === "new"}
+                            onClose={() => setActiveOverlay("none")}
+                            onNew={onNew}
+                        />
+                    </div>
+                )}
 
                 {/* 3. NOTIFICATIONS TRIGGER & POPOVER */}
                 <div className="fig-dashboard-header-item fig-dashboard-bell-container">

@@ -252,3 +252,246 @@ export async function getClientDashboard(projectId?: string): Promise<ClientDash
     const q = projectId ? `?projectId=${encodeURIComponent(projectId)}` : "";
     return clientApiFetch<ClientDashboardData>(`/api/v1/client/dashboard${q}`);
 }
+
+export type ClientBoqListItem = {
+    id: string;
+    projectId: string;
+    projectName: string;
+    boqNumber: string;
+    version: string;
+    status: string;
+    roomsCount: number;
+    itemsCount: number;
+    estimatedValue: number;
+    grandTotal: number;
+    subtotal: number;
+    date: string;
+    updatedAt: string;
+};
+
+export type ClientBoqRoomItem = {
+    id: string;
+    name: string;
+    description: string | null;
+    unit: string;
+    quantity: number;
+    rate: number;
+    amount: number;
+};
+
+export type ClientBoqCategory = {
+    id: string;
+    name: string;
+    description: string | null;
+    items: ClientBoqRoomItem[];
+};
+
+export type ClientBoqRoom = {
+    id: string;
+    name: string;
+    description: string | null;
+    categories: ClientBoqCategory[];
+};
+
+export type ClientBoqDetail = {
+    id: string;
+    projectId: string;
+    projectName: string;
+    projectCode: string;
+    clientName: string;
+    boqNumber: string;
+    version: string;
+    status: string;
+    subtotal: number;
+    markupPercent: number;
+    markupAmount: number;
+    taxPercent: number;
+    taxAmount: number;
+    grandTotal: number;
+    rooms: ClientBoqRoom[];
+    updatedAt: string;
+};
+
+export type ClientInvoiceListItem = {
+    id: string;
+    invoiceNumber: string;
+    systemCode?: string;
+    manualNumber?: string | null;
+    documentType: string;
+    clientName: string;
+    projectId: string;
+    projectName: string;
+    issueDate: string;
+    dueDate: string;
+    milestone: string;
+    taxRate: number;
+    subtotal: number;
+    taxAmount: number;
+    totalAmount: number;
+    totalPaid: number;
+    outstanding: number;
+    currency: string;
+    status: string;
+    updatedAt: string;
+};
+
+export type ClientInvoiceDetail = ClientInvoiceListItem & {
+    billingAddress?: Record<string, string>;
+    reference?: string | null;
+    additionalNotes?: string | null;
+    bankDetails?: Record<string, string>;
+    items: Array<{
+        id?: string;
+        position?: number;
+        description: string;
+        quantity: number;
+        rate: number;
+        amount?: number;
+    }>;
+    payments: Array<{
+        id: string;
+        amount: number;
+        paid_at: string;
+        method: string | null;
+        reference: string | null;
+        notes: string | null;
+    }>;
+};
+
+export type ClientApprovalItem = {
+    id: string;
+    title: string;
+    type: string;
+    description: string;
+    projectId: string;
+    projectName: string;
+    projectCode: string;
+    status: "draft" | "sent" | "in_review" | "pending" | "approved" | "rejected" | "changes_required" | "cancelled";
+    dueDate: string | null;
+    requestedAt: string;
+    decidedAt: string | null;
+    attachments: Array<{ name: string; url: string; type?: string }>;
+    comments: Array<{
+        id: string;
+        body: string;
+        author_id?: string;
+        created_at?: string;
+        createdAt?: string;
+    }>;
+    proposalId?: string;
+};
+
+export async function listClientProjects(): Promise<{ items: ClientProjectDetails[] }> {
+    return clientApiFetch<{ items: ClientProjectDetails[] }>("/api/v1/client/projects");
+}
+
+export async function listClientBoqs(params?: {
+    page?: number;
+    pageSize?: number;
+    status?: string;
+    search?: string;
+    projectId?: string;
+}): Promise<{
+    items: ClientBoqListItem[];
+    page: number;
+    pageSize: number;
+    total: number;
+    hasMore: boolean;
+    pendingApprovals: number;
+}> {
+    const sp = new URLSearchParams();
+    if (params?.page) sp.set("page", String(params.page));
+    if (params?.pageSize) sp.set("pageSize", String(params.pageSize));
+    if (params?.status) sp.set("status", params.status);
+    if (params?.search) sp.set("search", params.search);
+    if (params?.projectId) sp.set("projectId", params.projectId);
+    const q = sp.toString();
+    return clientApiFetch(`/api/v1/client/boqs${q ? `?${q}` : ""}`);
+}
+
+export async function getClientBoq(boqId: string): Promise<ClientBoqDetail> {
+    return clientApiFetch<ClientBoqDetail>(`/api/v1/client/boqs/${encodeURIComponent(boqId)}`);
+}
+
+export async function listClientDocuments(params?: {
+    projectId?: string;
+    search?: string;
+    status?: string;
+    type?: string;
+}): Promise<{ items: ClientDocumentItem[] }> {
+    const sp = new URLSearchParams();
+    if (params?.projectId) sp.set("projectId", params.projectId);
+    if (params?.search) sp.set("search", params.search);
+    if (params?.status) sp.set("status", params.status);
+    if (params?.type) sp.set("type", params.type);
+    const q = sp.toString();
+    return clientApiFetch<{ items: ClientDocumentItem[] }>(`/api/v1/client/documents${q ? `?${q}` : ""}`);
+}
+
+export async function listClientInvoices(params?: {
+    page?: number;
+    pageSize?: number;
+    status?: string;
+    search?: string;
+    projectId?: string;
+}): Promise<{
+    items: ClientInvoiceListItem[];
+    summary: {
+        totalInvoiced: number;
+        collected: number;
+        outstanding: number;
+        totalCount: number;
+    };
+    page: number;
+    pageSize: number;
+    total: number;
+    hasMore: boolean;
+}> {
+    const sp = new URLSearchParams();
+    if (params?.page) sp.set("page", String(params.page));
+    if (params?.pageSize) sp.set("pageSize", String(params.pageSize));
+    if (params?.status) sp.set("status", params.status);
+    if (params?.search) sp.set("search", params.search);
+    if (params?.projectId) sp.set("projectId", params.projectId);
+    const q = sp.toString();
+    return clientApiFetch(`/api/v1/client/invoices${q ? `?${q}` : ""}`);
+}
+
+export async function getClientInvoice(invoiceId: string): Promise<ClientInvoiceDetail> {
+    return clientApiFetch<ClientInvoiceDetail>(`/api/v1/client/invoices/${encodeURIComponent(invoiceId)}`);
+}
+
+export async function listClientApprovals(params?: {
+    projectId?: string;
+}): Promise<{
+    items: ClientApprovalItem[];
+    pendingCount: number;
+    decidedCount: number;
+}> {
+    const sp = new URLSearchParams();
+    if (params?.projectId) sp.set("projectId", params.projectId);
+    const q = sp.toString();
+    return clientApiFetch(`/api/v1/client/approvals${q ? `?${q}` : ""}`);
+}
+
+export async function submitClientApprovalDecision(
+    approvalId: string,
+    decision: "approved" | "rejected" | "changes_required",
+    comment?: string
+): Promise<{ id: string; status: string; decidedAt?: string }> {
+    return clientApiFetch(`/api/v1/client/approvals/${encodeURIComponent(approvalId)}/decision`, {
+        method: "POST",
+        body: JSON.stringify({ decision, comment }),
+    });
+}
+
+export async function addClientApprovalComment(
+    approvalId: string,
+    body: string
+): Promise<{ id: string; body: string; author_id?: string; created_at?: string; createdAt?: string }> {
+    return clientApiFetch(`/api/v1/client/approvals/${encodeURIComponent(approvalId)}/comments`, {
+        method: "POST",
+        body: JSON.stringify({ body }),
+    });
+}
+
