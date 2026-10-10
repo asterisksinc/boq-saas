@@ -22,6 +22,10 @@ export type Project = {
   targetCompletionDate?: string | null;
   progress?: number | null;
   imageUrl?: string | null;
+  boqsCount?: number;
+  margin?: number | null;
+  estimatedValue?: number | null;
+  totalCost?: number | null;
   rooms?: ProjectRoom[];
 };
 
@@ -122,6 +126,7 @@ export default function ProjectsPage() {
   const [wizardProject, setWizardProject] = useState<Project | null>(null);
   const [remove, setRemove] = useState<Project | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [summary, setSummary] = useState<{ totalProjects: number; totalEstimatedValue: number } | null>(null);
 
   const filterWrapRef = useRef<HTMLDivElement>(null);
   const file = useRef<HTMLInputElement>(null);
@@ -136,12 +141,23 @@ export default function ProjectsPage() {
       const b = await r.json();
       if (!r.ok) throw new Error(message(b, "Projects could not be loaded."));
       setProjects(b.data?.items || []);
+      if (b.data?.summary) {
+        setSummary(b.data.summary);
+      }
     } catch (e) {
       setNotice(e instanceof Error ? e.message : "Projects could not be loaded.");
     } finally {
       setLoading(false);
     }
   }, [query, filter]);
+
+  useEffect(() => {
+    const handleFocus = () => {
+      load();
+    };
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [load]);
 
   useEffect(() => {
     const id = setTimeout(() => {
@@ -226,9 +242,10 @@ export default function ProjectsPage() {
   };
 
   const total = useMemo(
-    () => projects.reduce((s, p) => s + (p.approvedBudget ?? p.projectValue ?? 0), 0),
-    [projects]
+    () => summary?.totalEstimatedValue ?? projects.reduce((s, p) => s + (p.estimatedValue ?? p.approvedBudget ?? p.projectValue ?? 0), 0),
+    [summary, projects]
   );
+  const projectCount = summary?.totalProjects ?? projects.length;
 
   const status = async (project: Project, next: string) => {
     try {
@@ -409,7 +426,7 @@ export default function ProjectsPage() {
               <div>
                 <h2>All Projects</h2>
                 <p>
-                  {projects.length} projects | {total >= 10000000 ? `₹${(total / 10000000).toFixed(2)}Cr` : money(total)} total estimated value
+                  {projectCount} projects | {total >= 10000000 ? `₹${(total / 10000000).toFixed(2)}Cr` : money(total)} total estimated value
                 </p>
               </div>
               <div className="projects-actions">
@@ -748,10 +765,17 @@ function Table({
                   <span className="designer-dot">{(p.clientName || "UN").slice(0, 2).toUpperCase()}</span>
                   <span className="designer-name">{p.clientName?.split(" ")[0] || "Unassigned"}</span>
                 </td>
-                <td>{p.approvedBudget ? money(p.approvedBudget) : "—"}</td>
-                <td>—</td>
+                <td>{p.boqsCount ?? 0}</td>
+                <td>{p.margin != null ? `${p.margin}%` : "—"}</td>
                 <td>
-                  <div className="progress">
+                  <div
+                    className="progress"
+                    role="progressbar"
+                    aria-valuenow={p.progress || 0}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`Project progress: ${p.progress || 0}%`}
+                  >
                     <i style={{ width: `${Math.min(100, Math.max(0, p.progress || 0))}%` }} />
                     <span>{p.progress || 0}%</span>
                   </div>
@@ -798,7 +822,7 @@ function Grid({
           <div key={p.id} className="project-card" onClick={() => location.assign(`/projects/${p.id}`)}>
             <div className="project-card-header">
               <div>
-                <h3>
+                <h3 title={`${p.name}${p.location ? ` — ${p.location}` : ""}`}>
                   {p.name}
                   {p.location ? ` — ${p.location}` : ""}
                 </h3>
@@ -823,7 +847,7 @@ function Grid({
             <div className="project-card-details">
               <div>
                 <span className="project-card-detail-label">Client Name</span>
-                <span className="project-card-detail-value">{p.clientName}</span>
+                <span className="project-card-detail-value" title={p.clientName}>{p.clientName}</span>
               </div>
               <div>
                 <span className="project-card-detail-label">Square Foot</span>
@@ -831,19 +855,19 @@ function Grid({
               </div>
               <div>
                 <span className="project-card-detail-label">Type</span>
-                <span className="project-card-detail-value">{p.projectType}</span>
+                <span className="project-card-detail-value" title={p.projectType}>{p.projectType}</span>
               </div>
               <div>
                 <span className="project-card-detail-label">Designer</span>
-                <span className="project-card-detail-value">{p.clientName?.split(" ")[0] || "Unassigned"}</span>
+                <span className="project-card-detail-value" title={p.clientName?.split(" ")[0] || "Unassigned"}>{p.clientName?.split(" ")[0] || "Unassigned"}</span>
               </div>
               <div>
                 <span className="project-card-detail-label">BOQs</span>
-                <span className="project-card-detail-value">{money(p.approvedBudget ?? p.projectValue)}</span>
+                <span className="project-card-detail-value">{p.boqsCount ?? 0}</span>
               </div>
               <div>
                 <span className="project-card-detail-label">Margin</span>
-                <span className="project-card-detail-value">—</span>
+                <span className="project-card-detail-value">{p.margin != null ? `${p.margin}%` : "—"}</span>
               </div>
             </div>
             <div className="project-card-footer">
@@ -854,7 +878,14 @@ function Grid({
               <div className="project-card-footer-right">
                 <span className="project-card-detail-label">Progress</span>
                 <div className="card-progress">
-                  <div className="card-progress-bar">
+                  <div
+                    className="card-progress-bar"
+                    role="progressbar"
+                    aria-valuenow={p.progress || 0}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`Project progress: ${p.progress || 0}%`}
+                  >
                     <i style={{ width: `${Math.min(100, Math.max(0, p.progress || 0))}%` }} />
                   </div>
                   <span className="card-progress-pct">{p.progress || 0}%</span>

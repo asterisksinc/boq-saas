@@ -12,12 +12,6 @@ interface SearchPopoverProps {
     onNavigate: (url: string) => void;
 }
 
-const DEFAULT_RECENTS = [
-    "Mehta Residence BOQ",
-    "Kohinoor Office",
-    "Oberoi Residence",
-];
-
 const STORAGE_KEY = "boq_recent_searches";
 
 export default function SearchPopover({
@@ -57,7 +51,7 @@ export default function SearchPopover({
         } catch {
             // fallback
         }
-        setRecents(DEFAULT_RECENTS);
+        setRecents([]);
     }, []);
 
     // Save recent search

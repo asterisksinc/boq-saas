@@ -152,7 +152,7 @@ export default function ProjectPage() {
       const rs = await Promise.all([
         fetch(`/api/v1/projects/${id}`, { credentials: "include" }),
         fetch(`/api/v1/boqs?projectId=${id}&pageSize=100`, { credentials: "include" }),
-        fetch("/api/v1/invoices?pageSize=100", { credentials: "include" }),
+        fetch(`/api/v1/invoices?projectId=${encodeURIComponent(id)}&pageSize=100`, { credentials: "include" }),
         fetch("/api/v1/document-folders", { credentials: "include" }),
         fetch(`/api/v1/projects/${id}/client-invite`, { credentials: "include" }).catch(() => null),
       ]);
@@ -178,7 +178,7 @@ export default function ProjectPage() {
 
   const open = async (f: Folder) => {
     setFolder(f);
-    const r = await fetch(`/api/v1/documents?folderId=${f.id}&pageSize=100`, { credentials: "include" });
+    const r = await fetch(`/api/v1/documents?folderId=${f.id}&projectId=${encodeURIComponent(id)}&pageSize=100`, { credentials: "include" });
     const b = await r.json();
     setD((b.data?.items || []).filter((x: Doc) => x.projectId === id));
   };

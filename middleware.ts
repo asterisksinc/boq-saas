@@ -18,7 +18,13 @@ const publicPaths = new Set([
 ]);
 
 function isPublicPath(pathname: string) {
-    return publicPaths.has(pathname) || pathname.startsWith("/solutions/") || pathname.startsWith("/invite/");
+    return (
+        publicPaths.has(pathname) ||
+        pathname.startsWith("/solutions/") ||
+        pathname.startsWith("/invite/") ||
+        pathname.startsWith("/client/invitation") ||
+        pathname.startsWith("/client/create-account")
+    );
 }
 
 function isPlatformAdmin(user: { email?: string | null; app_metadata?: Record<string, unknown>; user_metadata?: Record<string, unknown> }) {
@@ -30,6 +36,10 @@ function isPlatformAdmin(user: { email?: string | null; app_metadata?: Record<st
     const appRole = user.app_metadata?.role;
     const userRole = user.user_metadata?.role;
     return appRole === "admin" || appRole === "platform_admin" || userRole === "platform_admin" || (!!email && configuredEmails.includes(email));
+}
+
+function isClientUser(user: { app_metadata?: Record<string, unknown>; user_metadata?: Record<string, unknown> }) {
+    return user.app_metadata?.role === "client" || user.user_metadata?.role === "client";
 }
 
 export async function middleware(request: NextRequest) {
@@ -59,12 +69,14 @@ export async function middleware(request: NextRequest) {
 
     if (user && (request.nextUrl.pathname === "/admin" || request.nextUrl.pathname.startsWith("/admin/"))) {
         if (!isPlatformAdmin(user)) {
-            return NextResponse.redirect(new URL("/dashboard", request.url));
+            const redirectPath = isClientUser(user) ? "/client/dashboard" : "/dashboard";
+            return NextResponse.redirect(new URL(redirectPath, request.url));
         }
     }
 
     if (user && (request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/register")) {
-        return NextResponse.redirect(new URL("/dashboard", request.url));
+        const redirectPath = isClientUser(user) ? "/client/dashboard" : "/dashboard";
+        return NextResponse.redirect(new URL(redirectPath, request.url));
     }
 
     return response;

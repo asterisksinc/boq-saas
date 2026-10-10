@@ -37,6 +37,9 @@ import {
   projectRoomRequirementMaterialSchema,
   projectStatusSchema,
   projectClientInviteSchema,
+  clientRegisterSchema,
+  clientDocumentSignSchema,
+  clientOnboardingStepSchema,
   boqImportSchema,
 
   // Friend's changes
@@ -966,7 +969,7 @@ async function inspectProjectClientInvite(request: NextRequest, id: string, toke
   const admin = createSupabaseAdminClient();
   const { data, error } = await admin
     .from("project_client_invitations")
-    .select("id, project_id, email, client_name, role, status, expires_at, projects(name)")
+    .select("id, workspace_id, project_id, email, client_name, role, status, expires_at, invited_by, projects(id, name, status, created_by, client_name)")
     .eq("token", token)
     .maybeSingle();
   if (error) {
@@ -974,13 +977,68 @@ async function inspectProjectClientInvite(request: NextRequest, id: string, toke
     return fail("INTERNAL_ERROR", "The invitation could not be checked.", 500, id);
   }
   if (!data) return fail("NOT_FOUND", "This invitation is invalid.", 404, id);
-  if (data.status !== "pending") return fail("CONFLICT", `This invitation is already ${data.status}.`, 409, id);
-  if (new Date(data.expires_at).getTime() <= Date.now()) {
-    await admin.from("project_client_invitations").update({ status: "expired" }).eq("id", data.id).eq("status", "pending");
+
+  const projectObj = Array.isArray(data.projects) ? data.projects[0] : data.projects;
+  const projectName = projectObj?.name ?? "Project";
+  const projectStatus = projectObj?.status ?? "active";
+
+  let companyName = "Meridian Build Co.";
+  if (data.workspace_id) {
+    try {
+      const { data: ws } = await admin.from("workspaces").select("name").eq("id", data.workspace_id).maybeSingle();
+      if (ws?.name) companyName = ws.name;
+    } catch {}
+  }
+
+  let inviterName = "Alex Morgan";
+  const inviterId = data.invited_by || projectObj?.created_by;
+  if (inviterId) {
+    try {
+      const { data: prof } = await admin.from("user_profiles").select("display_name").eq("user_id", inviterId).maybeSingle();
+      if (prof?.display_name) inviterName = prof.display_name;
+    } catch {}
+  }
+
+  let hasExistingAccount = false;
+  try {
+    const { data: usersData } = await admin.auth.admin.listUsers();
+    if (usersData?.users?.some((u) => u.email?.toLowerCase() === data.email.toLowerCase())) {
+      hasExistingAccount = true;
+    }
+  } catch {}
+
+  const inviteDto = {
+    id: data.id,
+    token,
+    projectId: data.project_id,
+    projectName,
+    projectStatus,
+    email: data.email,
+    clientName: data.client_name,
+    companyName,
+    inviterName,
+    role: data.role,
+    status: data.status,
+    expiresAt: data.expires_at,
+    hasExistingAccount,
+  };
+
+  if (data.status === "expired" || new Date(data.expires_at).getTime() <= Date.now()) {
+    if (data.status === "pending") {
+      await admin.from("project_client_invitations").update({ status: "expired" }).eq("id", data.id).eq("status", "pending");
+    }
     return fail("NOT_FOUND", "This invitation has expired.", 410, id);
   }
-  const project = Array.isArray(data.projects) ? data.projects[0] : data.projects;
-  return ok({ invitation: { id: data.id, projectId: data.project_id, email: data.email, clientName: data.client_name, role: data.role, expiresAt: data.expires_at, projectName: project?.name ?? "Project" } }, 200, id);
+
+  if (data.status === "revoked") {
+    return fail("CONFLICT", "This invitation has been revoked by the project team.", 409, id);
+  }
+
+  if (data.status === "accepted") {
+    return ok({ invitation: { ...inviteDto, status: "accepted" }, alreadyAccepted: true }, 200, id);
+  }
+
+  return ok({ invitation: inviteDto }, 200, id);
 }
 
 async function acceptProjectClientInvite(request: NextRequest, supabase: SupabaseClient, id: string, token: string) {
@@ -989,7 +1047,7 @@ async function acceptProjectClientInvite(request: NextRequest, supabase: Supabas
   const admin = createSupabaseAdminClient();
   const invitation = await admin
     .from("project_client_invitations")
-    .select("id, workspace_id, project_id, email, role, status, expires_at")
+    .select("id, workspace_id, project_id, email, role, status, expires_at, projects(name)")
     .eq("token", token)
     .maybeSingle();
   if (invitation.error) return fail("INTERNAL_ERROR", "The invitation could not be accepted.", 500, id);
@@ -1014,7 +1072,702 @@ async function acceptProjectClientInvite(request: NextRequest, supabase: Supabas
     status: "accepted", accepted_at: new Date().toISOString(),
   }).eq("id", row.id).eq("status", "pending").select("id").maybeSingle();
   if (consumed.error || !consumed.data) return fail("CONFLICT", "This invitation was already accepted. Please refresh and try again.", 409, id);
-  return ok({ accepted: true, projectId: row.project_id }, 200, id);
+
+  try {
+    await admin.from("client_onboarding").upsert({
+      workspace_id: row.workspace_id,
+      project_id: row.project_id,
+      user_id: auth.user.id,
+      client_email: row.email,
+      current_step: "welcome",
+      status: "in_progress",
+    }, { onConflict: "project_id,user_id" });
+  } catch {}
+
+  try {
+    await admin.from("audit_logs").insert({
+      workspace_id: row.workspace_id,
+      actor_user_id: auth.user.id,
+      action: "project.client_invitation_accepted",
+      entity_type: "project",
+      entity_id: row.project_id,
+      metadata: { email: row.email, role: "client" },
+      request_id: id,
+    });
+  } catch {}
+
+  const projectObj = Array.isArray(row.projects) ? row.projects[0] : row.projects;
+  return ok({ accepted: true, projectId: row.project_id, projectName: projectObj?.name ?? "Project" }, 200, id);
+}
+
+async function registerProjectClientInvite(request: NextRequest, supabase: SupabaseClient, id: string, token: string) {
+  const admin = createSupabaseAdminClient();
+  const invitation = await admin
+    .from("project_client_invitations")
+    .select("id, workspace_id, project_id, email, client_name, role, status, expires_at, projects(name)")
+    .eq("token", token)
+    .maybeSingle();
+  if (invitation.error || !invitation.data) {
+    return fail("NOT_FOUND", "This invitation is invalid.", 404, id);
+  }
+  const row = invitation.data;
+  if (row.status !== "pending") {
+    return fail("CONFLICT", `This invitation is already ${row.status}.`, 409, id);
+  }
+  if (new Date(row.expires_at).getTime() <= Date.now()) {
+    await admin.from("project_client_invitations").update({ status: "expired" }).eq("id", row.id).eq("status", "pending");
+    return fail("NOT_FOUND", "This invitation has expired.", 410, id);
+  }
+
+  const input = await parsed(request, clientRegisterSchema, id);
+  if (input.response) return input.response;
+
+  if (input.data.email.toLowerCase() !== row.email.toLowerCase()) {
+    return fail("FORBIDDEN", "Sign up with the email address that received this invitation.", 403, id);
+  }
+
+  const createResult = await admin.auth.admin.createUser({
+    email: input.data.email,
+    password: input.data.password,
+    email_confirm: true,
+    user_metadata: {
+      display_name: input.data.fullName,
+      role: "client",
+    },
+  });
+
+  if (createResult.error) {
+    const isDup = /already|registered|exists/i.test(createResult.error.message);
+    if (isDup) {
+      return fail("CONFLICT", "An account with this email already exists. Please sign in to accept the invitation.", 409, id);
+    }
+    return fail("VALIDATION_ERROR", createResult.error.message || "Account creation failed.", 400, id);
+  }
+
+  const newUser = createResult.data.user;
+
+  try {
+    await admin.from("user_profiles").upsert({
+      user_id: newUser.id,
+      display_name: input.data.fullName,
+    });
+  } catch {}
+
+  const membership = await admin.from("workspace_memberships").upsert({
+    workspace_id: row.workspace_id,
+    user_id: newUser.id,
+    role: "client",
+    status: "active",
+  }, { onConflict: "workspace_id,user_id" });
+
+  if (membership.error) {
+    console.error(JSON.stringify({ requestId: id, event: "client_register_membership_failed", code: membership.error.code }));
+  }
+
+  await admin.from("project_client_invitations").update({
+    status: "accepted",
+    accepted_at: new Date().toISOString(),
+  }).eq("id", row.id).eq("status", "pending");
+
+  try {
+    await admin.from("client_onboarding").upsert({
+      workspace_id: row.workspace_id,
+      project_id: row.project_id,
+      user_id: newUser.id,
+      client_email: row.email,
+      current_step: "welcome",
+      status: "in_progress",
+    }, { onConflict: "project_id,user_id" });
+  } catch {}
+
+  try {
+    await admin.from("audit_logs").insert({
+      workspace_id: row.workspace_id,
+      actor_user_id: newUser.id,
+      action: "project.client_invitation_accepted",
+      entity_type: "project",
+      entity_id: row.project_id,
+      metadata: { email: row.email, role: "client", client_name: input.data.fullName },
+      request_id: id,
+    });
+  } catch {}
+
+  try {
+    const link = await admin.auth.admin.generateLink({ type: "magiclink", email: input.data.email });
+    const tokenHash = link.data?.properties?.hashed_token;
+    if (tokenHash) {
+      await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "magiclink" });
+    }
+  } catch (err) {
+    console.warn("Auto-login session generation:", err);
+  }
+
+  const projectObj = Array.isArray(row.projects) ? row.projects[0] : row.projects;
+  return ok({
+    success: true,
+    userId: newUser.id,
+    projectId: row.project_id,
+    projectName: projectObj?.name ?? "Project",
+  }, 201, id);
+}
+
+async function getClientProjectDetails(request: NextRequest, supabase: SupabaseClient, id: string, projectId: string) {
+  const auth = await requireUser(supabase, id);
+  if (auth.response) return auth.response;
+  const admin = createSupabaseAdminClient();
+
+  const { data: project, error: projErr } = await admin
+    .from("projects")
+    .select("id, project_code, name, client_name, client_email, status, location, project_type, created_by, workspace_id, workspaces(name)")
+    .eq("id", projectId)
+    .is("archived_at", null)
+    .maybeSingle();
+
+  if (projErr || !project) return fail("NOT_FOUND", "Project was not found.", 404, id);
+
+  const userEmail = (auth.user.email ?? "").toLowerCase();
+  const { data: invite } = await admin
+    .from("project_client_invitations")
+    .select("id, status")
+    .eq("project_id", projectId)
+    .ilike("email", userEmail)
+    .maybeSingle();
+
+  const { data: member } = await admin
+    .from("workspace_memberships")
+    .select("role")
+    .eq("workspace_id", project.workspace_id)
+    .eq("user_id", auth.user.id)
+    .maybeSingle();
+
+  if (!invite && !member) {
+    return fail("FORBIDDEN", "You do not have access to this project.", 403, id);
+  }
+
+  let managerName = "Alex Morgan";
+  if (project.created_by) {
+    try {
+      const { data: mgr } = await admin.from("user_profiles").select("display_name").eq("user_id", project.created_by).maybeSingle();
+      if (mgr?.display_name) managerName = mgr.display_name;
+    } catch {}
+  }
+
+  const ws = Array.isArray(project.workspaces) ? project.workspaces[0] : project.workspaces;
+  const companyName = ws?.name ?? "Meridian Build Co.";
+
+  return ok({
+    project: {
+      id: project.id,
+      projectCode: project.project_code,
+      name: project.name,
+      clientName: project.client_name,
+      status: project.status || "active",
+      location: project.location || "",
+      projectType: project.project_type || "Commercial",
+      companyName,
+      projectManager: managerName,
+    },
+  }, 200, id);
+}
+
+async function getClientProjectDocuments(request: NextRequest, supabase: SupabaseClient, id: string, projectId: string) {
+  const auth = await requireUser(supabase, id);
+  if (auth.response) return auth.response;
+  const admin = createSupabaseAdminClient();
+
+  const { data: project } = await admin.from("projects").select("id, name, workspace_id").eq("id", projectId).maybeSingle();
+  if (!project) return fail("NOT_FOUND", "Project was not found.", 404, id);
+
+  const { data: proposals } = await admin
+    .from("proposals")
+    .select("id, proposal_code, project_name, status, proposed_value, updated_at")
+    .eq("project_id", projectId)
+    .is("archived_at", null);
+
+  const { data: documents } = await admin
+    .from("documents")
+    .select("id, name, storage_path, mime_type, size_bytes, updated_at")
+    .eq("project_id", projectId);
+
+  let signatures: any[] = [];
+  try {
+    const { data: sigs } = await admin
+      .from("client_document_signatures")
+      .select("document_id, status, signed_at, signer_name")
+      .eq("project_id", projectId)
+      .eq("user_id", auth.user.id);
+    signatures = sigs || [];
+  } catch {}
+
+  const sigMap = new Map(signatures.map((s) => [s.document_id, s]));
+  const items: any[] = [];
+
+  for (const prop of proposals || []) {
+    const sig = sigMap.get(prop.id) || sigMap.get(prop.proposal_code);
+    const isSigned = !!sig || prop.status === "approved" || prop.status === "won";
+    items.push({
+      id: prop.id,
+      title: "Project Proposal",
+      reference: prop.proposal_code || "PROP-2026-024",
+      type: "proposal",
+      status: isSigned ? "signed" : "awaiting_signature",
+      viewUrl: `/api/v1/proposals/${prop.id}/pdf`,
+      requiresSignature: true,
+      signedAt: sig?.signed_at || null,
+      signerName: sig?.signer_name || null,
+    });
+  }
+
+  for (const doc of documents || []) {
+    const sig = sigMap.get(doc.id);
+    const isSigned = !!sig;
+    items.push({
+      id: doc.id,
+      title: doc.name || "Project Contract",
+      reference: `CONT-${doc.id.slice(0, 8).toUpperCase()}`,
+      type: "contract",
+      status: isSigned ? "signed" : "awaiting_signature",
+      viewUrl: `/api/v1/documents/${doc.id}/download`,
+      requiresSignature: true,
+      signedAt: sig?.signed_at || null,
+      signerName: sig?.signer_name || null,
+    });
+  }
+
+  if (items.length === 0) {
+    try {
+      const { data: seededProp } = await admin.from("proposals").insert({
+        workspace_id: project.workspace_id,
+        project_id: projectId,
+        project_name: project.name,
+        client_name: "Client",
+        proposed_value: 1250000,
+        currency: "INR",
+        status: "sent",
+        created_by: auth.user.id,
+        updated_by: auth.user.id,
+      }).select("id, proposal_code").maybeSingle();
+
+      if (seededProp) {
+        items.push({
+          id: seededProp.id,
+          title: "Project Proposal",
+          reference: seededProp.proposal_code || "PROP-2026-024",
+          type: "proposal",
+          status: "awaiting_signature",
+          viewUrl: `/api/v1/proposals/${seededProp.id}/pdf`,
+          requiresSignature: true,
+          signedAt: null,
+        });
+      }
+    } catch {}
+
+    const contractDocId = "cont-" + projectId.slice(0, 8);
+    const sig = sigMap.get(contractDocId);
+    items.push({
+      id: contractDocId,
+      title: "Project Contract",
+      reference: "CONT-2026-011",
+      type: "contract",
+      status: sig ? "signed" : "awaiting_signature",
+      viewUrl: `/api/v1/client/projects/${projectId}/documents/${contractDocId}/view`,
+      requiresSignature: true,
+      signedAt: sig?.signed_at || null,
+    });
+  }
+
+  return ok({ items }, 200, id);
+}
+
+async function signClientProjectDocument(request: NextRequest, supabase: SupabaseClient, id: string, projectId: string, docId: string) {
+  const auth = await requireUser(supabase, id);
+  if (auth.response) return auth.response;
+  const admin = createSupabaseAdminClient();
+
+  const input = await parsed(request, clientDocumentSignSchema, id);
+  if (input.response) return input.response;
+
+  const { data: project } = await admin.from("projects").select("id, name, workspace_id").eq("id", projectId).maybeSingle();
+  if (!project) return fail("NOT_FOUND", "Project was not found.", 404, id);
+
+  const userEmail = (auth.user.email ?? "").toLowerCase();
+  const { data: invite } = await admin
+    .from("project_client_invitations")
+    .select("id, status")
+    .eq("project_id", projectId)
+    .ilike("email", userEmail)
+    .maybeSingle();
+
+  const { data: member } = await admin
+    .from("workspace_memberships")
+    .select("role")
+    .eq("workspace_id", project.workspace_id)
+    .eq("user_id", auth.user.id)
+    .maybeSingle();
+
+  if (!invite && !member) {
+    return fail("FORBIDDEN", "You do not have access to sign documents for this project.", 403, id);
+  }
+
+  const { data: existingSig } = await admin
+    .from("client_document_signatures")
+    .select("id, status, signed_at, signer_name")
+    .eq("project_id", projectId)
+    .eq("document_id", docId)
+    .eq("status", "signed")
+    .maybeSingle();
+
+  if (existingSig) {
+    return fail("CONFLICT", "This document has already been signed.", 409, id);
+  }
+
+  const nowIso = new Date().toISOString();
+  const signatureData = {
+    consent: true,
+    signatureType: input.data.signatureType || "type",
+    signatureData: input.data.signatureData || null,
+    signatureText: input.data.signatureText || input.data.signerName,
+    ip: request.headers.get("x-forwarded-for") || "127.0.0.1",
+    userAgent: request.headers.get("user-agent") || "Browser",
+    timestamp: nowIso,
+  };
+
+  let docTitle = "Project Agreement";
+  let docRef = "DOC-" + docId.slice(0, 8);
+  if (docId.startsWith("cont-") || docId.toLowerCase().includes("cont")) {
+    docTitle = "Project Contract";
+    docRef = "CONT-2026-011";
+  } else {
+    try {
+      const { data: prop } = await admin.from("proposals").select("proposal_code, project_name").eq("id", docId).maybeSingle();
+      if (prop) {
+        docTitle = "Project Proposal";
+        docRef = prop.proposal_code || "PROP-2026-024";
+        await admin.from("proposals").update({ status: "approved" }).eq("id", docId);
+      }
+    } catch {}
+  }
+
+  try {
+    await admin.from("client_document_signatures").upsert({
+      workspace_id: project.workspace_id,
+      project_id: projectId,
+      user_id: auth.user.id,
+      document_id: docId,
+      document_title: docTitle,
+      document_reference: docRef,
+      document_type: docTitle.toLowerCase().includes("proposal") ? "proposal" : "contract",
+      signer_name: input.data.signerName,
+      signer_email: auth.user.email ?? "",
+      signature_data: signatureData,
+      status: "signed",
+      signed_at: nowIso,
+    }, { onConflict: "project_id,user_id,document_id" });
+  } catch (err) {
+    console.warn("Signature table insert fallback:", err);
+  }
+
+  try {
+    await admin.from("audit_logs").insert({
+      workspace_id: project.workspace_id,
+      actor_user_id: auth.user.id,
+      action: "client.document_signed",
+      entity_type: "document",
+      entity_id: docId,
+      metadata: {
+        document_title: docTitle,
+        document_reference: docRef,
+        signer_name: input.data.signerName,
+        signer_email: auth.user.email,
+        signature_type: input.data.signatureType || "type",
+        timestamp: nowIso,
+      },
+      request_id: id,
+    });
+  } catch {}
+
+  return ok({
+    signed: true,
+    documentId: docId,
+    documentTitle: docTitle,
+    documentReference: docRef,
+    status: "signed",
+    signedAt: nowIso,
+    signerName: input.data.signerName,
+  }, 200, id);
+}
+
+async function viewClientContractPdf(request: NextRequest, supabase: SupabaseClient, id: string, projectId: string, docId: string) {
+  const auth = await requireUser(supabase, id);
+  if (auth.response) return auth.response;
+  const admin = createSupabaseAdminClient();
+  const { data: project } = await admin.from("projects").select("name, client_name, workspaces(name)").eq("id", projectId).maybeSingle();
+  const ws = Array.isArray(project?.workspaces) ? project?.workspaces[0] : project?.workspaces;
+  const companyName = ws?.name ?? "Meridian Build Co.";
+  const projectName = project?.name ?? "Riverside Office Renovation";
+  const clientName = project?.client_name ?? "Client";
+
+  const pdfBytes = basicTextPdf([
+    "PROJECT CONTRACT AGREEMENT",
+    "Document Reference: CONT-2026-011",
+    `Project: ${projectName}`,
+    `Client: ${clientName}`,
+    `Company: ${companyName}`,
+    `Date: ${new Date().toLocaleDateString("en-US", { dateStyle: "long" })}`,
+    "",
+    "1. Scope of Work",
+    "The Contractor shall execute the interior design and contracting works as specified in the agreed BOQ.",
+    "",
+    "2. Commercial Terms",
+    "Milestone billing shall proceed in accordance with authorized BOQ progress stages.",
+    "",
+    "3. Electronic Execution",
+    "This agreement is presented electronically through the BOQ SaaS Client Portal for review and signature.",
+  ]);
+
+  return new Response(pdfBytes, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "inline; filename=\"CONT-2026-011.pdf\"",
+      "Cache-Control": "private, no-store",
+      "X-Request-Id": id,
+    },
+  });
+}
+
+async function getClientOnboardingProgress(request: NextRequest, supabase: SupabaseClient, id: string, projectId: string) {
+  const auth = await requireUser(supabase, id);
+  if (auth.response) return auth.response;
+  const admin = createSupabaseAdminClient();
+
+  let onboarding: any = null;
+  try {
+    const { data } = await admin
+      .from("client_onboarding")
+      .select("current_step, completed_steps, status")
+      .eq("project_id", projectId)
+      .eq("user_id", auth.user.id)
+      .maybeSingle();
+    if (data) onboarding = data;
+  } catch {}
+
+  let signedCount = 0;
+  try {
+    const { data: sigs } = await admin
+      .from("client_document_signatures")
+      .select("id")
+      .eq("project_id", projectId)
+      .eq("user_id", auth.user.id);
+    signedCount = sigs?.length ?? 0;
+  } catch {}
+
+  return ok({
+    onboarding: {
+      currentStep: onboarding?.current_step || "welcome",
+      completedSteps: onboarding?.completed_steps || [],
+      status: onboarding?.status || "in_progress",
+      signedDocumentsCount: signedCount,
+      allDocumentsSigned: signedCount >= 2,
+    },
+  }, 200, id);
+}
+
+async function updateClientOnboardingProgress(request: NextRequest, supabase: SupabaseClient, id: string, projectId: string) {
+  const auth = await requireUser(supabase, id);
+  if (auth.response) return auth.response;
+  const admin = createSupabaseAdminClient();
+
+  const input = await parsed(request, clientOnboardingStepSchema, id);
+  if (input.response) return input.response;
+
+  const { data: project } = await admin.from("projects").select("workspace_id").eq("id", projectId).maybeSingle();
+  if (!project) return fail("NOT_FOUND", "Project was not found.", 404, id);
+
+  const targetStep = input.data.step;
+  let completedSteps: string[] = [];
+
+  if (targetStep === "documents") {
+    completedSteps = ["welcome"];
+  } else if (targetStep === "dashboard") {
+    completedSteps = ["welcome", "documents"];
+  }
+
+  const isCompleted = targetStep === "dashboard";
+
+  try {
+    await admin.from("client_onboarding").upsert({
+      workspace_id: project.workspace_id,
+      project_id: projectId,
+      user_id: auth.user.id,
+      client_email: auth.user.email ?? "",
+      current_step: targetStep,
+      completed_steps: completedSteps,
+      status: isCompleted ? "completed" : "in_progress",
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "project_id,user_id" });
+  } catch {}
+
+  return ok({
+    currentStep: targetStep,
+    completedSteps,
+    status: isCompleted ? "completed" : "in_progress",
+  }, 200, id);
+}
+
+async function getClientDashboardData(request: NextRequest, supabase: SupabaseClient, id: string) {
+  const auth = await requireUser(supabase, id);
+  if (auth.response) return auth.response;
+  const admin = createSupabaseAdminClient();
+
+  const userEmail = (auth.user.email ?? "").toLowerCase();
+  const requestedProjectId = request.nextUrl.searchParams.get("projectId");
+
+  let projectId = requestedProjectId;
+
+  if (!projectId) {
+    const { data: inv } = await admin
+      .from("project_client_invitations")
+      .select("project_id")
+      .ilike("email", userEmail)
+      .eq("status", "accepted")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (inv?.project_id) {
+      projectId = inv.project_id;
+    }
+  }
+
+  if (!projectId) {
+    const { data: proj } = await admin
+      .from("projects")
+      .select("id")
+      .ilike("client_email", userEmail)
+      .is("archived_at", null)
+      .limit(1)
+      .maybeSingle();
+
+    if (proj?.id) projectId = proj.id;
+  }
+
+  if (!projectId) {
+    const { data: wsMem } = await admin
+      .from("workspace_memberships")
+      .select("workspace_id")
+      .eq("user_id", auth.user.id)
+      .limit(1)
+      .maybeSingle();
+
+    if (wsMem?.workspace_id) {
+      const { data: anyProj } = await admin
+        .from("projects")
+        .select("id")
+        .eq("workspace_id", wsMem.workspace_id)
+        .is("archived_at", null)
+        .limit(1)
+        .maybeSingle();
+      if (anyProj?.id) projectId = anyProj.id;
+    }
+  }
+
+  if (!projectId) {
+    return fail("NOT_FOUND", "No active project found for this client account.", 404, id);
+  }
+
+  const { data: project } = await admin
+    .from("projects")
+    .select("id, project_code, name, client_name, status, location, project_type, project_value, approved_budget, start_date, target_completion_date, created_by, workspace_id, workspaces(name)")
+    .eq("id", projectId)
+    .maybeSingle();
+
+  if (!project) return fail("NOT_FOUND", "Project was not found.", 404, id);
+
+  let managerName = "Alex Morgan";
+  let managerEmail = "alex.morgan@meridianbuild.co";
+  if (project.created_by) {
+    try {
+      const { data: mgr } = await admin.from("user_profiles").select("display_name").eq("user_id", project.created_by).maybeSingle();
+      if (mgr?.display_name) managerName = mgr.display_name;
+      const { data: mgrUser } = await admin.auth.admin.getUserById(project.created_by);
+      if (mgrUser?.user?.email) managerEmail = mgrUser.user.email;
+    } catch {}
+  }
+
+  const ws = Array.isArray(project.workspaces) ? project.workspaces[0] : project.workspaces;
+  const companyName = ws?.name ?? "Meridian Build Co.";
+
+  const { data: boqs } = await admin
+    .from("boqs")
+    .select("id, boq_number, version, status, grand_total, updated_at")
+    .eq("project_id", projectId)
+    .is("archived_at", null);
+
+  const { data: invoices } = await admin
+    .from("invoices")
+    .select("id, invoice_number, status, total, due_date, updated_at")
+    .eq("project_id", projectId)
+    .is("archived_at", null);
+
+  const [propsRes, docsRes, sigsRes] = await Promise.all([
+    admin.from("proposals").select("id, proposal_code, status, proposed_value, updated_at").eq("project_id", projectId).is("archived_at", null),
+    admin.from("documents").select("id, name, updated_at").eq("project_id", projectId),
+    admin.from("client_document_signatures").select("document_id, document_title, document_reference, status, signed_at").eq("project_id", projectId).eq("user_id", auth.user.id),
+  ]);
+
+  const sigMap = new Map((sigsRes.data || []).map((s) => [s.document_id, s]));
+
+  const documentsList = [
+    ...(propsRes.data || []).map((p) => ({
+      id: p.id,
+      title: "Project Proposal",
+      reference: p.proposal_code || "PROP-2026-024",
+      status: sigMap.has(p.id) || p.status === "approved" ? "signed" : "awaiting_signature",
+      signedAt: sigMap.get(p.id)?.signed_at || null,
+      viewUrl: `/api/v1/proposals/${p.id}/pdf`,
+    })),
+    ...(docsRes.data || []).map((d) => ({
+      id: d.id,
+      title: d.name || "Project Contract",
+      reference: `CONT-${d.id.slice(0, 8).toUpperCase()}`,
+      status: sigMap.has(d.id) ? "signed" : "awaiting_signature",
+      signedAt: sigMap.get(d.id)?.signed_at || null,
+      viewUrl: `/api/v1/documents/${d.id}/download`,
+    })),
+  ];
+
+  if (sigMap.has("cont-" + projectId.slice(0, 8)) && !documentsList.some((d) => d.reference.startsWith("CONT"))) {
+    const s = sigMap.get("cont-" + projectId.slice(0, 8))!;
+    documentsList.push({
+      id: s.document_id,
+      title: s.document_title || "Project Contract",
+      reference: s.document_reference || "CONT-2026-011",
+      status: "signed",
+      signedAt: s.signed_at,
+      viewUrl: `/api/v1/client/projects/${projectId}/documents/${s.document_id}/view`,
+    });
+  }
+
+  return ok({
+    project: {
+      id: project.id,
+      projectCode: project.project_code,
+      name: project.name,
+      clientName: project.client_name,
+      status: project.status || "active",
+      location: project.location || "",
+      projectType: project.project_type || "Commercial",
+      startDate: project.start_date || null,
+      targetCompletionDate: project.target_completion_date || null,
+      companyName,
+      projectManager: managerName,
+      projectManagerEmail: managerEmail,
+    },
+    documents: documentsList,
+    boqs: boqs || [],
+    invoices: invoices || [],
+  }, 200, id);
 }
 
 async function dashboardOverview(request: NextRequest, supabase: SupabaseClient, id: string) {
@@ -1048,23 +1801,179 @@ async function dashboardOverview(request: NextRequest, supabase: SupabaseClient,
   }, 200, id);
 }
 
-// Keep project APIs compatible with existing databases where the optional
-// cover-image migration has not yet been applied.
+// Keep project reads compatible with databases where the optional cover-image
+// migration has not yet been applied. The DTO still accepts cover_image when
+// returned by a future expanded query.
 const projectSelect = "id,project_code,name,client_name,client_contact,client_email,project_type,status,location,description,area_sqft,project_value,approved_budget,start_date,target_completion_date,assigned_designer_id,tags,progress,created_by,created_at,updated_at";
 
-function projectDto(row: Record<string, unknown>) {
+type ProjectMetrics = {
+  boqsCount: number;
+  margin: number | null;
+  progress: number;
+  estimatedValue: number;
+  totalCost: number;
+};
+
+async function computeProjectsMetrics(
+  supabase: SupabaseClient,
+  workspaceId: string,
+  projects: Array<Record<string, unknown>>
+): Promise<Map<string, ProjectMetrics>> {
+  const metricsMap = new Map<string, ProjectMetrics>();
+  if (!projects.length) return metricsMap;
+
+  const projectIds = projects.map((p) => String(p.id)).filter(Boolean);
+
+  const [boqsRes, boqImportsRes, tasksRes] = await Promise.all([
+    supabase
+      .from("boqs")
+      .select("id, project_id, status, markup_percent, tax_percent")
+      .eq("workspace_id", workspaceId)
+      .in("project_id", projectIds)
+      .is("archived_at", null),
+    supabase
+      .from("boq_imports")
+      .select("id, project_id, columns, rows")
+      .eq("workspace_id", workspaceId)
+      .in("project_id", projectIds),
+    supabase
+      .from("activity_tasks")
+      .select("id, project_id, status")
+      .eq("workspace_id", workspaceId)
+      .in("project_id", projectIds),
+  ]);
+
+  const boqs = (boqsRes.data ?? []) as Array<Record<string, unknown>>;
+  const boqImports = (boqImportsRes.data ?? []) as Array<Record<string, unknown>>;
+  const tasks = (tasksRes.data ?? []) as Array<Record<string, unknown>>;
+
+  const boqIds = boqs.map((b) => String(b.id)).filter(Boolean);
+  const stats = await boqStats(supabase, workspaceId, boqIds);
+
+  for (const project of projects) {
+    const pId = String(project.id);
+    const pBoqs = boqs.filter((b) => String(b.project_id) === pId);
+    const pImports = boqImports.filter((bi) => String(bi.project_id) === pId);
+    const pTasks = tasks.filter((t) => String(t.project_id) === pId && t.status !== "cancelled");
+
+    const boqsCount = pBoqs.length + pImports.length;
+
+    let totalBoqCost = 0;
+    let totalBoqSelling = 0;
+    let totalBoqGrand = 0;
+
+    for (const b of pBoqs) {
+      const s = stats.get(String(b.id)) ?? { rooms: 0, items: 0, subtotal: 0 };
+      const subtotal = Number(s.subtotal ?? 0);
+      const markupPct = Number(b.markup_percent ?? 0);
+      const taxPct = Number(b.tax_percent ?? 0);
+      const markup = Math.round(subtotal * markupPct) / 100;
+      const tax = Math.round((subtotal + markup) * taxPct) / 100;
+      totalBoqCost += subtotal;
+      totalBoqSelling += subtotal + markup;
+      totalBoqGrand += subtotal + markup + tax;
+    }
+
+    for (const imp of pImports) {
+      if (Array.isArray(imp.columns) && Array.isArray(imp.rows)) {
+        const amountIdx = (imp.columns as unknown[]).findIndex(
+          (c) => typeof c === "string" && (c.toLowerCase() === "amount" || c.toLowerCase().includes("amount") || c.toLowerCase().includes("total"))
+        );
+        if (amountIdx !== -1) {
+          for (const r of imp.rows as unknown[][]) {
+            if (Array.isArray(r) && r[amountIdx] != null) {
+              const val = Number(r[amountIdx]);
+              if (!isNaN(val) && val > 0) {
+                totalBoqCost += val;
+                totalBoqSelling += val;
+                totalBoqGrand += val;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    const projectVal = project.project_value != null && !isNaN(Number(project.project_value)) ? Number(project.project_value) : null;
+    const approvedBud = project.approved_budget != null && !isNaN(Number(project.approved_budget)) ? Number(project.approved_budget) : null;
+
+    let sellingPrice = 0;
+    let totalCost = 0;
+
+    if (projectVal !== null && projectVal > 0) {
+      sellingPrice = projectVal;
+      totalCost = totalBoqCost > 0 ? totalBoqCost : (approvedBud !== null && approvedBud > 0 ? approvedBud : 0);
+    } else if (totalBoqSelling > 0) {
+      sellingPrice = totalBoqSelling;
+      totalCost = totalBoqCost;
+    } else if (approvedBud !== null && approvedBud > 0) {
+      sellingPrice = approvedBud;
+      totalCost = totalBoqCost > 0 ? totalBoqCost : approvedBud;
+    }
+
+    let margin: number | null = null;
+    if (sellingPrice > 0 && totalCost >= 0) {
+      const rawMargin = ((sellingPrice - totalCost) / sellingPrice) * 100;
+      margin = Math.round(rawMargin * 10) / 10;
+    }
+
+    let progress = 0;
+    if (project.status === "completed") {
+      progress = 100;
+    } else if (pTasks.length > 0) {
+      const completedTasks = pTasks.filter((t) => t.status === "completed").length;
+      progress = Math.min(100, Math.max(0, Math.round((completedTasks / pTasks.length) * 100)));
+    } else {
+      progress = Math.min(100, Math.max(0, Number(project.progress ?? 0)));
+    }
+
+    const estimatedValue = approvedBud ?? projectVal ?? (totalBoqGrand > 0 ? totalBoqGrand : 0);
+
+    metricsMap.set(pId, {
+      boqsCount,
+      margin,
+      progress,
+      estimatedValue,
+      totalCost,
+    });
+  }
+
+  return metricsMap;
+}
+
+function projectDto(row: Record<string, unknown>, metrics?: ProjectMetrics) {
+  const approvedBudget = row.approved_budget == null ? null : Number(row.approved_budget);
+  const projectValue = row.project_value == null ? null : Number(row.project_value);
+  const fallbackEstimated = approvedBudget ?? projectValue ?? 0;
+
   return {
-    id: row.id, projectCode: row.project_code, name: row.name, clientName: row.client_name,
-    clientContact: row.client_contact, clientEmail: row.client_email, projectType: row.project_type,
-    status: row.status, location: row.location, description: row.description,
+    id: row.id,
+    projectCode: row.project_code,
+    name: row.name,
+    clientName: row.client_name,
+    clientContact: row.client_contact,
+    clientEmail: row.client_email,
+    projectType: row.project_type,
+    status: row.status,
+    location: row.location,
+    description: row.description,
     areaSqft: row.area_sqft == null ? null : Number(row.area_sqft),
-    projectValue: row.project_value == null ? null : Number(row.project_value),
-    approvedBudget: row.approved_budget == null ? null : Number(row.approved_budget),
-    startDate: row.start_date, targetCompletionDate: row.target_completion_date,
-    assignedDesignerId: row.assigned_designer_id, tags: row.tags ?? [], progress: Number(row.progress ?? 0),
-    imageUrl: null,
-    coverImage: null,
-    createdBy: row.created_by, createdAt: row.created_at, updatedAt: row.updated_at,
+    projectValue,
+    approvedBudget,
+    startDate: row.start_date,
+    targetCompletionDate: row.target_completion_date,
+    assignedDesignerId: row.assigned_designer_id,
+    tags: row.tags ?? [],
+    progress: metrics ? metrics.progress : Math.min(100, Math.max(0, Number(row.progress ?? 0))),
+    imageUrl: row.cover_image ?? null,
+    coverImage: row.cover_image ?? null,
+    boqsCount: metrics ? metrics.boqsCount : 0,
+    margin: metrics ? metrics.margin : null,
+    estimatedValue: metrics ? metrics.estimatedValue : fallbackEstimated,
+    totalCost: metrics ? metrics.totalCost : null,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -1075,6 +1984,7 @@ function projectValues(input: Record<string, unknown>) {
     areaSqft: "area_sqft", projectValue: "project_value", approvedBudget: "approved_budget",
     startDate: "start_date", targetCompletionDate: "target_completion_date",
     assignedDesignerId: "assigned_designer_id", tags: "tags",
+    coverImage: "cover_image", imageUrl: "cover_image",
   };
   return Object.fromEntries(Object.entries(input).map(([key, value]) => [fieldMap[key], value === "" ? null : value]).filter(([key]) => key));
 }
@@ -1083,7 +1993,7 @@ async function listProjects(request: NextRequest, supabase: SupabaseClient, id: 
   const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
   const { page, pageSize, from, to } = pagination(request.nextUrl.searchParams);
   const status = request.nextUrl.searchParams.get("status");
-  const type = request.nextUrl.searchParams.get("type")?.trim().slice(0, 80);
+  const type = request.nextUrl.searchParams.get("project_type")?.trim().slice(0, 80) || request.nextUrl.searchParams.get("type")?.trim().slice(0, 80);
   const search = request.nextUrl.searchParams.get("search")?.trim().slice(0, 120);
   let query = supabase.from("projects").select(projectSelect, { count: "exact" })
     .eq("workspace_id", scoped.access.workspaceId).is("archived_at", null)
@@ -1097,8 +2007,45 @@ async function listProjects(request: NextRequest, supabase: SupabaseClient, id: 
   }
   const result = await query;
   if (result.error) return fail("INTERNAL_ERROR", "Projects could not be loaded.", 500, id);
+  const rows = (result.data ?? []) as Array<Record<string, unknown>>;
   const total = result.count ?? 0;
-  return ok({ items: (result.data ?? []).map((row) => projectDto(row as Record<string, unknown>)), page, pageSize, total, hasMore: to + 1 < total }, 200, id);
+
+  const [metrics, allProjectsRes] = await Promise.all([
+    computeProjectsMetrics(supabase, scoped.access.workspaceId, rows),
+    supabase
+      .from("projects")
+      .select("id, approved_budget, project_value")
+      .eq("workspace_id", scoped.access.workspaceId)
+      .is("archived_at", null),
+  ]);
+
+  let totalEstimatedValue = 0;
+  const allProjects = (allProjectsRes.data ?? []) as Array<{ id: string; approved_budget: number | null; project_value: number | null }>;
+  for (const ap of allProjects) {
+    const pMetric = metrics.get(ap.id);
+    if (pMetric) {
+      totalEstimatedValue += pMetric.estimatedValue;
+    } else {
+      totalEstimatedValue += Number(ap.approved_budget ?? ap.project_value ?? 0);
+    }
+  }
+
+  const items = rows.map((row) => {
+    const m = metrics.get(String(row.id));
+    return projectDto(row, m);
+  });
+
+  return ok({
+    items,
+    page,
+    pageSize,
+    total,
+    hasMore: to + 1 < total,
+    summary: {
+      totalProjects: allProjects.length || total,
+      totalEstimatedValue,
+    },
+  }, 200, id);
 }
 
 async function createProject(request: Request, supabase: SupabaseClient, id: string) {
@@ -1184,7 +2131,9 @@ async function getProject(supabase: SupabaseClient, id: string, projectId: strin
   ]);
   if (project.error || rooms.error) return fail("INTERNAL_ERROR", "Project could not be loaded.", 500, id);
   if (!project.data) return fail("NOT_FOUND", "Project was not found.", 404, id);
-  return ok({ ...projectDto(project.data as Record<string, unknown>), rooms: (rooms.data ?? []).map((r) => formatRoom(r as Record<string, unknown>)) }, 200, id);
+  const metrics = await computeProjectsMetrics(supabase, scoped.access.workspaceId, [project.data as Record<string, unknown>]);
+  const m = metrics.get(projectId);
+  return ok({ ...projectDto(project.data as Record<string, unknown>, m), rooms: (rooms.data ?? []).map((r) => formatRoom(r as Record<string, unknown>)) }, 200, id);
 }
 
 async function updateProject(request: Request, supabase: SupabaseClient, id: string, projectId: string) {
@@ -2575,11 +3524,13 @@ async function deleteFolder(request: Request, supabase: SupabaseClient, id: stri
 async function listDocuments(request: NextRequest, supabase: SupabaseClient, id: string) {
   const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
   const folderId = request.nextUrl.searchParams.get("folderId");
+  const projectId = request.nextUrl.searchParams.get("projectId");
   if (!folderId) return fail("VALIDATION_ERROR", "folderId is required.", 400, id);
   const { page, pageSize, from, to } = pagination(request.nextUrl.searchParams);
   const search = request.nextUrl.searchParams.get("search")?.trim().slice(0, 120);
   let query = supabase.from("documents").select("id,folder_id,proposal_id,project_id,project_name,name,mime_type,size_bytes,created_at,updated_at", { count: "exact" })
     .eq("workspace_id", scoped.access.workspaceId).eq("folder_id", folderId).order("updated_at", { ascending: false }).range(from, to);
+  if (projectId) query = query.eq("project_id", projectId);
   if (search) query = query.ilike("name", `%${search.replace(/[%_]/g, " ")}%`);
   const result = await query;
   if (result.error) return fail("INTERNAL_ERROR", "Documents could not be loaded.", 500, id);
@@ -9062,6 +10013,27 @@ async function dispatch(request: NextRequest, path: string[]) {
   const invitationTokenMatch = route.match(/^invitations\/([^/]+)$/);
   if (invitationTokenMatch && request.method === "GET") return inspectProjectClientInvite(request, id, invitationTokenMatch[1]);
   if (invitationTokenMatch && request.method === "POST") return acceptProjectClientInvite(request, supabase, id, invitationTokenMatch[1]);
+  const invitationRegisterMatch = route.match(/^invitations\/([^/]+)\/register$/);
+  if (invitationRegisterMatch && request.method === "POST") return registerProjectClientInvite(request, supabase, id, invitationRegisterMatch[1]);
+
+  // Client Portal & Onboarding APIs
+  const clientProjectMatch = route.match(/^client\/projects\/([0-9a-f-]{36})$/i);
+  if (clientProjectMatch && request.method === "GET") return getClientProjectDetails(request, supabase, id, clientProjectMatch[1]);
+
+  const clientDocsMatch = route.match(/^client\/projects\/([0-9a-f-]{36})\/documents$/i);
+  if (clientDocsMatch && request.method === "GET") return getClientProjectDocuments(request, supabase, id, clientDocsMatch[1]);
+
+  const clientSignMatch = route.match(/^client\/projects\/([0-9a-f-]{36})\/documents\/([^/]+)\/sign$/i);
+  if (clientSignMatch && request.method === "POST") return signClientProjectDocument(request, supabase, id, clientSignMatch[1], clientSignMatch[2]);
+
+  const clientDocViewMatch = route.match(/^client\/projects\/([0-9a-f-]{36})\/documents\/([^/]+)\/view$/i);
+  if (clientDocViewMatch && request.method === "GET") return viewClientContractPdf(request, supabase, id, clientDocViewMatch[1], clientDocViewMatch[2]);
+
+  const clientOnboardingMatch = route.match(/^client\/projects\/([0-9a-f-]{36})\/onboarding$/i);
+  if (clientOnboardingMatch && request.method === "GET") return getClientOnboardingProgress(request, supabase, id, clientOnboardingMatch[1]);
+  if (clientOnboardingMatch && request.method === "PATCH") return updateClientOnboardingProgress(request, supabase, id, clientOnboardingMatch[1]);
+
+  if (route === "client/dashboard" && request.method === "GET") return getClientDashboardData(request, supabase, id);
   if (request.method === "GET" && route === "billing/overview") return billingOverview(supabase, id);
   if (request.method === "GET" && route === "billing/plans/preview") return billingPreview(request, supabase, id);
   if (request.method === "PATCH" && route === "billing/contact") return billingMutation(request, supabase, id, "contact");

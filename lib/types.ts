@@ -22,6 +22,12 @@ export interface Project {
   assignedDesignerId: string | null;
   tags: string[];
   progress: number;
+  imageUrl?: string | null;
+  coverImage?: string | null;
+  boqsCount?: number;
+  margin?: number | null;
+  estimatedValue?: number | null;
+  totalCost?: number | null;
   createdBy: string;
   createdAt: string;
   updatedAt: string;

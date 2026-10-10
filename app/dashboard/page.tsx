@@ -64,8 +64,8 @@ export default function DashboardPage() {
                 fetch("/api/v1/dashboard/recent-boqs?pageSize=5", { credentials: "include" }).then(r => r.ok ? r.json() : null).catch(() => null),
             ]);
             setOverview(overviewData);
-            setRecentProjects(toDashboardItems(projRes?.data?.items, "project"));
-            setRecentBoqs(toDashboardItems(boqRes?.data?.items, "boq"));
+            setRecentProjects(toDashboardItems(projRes?.data?.items ?? overviewData.recentProjects, "project"));
+            setRecentBoqs(toDashboardItems(boqRes?.data?.items ?? overviewData.recentBoqs, "boq"));
         }
         catch (requestError) {
             const message = getApiErrorMessage(requestError);
@@ -90,7 +90,7 @@ export default function DashboardPage() {
                 <div className="fig-dashboard-left">
                     <Analytics overview={overview} hasContent={hasAnalytics} money={money} activePeriod={activePeriod} onPeriodChange={setActivePeriod} />
                     <div className="fig-dashboard-bottom">
-                        <ProjectsCard overview={overview} hasContent={hasProjects} money={money} />
+                        <ProjectsCard overview={overview} recentProjects={recentProjects} hasContent={hasProjects} money={money} />
                         <div className="fig-dashboard-stack"><BoqCard items={recentBoqs} hasContent={hasBoqs} money={money} boqIndex={boqIndex} onBoqIndexChange={setBoqIndex} /><QuickActions /></div>
                     </div>
                 </div>
@@ -208,7 +208,7 @@ function DynamicChart({ data, currency }: { data: Array<{ label: string; estimat
     </div>;
 }
 
-function ProjectsCard({ overview, hasContent, money }: { overview: DashboardOverview; hasContent: boolean; money: Intl.NumberFormat | null }) {
+function ProjectsCard({ overview, recentProjects, hasContent, money }: { overview: DashboardOverview; recentProjects: DashboardItem[]; hasContent: boolean; money: Intl.NumberFormat | null }) {
     const total = overview.kpis.totalProjects;
     const active = overview.kpis.activeProjects;
     const planning = overview.projectStatusBreakdown?.planning ?? null;
@@ -222,10 +222,12 @@ function ProjectsCard({ overview, hasContent, money }: { overview: DashboardOver
             <span>○ On Hold <b>{onHold ?? "—"}</b></span>
             <span className="complete">● Completed <b>{completed}</b></span>
         </div>
-        <div className="fig-project-graph">
-            <div className="fig-value-label"><span>Total BOQ Value</span><strong>{overview.permissions.canViewFinancials && overview.kpis.totalEstimatedValue !== null ? money?.format(overview.kpis.totalEstimatedValue) : "Private"}</strong></div>
-            <div className="fig-project-bars">{Array.from({ length: 18 }, (_, index) => <i key={index} />)}<b /></div>
-        </div>
+        {recentProjects.length > 0 ? <div className="fig-project-recent">
+            {recentProjects.slice(0, 5).map((project) => <a key={project.name} href={`/projects?search=${encodeURIComponent(project.name)}`}>
+                <span>{project.name}</span><small>{project.subtitle || "Project"}{project.status ? ` · ${project.status.replace(/_/g, " ")}` : ""}</small>
+                {project.value !== undefined && overview.permissions.canViewFinancials ? <b>{money?.format(project.value)}</b> : null}
+            </a>)}
+        </div> : <EmptyCard icon="dashboard-projects" title="No recent projects" detail="Create a project to see it here." compact />}
     </> : <EmptyCard icon="dashboard-projects" title="No projects or BOQ yet" detail="Create your first project or BOQ to see the overview here." />}</section>;
 }
 

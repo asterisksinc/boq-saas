@@ -1031,6 +1031,40 @@ export const projectClientInviteSchema = z
   })
   .strict();
 
+export const clientRegisterSchema = z
+  .object({
+    fullName: z.string().trim().min(1, "Full Name is required").max(160),
+    email: z
+      .string()
+      .trim()
+      .email("Enter a valid email address")
+      .max(254)
+      .transform((val) => val.toLowerCase()),
+    password: z.string().min(10, "Password must be at least 10 characters long"),
+    confirmPassword: z.string().min(10, "Confirm password is required"),
+  })
+  .strict()
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
+
+export const clientDocumentSignSchema = z
+  .object({
+    signerName: z.string().trim().min(1, "Signer name is required").max(160),
+    consent: z.boolean().refine((val) => val === true, "You must agree to electronically sign this document"),
+    signatureType: z.enum(["draw", "type"]).optional(),
+    signatureData: z.string().max(500000).optional(),
+    signatureText: z.string().trim().optional(),
+  })
+  .strict();
+
+export const clientOnboardingStepSchema = z
+  .object({
+    step: z.enum(["welcome", "documents", "dashboard"]),
+  })
+  .strict();
+
 export function fieldErrors(error: z.ZodError) {
   const result: Record<string, string[]> = {};
 
@@ -1041,5 +1075,6 @@ export function fieldErrors(error: z.ZodError) {
 
   return result;
 }
+
 
 
