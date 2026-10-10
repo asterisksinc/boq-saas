@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, MoreHorizontal, Plus, X, ArrowLeft, Home, User, MapPin, Calendar, Briefcase, Search, Minus, Info, RefreshCcw, Edit2, Trash2, Copy } from "lucide-react";
+import { Check, ChevronDown, MoreHorizontal, Plus, X, ArrowLeft, Home, User, MapPin, Calendar, Briefcase, Search, Minus, Info, RefreshCcw, Edit2, Trash2, Copy, UploadCloud } from "lucide-react";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
@@ -22,6 +22,7 @@ export type Project = {
   targetCompletionDate?: string | null;
   progress?: number | null;
   imageUrl?: string | null;
+  coverImage?: string | null;
   boqsCount?: number;
   margin?: number | null;
   estimatedValue?: number | null;
@@ -1196,6 +1197,7 @@ function Create({
     quantity: number;
     partitions: number;
     notes: string;
+    referenceImageUrl?: string | null;
   }>({
     name: "Wardrobe",
     category: "Storage",
@@ -1206,6 +1208,7 @@ function Create({
     quantity: 1,
     partitions: 4,
     notes: "",
+    referenceImageUrl: null,
   });
 
   const [activeMaterialReqId, setActiveMaterialReqId] = useState<string | null>(null);
@@ -1213,8 +1216,62 @@ function Create({
   const [materialsCatalog, setMaterialsCatalog] = useState<any[]>([]);
   const [selectedMaterialForAssign, setSelectedMaterialForAssign] = useState<any | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [uploadingRoomRef, setUploadingRoomRef] = useState(false);
+  const [uploadingReqRef, setUploadingReqRef] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUploadRoomRef = async (file: File) => {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Image size must be less than 5MB.");
+      return;
+    }
+    setUploadingRoomRef(true);
+    setError("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/v1/projects/upload-image", {
+        method: "POST",
+        credentials: "include",
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(message(data, "Failed to upload image."));
+      updateActiveRoomField("referenceImageUrl", data.data?.url || data.url);
+    } catch (err: any) {
+      setError(err.message || "Failed to upload image.");
+    } finally {
+      setUploadingRoomRef(false);
+    }
+  };
+
+  const handleUploadReqRef = async (file: File) => {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Image size must be less than 5MB.");
+      return;
+    }
+    setUploadingReqRef(true);
+    setError("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/v1/projects/upload-image", {
+        method: "POST",
+        credentials: "include",
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(message(data, "Failed to upload image."));
+      setReqForm((f) => ({ ...f, referenceImageUrl: data.data?.url || data.url }));
+    } catch (err: any) {
+      setError(err.message || "Failed to upload image.");
+    } finally {
+      setUploadingReqRef(false);
+    }
+  };
 
   useEffect(() => {
     if (initialProject) {
@@ -1388,33 +1445,24 @@ function Create({
 
       if (coverFile && currentProj?.id) {
         try {
-          const fr = await fetch("/api/v1/document-folders", {
+          const d = new FormData();
+          d.append("file", coverFile);
+          const ur = await fetch("/api/v1/projects/upload-image", {
             method: "POST",
             credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name: "Project Assets", parentId: null }),
+            body: d,
           });
-          const fb = await fr.json();
-          if (fr.ok && fb.data?.id) {
-            const d = new FormData();
-            d.append("file", coverFile);
-            d.append("folderId", fb.data.id);
-            d.append("projectId", currentProj.id);
-            d.append("projectName", currentProj.name);
-            const ur = await fetch("/api/v1/documents/upload", {
-              method: "POST",
+          const ub = await ur.json();
+          const coverUrl = ub.data?.url || ub.url;
+          if (ur.ok && coverUrl) {
+            await fetch(`/api/v1/projects/${currentProj.id}`, {
+              method: "PATCH",
               credentials: "include",
-              body: d,
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ coverImage: coverUrl, imageUrl: coverUrl }),
             });
-            const ub = await ur.json();
-            if (ur.ok && ub.data?.id) {
-              await fetch(`/api/v1/projects/${currentProj.id}`, {
-                method: "PATCH",
-                credentials: "include",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ imageUrl: `/api/v1/documents/${ub.data.id}/download` }),
-              });
-            }
+            currentProj = { ...currentProj, coverImage: coverUrl, imageUrl: coverUrl };
+            setProject(currentProj);
           }
         } catch (err) {
           console.error("Cover upload failed", err);
@@ -1448,6 +1496,7 @@ function Create({
               height: rm.height ? Number(rm.height) : null,
               unit: rm.unit || "ft",
               notes: rm.notes || null,
+              referenceImageUrl: rm.referenceImageUrl || null,
             }),
           });
         } else {
@@ -1463,6 +1512,7 @@ function Create({
               height: rm.height ? Number(rm.height) : null,
               unit: rm.unit || "ft",
               notes: rm.notes || null,
+              referenceImageUrl: rm.referenceImageUrl || null,
             }),
           });
           const b = await res.json();
@@ -1533,6 +1583,7 @@ function Create({
             height: h,
             unit: targetRoom.unit || "ft",
             notes: targetRoom.notes || null,
+            referenceImageUrl: targetRoom.referenceImageUrl || null,
           }),
         });
         const b = await r.json();
@@ -1553,6 +1604,7 @@ function Create({
             height: h,
             unit: targetRoom.unit || "ft",
             notes: targetRoom.notes || null,
+            referenceImageUrl: targetRoom.referenceImageUrl || null,
           }),
         });
         const b = await r.json();
@@ -1596,6 +1648,7 @@ function Create({
       quantity: reqForm.quantity || 1,
       partitions: reqForm.partitions || 0,
       notes: reqForm.notes || undefined,
+      referenceImageUrl: reqForm.referenceImageUrl || null,
     };
 
     try {
@@ -1693,6 +1746,7 @@ function Create({
       quantity: req.quantity || 1,
       partitions: req.partitions || 0,
       notes: req.notes || "",
+      referenceImageUrl: req.referenceImageUrl || null,
     });
     setEditingReqId(req.id);
     setAddingRequirement(true);
@@ -2505,7 +2559,7 @@ function Create({
                       step="any"
                       min="0"
                       value={activeRoom.length ?? ""}
-                      onChange={(e) => updateActiveRoomField("length", e.target.value ? Number(e.target.value) : null)}
+                      onChange={(e) => updateActiveRoomField("length", e.target.value ? Math.max(0, Number(e.target.value)) : null)}
                       placeholder="0"
                     />
                     <span>{unitLabel}</span>
@@ -2522,7 +2576,7 @@ function Create({
                       step="any"
                       min="0"
                       value={activeRoom.width ?? ""}
-                      onChange={(e) => updateActiveRoomField("width", e.target.value ? Number(e.target.value) : null)}
+                      onChange={(e) => updateActiveRoomField("width", e.target.value ? Math.max(0, Number(e.target.value)) : null)}
                       placeholder="0"
                     />
                     <span>{unitLabel}</span>
@@ -2539,7 +2593,7 @@ function Create({
                       step="any"
                       min="0"
                       value={activeRoom.height ?? ""}
-                      onChange={(e) => updateActiveRoomField("height", e.target.value ? Number(e.target.value) : null)}
+                      onChange={(e) => updateActiveRoomField("height", e.target.value ? Math.max(0, Number(e.target.value)) : null)}
                       placeholder="0"
                     />
                     <span>{unitLabel}</span>
@@ -2582,6 +2636,113 @@ function Create({
                   placeholder="ex. notes about this room..."
                 />
               </div>
+            </div>
+
+            <div className="rdp-section">
+              <h4>ROOM REFERENCES</h4>
+              <p style={{ fontSize: "11px", color: "#64748b", margin: "-6px 0 12px 0" }}>
+                Upload room photos, blueprints, or reference imagery (JPG, PNG, WebP up to 5MB).
+              </p>
+              {activeRoom.referenceImageUrl ? (
+                <div style={{
+                  position: "relative",
+                  borderRadius: "8px",
+                  border: "1px solid #e2e8f0",
+                  padding: "12px",
+                  background: "#f8fafc",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "14px",
+                }}>
+                  <img
+                    src={activeRoom.referenceImageUrl}
+                    alt="Room Reference"
+                    style={{
+                      width: "80px",
+                      height: "60px",
+                      objectFit: "cover",
+                      borderRadius: "6px",
+                      border: "1px solid #cbd5e1",
+                    }}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: "12px", fontWeight: 600, color: "#1e293b", margin: "0 0 6px 0" }}>
+                      Reference Image Attached
+                    </p>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <label style={{
+                        cursor: "pointer",
+                        fontSize: "11px",
+                        color: "#2563eb",
+                        fontWeight: 600,
+                        padding: "4px 10px",
+                        borderRadius: "4px",
+                        background: "#eff6ff",
+                        border: "1px solid #bfdbfe",
+                      }}>
+                        {uploadingRoomRef ? "Uploading..." : "Replace"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: "none" }}
+                          disabled={uploadingRoomRef}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleUploadRoomRef(file);
+                          }}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        style={{
+                          fontSize: "11px",
+                          color: "#ef4444",
+                          fontWeight: 600,
+                          padding: "4px 10px",
+                          borderRadius: "4px",
+                          background: "#fef2f2",
+                          border: "1px solid #fecaca",
+                          cursor: "pointer",
+                        }}
+                        onClick={() => updateActiveRoomField("referenceImageUrl", null)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <label style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "24px 16px",
+                  border: "2px dashed #cbd5e1",
+                  borderRadius: "8px",
+                  background: "#f8fafc",
+                  cursor: uploadingRoomRef ? "not-allowed" : "pointer",
+                  textAlign: "center",
+                }}>
+                  <UploadCloud size={24} style={{ color: "#64748b", marginBottom: "8px" }} />
+                  <span style={{ fontSize: "13px", fontWeight: 600, color: "#1e293b" }}>
+                    {uploadingRoomRef ? "Uploading image..." : "Upload room reference image"}
+                  </span>
+                  <span style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>
+                    PNG, JPG, WebP up to 5MB
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: "none" }}
+                    disabled={uploadingRoomRef}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleUploadRoomRef(file);
+                    }}
+                  />
+                </label>
+              )}
             </div>
 
             <div className="rdp-footer">
@@ -3162,6 +3323,110 @@ function Create({
                         placeholder="ex. add notes about this item..."
                       />
                     </div>
+                  </div>
+
+                  <div className="rdp-section">
+                    <h4>Requirement References</h4>
+                    <p style={{ fontSize: "11px", color: "#64748b", margin: "-6px 0 10px 0" }}>
+                      Upload reference design, finish or detail photos (JPG, PNG, WebP up to 5MB).
+                    </p>
+                    {reqForm.referenceImageUrl ? (
+                      <div style={{
+                        position: "relative",
+                        borderRadius: "8px",
+                        border: "1px solid #e2e8f0",
+                        padding: "10px",
+                        background: "#f8fafc",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "14px",
+                      }}>
+                        <img
+                          src={reqForm.referenceImageUrl}
+                          alt="Requirement Reference"
+                          style={{
+                            width: "80px",
+                            height: "60px",
+                            objectFit: "cover",
+                            borderRadius: "6px",
+                            border: "1px solid #cbd5e1"
+                          }}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: "12px", fontWeight: 600, color: "#1e293b", margin: "0 0 4px 0" }}>
+                            Reference Image Attached
+                          </p>
+                          <div style={{ display: "flex", gap: "8px" }}>
+                            <label style={{
+                              cursor: "pointer",
+                              fontSize: "11px",
+                              color: "#2563eb",
+                              fontWeight: 600,
+                              padding: "3px 8px",
+                              borderRadius: "4px",
+                              background: "#eff6ff",
+                              border: "1px solid #bfdbfe",
+                            }}>
+                              {uploadingReqRef ? "Uploading..." : "Replace"}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                style={{ display: "none" }}
+                                disabled={uploadingReqRef}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleUploadReqRef(file);
+                                }}
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              style={{
+                                fontSize: "11px",
+                                color: "#ef4444",
+                                fontWeight: 600,
+                                padding: "3px 8px",
+                                borderRadius: "4px",
+                                background: "#fef2f2",
+                                border: "1px solid #fecaca",
+                                cursor: "pointer",
+                              }}
+                              onClick={() => setReqForm((f) => ({ ...f, referenceImageUrl: null }))}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <label style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: "20px 16px",
+                        border: "2px dashed #cbd5e1",
+                        borderRadius: "8px",
+                        background: "#f8fafc",
+                        cursor: uploadingReqRef ? "not-allowed" : "pointer",
+                        textAlign: "center",
+                      }}>
+                        <UploadCloud size={22} style={{ color: "#64748b", marginBottom: "6px" }} />
+                        <span style={{ fontSize: "12px", fontWeight: 600, color: "#1e293b" }}>
+                          {uploadingReqRef ? "Uploading..." : "Upload reference photo"}
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: "none" }}
+                          disabled={uploadingReqRef}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleUploadReqRef(file);
+                          }}
+                        />
+                      </label>
+                    )}
                   </div>
 
                   <div className="rdp-footer">

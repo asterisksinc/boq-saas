@@ -1801,10 +1801,8 @@ async function dashboardOverview(request: NextRequest, supabase: SupabaseClient,
   }, 200, id);
 }
 
-// Keep project reads compatible with databases where the optional cover-image
-// migration has not yet been applied. The DTO still accepts cover_image when
-// returned by a future expanded query.
-const projectSelect = "id,project_code,name,client_name,client_contact,client_email,project_type,status,location,description,area_sqft,project_value,approved_budget,start_date,target_completion_date,assigned_designer_id,tags,progress,created_by,created_at,updated_at";
+const projectBaseSelect = "id,project_code,name,client_name,client_contact,client_email,project_type,status,location,description,area_sqft,project_value,approved_budget,start_date,target_completion_date,assigned_designer_id,tags,progress,created_by,created_at,updated_at";
+const projectSelect = "id,project_code,name,client_name,client_contact,client_email,project_type,status,location,description,area_sqft,project_value,approved_budget,start_date,target_completion_date,assigned_designer_id,tags,progress,cover_image,metadata,created_by,created_at,updated_at";
 
 type ProjectMetrics = {
   boqsCount: number;
@@ -1945,6 +1943,7 @@ function projectDto(row: Record<string, unknown>, metrics?: ProjectMetrics) {
   const approvedBudget = row.approved_budget == null ? null : Number(row.approved_budget);
   const projectValue = row.project_value == null ? null : Number(row.project_value);
   const fallbackEstimated = approvedBudget ?? projectValue ?? 0;
+  const metadata = (row.metadata && typeof row.metadata === "object" ? row.metadata : {}) as Record<string, unknown>;
 
   return {
     id: row.id,
@@ -1965,19 +1964,44 @@ function projectDto(row: Record<string, unknown>, metrics?: ProjectMetrics) {
     assignedDesignerId: row.assigned_designer_id,
     tags: row.tags ?? [],
     progress: metrics ? metrics.progress : Math.min(100, Math.max(0, Number(row.progress ?? 0))),
-    imageUrl: row.cover_image ?? null,
-    coverImage: row.cover_image ?? null,
+    imageUrl: row.cover_image ?? (typeof metadata.coverImage === "string" ? metadata.coverImage : null),
+    coverImage: row.cover_image ?? (typeof metadata.coverImage === "string" ? metadata.coverImage : null),
     boqsCount: metrics ? metrics.boqsCount : 0,
-    margin: metrics ? metrics.margin : null,
+    margin: metrics ? metrics.margin : (metadata.targetMargin != null ? Number(metadata.targetMargin) : null),
     estimatedValue: metrics ? metrics.estimatedValue : fallbackEstimated,
     totalCost: metrics ? metrics.totalCost : null,
+    // Extended metadata fields for 6 Project Details cards
+    propertyName: (metadata.propertyName as string) || null,
+    address: (metadata.address as string) || (row.location as string) || null,
+    city: (metadata.city as string) || null,
+    state: (metadata.state as string) || null,
+    country: (metadata.country as string) || "India",
+    postalCode: (metadata.postalCode as string) || null,
+    siteAccessNotes: (metadata.siteAccessNotes as string) || null,
+    organization: (metadata.organization as string) || null,
+    billingContact: (metadata.billingContact as string) || null,
+    communicationPreference: (metadata.communicationPreference as string) || "Email",
+    actualStartDate: (metadata.actualStartDate as string) || null,
+    currentPhase: (metadata.currentPhase as string) || "Execution",
+    priority: (metadata.priority as string) || "Medium",
+    currency: (metadata.currency as string) || "INR",
+    taxConfiguration: (metadata.taxConfiguration as string) || "GST 18%",
+    targetMargin: metadata.targetMargin != null ? Number(metadata.targetMargin) : null,
+    paymentTerms: (metadata.paymentTerms as string) || "Milestone Based",
+    contractReference: (metadata.contractReference as string) || null,
+    projectManager: (metadata.projectManager as string) || null,
+    leadDesigner: (metadata.leadDesigner as string) || (row.assigned_designer_id as string) || null,
+    estimator: (metadata.estimator as string) || null,
+    procurementOwner: (metadata.procurementOwner as string) || null,
+    financeOwner: (metadata.financeOwner as string) || null,
+    metadata,
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
-function projectValues(input: Record<string, unknown>) {
+function projectValues(input: Record<string, unknown>, existingMetadata: Record<string, unknown> = {}) {
   const fieldMap: Record<string, string> = {
     name: "name", clientName: "client_name", clientContact: "client_contact", clientEmail: "client_email",
     projectType: "project_type", status: "status", location: "location", description: "description",
@@ -1986,7 +2010,39 @@ function projectValues(input: Record<string, unknown>) {
     assignedDesignerId: "assigned_designer_id", tags: "tags",
     coverImage: "cover_image", imageUrl: "cover_image",
   };
-  return Object.fromEntries(Object.entries(input).map(([key, value]) => [fieldMap[key], value === "" ? null : value]).filter(([key]) => key));
+
+  const metadataKeys = [
+    "propertyName", "address", "city", "state", "country", "postalCode", "siteAccessNotes",
+    "organization", "billingContact", "communicationPreference",
+    "actualStartDate", "currentPhase", "priority",
+    "currency", "taxConfiguration", "targetMargin", "paymentTerms", "contractReference",
+    "projectManager", "leadDesigner", "estimator", "procurementOwner", "financeOwner",
+  ];
+
+  const result: Record<string, unknown> = {};
+  for (const [key, dbCol] of Object.entries(fieldMap)) {
+    if (key in input) {
+      result[dbCol] = input[key] === "" ? null : input[key];
+    }
+  }
+
+  const newMeta = { ...existingMetadata, ...(input.metadata && typeof input.metadata === "object" ? (input.metadata as Record<string, unknown>) : {}) };
+  let metaChanged = input.metadata !== undefined;
+  for (const mKey of metadataKeys) {
+    if (mKey in input) {
+      newMeta[mKey] = input[mKey];
+      metaChanged = true;
+    }
+  }
+  if (input.coverImage) {
+    newMeta.coverImage = input.coverImage;
+    metaChanged = true;
+  }
+  if (metaChanged || Object.keys(newMeta).length > 0) {
+    result.metadata = newMeta;
+  }
+
+  return result;
 }
 
 async function listProjects(request: NextRequest, supabase: SupabaseClient, id: string) {
@@ -2005,7 +2061,20 @@ async function listProjects(request: NextRequest, supabase: SupabaseClient, id: 
     const safe = search.replace(/[%_,()]/g, " ");
     query = query.or(`project_code.ilike.%${safe}%,name.ilike.%${safe}%,client_name.ilike.%${safe}%,location.ilike.%${safe}%`);
   }
-  const result = await query;
+  let result: any = await query;
+  if (result.error && (result.error.message?.includes("column") || result.error.code === "42703")) {
+    let fallbackQuery = supabase.from("projects").select(projectBaseSelect, { count: "exact" })
+      .eq("workspace_id", scoped.access.workspaceId).is("archived_at", null)
+      .order("updated_at", { ascending: false }).range(from, to);
+    if (status && ["active","planning","in_progress","on_hold","completed"].includes(status)) fallbackQuery = fallbackQuery.eq("status", status);
+    if (type) fallbackQuery = fallbackQuery.eq("project_type", type);
+    if (request.nextUrl.searchParams.get("assignedToMe") === "true") fallbackQuery = fallbackQuery.eq("assigned_designer_id", scoped.access.userId);
+    if (search) {
+      const safe = search.replace(/[%_,()]/g, " ");
+      fallbackQuery = fallbackQuery.or(`project_code.ilike.%${safe}%,name.ilike.%${safe}%,client_name.ilike.%${safe}%,location.ilike.%${safe}%`);
+    }
+    result = await fallbackQuery;
+  }
   if (result.error) return fail("INTERNAL_ERROR", "Projects could not be loaded.", 500, id);
   const rows = (result.data ?? []) as Array<Record<string, unknown>>;
   const total = result.count ?? 0;
@@ -2051,9 +2120,18 @@ async function listProjects(request: NextRequest, supabase: SupabaseClient, id: 
 async function createProject(request: Request, supabase: SupabaseClient, id: string) {
   const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
   const input = await parsed(request, projectCreateSchema, id); if (input.response) return input.response;
-  const { data, error } = await supabase.from("projects").insert({
+  let insertRes = await supabase.from("projects").insert({
     workspace_id: scoped.access.workspaceId, created_by: scoped.access.userId, ...projectValues(input.data),
   }).select(projectSelect).single();
+  if (insertRes.error && (insertRes.error.message?.includes("column") || insertRes.error.code === "42703")) {
+    const safeVals = { ...projectValues(input.data) };
+    delete safeVals.metadata;
+    delete safeVals.cover_image;
+    insertRes = await supabase.from("projects").insert({
+      workspace_id: scoped.access.workspaceId, created_by: scoped.access.userId, ...safeVals,
+    }).select(projectBaseSelect).single();
+  }
+  const { data, error } = insertRes;
   if (error) {
     console.error(JSON.stringify({ requestId: id, event: "project_create_failed", code: error.code, message: error.message }));
     return fail(error.code === "23505" ? "CONFLICT" : "VALIDATION_ERROR", error.code === "23505" ? "A project with these details already exists." : "Project could not be created.", error.code === "23505" ? 409 : 400, id);
@@ -2125,10 +2203,11 @@ function formatRoom(row: Record<string, unknown>) {
 
 async function getProject(supabase: SupabaseClient, id: string, projectId: string) {
   const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
-  const [project, rooms] = await Promise.all([
-    supabase.from("projects").select(projectSelect).eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).is("archived_at", null).maybeSingle(),
-    supabase.from("project_rooms").select("id,project_id,name,room_type,length,width,height,unit,notes,sort_order,created_at,updated_at").eq("workspace_id", scoped.access.workspaceId).eq("project_id", projectId).order("sort_order"),
-  ]);
+  let project: any = await supabase.from("projects").select(projectSelect).eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).is("archived_at", null).maybeSingle();
+  if (project.error && (project.error.message?.includes("column") || project.error.code === "42703")) {
+    project = await supabase.from("projects").select(projectBaseSelect).eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).is("archived_at", null).maybeSingle();
+  }
+  const rooms = await supabase.from("project_rooms").select("id,project_id,name,room_type,length,width,height,unit,notes,sort_order,created_at,updated_at").eq("workspace_id", scoped.access.workspaceId).eq("project_id", projectId).order("sort_order");
   if (project.error || rooms.error) return fail("INTERNAL_ERROR", "Project could not be loaded.", 500, id);
   if (!project.data) return fail("NOT_FOUND", "Project was not found.", 404, id);
   const metrics = await computeProjectsMetrics(supabase, scoped.access.workspaceId, [project.data as Record<string, unknown>]);
@@ -2139,10 +2218,25 @@ async function getProject(supabase: SupabaseClient, id: string, projectId: strin
 async function updateProject(request: Request, supabase: SupabaseClient, id: string, projectId: string) {
   const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
   const input = await parsed(request, projectPatchSchema, id); if (input.response) return input.response;
-  const values = projectValues(input.data);
+  let existingMeta: Record<string, unknown> = {};
+  try {
+    const existing = await supabase.from("projects").select("metadata").eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).is("archived_at", null).maybeSingle();
+    if (existing.data?.metadata && typeof existing.data.metadata === "object") {
+      existingMeta = existing.data.metadata as Record<string, unknown>;
+    }
+  } catch {}
+  const values = projectValues(input.data, existingMeta);
   if (Object.keys(values).length === 0) return fail("VALIDATION_ERROR", "At least one valid field must be provided.", 400, id);
-  const { data, error } = await supabase.from("projects").update(values)
+  let updateRes = await supabase.from("projects").update(values)
     .eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).is("archived_at", null).select(projectSelect).maybeSingle();
+  if (updateRes.error && (updateRes.error.message?.includes("column") || updateRes.error.code === "42703")) {
+    const safeVals = { ...values };
+    delete safeVals.metadata;
+    delete safeVals.cover_image;
+    updateRes = await supabase.from("projects").update(safeVals)
+      .eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).is("archived_at", null).select(projectBaseSelect).maybeSingle();
+  }
+  const { data, error } = updateRes;
   if (error) {
     console.error(JSON.stringify({ requestId: id, event: "project_update_failed", code: error.code, message: error.message }));
     return fail("VALIDATION_ERROR", "Project could not be updated.", 400, id);
@@ -2643,6 +2737,123 @@ async function resendProjectClientInvite(request: Request, supabase: SupabaseCli
     emailError,
     message: emailDelivered ? "Client invitation resent successfully." : "Invitation refreshed. (Email delivery skipped or pending.)",
   }, 200, id);
+}
+
+async function getProjectActivities(request: NextRequest, supabase: SupabaseClient, id: string, projectId: string) {
+  const scoped = await workspaceAccess(supabase, id);
+  if ("response" in scoped) return scoped.response;
+  const wid = scoped.access.workspaceId;
+
+  const [projectRes, tasksRes, approvalsRes, boqsRes, invoicesRes, invitesRes, auditRes] = await Promise.all([
+    supabase.from("projects").select("id, name, project_code, created_at, created_by").eq("workspace_id", wid).eq("id", projectId).maybeSingle(),
+    supabase.from("activity_tasks").select("id, name, status, priority, due_date, created_at, updated_at").eq("workspace_id", wid).eq("project_id", projectId),
+    supabase.from("activity_approvals").select("id, name, status, due_date, requested_at, decided_at, created_at, updated_at").eq("workspace_id", wid).eq("project_id", projectId),
+    supabase.from("boqs").select("id, boq_number, name, status, created_at, updated_at").eq("workspace_id", wid).eq("project_id", projectId).is("archived_at", null),
+    supabase.from("invoices").select("id, invoice_number, total_amount, status, created_at, updated_at").eq("workspace_id", wid).eq("project_id", projectId),
+    supabase.from("project_client_invitations").select("id, email, client_name, status, created_at").eq("workspace_id", wid).eq("project_id", projectId),
+    supabase.from("audit_logs").select("id, action, entity_type, entity_id, metadata, created_at").eq("workspace_id", wid).eq("entity_id", projectId).order("created_at", { ascending: false }).limit(20)
+  ]);
+
+  if (!projectRes.data) return fail("NOT_FOUND", "Project was not found.", 404, id);
+
+  type ActivityItem = {
+    id: string;
+    type: "project" | "task" | "approval" | "boq" | "invoice" | "invite" | "audit";
+    title: string;
+    description: string;
+    user: string;
+    timestamp: string;
+    status?: string;
+  };
+
+  const activities: ActivityItem[] = [];
+
+  activities.push({
+    id: `proj-created-${projectId}`,
+    type: "project",
+    title: "Project Created",
+    description: `Project ${projectRes.data.name} (${projectRes.data.project_code || "New"}) was initiated`,
+    user: "System",
+    timestamp: projectRes.data.created_at,
+    status: "completed",
+  });
+
+  for (const t of (tasksRes.data ?? [])) {
+    activities.push({
+      id: `task-${t.id}`,
+      type: "task",
+      title: `Task: ${t.name}`,
+      description: `Status: ${t.status || "open"} | Priority: ${t.priority || "medium"}${t.due_date ? ` | Due: ${t.due_date}` : ""}`,
+      user: "Project Team",
+      timestamp: t.updated_at || t.created_at,
+      status: t.status,
+    });
+  }
+
+  for (const a of (approvalsRes.data ?? [])) {
+    activities.push({
+      id: `approval-${a.id}`,
+      type: "approval",
+      title: `Approval: ${a.name}`,
+      description: `Status: ${a.status || "pending"}${a.decided_at ? ` on ${new Date(a.decided_at).toLocaleDateString()}` : ""}`,
+      user: "Client / Lead",
+      timestamp: a.decided_at || a.requested_at || a.updated_at || a.created_at,
+      status: a.status,
+    });
+  }
+
+  for (const b of (boqsRes.data ?? [])) {
+    activities.push({
+      id: `boq-${b.id}`,
+      type: "boq",
+      title: `BOQ ${b.boq_number || b.name || "Draft"}`,
+      description: `BOQ status changed to ${b.status || "draft"}`,
+      user: "Estimator",
+      timestamp: b.updated_at || b.created_at,
+      status: b.status,
+    });
+  }
+
+  for (const inv of (invoicesRes.data ?? [])) {
+    activities.push({
+      id: `inv-${inv.id}`,
+      type: "invoice",
+      title: `Invoice #${inv.invoice_number || inv.id.slice(0, 8)}`,
+      description: `Total amount ₹${Number(inv.total_amount || 0).toLocaleString()} • ${inv.status || "draft"}`,
+      user: "Finance",
+      timestamp: inv.updated_at || inv.created_at,
+      status: inv.status,
+    });
+  }
+
+  for (const inv of (invitesRes.data ?? [])) {
+    activities.push({
+      id: `invite-${inv.id}`,
+      type: "invite",
+      title: "Client Invitation Sent",
+      description: `Invitation sent to ${inv.client_name || inv.email} (${inv.status})`,
+      user: "Project Lead",
+      timestamp: inv.created_at,
+      status: inv.status,
+    });
+  }
+
+  for (const al of (auditRes.data ?? [])) {
+    if (!activities.some(x => x.timestamp === al.created_at)) {
+      activities.push({
+        id: `audit-${al.id}`,
+        type: "audit",
+        title: al.action.replace(/[._]/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()),
+        description: al.action,
+        user: "System",
+        timestamp: al.created_at,
+      });
+    }
+  }
+
+  activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+  return ok({ items: activities, total: activities.length }, 200, id);
 }
 
 async function listProjectRooms(supabase: SupabaseClient, id: string, projectId: string) {
@@ -5413,7 +5624,47 @@ async function costingCategoryDetail(request: Request,supabase:SupabaseClient,id
 }
 
 async function costingItems(request: NextRequest,supabase:SupabaseClient,id:string){
-  const scoped=await workspaceAccess(supabase,id);if("response" in scoped)return scoped.response;const{page,pageSize,from,to}=pagination(request.nextUrl.searchParams);const categoryId=request.nextUrl.searchParams.get("categoryId");const rateStatus=request.nextUrl.searchParams.get("rateStatus");const search=request.nextUrl.searchParams.get("search")?.trim().replace(/[%_,()]/g," ").slice(0,120);
+  const scoped=await workspaceAccess(supabase,id);if("response" in scoped)return scoped.response;const{page,pageSize,from,to}=pagination(request.nextUrl.searchParams);const categoryId=request.nextUrl.searchParams.get("categoryId");const rateStatus=request.nextUrl.searchParams.get("rateStatus");const projectId=request.nextUrl.searchParams.get("projectId");const search=request.nextUrl.searchParams.get("search")?.trim().replace(/[%_,()]/g," ").slice(0,120);
+
+  if (projectId) {
+    const boqsRes = await supabase.from("boqs").select("id, boq_number, name").eq("workspace_id", scoped.access.workspaceId).eq("project_id", projectId).is("archived_at", null);
+    const boqIds = (boqsRes.data ?? []).map((b: { id: string }) => b.id);
+    if (boqIds.length > 0) {
+      let bItemsQuery = supabase.from("boq_items").select("id, boq_id, category_id, name, amount, rate, quantity, unit, description, boq_categories(name)").eq("workspace_id", scoped.access.workspaceId).in("boq_id", boqIds).order("created_at", { ascending: false });
+      if (search) bItemsQuery = bItemsQuery.ilike("name", `%${search}%`);
+      const bItemsRes = await bItemsQuery.range(from, to);
+      const bRows = (bItemsRes.data ?? []) as Array<Record<string, unknown>>;
+      const items = bRows.map((bi) => {
+        const cat = bi.boq_categories as Record<string, unknown> | null;
+        const rate = Number(bi.rate || 0);
+        const qty = Number(bi.quantity || 1);
+        const amt = Number(bi.amount || (rate * qty));
+        const selling = Math.round(rate * 1.18);
+        return {
+          id: bi.id,
+          code: `BOQ-${String(bi.id).slice(0, 6).toUpperCase()}`,
+          name: bi.name,
+          category: cat?.name || "General",
+          categoryName: cat?.name || "General",
+          unit: bi.unit || "Nos",
+          baseCost: rate,
+          rate: rate,
+          quantity: qty,
+          amount: amt,
+          sellingRate: selling,
+          rateStatus: "final",
+          spec: bi.description || "",
+          preferredVendor: "Approved Supplier",
+          vendor: "Approved Supplier",
+          boqId: bi.boq_id,
+          marginPercent: 18,
+          margin: "18%",
+        };
+      });
+      return ok({ items, page, pageSize, total: items.length, hasMore: to + 1 < items.length }, 200, id);
+    }
+  }
+
   let query=supabase.from("costing_items").select("*",{count:"exact"}).eq("workspace_id",scoped.access.workspaceId).is("archived_at",null).order("updated_at",{ascending:false}).range(from,to);if(categoryId)query=query.eq("category_id",categoryId);if(rateStatus&&rateStatus!=="all")query=query.eq("rate_status",rateStatus);if(search)query=query.or(`name.ilike.%${search}%,code.ilike.%${search}%`);const result=await query;if(result.error)return fail("INTERNAL_ERROR","Costing items could not be loaded.",500,id);
   const categoriesRes = await supabase.from("costing_categories").select("id, name, parent_id, code").eq("workspace_id", scoped.access.workspaceId);
   const catMap = new Map<string, { id: string; name: string; parent_id: string | null }>();
@@ -5569,22 +5820,29 @@ async function costingScenarioDetail(request:Request,supabase:SupabaseClient,id:
   if(request.method==="DELETE"){const result=await supabase.from("costing_scenarios").update({archived_at:new Date().toISOString(),updated_by:scoped.access.userId}).eq("workspace_id",scoped.access.workspaceId).eq("id",scenarioId).select("id").maybeSingle();return result.data?ok({deleted:true,id:scenarioId},200,id):fail("NOT_FOUND","Costing scenario was not found.",404,id)}
   const items=await supabase.from("boq_items").select("amount").eq("workspace_id",scoped.access.workspaceId).eq("boq_id",source.data.boq_id);const baseCost=(items.data??[]).reduce((s,x)=>s+num(x.amount),0);const adjustments=source.data.adjustments as Array<Record<string,unknown>>;const scenarioCost=Math.max(0,baseCost+adjustments.reduce((s,x)=>s+(x.rate==null?0:num(x.rate)),0));return ok({...source.data,baseCost,scenarioCost,savings:baseCost-scenarioCost,baseMargin:null,scenarioMargin:null},200,id)}
 
-async function costingAnalysis(supabase: SupabaseClient, id: string) {
+async function costingAnalysis(supabase: SupabaseClient, id: string, request?: NextRequest) {
   const scoped = await workspaceAccess(supabase, id);
   if ("response" in scoped) return scoped.response;
   const workspaceId = scoped.access.workspaceId;
+  const projectId = request?.nextUrl?.searchParams?.get("projectId");
+
+  let pQuery = supabase
+    .from("projects")
+    .select("id, name, project_code, approved_budget, project_value, status")
+    .eq("workspace_id", workspaceId)
+    .is("archived_at", null);
+  if (projectId) pQuery = pQuery.eq("id", projectId);
+
+  let bQuery = supabase
+    .from("boqs")
+    .select("id, project_id, boq_number, status, markup_percent, tax_percent")
+    .eq("workspace_id", workspaceId)
+    .is("archived_at", null);
+  if (projectId) bQuery = bQuery.eq("project_id", projectId);
 
   const [projectsRes, boqsRes, categoriesRes, itemsRes, quotesRes] = await Promise.all([
-    supabase
-      .from("projects")
-      .select("id, name, project_code, approved_budget, project_value, status")
-      .eq("workspace_id", workspaceId)
-      .is("archived_at", null),
-    supabase
-      .from("boqs")
-      .select("id, project_id, boq_number, status, markup_percent, tax_percent")
-      .eq("workspace_id", workspaceId)
-      .is("archived_at", null),
+    pQuery,
+    bQuery,
     supabase
       .from("costing_categories")
       .select("id, name, code, parent_id, default_markup_percent, default_tax_percent")
@@ -9269,7 +9527,15 @@ function approvalDto(row: Record<string, any>) {
 async function verifyActivityParents(supabase: SupabaseClient,wid:string,projectId:string,stageId:string){const [p,s]=await Promise.all([supabase.from("projects").select("id").eq("workspace_id",wid).eq("id",projectId).maybeSingle(),supabase.from("activity_stages").select("id").eq("workspace_id",wid).eq("id",stageId).maybeSingle()]);return Boolean(p.data&&s.data);}
 async function tasksApi(request: NextRequest,supabase:SupabaseClient,id:string,taskId?:string){
   const scoped=await workspaceAccess(supabase,id,request.method!=="GET");if("response"in scoped)return scoped.response;const wid=scoped.access.workspaceId;
-  if(request.method==="GET"){let q=supabase.from("activity_tasks").select("*,projects(project_code,name),activity_stages!activity_tasks_stage_id_fkey(name,color)").eq("workspace_id",wid).order("updated_at",{ascending:false});if(taskId)q=q.eq("id",taskId);const r=taskId?await q.single():await q;return r.error?fail(taskId?"NOT_FOUND":"INTERNAL_ERROR","Task(s) could not be loaded.",taskId?404:500,id):ok(taskId?taskDto(r.data):{items:(r.data??[]).map(taskDto)},200,id);}
+  if(request.method==="GET"){
+    let q=supabase.from("activity_tasks").select("*,projects(project_code,name),activity_stages!activity_tasks_stage_id_fkey(name,color)").eq("workspace_id",wid).order("updated_at",{ascending:false});
+    if(taskId)q=q.eq("id",taskId);
+    const pId = request.nextUrl.searchParams.get("projectId");
+    const st = request.nextUrl.searchParams.get("status");
+    if(pId) q = q.eq("project_id", pId);
+    if(st && st !== "all") q = q.eq("status", st);
+    const r=taskId?await q.single():await q;return r.error?fail(taskId?"NOT_FOUND":"INTERNAL_ERROR","Task(s) could not be loaded.",taskId?404:500,id):ok(taskId?taskDto(r.data):{items:(r.data??[]).map(taskDto)},200,id);
+  }
   const input=await parsed(request,taskId?activityTaskPatchSchema:activityTaskSchema,id);if(input.response)return input.response;const v=input.data as Record<string,unknown>;
   if(!taskId&&!await verifyActivityParents(supabase,wid,String(v.projectId),String(v.stageId)))return fail("VALIDATION_ERROR","projectId and stageId must belong to this workspace.",400,id);
   const values={...(v.name!==undefined?{name:v.name}:{}),...(v.stageId!==undefined?{stage_id:v.stageId}:{}),...(v.description!==undefined?{description:v.description}:{}),...(v.assignedTo!==undefined?{assigned_to:v.assignedTo}:{}),...(v.ownerId!==undefined?{owner_id:v.ownerId}:{}),...(v.dueDate!==undefined?{due_date:v.dueDate}:{}),...(v.priority!==undefined?{priority:v.priority}:{}),...(v.status!==undefined?{status:v.status}:{}),...(v.attachments!==undefined?{attachments:v.attachments}:{})};
@@ -9278,7 +9544,15 @@ async function tasksApi(request: NextRequest,supabase:SupabaseClient,id:string,t
 
 async function approvalsApi(request:NextRequest,supabase:SupabaseClient,id:string,approvalId?:string){
   const scoped=await workspaceAccess(supabase,id,request.method!=="GET");if("response"in scoped)return scoped.response;const wid=scoped.access.workspaceId;
-  if(request.method==="GET"){let q=supabase.from("activity_approvals").select("*,projects(project_code,name),activity_stages!activity_approvals_stage_id_fkey(name,color)").eq("workspace_id",wid).order("updated_at",{ascending:false});if(approvalId)q=q.eq("id",approvalId);const r=approvalId?await q.single():await q;return r.error?fail(approvalId?"NOT_FOUND":"INTERNAL_ERROR","Approval(s) could not be loaded.",approvalId?404:500,id):ok(approvalId?approvalDto(r.data):{items:(r.data??[]).map(approvalDto)},200,id);}
+  if(request.method==="GET"){
+    let q=supabase.from("activity_approvals").select("*,projects(project_code,name),activity_stages!activity_approvals_stage_id_fkey(name,color)").eq("workspace_id",wid).order("updated_at",{ascending:false});
+    if(approvalId)q=q.eq("id",approvalId);
+    const pId = request.nextUrl.searchParams.get("projectId");
+    const st = request.nextUrl.searchParams.get("status");
+    if(pId) q = q.eq("project_id", pId);
+    if(st && st !== "all") q = q.eq("status", st);
+    const r=approvalId?await q.single():await q;return r.error?fail(approvalId?"NOT_FOUND":"INTERNAL_ERROR","Approval(s) could not be loaded.",approvalId?404:500,id):ok(approvalId?approvalDto(r.data):{items:(r.data??[]).map(approvalDto)},200,id);
+  }
   const input=await parsed(request,approvalId?activityApprovalPatchSchema:activityApprovalSchema,id);if(input.response)return input.response;const v=input.data as Record<string,unknown>;
   if(!approvalId&&!await verifyActivityParents(supabase,wid,String(v.projectId),String(v.stageId)))return fail("VALIDATION_ERROR","projectId and stageId must belong to this workspace.",400,id);
   const values={...(v.name!==undefined?{name:v.name}:{}),...(v.stageId!==undefined?{stage_id:v.stageId}:{}),...(v.description!==undefined?{description:v.description}:{}),...(v.approverId!==undefined?{approver_id:v.approverId}:{}),...(v.approverName!==undefined?{approver_name:v.approverName}:{}),...(v.dueDate!==undefined?{due_date:v.dueDate}:{}),...(v.status!==undefined?{status:v.status}:{}),...(v.attachments!==undefined?{attachments:v.attachments}:{})};
@@ -10128,6 +10402,7 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (projectTemplateDuplicateMatch && request.method === "POST") return duplicateProjectTemplate(supabase, id, projectTemplateDuplicateMatch[1]);
   if (request.method === "GET" && route === "projects") return listProjects(request, supabase, id);
   if (request.method === "POST" && route === "projects") return createProject(request, supabase, id);
+  if (request.method === "POST" && route === "projects/upload-image") return uploadTemplateImage(request, supabase, id);
   if (request.method === "GET" && route === "projects/import-template") return projectImportTemplate(supabase, id);
   if (request.method === "GET" && route === "projects/export") return projectExport(request, supabase, id);
   if (request.method === "GET" && route === "projects/imports") return projectImportHistory(request, supabase, id);
@@ -10137,6 +10412,8 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (projectMatch && request.method === "GET") return getProject(supabase, id, projectMatch[1]);
   if (projectMatch && request.method === "PATCH") return updateProject(request, supabase, id, projectMatch[1]);
   if (projectMatch && request.method === "DELETE") return deleteProject(supabase, id, projectMatch[1]);
+  const projectActivitiesMatch = route.match(/^projects\/([0-9a-f-]{36})\/activities$/i);
+  if (projectActivitiesMatch && request.method === "GET") return getProjectActivities(request, supabase, id, projectActivitiesMatch[1]);
   const projectClientInviteMatch = route.match(/^projects\/([0-9a-f-]{36})\/client-invite$/i);
   if (projectClientInviteMatch && request.method === "GET") return getProjectClientInvite(supabase, id, projectClientInviteMatch[1]);
   if (projectClientInviteMatch && request.method === "POST") return createProjectClientInvite(request, supabase, id, projectClientInviteMatch[1]);
@@ -10226,7 +10503,7 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (scenarioMatch && ["GET","PATCH","DELETE"].includes(request.method)) return costingScenarioDetail(request, supabase, id, scenarioMatch[1]);
   const scenarioDuplicateMatch = route.match(/^costing\/scenarios\/([0-9a-f-]{36})\/duplicate$/i);
   if (scenarioDuplicateMatch && request.method === "POST") return costingScenarioDetail(request, supabase, id, scenarioDuplicateMatch[1], true);
-  if (request.method === "GET" && route === "costing/analysis") return costingAnalysis(supabase, id);
+  if (request.method === "GET" && route === "costing/analysis") return costingAnalysis(supabase, id, request);
   if (request.method === "GET" && route === "costing/margins") return marginAnalysis(supabase, id);
   if (request.method === "GET" && route === "costing/settings") return costingSettings(supabase, id);
   if (request.method === "GET" && route === "reports/analytics") return reportsAnalytics(request, supabase, id);

@@ -160,8 +160,9 @@ export async function selectVendorQuote(quoteId: string, selected: boolean): Pro
 
 // ── Analysis ────────────────────────────────────────────────────────────────
 
-export async function getCostingAnalysis(): Promise<CostingAnalysisResponse> {
-    return fetchApi<CostingAnalysisResponse>("/api/v1/costing/analysis");
+export async function getCostingAnalysis(params?: { projectId?: string }): Promise<CostingAnalysisResponse> {
+    const q = params?.projectId ? `?projectId=${encodeURIComponent(params.projectId)}` : "";
+    return fetchApi<CostingAnalysisResponse>(`/api/v1/costing/analysis${q}`);
 }
 
 // ── Margins ─────────────────────────────────────────────────────────────────

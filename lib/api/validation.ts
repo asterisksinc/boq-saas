@@ -166,6 +166,30 @@ const projectBaseSchema = z
     tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
     imageUrl: z.string().trim().max(2048).nullable().optional(),
     coverImage: z.string().trim().max(2048).nullable().optional(),
+    metadata: z.record(z.string(), z.any()).optional(),
+    propertyName: z.string().trim().max(160).nullable().optional(),
+    address: z.string().trim().max(300).nullable().optional(),
+    city: z.string().trim().max(100).nullable().optional(),
+    state: z.string().trim().max(100).nullable().optional(),
+    country: z.string().trim().max(100).nullable().optional(),
+    postalCode: z.string().trim().max(20).nullable().optional(),
+    siteAccessNotes: z.string().trim().max(2000).nullable().optional(),
+    organization: z.string().trim().max(160).nullable().optional(),
+    billingContact: z.string().trim().max(160).nullable().optional(),
+    communicationPreference: z.string().trim().max(50).nullable().optional(),
+    actualStartDate: z.string().date().nullable().optional(),
+    currentPhase: z.string().trim().max(80).nullable().optional(),
+    priority: z.string().trim().max(40).nullable().optional(),
+    currency: z.string().trim().max(20).nullable().optional(),
+    taxConfiguration: z.string().trim().max(80).nullable().optional(),
+    targetMargin: z.coerce.number().finite().min(0).max(100).nullable().optional(),
+    paymentTerms: z.string().trim().max(160).nullable().optional(),
+    contractReference: z.string().trim().max(100).nullable().optional(),
+    projectManager: z.string().trim().max(120).nullable().optional(),
+    leadDesigner: z.string().trim().max(120).nullable().optional(),
+    estimator: z.string().trim().max(120).nullable().optional(),
+    procurementOwner: z.string().trim().max(120).nullable().optional(),
+    financeOwner: z.string().trim().max(120).nullable().optional(),
   })
   .strict();
 
@@ -924,6 +948,20 @@ export const paymentCreateSchema = z
       .string()
       .trim()
       .max(1000)
+      .nullable()
+      .optional(),
+
+    receiptUrl: z
+      .string()
+      .trim()
+      .max(2048)
+      .nullable()
+      .optional(),
+
+    milestone: z
+      .string()
+      .trim()
+      .max(200)
       .nullable()
       .optional(),
   })

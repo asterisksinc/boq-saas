@@ -61,7 +61,7 @@ export async function changeInvoiceStatus(invoiceId: string, status: string): Pr
 }
 
 export async function recordPayment(invoiceId: string, input: {
-    amount: number; paidAt?: string; method?: string; reference?: string; notes?: string;
+    amount: number; paidAt?: string; method?: string; reference?: string; notes?: string; receiptUrl?: string; milestone?: string;
 }): Promise<Invoice> {
     return fetchApi<Invoice>(`/api/v1/invoices/${invoiceId}/payments`, { method: "POST", body: JSON.stringify(input) });
 }
