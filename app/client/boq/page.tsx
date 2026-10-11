@@ -4,64 +4,106 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     ArrowLeft,
     ChevronRight,
-    Download,
-    Eye,
-    FileDown,
-    FileSpreadsheet,
-    Loader2,
-    RefreshCw,
     Search,
+    MoreHorizontal,
+    Folder,
+    GripVertical,
+    FileDown,
+    Loader2,
     AlertCircle,
-    FileText,
+    ChevronLeft,
 } from "lucide-react";
 import ClientDashboardRail from "@/components/client/ClientDashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
+import ReviewBoqModal from "@/components/client/ReviewBoqModal";
 import {
     listClientBoqs,
     getClientBoq,
-    listClientProjects,
     type ClientBoqListItem,
     type ClientBoqDetail,
-    type ClientProjectDetails,
+    type ClientBoqRoom,
+    type ClientBoqCategory,
 } from "@/lib/api/client";
 
 function formatMoney(value: number) {
     return new Intl.NumberFormat("en-IN", {
         style: "currency",
         currency: "INR",
-        maximumFractionDigits: 0,
+        maximumFractionDigits: 2,
     }).format(value);
 }
 
+function formatNumber(value: number) {
+    return new Intl.NumberFormat("en-IN").format(value);
+}
+
+function getStatusBadgeStyle(statusStr?: string) {
+    const s = (statusStr || "").toLowerCase().replace(/[-_]/g, " ");
+    if (s.includes("approved")) {
+        return {
+            bg: "#dcfce7",
+            color: "#15803d",
+            label: "APPROVED",
+        };
+    }
+    if (s.includes("revision") || s.includes("changes")) {
+        return {
+            bg: "#fef3c7",
+            color: "#b45309",
+            label: "REVISION REQUESTED",
+        };
+    }
+    if (s.includes("reject")) {
+        return {
+            bg: "#fee2e2",
+            color: "#dc2626",
+            label: "REJECTED",
+        };
+    }
+    return {
+        bg: "#cbd5e1",
+        color: "#334155",
+        label: "YET TO APPROVE",
+    };
+}
+
 export default function ClientBoqPage() {
-    const [screen, setScreen] = useState<"list" | "detail">("list");
+    // Screen flow: "list" -> "detail" (room overview) -> "category_items" (room items by category)
+    const [screen, setScreen] = useState<"list" | "detail" | "category_items">("list");
     const [boqs, setBoqs] = useState<ClientBoqListItem[]>([]);
     const [selectedBoq, setSelectedBoq] = useState<ClientBoqDetail | null>(null);
+    const [selectedRoomIndex, setSelectedRoomIndex] = useState<number>(0);
+    const [selectedCategoryIndex, setSelectedCategoryIndex] = useState<number>(0);
+
     const [loading, setLoading] = useState(true);
     const [detailLoading, setDetailLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Filters and pagination
+    // List filters
     const [searchQuery, setSearchQuery] = useState("");
-    const [statusFilter, setStatusFilter] = useState<string>("ALL");
-    const [selectedProjectId, setSelectedProjectId] = useState<string>("");
-    const [projects, setProjects] = useState<ClientProjectDetails[]>([]);
     const [page, setPage] = useState(1);
-    const [pageSize] = useState(10);
+    const [pageSize] = useState(12);
     const [total, setTotal] = useState(0);
     const [pendingApprovals, setPendingApprovals] = useState(0);
 
-    // Detail search
-    const [detailItemSearch, setDetailItemSearch] = useState("");
+    // Room table search (Screenshot 2)
+    const [roomSearch, setRoomSearch] = useState("");
 
-    const loadProjects = useCallback(async () => {
-        try {
-            const res = await listClientProjects();
-            setProjects(res.items || []);
-        } catch {
-            // Ignore error
-        }
-    }, []);
+    // Category items pagination (Screenshot 3)
+    const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [itemPageIndex, setItemPageIndex] = useState(1);
+
+    // Dropdown menu state
+    const [activeDropdownCardId, setActiveDropdownCardId] = useState<string | null>(null);
+
+    // Review Modal State (Screenshots 4-7)
+    const [reviewModalOpen, setReviewModalOpen] = useState(false);
+    const [reviewTargetBoq, setReviewTargetBoq] = useState<{
+        id: string;
+        boqNumber: string;
+        version: string;
+        totalAmount: number;
+    } | null>(null);
 
     const loadBoqs = useCallback(async () => {
         setLoading(true);
@@ -71,8 +113,6 @@ export default function ClientBoqPage() {
                 page,
                 pageSize,
                 search: searchQuery || undefined,
-                status: statusFilter !== "ALL" ? statusFilter : undefined,
-                projectId: selectedProjectId || undefined,
             });
             setBoqs(res.items);
             setTotal(res.total);
@@ -82,15 +122,18 @@ export default function ClientBoqPage() {
         } finally {
             setLoading(false);
         }
-    }, [page, pageSize, searchQuery, statusFilter, selectedProjectId]);
-
-    useEffect(() => {
-        loadProjects();
-    }, [loadProjects]);
+    }, [page, pageSize, searchQuery]);
 
     useEffect(() => {
         loadBoqs();
     }, [loadBoqs]);
+
+    // Close card dropdown on window click
+    useEffect(() => {
+        const handleClickOutside = () => setActiveDropdownCardId(null);
+        window.addEventListener("click", handleClickOutside);
+        return () => window.removeEventListener("click", handleClickOutside);
+    }, []);
 
     const openBoqDetail = async (boqId: string) => {
         setDetailLoading(true);
@@ -98,6 +141,9 @@ export default function ClientBoqPage() {
         try {
             const detail = await getClientBoq(boqId);
             setSelectedBoq(detail);
+            setSelectedRoomIndex(0);
+            setSelectedCategoryIndex(0);
+            setItemPageIndex(1);
             setScreen("detail");
         } catch (err: any) {
             setError(err.message || "Failed to load BOQ details.");
@@ -109,51 +155,89 @@ export default function ClientBoqPage() {
     const handleBackToList = () => {
         setScreen("list");
         setSelectedBoq(null);
-        setDetailItemSearch("");
+        setRoomSearch("");
+        setSelectedRoomIndex(0);
+        setSelectedCategoryIndex(0);
     };
 
-    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const handleBackToDetail = () => {
+        setScreen("detail");
+    };
 
-    // Filter rooms & items in detail view
+    const handleOpenReviewModal = (boqItem?: { id: string; boqNumber: string; version: string; totalAmount: number }) => {
+        if (boqItem) {
+            setReviewTargetBoq(boqItem);
+        } else if (selectedBoq) {
+            setReviewTargetBoq({
+                id: selectedBoq.id,
+                boqNumber: selectedBoq.boqNumber,
+                version: selectedBoq.version,
+                totalAmount: selectedBoq.grandTotal,
+            });
+        }
+        setReviewModalOpen(true);
+    };
+
+    const handleDecisionSuccess = async (newStatus: string) => {
+        // Refresh list
+        loadBoqs();
+        // If viewing detail, reload selectedBoq
+        if (selectedBoq && reviewTargetBoq && selectedBoq.id === reviewTargetBoq.id) {
+            try {
+                const refreshed = await getClientBoq(selectedBoq.id);
+                setSelectedBoq(refreshed);
+            } catch {
+                // Ignore error
+            }
+        }
+    };
+
+    // Current room and category for Screen 3
+    const selectedRoom: ClientBoqRoom | undefined = selectedBoq?.rooms?.[selectedRoomIndex];
+    const selectedCategory: ClientBoqCategory | undefined = selectedRoom?.categories?.[selectedCategoryIndex];
+
+    // Filtered rooms for Screen 2
     const filteredRooms = useMemo(() => {
         if (!selectedBoq?.rooms) return [];
-        if (!detailItemSearch.trim()) return selectedBoq.rooms;
-        const q = detailItemSearch.toLowerCase();
-        return selectedBoq.rooms
-            .map((room) => {
-                const roomMatches = room.name.toLowerCase().includes(q);
-                const matchedCategories = room.categories
-                    .map((cat) => {
-                        const catMatches = cat.name.toLowerCase().includes(q);
-                        const matchedItems = cat.items.filter(
-                            (it) =>
-                                it.name.toLowerCase().includes(q) ||
-                                (it.description && it.description.toLowerCase().includes(q))
-                        );
-                        if (catMatches || matchedItems.length > 0) {
-                            return { ...cat, items: catMatches ? cat.items : matchedItems };
-                        }
-                        return null;
-                    })
-                    .filter(Boolean) as typeof room.categories;
+        if (!roomSearch.trim()) return selectedBoq.rooms;
+        const q = roomSearch.toLowerCase();
+        return selectedBoq.rooms.filter(
+            (r) =>
+                r.name.toLowerCase().includes(q) ||
+                (r.description && r.description.toLowerCase().includes(q)) ||
+                r.categories.some((c) => c.name.toLowerCase().includes(q))
+        );
+    }, [selectedBoq, roomSearch]);
 
-                if (roomMatches || matchedCategories.length > 0) {
-                    return { ...room, categories: roomMatches ? room.categories : matchedCategories };
-                }
-                return null;
-            })
-            .filter(Boolean) as typeof selectedBoq.rooms;
-    }, [selectedBoq, detailItemSearch]);
+    // Paginated category items for Screen 3
+    const allCategoryItems = selectedCategory?.items || [];
+    const totalCategoryItemsCount = allCategoryItems.length;
+    const totalCategoryPages = Math.max(1, Math.ceil(totalCategoryItemsCount / itemsPerPage));
+    const paginatedItems = useMemo(() => {
+        const start = (itemPageIndex - 1) * itemsPerPage;
+        return allCategoryItems.slice(start, start + itemsPerPage);
+    }, [allCategoryItems, itemPageIndex, itemsPerPage]);
+
+    // Category summary totals for Screen 3
+    const categoryTotalQty = useMemo(() => {
+        return allCategoryItems.reduce((acc, it) => acc + (Number(it.quantity) || 0), 0);
+    }, [allCategoryItems]);
+
+    const categoryTotalAmount = useMemo(() => {
+        return allCategoryItems.reduce((acc, it) => acc + (Number(it.amount) || 0), 0);
+    }, [allCategoryItems]);
 
     return (
-        <main className="fig-dashboard boq-dashboard">
+        <main className="fig-dashboard boq-dashboard" style={{ backgroundColor: "#e9edf5", minHeight: "100vh" }}>
             <div className="fig-dashboard-glow" />
 
+            {/* Left Nav Rail */}
             <ClientDashboardRail current="/client/boq" />
 
-            <div className="fig-dashboard-main">
+            <div className="fig-dashboard-main" style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+                {/* Header matching Screenshot 1-3 */}
                 <DashboardHeader
-                    title="Bill of Quantities"
+                    title="BOQ"
                     hideNew={true}
                     onSearch={(q) => {
                         setSearchQuery(q);
@@ -162,12 +246,15 @@ export default function ClientBoqPage() {
                 />
 
                 {detailLoading ? (
-                    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "50vh" }}>
-                        <Loader2 className="animate-spin" size={36} color="#2563EB" />
+                    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
+                        <Loader2 className="animate-spin" size={40} color="#2563EB" />
                     </div>
-                ) : screen === "detail" && selectedBoq ? (
-                    <section className="boq-detail-shell" style={{ padding: "24px 32px" }}>
-                        {/* Breadcrumb navigation */}
+                ) : screen === "category_items" && selectedBoq && selectedRoom && selectedCategory ? (
+                    /* ========================================================================= */
+                    /* SCREEN 3: Room / Category / Item Details (Screenshot 3)                    */
+                    /* ========================================================================= */
+                    <section style={{ padding: "20px 32px 40px 32px", flex: 1 }}>
+                        {/* Breadcrumbs: Bill of Quantities > BOQ-0071 > Master Bedroom */}
                         <div
                             style={{
                                 display: "flex",
@@ -184,87 +271,436 @@ export default function ClientBoqPage() {
                                 style={{
                                     background: "none",
                                     border: "none",
-                                    color: "#2563eb",
+                                    color: "#64748b",
                                     cursor: "pointer",
-                                    fontWeight: 600,
                                     padding: 0,
+                                    fontSize: "14px",
                                 }}
                             >
                                 Bill of Quantities
                             </button>
-                            <ChevronRight size={15} />
-                            <span style={{ color: "#0f172a", fontWeight: 600 }}>{selectedBoq.boqNumber}</span>
+                            <ChevronRight size={14} color="#94a3b8" />
+                            <button
+                                type="button"
+                                onClick={handleBackToDetail}
+                                style={{
+                                    background: "none",
+                                    border: "none",
+                                    color: "#64748b",
+                                    cursor: "pointer",
+                                    padding: 0,
+                                    fontSize: "14px",
+                                }}
+                            >
+                                {selectedBoq.boqNumber}
+                            </button>
+                            <ChevronRight size={14} color="#94a3b8" />
+                            <span style={{ color: "#0f172a", fontWeight: 700 }}>{selectedRoom.name}</span>
+                        </div>
 
+                        {/* 2-Column Layout */}
+                        <div
+                            style={{
+                                display: "grid",
+                                gridTemplateColumns: "240px 1fr",
+                                gap: "20px",
+                                alignItems: "start",
+                            }}
+                        >
+                            {/* Left Panel: Category Navigation */}
+                            <div
+                                style={{
+                                    backgroundColor: "#ffffff",
+                                    borderRadius: "14px",
+                                    border: "1px solid #e2e8f0",
+                                    padding: "20px 16px",
+                                    boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)",
+                                }}
+                            >
+                                <h3
+                                    style={{
+                                        margin: "0 0 16px 0",
+                                        fontSize: "15px",
+                                        fontWeight: 700,
+                                        color: "#0f172a",
+                                        paddingBottom: "12px",
+                                        borderBottom: "1px solid #f1f5f9",
+                                    }}
+                                >
+                                    {selectedRoom.name}
+                                </h3>
+
+                                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                    {selectedRoom.categories.map((cat, idx) => {
+                                        const isActive = idx === selectedCategoryIndex;
+                                        return (
+                                            <button
+                                                key={cat.id || idx}
+                                                type="button"
+                                                onClick={() => {
+                                                    setSelectedCategoryIndex(idx);
+                                                    setItemPageIndex(1);
+                                                }}
+                                                style={{
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "space-between",
+                                                    padding: "10px 12px",
+                                                    borderRadius: "8px",
+                                                    border: "none",
+                                                    backgroundColor: isActive ? "#eff6ff" : "transparent",
+                                                    color: isActive ? "#2563eb" : "#334155",
+                                                    cursor: "pointer",
+                                                    textAlign: "left",
+                                                    width: "100%",
+                                                    transition: "background 0.15s ease",
+                                                }}
+                                            >
+                                                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                                    <Folder size={16} color={isActive ? "#2563eb" : "#94a3b8"} />
+                                                    <span style={{ fontSize: "13px", fontWeight: isActive ? 600 : 500 }}>
+                                                        {cat.name}
+                                                    </span>
+                                                </div>
+                                                <span
+                                                    style={{
+                                                        fontSize: "11px",
+                                                        padding: "2px 8px",
+                                                        borderRadius: "999px",
+                                                        backgroundColor: isActive ? "#dbeafe" : "#f1f5f9",
+                                                        color: isActive ? "#1e40af" : "#64748b",
+                                                        fontWeight: 600,
+                                                    }}
+                                                >
+                                                    Item {cat.items.length}
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Right Panel: Items Table */}
+                            <div
+                                style={{
+                                    backgroundColor: "#ffffff",
+                                    borderRadius: "14px",
+                                    border: "1px solid #e2e8f0",
+                                    boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)",
+                                    overflow: "hidden",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                }}
+                            >
+                                {/* Header */}
+                                <div style={{ padding: "20px 24px 16px 24px" }}>
+                                    <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 700, color: "#0f172a" }}>
+                                        {selectedCategory.name}
+                                    </h2>
+                                    <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "#64748b" }}>
+                                        {selectedRoom.name} · BOQ Section
+                                    </p>
+                                </div>
+
+                                {/* Table */}
+                                <div style={{ overflowX: "auto" }}>
+                                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                        <thead>
+                                            <tr style={{ backgroundColor: "#eaf0f9", borderBottom: "1px solid #dbeafe" }}>
+                                                <th style={{ width: "32px", padding: "12px 8px", textAlign: "center" }}></th>
+                                                <th style={{ width: "40px", padding: "12px 10px", textAlign: "center", fontSize: "12px", color: "#475569", fontWeight: 600 }}>#</th>
+                                                <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", color: "#475569", fontWeight: 600 }}>ITEM</th>
+                                                <th style={{ width: "80px", padding: "12px 12px", textAlign: "left", fontSize: "12px", color: "#475569", fontWeight: 600 }}>UNIT</th>
+                                                <th style={{ width: "70px", padding: "12px 12px", textAlign: "right", fontSize: "12px", color: "#475569", fontWeight: 600 }}>QTY</th>
+                                                <th style={{ width: "110px", padding: "12px 12px", textAlign: "right", fontSize: "12px", color: "#475569", fontWeight: 600 }}>RATE (₹)</th>
+                                                <th style={{ width: "90px", padding: "12px 12px", textAlign: "right", fontSize: "12px", color: "#475569", fontWeight: 600 }}>WASTE (%)</th>
+                                                <th style={{ width: "80px", padding: "12px 12px", textAlign: "right", fontSize: "12px", color: "#475569", fontWeight: 600 }}>TAX (%)</th>
+                                                <th style={{ width: "120px", padding: "12px 16px", textAlign: "right", fontSize: "12px", color: "#475569", fontWeight: 600 }}>AMOUNT(₹)</th>
+                                                <th style={{ width: "40px", padding: "12px 8px", textAlign: "center" }}></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {paginatedItems.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={10} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "14px" }}>
+                                                        No items found in this category.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                paginatedItems.map((item, idx) => {
+                                                    const rowNum = (itemPageIndex - 1) * itemsPerPage + idx + 1;
+                                                    return (
+                                                        <tr
+                                                            key={item.id || idx}
+                                                            style={{
+                                                                borderBottom: "1px solid #f1f5f9",
+                                                                transition: "background 0.15s ease",
+                                                            }}
+                                                        >
+                                                            <td style={{ textAlign: "center", padding: "14px 4px", color: "#cbd5e1" }}>
+                                                                <GripVertical size={14} />
+                                                            </td>
+                                                            <td style={{ textAlign: "center", padding: "14px 10px", fontSize: "13px", color: "#64748b" }}>
+                                                                {rowNum}
+                                                            </td>
+                                                            <td style={{ padding: "14px 16px" }}>
+                                                                <div style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a" }}>
+                                                                    {item.name}
+                                                                </div>
+                                                                {item.description && (
+                                                                    <div style={{ fontSize: "12px", color: "#64748b", marginTop: "2px" }}>
+                                                                        {item.description}
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                            <td style={{ padding: "14px 12px", fontSize: "13px", color: "#64748b" }}>
+                                                                {item.unit || "Nos"}
+                                                            </td>
+                                                            <td style={{ padding: "14px 12px", textAlign: "right", fontSize: "13px", color: "#0f172a", fontWeight: 500 }}>
+                                                                {item.quantity}
+                                                            </td>
+                                                            <td style={{ padding: "14px 12px", textAlign: "right", fontSize: "13px", color: "#0f172a", fontWeight: 600 }}>
+                                                                {Number(item.rate).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                            </td>
+                                                            <td style={{ padding: "14px 12px", textAlign: "right", fontSize: "13px", color: "#64748b" }}>
+                                                                {item.wastePercent != null ? `${item.wastePercent}%` : "0%"}
+                                                            </td>
+                                                            <td style={{ padding: "14px 12px", textAlign: "right", fontSize: "13px", color: "#64748b" }}>
+                                                                {item.taxPercent != null ? `${item.taxPercent}%` : "18%"}
+                                                            </td>
+                                                            <td style={{ padding: "14px 16px", textAlign: "right", fontSize: "13px", color: "#16a34a", fontWeight: 600 }}>
+                                                                {Number(item.amount).toLocaleString("en-IN")}
+                                                            </td>
+                                                            <td style={{ textAlign: "center", padding: "14px 8px", color: "#94a3b8" }}>
+                                                                <button
+                                                                    type="button"
+                                                                    style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", padding: "4px" }}
+                                                                >
+                                                                    <MoreHorizontal size={16} />
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* Table Footer Summary Row */}
+                                <div
+                                    style={{
+                                        backgroundColor: "#eff6ff",
+                                        padding: "14px 24px",
+                                        display: "grid",
+                                        gridTemplateColumns: "1fr 140px 180px",
+                                        alignItems: "center",
+                                        borderTop: "1px solid #dbeafe",
+                                    }}
+                                >
+                                    <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e3a8a", textTransform: "uppercase" }}>
+                                        TOTAL ({totalCategoryItemsCount} ITEMS)
+                                    </div>
+                                    <div style={{ textAlign: "right", fontSize: "13px", fontWeight: 700, color: "#1e3a8a" }}>
+                                        {formatNumber(categoryTotalQty)}
+                                    </div>
+                                    <div style={{ textAlign: "right", fontSize: "14px", fontWeight: 700, color: "#1e3a8a" }}>
+                                        ₹{formatNumber(categoryTotalAmount)}
+                                    </div>
+                                </div>
+
+                                {/* Pagination and Page size */}
+                                <div
+                                    style={{
+                                        padding: "16px 24px",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "space-between",
+                                        borderTop: "1px solid #f1f5f9",
+                                        fontSize: "13px",
+                                        color: "#64748b",
+                                    }}
+                                >
+                                    <div>Total Items: {totalCategoryItemsCount}</div>
+
+                                    {/* Pagination Controls */}
+                                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                        <button
+                                            type="button"
+                                            disabled={itemPageIndex <= 1}
+                                            onClick={() => setItemPageIndex((p) => Math.max(1, p - 1))}
+                                            style={{
+                                                padding: "4px 8px",
+                                                borderRadius: "6px",
+                                                border: "1px solid #e2e8f0",
+                                                background: "#ffffff",
+                                                cursor: itemPageIndex <= 1 ? "not-allowed" : "pointer",
+                                                opacity: itemPageIndex <= 1 ? 0.5 : 1,
+                                            }}
+                                        >
+                                            <ChevronLeft size={14} />
+                                        </button>
+
+                                        {Array.from({ length: totalCategoryPages }, (_, i) => i + 1).map((pNum) => (
+                                            <button
+                                                key={pNum}
+                                                type="button"
+                                                onClick={() => setItemPageIndex(pNum)}
+                                                style={{
+                                                    width: "28px",
+                                                    height: "28px",
+                                                    borderRadius: "6px",
+                                                    border: pNum === itemPageIndex ? "1px solid #2563eb" : "1px solid #e2e8f0",
+                                                    backgroundColor: pNum === itemPageIndex ? "#eff6ff" : "#ffffff",
+                                                    color: pNum === itemPageIndex ? "#2563eb" : "#334155",
+                                                    fontWeight: pNum === itemPageIndex ? 700 : 500,
+                                                    fontSize: "12px",
+                                                    cursor: "pointer",
+                                                }}
+                                            >
+                                                {pNum}
+                                            </button>
+                                        ))}
+
+                                        <button
+                                            type="button"
+                                            disabled={itemPageIndex >= totalCategoryPages}
+                                            onClick={() => setItemPageIndex((p) => Math.min(totalCategoryPages, p + 1))}
+                                            style={{
+                                                padding: "4px 8px",
+                                                borderRadius: "6px",
+                                                border: "1px solid #e2e8f0",
+                                                background: "#ffffff",
+                                                cursor: itemPageIndex >= totalCategoryPages ? "not-allowed" : "pointer",
+                                                opacity: itemPageIndex >= totalCategoryPages ? 0.5 : 1,
+                                            }}
+                                        >
+                                            <ChevronRight size={14} />
+                                        </button>
+                                    </div>
+
+                                    {/* Show per page */}
+                                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                        <span>Show per Page:</span>
+                                        <select
+                                            value={itemsPerPage}
+                                            onChange={(e) => {
+                                                setItemsPerPage(Number(e.target.value));
+                                                setItemPageIndex(1);
+                                            }}
+                                            style={{
+                                                padding: "4px 8px",
+                                                borderRadius: "6px",
+                                                border: "1px solid #cbd5e1",
+                                                fontSize: "12px",
+                                                color: "#334155",
+                                                outline: "none",
+                                                background: "#ffffff",
+                                            }}
+                                        >
+                                            <option value={10}>10</option>
+                                            <option value={20}>20</option>
+                                            <option value={50}>50</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                ) : screen === "detail" && selectedBoq ? (
+                    /* ========================================================================= */
+                    /* SCREEN 2: Individual BOQ Overview (Screenshot 2)                          */
+                    /* ========================================================================= */
+                    <section style={{ padding: "20px 32px 40px 32px", flex: 1 }}>
+                        {/* Breadcrumbs */}
+                        <div
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
+                                marginBottom: "16px",
+                                fontSize: "14px",
+                                color: "#64748b",
+                            }}
+                        >
                             <button
                                 type="button"
                                 onClick={handleBackToList}
                                 style={{
-                                    marginLeft: "auto",
-                                    background: "#f1f5f9",
-                                    border: "1px solid #cbd5e1",
-                                    borderRadius: "6px",
-                                    padding: "6px 12px",
-                                    color: "#334155",
-                                    fontSize: "13px",
-                                    fontWeight: 500,
+                                    background: "none",
+                                    border: "none",
+                                    color: "#64748b",
                                     cursor: "pointer",
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: "6px",
+                                    padding: 0,
+                                    fontSize: "14px",
                                 }}
                             >
-                                <ArrowLeft size={14} /> Back to List
+                                Bill of Quantities
                             </button>
+                            <ChevronRight size={14} color="#94a3b8" />
+                            <span style={{ color: "#0f172a", fontWeight: 700 }}>{selectedBoq.boqNumber}</span>
                         </div>
 
-                        {/* BOQ Header Details */}
+                        {/* Top BOQ Header Card */}
                         <div
                             style={{
-                                background: "#ffffff",
-                                border: "1px solid #e2e8f0",
-                                borderRadius: "12px",
-                                padding: "24px",
-                                marginBottom: "24px",
                                 display: "flex",
+                                alignItems: "center",
                                 justifyContent: "space-between",
-                                alignItems: "flex-start",
+                                marginBottom: "24px",
                                 flexWrap: "wrap",
                                 gap: "16px",
                             }}
                         >
-                            <div>
-                                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
-                                    <h2 style={{ fontSize: "22px", fontWeight: 700, color: "#0f172a", margin: 0 }}>
-                                        {selectedBoq.boqNumber}
-                                    </h2>
-                                    <span
-                                        className={`boq-status-pill ${selectedBoq.status.toLowerCase().replace(/\s/g, "-")}`}
-                                        style={{ fontSize: "12px" }}
-                                    >
-                                        {selectedBoq.status}
-                                    </span>
-                                    <span
-                                        style={{
-                                            background: "#f1f5f9",
-                                            color: "#475569",
-                                            fontSize: "12px",
-                                            fontWeight: 600,
-                                            padding: "3px 8px",
-                                            borderRadius: "6px",
-                                        }}
-                                    >
-                                        {selectedBoq.version}
-                                    </span>
+                            <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
+                                <button
+                                    type="button"
+                                    onClick={handleBackToList}
+                                    style={{
+                                        background: "none",
+                                        border: "none",
+                                        cursor: "pointer",
+                                        padding: "4px",
+                                        color: "#0f172a",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        marginTop: "4px",
+                                    }}
+                                >
+                                    <ArrowLeft size={22} />
+                                </button>
+                                <div>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                        <h1 style={{ margin: 0, fontSize: "22px", fontWeight: 700, color: "#0f172a" }}>
+                                            {selectedBoq.boqNumber}
+                                        </h1>
+                                        {(() => {
+                                            const badge = getStatusBadgeStyle(selectedBoq.decisionStatus || selectedBoq.status);
+                                            return (
+                                                <span
+                                                    style={{
+                                                        padding: "4px 10px",
+                                                        borderRadius: "999px",
+                                                        backgroundColor: badge.bg,
+                                                        color: badge.color,
+                                                        fontSize: "11px",
+                                                        fontWeight: 700,
+                                                        letterSpacing: "0.04em",
+                                                    }}
+                                                >
+                                                    {badge.label}
+                                                </span>
+                                            );
+                                        })()}
+                                    </div>
+                                    <div style={{ fontSize: "13px", color: "#64748b", marginTop: "4px" }}>
+                                        {selectedBoq.projectName} - {selectedBoq.version}
+                                    </div>
                                 </div>
-                                <p style={{ fontSize: "14px", color: "#64748b", margin: 0 }}>
-                                    Project: <strong style={{ color: "#0f172a" }}>{selectedBoq.projectName}</strong>
-                                    {selectedBoq.projectCode && ` (${selectedBoq.projectCode})`}
-                                    {selectedBoq.clientName && ` • Client: ${selectedBoq.clientName}`}
-                                </p>
                             </div>
 
-                            {/* Export Actions */}
-                            <div style={{ display: "flex", gap: "10px" }}>
+                            {/* Top Right Actions */}
+                            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                                 <button
                                     type="button"
                                     onClick={() => window.open(`/api/v1/client/boqs/${selectedBoq.id}/pdf`, "_blank")}
@@ -272,491 +708,623 @@ export default function ClientBoqPage() {
                                         display: "inline-flex",
                                         alignItems: "center",
                                         gap: "6px",
-                                        background: "#ffffff",
+                                        backgroundColor: "#ffffff",
                                         border: "1px solid #cbd5e1",
                                         borderRadius: "8px",
-                                        padding: "8px 14px",
+                                        padding: "8px 16px",
                                         fontSize: "13px",
                                         fontWeight: 600,
                                         color: "#334155",
                                         cursor: "pointer",
                                     }}
                                 >
-                                    <FileDown size={15} color="#2563eb" /> Export PDF
+                                    <FileDown size={15} /> Export PDF
                                 </button>
+
                                 <button
                                     type="button"
-                                    onClick={() => window.open(`/api/v1/client/boqs/${selectedBoq.id}/excel`, "_blank")}
+                                    onClick={() => handleOpenReviewModal()}
                                     style={{
                                         display: "inline-flex",
                                         alignItems: "center",
                                         gap: "6px",
-                                        background: "#ffffff",
-                                        border: "1px solid #cbd5e1",
+                                        backgroundColor: "#2563eb",
+                                        border: "none",
                                         borderRadius: "8px",
-                                        padding: "8px 14px",
+                                        padding: "8px 18px",
                                         fontSize: "13px",
                                         fontWeight: 600,
-                                        color: "#334155",
+                                        color: "#ffffff",
                                         cursor: "pointer",
                                     }}
                                 >
-                                    <FileSpreadsheet size={15} color="#16a34a" /> Export Excel
+                                    Approve BOQ
                                 </button>
                             </div>
                         </div>
 
-                        {/* Financial summary banner */}
+                        {/* Main Grid: Left Rooms Table & Right Summary Panel */}
                         <div
                             style={{
                                 display: "grid",
-                                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                                gap: "16px",
-                                marginBottom: "24px",
+                                gridTemplateColumns: "1fr 340px",
+                                gap: "24px",
+                                alignItems: "start",
                             }}
                         >
-                            <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "16px" }}>
-                                <div style={{ fontSize: "12px", color: "#64748b", fontWeight: 600, textTransform: "uppercase" }}>
-                                    Subtotal (Items)
-                                </div>
-                                <div style={{ fontSize: "20px", fontWeight: 700, color: "#0f172a", marginTop: "4px" }}>
-                                    {formatMoney(selectedBoq.subtotal)}
-                                </div>
-                            </div>
-                            <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "16px" }}>
-                                <div style={{ fontSize: "12px", color: "#64748b", fontWeight: 600, textTransform: "uppercase" }}>
-                                    Markup ({selectedBoq.markupPercent}%)
-                                </div>
-                                <div style={{ fontSize: "20px", fontWeight: 700, color: "#0f172a", marginTop: "4px" }}>
-                                    {formatMoney(selectedBoq.markupAmount)}
-                                </div>
-                            </div>
-                            <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "16px" }}>
-                                <div style={{ fontSize: "12px", color: "#64748b", fontWeight: 600, textTransform: "uppercase" }}>
-                                    Tax / GST ({selectedBoq.taxPercent}%)
-                                </div>
-                                <div style={{ fontSize: "20px", fontWeight: 700, color: "#0f172a", marginTop: "4px" }}>
-                                    {formatMoney(selectedBoq.taxAmount)}
-                                </div>
-                            </div>
-                            <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "10px", padding: "16px" }}>
-                                <div style={{ fontSize: "12px", color: "#166534", fontWeight: 600, textTransform: "uppercase" }}>
-                                    Grand Total
-                                </div>
-                                <div style={{ fontSize: "22px", fontWeight: 800, color: "#15803d", marginTop: "4px" }}>
-                                    {formatMoney(selectedBoq.grandTotal)}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Search within items */}
-                        <div style={{ marginBottom: "16px", display: "flex", alignItems: "center", gap: "10px" }}>
+                            {/* Left Rooms Table Container */}
                             <div
                                 style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    background: "#ffffff",
-                                    border: "1px solid #cbd5e1",
-                                    borderRadius: "8px",
-                                    padding: "6px 12px",
-                                    width: "320px",
-                                }}
-                            >
-                                <Search size={16} color="#94a3b8" style={{ marginRight: "8px" }} />
-                                <input
-                                    type="text"
-                                    placeholder="Search rooms or items..."
-                                    value={detailItemSearch}
-                                    onChange={(e) => setDetailItemSearch(e.target.value)}
-                                    style={{ border: "none", outline: "none", width: "100%", fontSize: "14px" }}
-                                />
-                            </div>
-                            <span style={{ fontSize: "13px", color: "#64748b" }}>
-                                {filteredRooms.length} {filteredRooms.length === 1 ? "Room" : "Rooms"} displayed
-                            </span>
-                        </div>
-
-                        {/* Rooms and items breakdown */}
-                        {filteredRooms.length === 0 ? (
-                            <div
-                                style={{
-                                    background: "#ffffff",
+                                    backgroundColor: "#ffffff",
+                                    borderRadius: "14px",
                                     border: "1px solid #e2e8f0",
-                                    borderRadius: "12px",
-                                    padding: "48px 24px",
-                                    textAlign: "center",
+                                    boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)",
+                                    overflow: "hidden",
                                 }}
                             >
-                                <FileSpreadsheet size={40} color="#94a3b8" style={{ margin: "0 auto 12px auto" }} />
-                                <h3 style={{ fontSize: "16px", fontWeight: 600, color: "#0f172a" }}>No items found</h3>
-                                <p style={{ fontSize: "14px", color: "#64748b", margin: "4px 0 0 0" }}>
-                                    {detailItemSearch ? "No items matching your search query." : "This BOQ does not contain any room specifications."}
-                                </p>
-                            </div>
-                        ) : (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                                {filteredRooms.map((room) => (
-                                    <div
-                                        key={room.id}
-                                        style={{
-                                            background: "#ffffff",
-                                            border: "1px solid #e2e8f0",
-                                            borderRadius: "12px",
-                                            overflow: "hidden",
-                                        }}
-                                    >
-                                        <div
-                                            style={{
-                                                padding: "14px 20px",
-                                                background: "#f8fafc",
-                                                borderBottom: "1px solid #e2e8f0",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "space-between",
-                                            }}
-                                        >
-                                            <h3 style={{ fontSize: "15px", fontWeight: 700, color: "#0f172a", margin: 0 }}>
-                                                {room.name}
-                                            </h3>
-                                            {room.description && (
-                                                <span style={{ fontSize: "13px", color: "#64748b" }}>{room.description}</span>
-                                            )}
-                                        </div>
-
-                                        <table className="boq-room-table" style={{ width: "100%", borderCollapse: "collapse" }}>
-                                            <thead>
-                                                <tr>
-                                                    <th style={{ width: "40px", textAlign: "center" }}>#</th>
-                                                    <th style={{ width: "140px" }}>CATEGORY</th>
-                                                    <th>ITEM & SPECIFICATION</th>
-                                                    <th style={{ width: "80px" }}>UNIT</th>
-                                                    <th style={{ width: "80px", textAlign: "right" }}>QTY</th>
-                                                    <th style={{ width: "120px", textAlign: "right" }}>RATE (₹)</th>
-                                                    <th style={{ width: "130px", textAlign: "right" }}>AMOUNT (₹)</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {room.categories.flatMap((cat) =>
-                                                    cat.items.map((it, idx) => (
-                                                        <tr key={it.id || `${cat.id}-${idx}`}>
-                                                            <td style={{ textAlign: "center", color: "#64748b" }}>{idx + 1}</td>
-                                                            <td style={{ fontWeight: 600, color: "#334155" }}>{cat.name}</td>
-                                                            <td>
-                                                                <div style={{ fontWeight: 600, color: "#0f172a" }}>{it.name}</div>
-                                                                {it.description && (
-                                                                    <div style={{ fontSize: "12px", color: "#64748b", marginTop: "2px" }}>
-                                                                        {it.description}
-                                                                    </div>
-                                                                )}
-                                                            </td>
-                                                            <td style={{ color: "#475569" }}>{it.unit}</td>
-                                                            <td style={{ textAlign: "right", fontWeight: 600 }}>{it.quantity}</td>
-                                                            <td style={{ textAlign: "right" }}>{it.rate.toLocaleString("en-IN")}</td>
-                                                            <td style={{ textAlign: "right", fontWeight: 700, color: "#0f172a" }}>
-                                                                {it.amount.toLocaleString("en-IN")}
-                                                            </td>
-                                                        </tr>
-                                                    ))
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </section>
-                ) : (
-                    /* BOQ List View */
-                    <section className="boq-page-shell" style={{ padding: "24px 32px" }}>
-                        {/* Title Row */}
-                        <div className="boq-page-header-row" style={{ marginBottom: "20px" }}>
-                            <div className="boq-page-title-block">
-                                <h2 style={{ fontSize: "24px", fontWeight: 700, color: "#0f172a", margin: 0 }}>
-                                    Bill of Quantities
-                                </h2>
-                                <p style={{ fontSize: "14px", color: "#64748b", margin: "4px 0 0 0" }}>
-                                    {total} {total === 1 ? "BOQ" : "BOQs"} • {pendingApprovals} Pending Review
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Filter Bar */}
-                        <div
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                flexWrap: "wrap",
-                                gap: "12px",
-                                marginBottom: "20px",
-                            }}
-                        >
-                            {/* Filter tabs */}
-                            <div style={{ display: "flex", gap: "8px" }}>
-                                {["ALL", "APPROVED", "IN REVIEW", "DRAFT"].map((st) => (
-                                    <button
-                                        key={st}
-                                        type="button"
-                                        onClick={() => {
-                                            setStatusFilter(st);
-                                            setPage(1);
-                                        }}
-                                        style={{
-                                            padding: "6px 14px",
-                                            borderRadius: "6px",
-                                            fontSize: "13px",
-                                            fontWeight: 600,
-                                            border: statusFilter === st ? "1px solid #2563eb" : "1px solid #e2e8f0",
-                                            backgroundColor: statusFilter === st ? "#eff6ff" : "#ffffff",
-                                            color: statusFilter === st ? "#2563eb" : "#64748b",
-                                            cursor: "pointer",
-                                        }}
-                                    >
-                                        {st}
-                                    </button>
-                                ))}
-                            </div>
-
-                            {/* Project selector dropdown */}
-                            {projects.length > 1 && (
-                                <select
-                                    value={selectedProjectId}
-                                    onChange={(e) => {
-                                        setSelectedProjectId(e.target.value);
-                                        setPage(1);
-                                    }}
+                                {/* Header with Room count and Search */}
+                                <div
                                     style={{
-                                        padding: "6px 12px",
-                                        borderRadius: "6px",
-                                        border: "1px solid #cbd5e1",
-                                        fontSize: "13px",
-                                        backgroundColor: "#ffffff",
-                                        color: "#334155",
-                                        outline: "none",
+                                        padding: "16px 20px",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "space-between",
+                                        borderBottom: "1px solid #f1f5f9",
                                     }}
                                 >
-                                    <option value="">All Assigned Projects</option>
-                                    {projects.map((p) => (
-                                        <option key={p.id} value={p.id}>
-                                            {p.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            )}
+                                    <div style={{ fontSize: "15px", fontWeight: 700, color: "#0f172a" }}>
+                                        {selectedBoq.rooms.length} Rooms
+                                    </div>
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            backgroundColor: "#f8fafc",
+                                            border: "1px solid #e2e8f0",
+                                            borderRadius: "8px",
+                                            padding: "6px 12px",
+                                            width: "220px",
+                                        }}
+                                    >
+                                        <Search size={15} color="#94a3b8" style={{ marginRight: "8px" }} />
+                                        <input
+                                            type="text"
+                                            placeholder="Search..."
+                                            value={roomSearch}
+                                            onChange={(e) => setRoomSearch(e.target.value)}
+                                            style={{
+                                                border: "none",
+                                                outline: "none",
+                                                backgroundColor: "transparent",
+                                                width: "100%",
+                                                fontSize: "13px",
+                                                color: "#0f172a",
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Rooms Table */}
+                                <div style={{ overflowX: "auto" }}>
+                                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                        <thead>
+                                            <tr style={{ backgroundColor: "#eaf0f9", borderBottom: "1px solid #dbeafe" }}>
+                                                <th style={{ width: "40px", padding: "12px 10px", textAlign: "center", fontSize: "12px", color: "#475569", fontWeight: 600 }}>#</th>
+                                                <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", color: "#475569", fontWeight: 600 }}>ROOM</th>
+                                                <th style={{ width: "80px", padding: "12px 12px", textAlign: "center", fontSize: "12px", color: "#475569", fontWeight: 600 }}>CATEGORY</th>
+                                                <th style={{ width: "130px", padding: "12px 12px", textAlign: "left", fontSize: "12px", color: "#475569", fontWeight: 600 }}>SPEC</th>
+                                                <th style={{ width: "70px", padding: "12px 12px", textAlign: "left", fontSize: "12px", color: "#475569", fontWeight: 600 }}>UNIT</th>
+                                                <th style={{ width: "70px", padding: "12px 12px", textAlign: "center", fontSize: "12px", color: "#475569", fontWeight: 600 }}>ITEMS</th>
+                                                <th style={{ width: "120px", padding: "12px 12px", textAlign: "right", fontSize: "12px", color: "#475569", fontWeight: 600 }}>AMOUNT (₹)</th>
+                                                <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", color: "#475569", fontWeight: 600 }}>DESCRIPTION</th>
+                                                <th style={{ width: "40px", padding: "12px 8px", textAlign: "center" }}></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {filteredRooms.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={9} style={{ padding: "40px", textAlign: "center", color: "#94a3b8", fontSize: "14px" }}>
+                                                        No rooms match your search.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                filteredRooms.map((room, idx) => {
+                                                    const roomItemsCount = room.categories.reduce((acc, c) => acc + c.items.length, 0);
+                                                    const roomAmount = room.categories.reduce(
+                                                        (acc, c) => acc + c.items.reduce((iAcc, it) => iAcc + (Number(it.amount) || 0), 0),
+                                                        0
+                                                    );
+                                                    const firstItem = room.categories[0]?.items[0];
+                                                    const specLabel = firstItem?.description || room.description || "Custom specifications";
+                                                    const unitLabel = firstItem?.unit || "No";
+
+                                                    return (
+                                                        <tr
+                                                            key={room.id || idx}
+                                                            onClick={() => {
+                                                                const actualIndex = selectedBoq.rooms.findIndex((r) => r.id === room.id);
+                                                                setSelectedRoomIndex(actualIndex >= 0 ? actualIndex : idx);
+                                                                setSelectedCategoryIndex(0);
+                                                                setItemPageIndex(1);
+                                                                setScreen("category_items");
+                                                            }}
+                                                            style={{
+                                                                borderBottom: "1px solid #f1f5f9",
+                                                                cursor: "pointer",
+                                                                transition: "background 0.15s ease",
+                                                            }}
+                                                            onMouseEnter={(e) => {
+                                                                e.currentTarget.style.backgroundColor = "#f8faff";
+                                                            }}
+                                                            onMouseLeave={(e) => {
+                                                                e.currentTarget.style.backgroundColor = "transparent";
+                                                            }}
+                                                        >
+                                                            <td style={{ textAlign: "center", padding: "16px 10px", fontSize: "13px", color: "#64748b" }}>
+                                                                {idx + 1}
+                                                            </td>
+                                                            <td style={{ padding: "16px", fontSize: "14px", fontWeight: 600, color: "#0f172a" }}>
+                                                                {room.name}
+                                                            </td>
+                                                            <td style={{ textAlign: "center", padding: "16px 12px", fontSize: "13px", color: "#334155" }}>
+                                                                {room.categories.length}
+                                                            </td>
+                                                            <td style={{ padding: "16px 12px", fontSize: "13px", color: "#64748b" }}>
+                                                                {specLabel.length > 20 ? `${specLabel.slice(0, 20)}...` : specLabel}
+                                                            </td>
+                                                            <td style={{ padding: "16px 12px", fontSize: "13px", color: "#64748b" }}>
+                                                                {unitLabel}
+                                                            </td>
+                                                            <td style={{ textAlign: "center", padding: "16px 12px", fontSize: "13px", color: "#334155" }}>
+                                                                {roomItemsCount}
+                                                            </td>
+                                                            <td style={{ textAlign: "right", padding: "16px 12px", fontSize: "13px", fontWeight: 600, color: "#0f172a" }}>
+                                                                ₹{formatNumber(roomAmount)}
+                                                            </td>
+                                                            <td style={{ padding: "16px", fontSize: "13px", color: "#64748b" }}>
+                                                                {room.description || (firstItem ? `${firstItem.name} with specifications` : "Standard room finish")}
+                                                            </td>
+                                                            <td style={{ textAlign: "center", padding: "16px 8px", color: "#94a3b8" }}>
+                                                                <MoreHorizontal size={16} />
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {/* Right Summary Panel (Screenshot 2) */}
+                            <div
+                                style={{
+                                    backgroundColor: "#ffffff",
+                                    borderRadius: "14px",
+                                    border: "1px solid #e2e8f0",
+                                    padding: "24px",
+                                    boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: "16px",
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        fontSize: "12px",
+                                        fontWeight: 700,
+                                        color: "#64748b",
+                                        letterSpacing: "0.06em",
+                                        textTransform: "uppercase",
+                                    }}
+                                >
+                                    SUMMARY
+                                </div>
+
+                                <div style={{ display: "flex", flexDirection: "column", gap: "10px", fontSize: "14px" }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", color: "#64748b" }}>
+                                        <span>Subtotal</span>
+                                        <span style={{ color: "#0f172a", fontWeight: 600 }}>{formatMoney(selectedBoq.subtotal)}</span>
+                                    </div>
+                                    <div style={{ display: "flex", justifyContent: "space-between", color: "#64748b" }}>
+                                        <span>Markup ({selectedBoq.markupPercent}%)</span>
+                                        <span style={{ color: "#0f172a", fontWeight: 600 }}>{formatMoney(selectedBoq.markupAmount)}</span>
+                                    </div>
+                                    <div style={{ display: "flex", justifyContent: "space-between", color: "#64748b" }}>
+                                        <span>GST ({selectedBoq.taxPercent}%)</span>
+                                        <span style={{ color: "#0f172a", fontWeight: 600 }}>{formatMoney(selectedBoq.taxAmount)}</span>
+                                    </div>
+
+                                    <div style={{ borderTop: "1px solid #f1f5f9", margin: "6px 0" }} />
+
+                                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "16px", fontWeight: 700 }}>
+                                        <span style={{ color: "#0f172a" }}>Grand Total</span>
+                                        <span style={{ color: "#0f172a" }}>{formatMoney(selectedBoq.grandTotal)}</span>
+                                    </div>
+                                </div>
+
+                                {/* Metric Box 1: Rooms Covered */}
+                                <div
+                                    style={{
+                                        backgroundColor: "#f8fafc",
+                                        borderRadius: "10px",
+                                        padding: "16px 20px",
+                                        border: "1px solid #f1f5f9",
+                                        marginTop: "8px",
+                                    }}
+                                >
+                                    <div style={{ fontSize: "12px", color: "#64748b", fontWeight: 500 }}>Rooms Covered</div>
+                                    <div style={{ fontSize: "22px", fontWeight: 700, color: "#0f172a", marginTop: "4px" }}>
+                                        {selectedBoq.roomsCovered ?? selectedBoq.rooms.length}
+                                    </div>
+                                </div>
+
+                                {/* Metric Box 2: Total Items */}
+                                <div
+                                    style={{
+                                        backgroundColor: "#f8fafc",
+                                        borderRadius: "10px",
+                                        padding: "16px 20px",
+                                        border: "1px solid #f1f5f9",
+                                    }}
+                                >
+                                    <div style={{ fontSize: "12px", color: "#64748b", fontWeight: 500 }}>Items</div>
+                                    <div style={{ fontSize: "22px", fontWeight: 700, color: "#0f172a", marginTop: "4px" }}>
+                                        {selectedBoq.totalItems ??
+                                            selectedBoq.rooms.reduce(
+                                                (acc, r) => acc + r.categories.reduce((cAcc, c) => cAcc + c.items.length, 0),
+                                                0
+                                            )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                ) : (
+                    /* ========================================================================= */
+                    /* SCREEN 1: Client BOQ Listing Overview (Screenshot 1)                      */
+                    /* ========================================================================= */
+                    <section style={{ padding: "24px 32px 48px 32px", flex: 1 }}>
+                        {/* Title and summary header matching Screenshot 1 */}
+                        <div style={{ marginBottom: "24px" }}>
+                            <h1 style={{ margin: 0, fontSize: "22px", fontWeight: 700, color: "#0f172a" }}>
+                                Bill of Quantities
+                            </h1>
+                            <p style={{ margin: "4px 0 0 0", fontSize: "14px", color: "#64748b" }}>
+                                {total} BOQs | {pendingApprovals} pending approval
+                            </p>
                         </div>
 
                         {/* Error state */}
                         {error && (
                             <div
                                 style={{
-                                    padding: "16px",
-                                    borderRadius: "8px",
-                                    backgroundColor: "#fef2f2",
-                                    border: "1px solid #fecaca",
-                                    color: "#b91c1c",
-                                    marginBottom: "20px",
                                     display: "flex",
                                     alignItems: "center",
                                     gap: "10px",
+                                    padding: "14px 18px",
+                                    backgroundColor: "#fef2f2",
+                                    border: "1px solid #fecaca",
+                                    borderRadius: "10px",
+                                    color: "#b91c1c",
+                                    fontSize: "14px",
+                                    marginBottom: "20px",
                                 }}
                             >
                                 <AlertCircle size={18} />
                                 <span>{error}</span>
-                                <button
-                                    type="button"
-                                    onClick={loadBoqs}
-                                    style={{
-                                        marginLeft: "auto",
-                                        background: "none",
-                                        border: "none",
-                                        color: "#b91c1c",
-                                        fontWeight: 600,
-                                        cursor: "pointer",
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        gap: "4px",
-                                    }}
-                                >
-                                    <RefreshCw size={14} /> Retry
-                                </button>
                             </div>
                         )}
 
-                        {/* BOQ List Table */}
-                        <div className="boq-table-card" style={{ background: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden" }}>
-                            <table className="boq-table" style={{ width: "100%", borderCollapse: "collapse" }}>
-                                <thead>
-                                    <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                                        <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", color: "#64748b", fontWeight: 600 }}>BOQ #</th>
-                                        <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", color: "#64748b", fontWeight: 600 }}>PROJECT</th>
-                                        <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", color: "#64748b", fontWeight: 600 }}>VERSION</th>
-                                        <th style={{ padding: "12px 16px", textAlign: "center", fontSize: "12px", color: "#64748b", fontWeight: 600 }}>ROOMS</th>
-                                        <th style={{ padding: "12px 16px", textAlign: "center", fontSize: "12px", color: "#64748b", fontWeight: 600 }}>ITEMS</th>
-                                        <th style={{ padding: "12px 16px", textAlign: "right", fontSize: "12px", color: "#64748b", fontWeight: 600 }}>ESTIMATED TOTAL</th>
-                                        <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", color: "#64748b", fontWeight: 600 }}>DATE</th>
-                                        <th style={{ padding: "12px 16px", textAlign: "center", fontSize: "12px", color: "#64748b", fontWeight: 600 }}>STATUS</th>
-                                        <th style={{ padding: "12px 16px", textAlign: "right", fontSize: "12px", color: "#64748b", fontWeight: 600 }}>ACTIONS</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {loading ? (
-                                        <tr>
-                                            <td colSpan={9} style={{ textAlign: "center", padding: "48px 16px" }}>
-                                                <Loader2 className="animate-spin" size={32} color="#2563EB" style={{ margin: "0 auto 8px auto" }} />
-                                                <div style={{ color: "#64748b", fontSize: "14px" }}>Loading your Bills of Quantities...</div>
-                                            </td>
-                                        </tr>
-                                    ) : boqs.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={9} style={{ textAlign: "center", padding: "56px 16px" }}>
-                                                <div style={{ maxWidth: "360px", margin: "0 auto" }}>
-                                                    <FileSpreadsheet size={40} color="#94a3b8" style={{ margin: "0 auto 12px auto" }} />
-                                                    <h4 style={{ fontSize: "16px", fontWeight: 600, color: "#0f172a", marginBottom: "4px" }}>
-                                                        No Bills of Quantities Available
-                                                    </h4>
-                                                    <p style={{ fontSize: "13px", color: "#64748b", margin: 0 }}>
-                                                        {searchQuery || statusFilter !== "ALL"
-                                                            ? "No BOQs match your current filter criteria."
-                                                            : "Your project team has not yet published a BOQ for your review."}
-                                                    </p>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        boqs.map((boq) => (
-                                            <tr
-                                                key={boq.id}
-                                                className="boq-row"
-                                                onClick={() => openBoqDetail(boq.id)}
-                                                style={{ cursor: "pointer", borderBottom: "1px solid #f1f5f9" }}
-                                            >
-                                                <td style={{ padding: "14px 16px", fontWeight: 600, color: "#2563eb" }}>
-                                                    {boq.boqNumber}
-                                                </td>
-                                                <td style={{ padding: "14px 16px" }}>
-                                                    <strong style={{ color: "#0f172a", fontWeight: 600 }}>{boq.projectName}</strong>
-                                                </td>
-                                                <td style={{ padding: "14px 16px", color: "#475569" }}>{boq.version}</td>
-                                                <td style={{ padding: "14px 16px", textAlign: "center", color: "#475569" }}>
-                                                    {boq.roomsCount}
-                                                </td>
-                                                <td style={{ padding: "14px 16px", textAlign: "center", color: "#475569" }}>
-                                                    {boq.itemsCount}
-                                                </td>
-                                                <td style={{ padding: "14px 16px", textAlign: "right", fontWeight: 700, color: "#0f172a" }}>
-                                                    {formatMoney(boq.grandTotal || boq.estimatedValue)}
-                                                </td>
-                                                <td style={{ padding: "14px 16px", color: "#64748b", fontSize: "13px" }}>
-                                                    {boq.date}
-                                                </td>
-                                                <td style={{ padding: "14px 16px", textAlign: "center" }}>
-                                                    <span className={`boq-status-pill ${boq.status.toLowerCase().replace(/\s/g, "-")}`}>
-                                                        {boq.status}
-                                                    </span>
-                                                </td>
-                                                <td style={{ padding: "14px 16px", textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
-                                                    <div style={{ display: "inline-flex", gap: "6px" }}>
-                                                        <button
-                                                            type="button"
-                                                            title="View BOQ details"
-                                                            onClick={() => openBoqDetail(boq.id)}
-                                                            style={{
-                                                                background: "#f1f5f9",
-                                                                border: "none",
-                                                                borderRadius: "6px",
-                                                                padding: "6px",
-                                                                cursor: "pointer",
-                                                                color: "#334155",
-                                                            }}
-                                                        >
-                                                            <Eye size={15} />
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            title="Download PDF"
-                                                            onClick={() => window.open(`/api/v1/client/boqs/${boq.id}/pdf`, "_blank")}
-                                                            style={{
-                                                                background: "#f1f5f9",
-                                                                border: "none",
-                                                                borderRadius: "6px",
-                                                                padding: "6px",
-                                                                cursor: "pointer",
-                                                                color: "#334155",
-                                                            }}
-                                                        >
-                                                            <FileDown size={15} />
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            title="Download Excel"
-                                                            onClick={() => window.open(`/api/v1/client/boqs/${boq.id}/excel`, "_blank")}
-                                                            style={{
-                                                                background: "#f1f5f9",
-                                                                border: "none",
-                                                                borderRadius: "6px",
-                                                                padding: "6px",
-                                                                cursor: "pointer",
-                                                                color: "#334155",
-                                                            }}
-                                                        >
-                                                            <FileSpreadsheet size={15} />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                        {loading ? (
+                            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "40vh" }}>
+                                <Loader2 className="animate-spin" size={36} color="#2563EB" />
+                            </div>
+                        ) : boqs.length === 0 ? (
+                            <div
+                                style={{
+                                    backgroundColor: "#ffffff",
+                                    borderRadius: "14px",
+                                    border: "1px solid #e2e8f0",
+                                    padding: "60px 24px",
+                                    textAlign: "center",
+                                }}
+                            >
+                                <p style={{ fontSize: "16px", fontWeight: 600, color: "#0f172a", margin: 0 }}>
+                                    No BOQs available
+                                </p>
+                                <p style={{ fontSize: "14px", color: "#64748b", margin: "6px 0 0 0" }}>
+                                    You do not currently have any BOQs assigned or shared for review.
+                                </p>
+                            </div>
+                        ) : (
+                            /* Responsive 3-Column Grid of BOQ Cards */
+                            <div
+                                style={{
+                                    display: "grid",
+                                    gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))",
+                                    gap: "20px",
+                                }}
+                            >
+                                {boqs.map((item) => {
+                                    const badge = getStatusBadgeStyle(item.decisionStatus || item.status);
+                                    const progressVal = item.progress ?? 68;
 
-                        {/* Pagination */}
-                        {totalPages > 1 && (
-                            <div className="boq-footer-row" style={{ marginTop: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                <span className="boq-footer-total" style={{ fontSize: "13px", color: "#64748b" }}>
-                                    Total: {total} {total === 1 ? "record" : "records"}
-                                </span>
-                                <div className="boq-pagination" style={{ display: "flex", gap: "4px" }}>
-                                    <button
-                                        type="button"
-                                        disabled={page <= 1}
-                                        onClick={() => setPage((p) => Math.max(1, p - 1))}
-                                        style={{ padding: "4px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", background: "#ffffff", cursor: page <= 1 ? "not-allowed" : "pointer" }}
-                                    >
-                                        ‹
-                                    </button>
-                                    {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((p) => (
-                                        <button
-                                            key={p}
-                                            type="button"
-                                            onClick={() => setPage(p)}
+                                    return (
+                                        <div
+                                            key={item.id}
                                             style={{
-                                                padding: "4px 10px",
-                                                borderRadius: "6px",
-                                                border: page === p ? "1px solid #2563eb" : "1px solid #cbd5e1",
-                                                background: page === p ? "#2563eb" : "#ffffff",
-                                                color: page === p ? "#ffffff" : "#334155",
-                                                fontWeight: 600,
+                                                backgroundColor: "#ffffff",
+                                                borderRadius: "14px",
+                                                border: "1px solid #e2e8f0",
+                                                padding: "20px 22px",
+                                                boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)",
+                                                display: "flex",
+                                                flexDirection: "column",
+                                                gap: "18px",
+                                                position: "relative",
                                                 cursor: "pointer",
+                                                transition: "transform 0.15s ease, box-shadow 0.15s ease",
+                                            }}
+                                            onClick={() => openBoqDetail(item.id)}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.boxShadow = "0 6px 16px -2px rgba(0, 0, 0, 0.08)";
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.boxShadow = "0 1px 3px 0 rgba(0, 0, 0, 0.05)";
                                             }}
                                         >
-                                            {p}
-                                        </button>
-                                    ))}
-                                    <button
-                                        type="button"
-                                        disabled={page >= totalPages}
-                                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                                        style={{ padding: "4px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", background: "#ffffff", cursor: page >= totalPages ? "not-allowed" : "pointer" }}
-                                    >
-                                        ›
-                                    </button>
-                                </div>
+                                            {/* Card Top Row: BOQ Number, Status Pill, Three-dot Menu */}
+                                            <div
+                                                style={{
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "space-between",
+                                                }}
+                                            >
+                                                <div style={{ fontSize: "15px", fontWeight: 700, color: "#0f172a" }}>
+                                                    {item.boqNumber}
+                                                </div>
+
+                                                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                                    <span
+                                                        style={{
+                                                            padding: "3px 9px",
+                                                            borderRadius: "999px",
+                                                            backgroundColor: badge.bg,
+                                                            color: badge.color,
+                                                            fontSize: "11px",
+                                                            fontWeight: 700,
+                                                            letterSpacing: "0.04em",
+                                                        }}
+                                                    >
+                                                        {badge.label}
+                                                    </span>
+
+                                                    {/* Three-dot Action Menu */}
+                                                    <div
+                                                        style={{ position: "relative" }}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setActiveDropdownCardId(
+                                                                    activeDropdownCardId === item.id ? null : item.id
+                                                                );
+                                                            }}
+                                                            style={{
+                                                                background: "none",
+                                                                border: "none",
+                                                                color: "#94a3b8",
+                                                                cursor: "pointer",
+                                                                padding: "4px",
+                                                                display: "flex",
+                                                                alignItems: "center",
+                                                            }}
+                                                        >
+                                                            <MoreHorizontal size={18} />
+                                                        </button>
+
+                                                        {activeDropdownCardId === item.id && (
+                                                            <div
+                                                                style={{
+                                                                    position: "absolute",
+                                                                    right: 0,
+                                                                    top: "26px",
+                                                                    backgroundColor: "#ffffff",
+                                                                    border: "1px solid #e2e8f0",
+                                                                    borderRadius: "10px",
+                                                                    boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
+                                                                    zIndex: 50,
+                                                                    minWidth: "150px",
+                                                                    padding: "6px 0",
+                                                                }}
+                                                            >
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setActiveDropdownCardId(null);
+                                                                        openBoqDetail(item.id);
+                                                                    }}
+                                                                    style={{
+                                                                        width: "100%",
+                                                                        textAlign: "left",
+                                                                        padding: "8px 14px",
+                                                                        background: "none",
+                                                                        border: "none",
+                                                                        fontSize: "13px",
+                                                                        color: "#334155",
+                                                                        cursor: "pointer",
+                                                                    }}
+                                                                >
+                                                                    View BOQ
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setActiveDropdownCardId(null);
+                                                                        window.open(`/api/v1/client/boqs/${item.id}/pdf`, "_blank");
+                                                                    }}
+                                                                    style={{
+                                                                        width: "100%",
+                                                                        textAlign: "left",
+                                                                        padding: "8px 14px",
+                                                                        background: "none",
+                                                                        border: "none",
+                                                                        fontSize: "13px",
+                                                                        color: "#334155",
+                                                                        cursor: "pointer",
+                                                                    }}
+                                                                >
+                                                                    Export PDF
+                                                                </button>
+                                                                {badge.label !== "APPROVED" && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setActiveDropdownCardId(null);
+                                                                            handleOpenReviewModal({
+                                                                                id: item.id,
+                                                                                boqNumber: item.boqNumber,
+                                                                                version: item.version,
+                                                                                totalAmount: item.grandTotal,
+                                                                            });
+                                                                        }}
+                                                                        style={{
+                                                                            width: "100%",
+                                                                            textAlign: "left",
+                                                                            padding: "8px 14px",
+                                                                            background: "none",
+                                                                            border: "none",
+                                                                            fontSize: "13px",
+                                                                            color: "#2563eb",
+                                                                            fontWeight: 600,
+                                                                            cursor: "pointer",
+                                                                        }}
+                                                                    >
+                                                                        Review BOQ
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Metadata 2x3 Grid (Screenshot 1) */}
+                                            <div
+                                                style={{
+                                                    display: "grid",
+                                                    gridTemplateColumns: "1.2fr 1fr 1fr",
+                                                    rowGap: "14px",
+                                                    columnGap: "12px",
+                                                }}
+                                            >
+                                                {/* Row 1 */}
+                                                <div>
+                                                    <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 500 }}>
+                                                        Issued by
+                                                    </div>
+                                                    <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a", marginTop: "2px" }}>
+                                                        {item.issuedBy || "Nikhil Oberoi"}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 500 }}>
+                                                        Estimated Value
+                                                    </div>
+                                                    <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a", marginTop: "2px" }}>
+                                                        {item.estimatedAreaValue || "3.200 sqft"}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 500 }}>
+                                                        Issued Date
+                                                    </div>
+                                                    <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a", marginTop: "2px" }}>
+                                                        {item.date || "04 Sep 2026"}
+                                                    </div>
+                                                </div>
+
+                                                {/* Row 2 */}
+                                                <div>
+                                                    <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 500 }}>
+                                                        Version
+                                                    </div>
+                                                    <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a", marginTop: "2px" }}>
+                                                        {item.version}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 500 }}>
+                                                        Rooms
+                                                    </div>
+                                                    <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a", marginTop: "2px" }}>
+                                                        {item.roomsCount}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 500 }}>
+                                                        Items
+                                                    </div>
+                                                    <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a", marginTop: "2px" }}>
+                                                        {item.itemsCount}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Progress Row */}
+                                            <div>
+                                                <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 500, marginBottom: "6px" }}>
+                                                    Progress
+                                                </div>
+                                                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                                    <div
+                                                        style={{
+                                                            flex: 1,
+                                                            height: "6px",
+                                                            borderRadius: "999px",
+                                                            backgroundColor: "#f1f5f9",
+                                                            overflow: "hidden",
+                                                        }}
+                                                    >
+                                                        <div
+                                                            style={{
+                                                                width: `${progressVal}%`,
+                                                                height: "100%",
+                                                                backgroundColor: "#f97316",
+                                                                borderRadius: "999px",
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <span style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 500, minWidth: "28px" }}>
+                                                        {progressVal}%
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )}
                     </section>
                 )}
             </div>
+
+            {/* Review BOQ Modal (Screenshots 4-7) */}
+            {reviewTargetBoq && (
+                <ReviewBoqModal
+                    isOpen={reviewModalOpen}
+                    onClose={() => setReviewModalOpen(false)}
+                    boqId={reviewTargetBoq.id}
+                    boqNumber={reviewTargetBoq.boqNumber}
+                    version={reviewTargetBoq.version}
+                    totalAmount={reviewTargetBoq.totalAmount}
+                    onSuccess={handleDecisionSuccess}
+                />
+            )}
         </main>
     );
 }

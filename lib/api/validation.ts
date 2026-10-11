@@ -498,6 +498,58 @@ export const activityApprovalPatchSchema = z.object({
   status: z.enum(["draft", "sent", "in_review", "cancelled"]).optional(), attachments: z.array(z.record(z.string(), z.unknown())).max(20).optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, "At least one field is required.");
 export const approvalDecisionSchema = z.object({ decision: z.enum(["approved", "changes_required", "rejected"]), comment: z.string().trim().max(5000).optional() }).strict();
+export const clientBoqDecisionSchema = z.object({
+  action: z.enum([
+    "APPROVE",
+    "REQUEST_MINOR_REVISION",
+    "REQUEST_MAJOR_REVISION",
+    "REJECT",
+    "approve",
+    "revise_minor",
+    "revise_major",
+    "reject",
+  ]),
+  version: z.string().trim().min(1).max(50),
+  confirmation: z.boolean().optional(),
+  comments: z.string().trim().max(5000).optional(),
+  reason: z.string().trim().max(5000).optional(),
+}).strict().superRefine((val, ctx) => {
+  const normAction = val.action.toUpperCase();
+  if (normAction === "APPROVE") {
+    if (val.confirmation !== true) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Confirmation is required before approving the BOQ.",
+        path: ["confirmation"],
+      });
+    }
+  } else if (normAction === "REQUEST_MINOR_REVISION" || normAction === "REVISE_MINOR") {
+    if (!val.comments || val.comments.trim().length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Revision comments are required.",
+        path: ["comments"],
+      });
+    }
+  } else if (normAction === "REQUEST_MAJOR_REVISION" || normAction === "REVISE_MAJOR") {
+    if (!val.comments || val.comments.trim().length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Revision comments are required.",
+        path: ["comments"],
+      });
+    }
+  } else if (normAction === "REJECT") {
+    const text = val.reason?.trim() || val.comments?.trim();
+    if (!text) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "A meaningful reason for rejection is required.",
+        path: ["reason"],
+      });
+    }
+  }
+});
 export const activityCommentSchema = z.object({ body: z.string().trim().min(1).max(5000), attachments: z.array(z.record(z.string(), z.unknown())).max(10).default([]) }).strict();
 
 export const articleFeedbackSchema = z.object({ helpful: z.boolean() }).strict();

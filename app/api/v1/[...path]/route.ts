@@ -40,6 +40,7 @@ import {
   clientRegisterSchema,
   clientDocumentSignSchema,
   clientOnboardingStepSchema,
+  clientBoqDecisionSchema,
   boqImportSchema,
 
   // Friend's changes
@@ -1888,8 +1889,34 @@ async function getClientBoqsList(request: NextRequest, supabase: SupabaseClient,
   const rows = res.data ?? [];
   const boqIds = rows.map((r) => r.id);
 
-  const { data: projs } = await admin.from("projects").select("id, name").in("id", targetProjectIds);
-  const projMap = new Map((projs || []).map((p) => [p.id, p.name]));
+  const [projsRes, auditRes] = await Promise.all([
+    admin.from("projects").select("id, name, area_sqft, project_value, progress, assigned_designer_id, created_by").in("id", targetProjectIds),
+    boqIds.length > 0
+      ? admin
+          .from("audit_logs")
+          .select("entity_id, action, created_at, metadata")
+          .eq("entity_type", "boq")
+          .in("entity_id", boqIds)
+          .in("action", ["client.boq.approved", "client.boq.revision_requested", "client.boq.rejected"])
+          .order("created_at", { ascending: false })
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const projs = projsRes.data || [];
+  const projMap = new Map(projs.map((p) => [p.id, p]));
+
+  const designerIds = Array.from(new Set(projs.map((p) => p.assigned_designer_id || p.created_by).filter(Boolean)));
+  const { data: designerProfiles } = designerIds.length > 0
+    ? await admin.from("user_profiles").select("user_id, display_name").in("user_id", designerIds)
+    : { data: [] };
+  const profileNameMap = new Map((designerProfiles || []).map((p) => [p.user_id, p.display_name]));
+
+  const latestDecisionByBoq = new Map<string, any>();
+  ((auditRes.data || []) as any[]).forEach((log) => {
+    if (!latestDecisionByBoq.has(log.entity_id)) {
+      latestDecisionByBoq.set(log.entity_id, log);
+    }
+  });
 
   let roomMap = new Map<string, number>();
   let itemMap = new Map<string, number>();
@@ -1919,28 +1946,66 @@ async function getClientBoqsList(request: NextRequest, supabase: SupabaseClient,
     }
   }
 
+  const pendingApprovalsCount = rows.filter((r) => {
+    const dec = latestDecisionByBoq.get(r.id);
+    if (dec?.action === "client.boq.approved" || dec?.action === "client.boq.rejected" || dec?.action === "client.boq.revision_requested") return false;
+    return r.status !== "approved" && r.status !== "archived";
+  }).length;
+
   const total = res.count ?? 0;
   return ok({
-    items: rows.map((b) => ({
-      id: b.id,
-      projectId: b.project_id,
-      projectName: projMap.get(b.project_id) || "Project",
-      boqNumber: b.boq_number || "BOQ-001",
-      version: b.version || "v1.0",
-      status: (b.status || "draft").toUpperCase().replace(/_/g, " "),
-      roomsCount: roomMap.get(b.id) || 0,
-      itemsCount: itemMap.get(b.id) || 0,
-      estimatedValue: Number(b.grand_total ?? b.subtotal ?? 0),
-      grandTotal: Number(b.grand_total ?? b.subtotal ?? 0),
-      subtotal: Number(b.subtotal ?? 0),
-      date: new Date(b.updated_at).toISOString().slice(0, 10),
-      updatedAt: b.updated_at,
-    })),
+    items: rows.map((b) => {
+      const p = projMap.get(b.project_id);
+      const lastDec = latestDecisionByBoq.get(b.id);
+      let statusUi = "YET TO APPROVE";
+      let decisionStatus: "yet_to_approve" | "approved" | "revision_requested" | "rejected" | "draft" = "yet_to_approve";
+
+      if (lastDec?.action === "client.boq.approved" || b.status === "approved") {
+        statusUi = "APPROVED";
+        decisionStatus = "approved";
+      } else if (lastDec?.action === "client.boq.rejected") {
+        statusUi = "REJECTED";
+        decisionStatus = "rejected";
+      } else if (lastDec?.action === "client.boq.revision_requested") {
+        statusUi = "REVISION REQUESTED";
+        decisionStatus = "revision_requested";
+      } else if (b.status === "draft") {
+        statusUi = "YET TO APPROVE";
+        decisionStatus = "yet_to_approve";
+      } else {
+        statusUi = "YET TO APPROVE";
+        decisionStatus = "yet_to_approve";
+      }
+
+      const issuedBy = (p && (profileNameMap.get(p.assigned_designer_id) || profileNameMap.get(p.created_by))) || "Nikhil Oberoi";
+      const estimatedAreaValue = p?.area_sqft ? `${Number(p.area_sqft).toLocaleString("en-IN")} sqft` : "3,200 sqft";
+      const progress = typeof p?.progress === "number" ? p.progress : (decisionStatus === "approved" ? 100 : 68);
+
+      return {
+        id: b.id,
+        projectId: b.project_id,
+        projectName: p?.name || "Project",
+        boqNumber: b.boq_number || "BOQ-001",
+        version: b.version || "v1.0",
+        status: statusUi,
+        decisionStatus,
+        issuedBy,
+        estimatedAreaValue,
+        progress,
+        roomsCount: roomMap.get(b.id) || 0,
+        itemsCount: itemMap.get(b.id) || 0,
+        estimatedValue: Number(b.grand_total ?? b.subtotal ?? 0),
+        grandTotal: Number(b.grand_total ?? b.subtotal ?? 0),
+        subtotal: Number(b.subtotal ?? 0),
+        date: new Date(b.created_at || b.updated_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+        updatedAt: b.updated_at,
+      };
+    }),
     page,
     pageSize,
     total,
     hasMore: to + 1 < total,
-    pendingApprovals: pendingRes.count ?? 0,
+    pendingApprovals: pendingApprovalsCount,
   }, 200, id);
 }
 
@@ -1964,7 +2029,40 @@ async function getClientBoqDetail(request: NextRequest, supabase: SupabaseClient
     return fail("FORBIDDEN", "You do not have access to view this BOQ.", 403, id);
   }
 
-  const { data: proj } = await admin.from("projects").select("id, name, project_code, client_name").eq("id", boq.project_id).maybeSingle();
+  const [projRes, decisionRes] = await Promise.all([
+    admin.from("projects").select("id, name, project_code, client_name, area_sqft, assigned_designer_id, created_by").eq("id", boq.project_id).maybeSingle(),
+    admin.from("audit_logs").select("action, metadata, created_at").eq("entity_type", "boq").eq("entity_id", boqId).in("action", ["client.boq.approved", "client.boq.revision_requested", "client.boq.rejected"]).order("created_at", { ascending: false }).limit(1),
+  ]);
+
+  const proj = projRes.data;
+  const lastDec = decisionRes.data?.[0];
+
+  let statusUi = "YET TO APPROVE";
+  let decisionStatus: "yet_to_approve" | "approved" | "revision_requested" | "rejected" | "draft" = "yet_to_approve";
+
+  if (lastDec?.action === "client.boq.approved" || boq.status === "approved") {
+    statusUi = "APPROVED";
+    decisionStatus = "approved";
+  } else if (lastDec?.action === "client.boq.rejected") {
+    statusUi = "REJECTED";
+    decisionStatus = "rejected";
+  } else if (lastDec?.action === "client.boq.revision_requested") {
+    statusUi = "REVISION REQUESTED";
+    decisionStatus = "revision_requested";
+  } else if (boq.status === "draft") {
+    statusUi = "DRAFT";
+    decisionStatus = "draft";
+  } else {
+    statusUi = "YET TO APPROVE";
+    decisionStatus = "yet_to_approve";
+  }
+
+  let issuedBy = "Nikhil Oberoi";
+  const designerId = proj?.assigned_designer_id || proj?.created_by;
+  if (designerId) {
+    const { data: prof } = await admin.from("user_profiles").select("display_name").eq("user_id", designerId).maybeSingle();
+    if (prof?.display_name) issuedBy = prof.display_name;
+  }
 
   const { data: rooms } = await admin.from("boq_rooms").select("id, name, description, sort_order").eq("boq_id", boqId).order("sort_order");
   const roomIds = (rooms || []).map((r) => r.id);
@@ -1991,6 +2089,8 @@ async function getClientBoqDetail(request: NextRequest, supabase: SupabaseClient
       unit: it.unit || "nos",
       quantity: Number(it.quantity) || 0,
       rate: Number(it.rate) || 0,
+      wastePercent: Number(it.waste_percent) || 0,
+      taxPercent: Number(it.tax_percent) || 18,
       amount: Number(it.amount) || ((Number(it.quantity) || 0) * (Number(it.rate) || 0)),
     });
     itemsByCat.set(it.category_id, list);
@@ -2030,30 +2130,37 @@ async function getClientBoqDetail(request: NextRequest, supabase: SupabaseClient
     clientName: proj?.client_name || "",
     boqNumber: boq.boq_number,
     version: boq.version,
-    status: (boq.status || "draft").toUpperCase().replace(/_/g, " "),
+    status: statusUi,
+    decisionStatus,
+    issuedBy,
+    areaSqft: proj?.area_sqft ? Number(proj.area_sqft) : null,
     subtotal: computedSubtotal,
     markupPercent,
     markupAmount,
     taxPercent,
     taxAmount,
     grandTotal,
+    roomsCovered: structuredRooms.length,
+    totalItems: items.length,
     rooms: structuredRooms,
     updatedAt: boq.updated_at,
   }, 200, id);
 }
 
 async function getClientBoqPdf(request: NextRequest, supabase: SupabaseClient, id: string, boqId: string) {
-  const auth = await requireUser(supabase, id);
-  if (auth.response) return auth.response;
-  const admin = createSupabaseAdminClient();
-  const userEmail = (auth.user.email ?? "").toLowerCase();
-  const accessibleProjectIds = await getClientAccessibleProjectIds(admin, userEmail, auth.user.id);
-
-  const { data: boq } = await admin.from("boqs").select("id, project_id, boq_number").eq("id", boqId).maybeSingle();
-  if (!boq || !accessibleProjectIds.includes(boq.project_id)) {
-    return fail("FORBIDDEN", "You do not have access to this BOQ.", 403, id);
-  }
-  return boqPdf(admin, id, boqId);
+  const detailRes = await getClientBoqDetail(request, supabase, id, boqId);
+  if (!detailRes.ok) return detailRes;
+  const payload = await detailRes.json();
+  const boqData = payload.data as Record<string, any>;
+  return new Response(basicBoqPdf(boqData), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="${pdfEscape(boqData.boqNumber || "BOQ")}.pdf"`,
+      "Cache-Control": "private, no-store",
+      "X-Request-Id": id,
+    },
+  });
 }
 
 async function getClientBoqExcel(request: NextRequest, supabase: SupabaseClient, id: string, boqId: string) {
@@ -2068,6 +2175,221 @@ async function getClientBoqExcel(request: NextRequest, supabase: SupabaseClient,
     return fail("FORBIDDEN", "You do not have access to this BOQ.", 403, id);
   }
   return boqExcel(admin, id, boqId);
+}
+
+async function clientBoqDecision(request: Request, supabase: SupabaseClient, id: string, boqId: string) {
+  const auth = await requireUser(supabase, id);
+  if (auth.response) return auth.response;
+  const admin = createSupabaseAdminClient();
+  const userEmail = (auth.user.email ?? "").toLowerCase();
+  const accessibleProjectIds = await getClientAccessibleProjectIds(admin, userEmail, auth.user.id);
+
+  const { data: boq, error: boqErr } = await admin
+    .from("boqs")
+    .select("id, workspace_id, project_id, boq_number, version, status, created_by")
+    .eq("id", boqId)
+    .is("archived_at", null)
+    .maybeSingle();
+
+  if (boqErr || !boq) return fail("NOT_FOUND", "BOQ was not found.", 404, id);
+
+  if (!accessibleProjectIds.includes(boq.project_id)) {
+    return fail("FORBIDDEN", "You do not have access to review this BOQ.", 403, id);
+  }
+
+  const input = await parsed(request, clientBoqDecisionSchema, id);
+  if (input.response) return input.response;
+
+  // Stale version check
+  if (input.data.version && input.data.version.toLowerCase() !== boq.version.toLowerCase()) {
+    return fail("CONFLICT", `Stale BOQ version. The BOQ is currently at version ${boq.version}, but decision was submitted for ${input.data.version}. Please refresh.`, 409, id);
+  }
+
+  // Already approved check
+  if (boq.status === "approved") {
+    return fail("CONFLICT", "This BOQ has already been approved.", 409, id);
+  }
+
+  // Check latest decision from audit_logs
+  const { data: existingDecisions } = await admin
+    .from("audit_logs")
+    .select("action, created_at")
+    .eq("entity_type", "boq")
+    .eq("entity_id", boqId)
+    .in("action", ["client.boq.approved", "client.boq.rejected"])
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (existingDecisions && existingDecisions.length > 0) {
+    const lastAction = existingDecisions[0].action;
+    if (lastAction === "client.boq.approved") {
+      return fail("CONFLICT", "This BOQ has already been approved.", 409, id);
+    }
+    if (lastAction === "client.boq.rejected") {
+      return fail("CONFLICT", "This BOQ has already been rejected and cannot be modified by the client.", 409, id);
+    }
+  }
+
+  const normAction = input.data.action.toUpperCase();
+  const now = new Date().toISOString();
+
+  if (normAction === "APPROVE") {
+    await admin.from("boqs").update({ status: "approved", updated_at: now }).eq("id", boqId);
+
+    // Update any related activity_approvals
+    await admin.from("activity_approvals").update({ status: "approved", decided_at: now }).eq("project_id", boq.project_id).ilike("name", `%${boq.boq_number}%`);
+
+    // Audit log
+    await admin.from("audit_logs").insert({
+      workspace_id: boq.workspace_id,
+      actor_user_id: auth.user.id,
+      action: "client.boq.approved",
+      entity_type: "boq",
+      entity_id: boqId,
+      metadata: {
+        boqNumber: boq.boq_number,
+        version: boq.version,
+        action: "APPROVE",
+        confirmed: true,
+        clientEmail: userEmail,
+      },
+      request_id: id,
+    });
+
+    // Notify project team
+    if (boq.created_by) {
+      try {
+        await admin.from("notifications").insert({
+          workspace_id: boq.workspace_id,
+          recipient_user_id: boq.created_by,
+          type: "boq_approved",
+          title: `BOQ ${boq.boq_number} Approved`,
+          priority: "high",
+          target_type: "boq",
+          target_id: boqId,
+        });
+      } catch {
+        // Ignore notification insert failure
+      }
+    }
+
+    return ok({ success: true, status: "APPROVED", decidedAt: now, message: "BOQ successfully approved." }, 200, id);
+  }
+
+  if (normAction === "REQUEST_MINOR_REVISION" || normAction === "REVISE_MINOR" || normAction === "REQUEST_MAJOR_REVISION" || normAction === "REVISE_MAJOR") {
+    const isMajor = normAction.includes("MAJOR");
+    const revType = isMajor ? "major" : "minor";
+    const comments = input.data.comments || "";
+
+    const { data: appRows } = await admin
+      .from("activity_approvals")
+      .select("id")
+      .eq("project_id", boq.project_id)
+      .ilike("name", `%${boq.boq_number}%`);
+
+    for (const app of (appRows || [])) {
+      await admin.from("activity_approvals").update({ status: "changes_required", decided_at: now }).eq("id", app.id);
+      await admin.from("activity_comments").insert({
+        workspace_id: boq.workspace_id,
+        entity_type: "approval",
+        entity_id: app.id,
+        body: `[${isMajor ? "Major" : "Minor"} Revision Request] ${comments}`,
+        author_id: auth.user.id,
+      });
+    }
+
+    await admin.from("audit_logs").insert({
+      workspace_id: boq.workspace_id,
+      actor_user_id: auth.user.id,
+      action: "client.boq.revision_requested",
+      entity_type: "boq",
+      entity_id: boqId,
+      metadata: {
+        boqNumber: boq.boq_number,
+        version: boq.version,
+        action: isMajor ? "REQUEST_MAJOR_REVISION" : "REQUEST_MINOR_REVISION",
+        revisionType: revType,
+        comments,
+        clientEmail: userEmail,
+      },
+      request_id: id,
+    });
+
+    if (boq.created_by) {
+      try {
+        await admin.from("notifications").insert({
+          workspace_id: boq.workspace_id,
+          recipient_user_id: boq.created_by,
+          type: "boq_revision_requested",
+          title: `${isMajor ? "Major" : "Minor"} Revision Requested: ${boq.boq_number}`,
+          priority: "normal",
+          target_type: "boq",
+          target_id: boqId,
+        });
+      } catch {
+        // Ignore notification insert failure
+      }
+    }
+
+    return ok({ success: true, status: "REVISION REQUESTED", revisionType: revType, decidedAt: now, message: `${isMajor ? "Major" : "Minor"} revision request submitted.` }, 200, id);
+  }
+
+  if (normAction === "REJECT") {
+    const reason = input.data.reason || input.data.comments || "";
+
+    const { data: appRows } = await admin
+      .from("activity_approvals")
+      .select("id")
+      .eq("project_id", boq.project_id)
+      .ilike("name", `%${boq.boq_number}%`);
+
+    for (const app of (appRows || [])) {
+      await admin.from("activity_approvals").update({ status: "rejected", decided_at: now }).eq("id", app.id);
+      await admin.from("activity_comments").insert({
+        workspace_id: boq.workspace_id,
+        entity_type: "approval",
+        entity_id: app.id,
+        body: `[Rejection Reason] ${reason}`,
+        author_id: auth.user.id,
+      });
+    }
+
+    await admin.from("audit_logs").insert({
+      workspace_id: boq.workspace_id,
+      actor_user_id: auth.user.id,
+      action: "client.boq.rejected",
+      entity_type: "boq",
+      entity_id: boqId,
+      metadata: {
+        boqNumber: boq.boq_number,
+        version: boq.version,
+        action: "REJECT",
+        reason,
+        clientEmail: userEmail,
+      },
+      request_id: id,
+    });
+
+    if (boq.created_by) {
+      try {
+        await admin.from("notifications").insert({
+          workspace_id: boq.workspace_id,
+          recipient_user_id: boq.created_by,
+          type: "boq_rejected",
+          title: `BOQ ${boq.boq_number} Rejected`,
+          priority: "high",
+          target_type: "boq",
+          target_id: boqId,
+        });
+      } catch {
+        // Ignore notification insert failure
+      }
+    }
+
+    return ok({ success: true, status: "REJECTED", decidedAt: now, message: "BOQ rejected." }, 200, id);
+  }
+
+  return fail("VALIDATION_ERROR", "Unknown action specified.", 400, id);
 }
 
 async function getClientDocumentsList(request: NextRequest, supabase: SupabaseClient, id: string) {
@@ -2474,6 +2796,22 @@ async function clientApprovalDecision(request: Request, supabase: SupabaseClient
     const newStatus = input.data.decision === "approved" ? "approved" : "rejected";
     await admin.from("proposals").update({ status: newStatus, updated_at: new Date().toISOString() }).eq("id", propId);
     return ok({ id: approvalId, status: input.data.decision, decidedAt: new Date().toISOString() }, 200, id);
+  }
+
+  if (approvalId.startsWith("boq-")) {
+    const boqId = approvalId.slice(4);
+    const boqDecision = input.data.decision === "approved" ? "APPROVE" : input.data.decision === "rejected" ? "REJECT" : "REQUEST_MINOR_REVISION";
+    const syntheticRequest = new Request(request.url, {
+      method: "POST",
+      headers: request.headers,
+      body: JSON.stringify({
+        action: boqDecision,
+        confirmation: boqDecision === "APPROVE" ? true : undefined,
+        comments: input.data.comment || (boqDecision !== "APPROVE" ? "Client requested revisions via Approvals tab" : undefined),
+        reason: boqDecision === "REJECT" ? (input.data.comment || "Client rejected via Approvals tab") : undefined,
+      }),
+    });
+    return clientBoqDecision(syntheticRequest as any, supabase, id, boqId);
   }
 
   const { data: currentApproval } = await admin
@@ -11096,6 +11434,8 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (clientBoqPdfMatch && request.method === "GET") return getClientBoqPdf(request, supabase, id, clientBoqPdfMatch[1]);
   const clientBoqExcelMatch = route.match(/^client\/boqs\/([0-9a-f-]{36})\/excel$/i);
   if (clientBoqExcelMatch && request.method === "GET") return getClientBoqExcel(request, supabase, id, clientBoqExcelMatch[1]);
+  const clientBoqDecisionMatch = route.match(/^client\/boqs\/([0-9a-f-]{36})\/decision$/i);
+  if (clientBoqDecisionMatch && request.method === "POST") return clientBoqDecision(request, supabase, id, clientBoqDecisionMatch[1]);
 
   if (route === "client/documents" && request.method === "GET") return getClientDocumentsList(request, supabase, id);
 

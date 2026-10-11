@@ -260,11 +260,15 @@ export type ClientBoqListItem = {
     boqNumber: string;
     version: string;
     status: string;
+    decisionStatus?: "yet_to_approve" | "approved" | "revision_requested" | "rejected" | "draft";
+    issuedBy?: string;
+    estimatedAreaValue?: string;
     roomsCount: number;
     itemsCount: number;
     estimatedValue: number;
     grandTotal: number;
     subtotal: number;
+    progress?: number;
     date: string;
     updatedAt: string;
 };
@@ -276,6 +280,8 @@ export type ClientBoqRoomItem = {
     unit: string;
     quantity: number;
     rate: number;
+    wastePercent?: number;
+    taxPercent?: number;
     amount: number;
 };
 
@@ -302,12 +308,17 @@ export type ClientBoqDetail = {
     boqNumber: string;
     version: string;
     status: string;
+    decisionStatus?: "yet_to_approve" | "approved" | "revision_requested" | "rejected" | "draft";
+    issuedBy?: string;
+    areaSqft?: number | null;
     subtotal: number;
     markupPercent: number;
     markupAmount: number;
     taxPercent: number;
     taxAmount: number;
     grandTotal: number;
+    roomsCovered?: number;
+    totalItems?: number;
     rooms: ClientBoqRoom[];
     updatedAt: string;
 };
@@ -411,6 +422,22 @@ export async function listClientBoqs(params?: {
 
 export async function getClientBoq(boqId: string): Promise<ClientBoqDetail> {
     return clientApiFetch<ClientBoqDetail>(`/api/v1/client/boqs/${encodeURIComponent(boqId)}`);
+}
+
+export async function submitClientBoqDecision(
+    boqId: string,
+    payload: {
+        action: "APPROVE" | "REQUEST_MINOR_REVISION" | "REQUEST_MAJOR_REVISION" | "REJECT" | "approve" | "revise_minor" | "revise_major" | "reject";
+        version: string;
+        confirmation?: boolean;
+        comments?: string;
+        reason?: string;
+    }
+): Promise<{ success: boolean; status: string; decidedAt: string; message?: string }> {
+    return clientApiFetch(`/api/v1/client/boqs/${encodeURIComponent(boqId)}/decision`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+    });
 }
 
 export async function listClientDocuments(params?: {
