@@ -4480,7 +4480,7 @@ async function dashboardList(request: NextRequest, supabase: SupabaseClient, id:
   return fail("NOT_FOUND", `Unknown dashboard list: ${name}`, 404, id);
 }
 
-type WorkspaceAccess = { userId: string; workspaceId: string; role: "owner" | "admin" | "member" | "viewer"; currency: string; email?: string | null; workspaceName?: string | null };
+type WorkspaceAccess = { userId: string; workspaceId: string; role: "owner" | "admin" | "member" | "viewer" | "client"; currency: string; email?: string | null; workspaceName?: string | null };
 
 async function workspaceAccess(supabase: SupabaseClient, id: string, write = false, admin = false) {
   const ctx = await context(supabase, id);
@@ -4489,13 +4489,37 @@ async function workspaceAccess(supabase: SupabaseClient, id: string, write = fal
     workspace?: { id?: string; name?: string; currency?: string };
     membership?: { role?: WorkspaceAccess["role"] };
   } | null;
-  const workspaceId = value?.workspace?.id;
-  const role = value?.membership?.role;
+  let workspaceId = value?.workspace?.id;
+  let role = value?.membership?.role;
+  let workspaceName = value?.workspace?.name ?? null;
+  let currency = value?.workspace?.currency ?? "INR";
+
+  if (!workspaceId || !role) {
+    const adminClient = createSupabaseAdminClient();
+    const userEmail = (ctx.user.email ?? "").toLowerCase();
+    const accessibleProjectIds = await getClientAccessibleProjectIds(adminClient, userEmail, ctx.user.id);
+    if (accessibleProjectIds.length > 0) {
+      const { data: project } = await adminClient
+        .from("projects")
+        .select("workspace_id, workspaces(name, currency)")
+        .in("id", accessibleProjectIds)
+        .limit(1)
+        .maybeSingle();
+      if (project?.workspace_id) {
+        const ws = Array.isArray(project.workspaces) ? project.workspaces[0] : project.workspaces;
+        workspaceId = project.workspace_id;
+        role = "client";
+        workspaceName = ws?.name ?? null;
+        currency = ws?.currency ?? "INR";
+      }
+    }
+  }
+
   if (!workspaceId || !role) return { response: fail("FORBIDDEN", "Active workspace membership required.", 403, id) };
   if ((write && role === "viewer") || (admin && !["owner", "admin"].includes(role))) {
     return { response: fail("FORBIDDEN", "Your workspace role cannot perform this action.", 403, id) };
   }
-  return { access: { userId: ctx.user.id, email: ctx.user.email ?? null, workspaceId, workspaceName: value?.workspace?.name ?? null, role, currency: value?.workspace?.currency ?? "INR" } satisfies WorkspaceAccess };
+  return { access: { userId: ctx.user.id, email: ctx.user.email ?? null, workspaceId, workspaceName, role, currency } satisfies WorkspaceAccess };
 }
 
 async function dashboardSearch(request: NextRequest, supabase: SupabaseClient, id: string) {
@@ -4765,12 +4789,37 @@ function documentDto(row: Record<string, unknown>) {
 async function listFolders(request: NextRequest, supabase: SupabaseClient, id: string) {
   const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
   const parentId = request.nextUrl.searchParams.get("parentId");
-  let foldersQuery = supabase.from("document_folders").select("id,parent_id,name,created_at,updated_at").eq("workspace_id", scoped.access.workspaceId).order("updated_at", { ascending: false });
+  const admin = createSupabaseAdminClient();
+  let foldersQuery = admin.from("document_folders").select("id,parent_id,name,created_at,updated_at").eq("workspace_id", scoped.access.workspaceId).order("updated_at", { ascending: false });
   foldersQuery = parentId ? foldersQuery.eq("parent_id", parentId) : foldersQuery.is("parent_id", null);
-  const folders = await foldersQuery;
+  let folders = await foldersQuery;
   if (folders.error) return fail("INTERNAL_ERROR", "Folders could not be loaded.", 500, id);
+
+  if (!parentId && (!folders.data || folders.data.length === 0)) {
+    const defaultNames = ['Projects', 'BOQ Files', 'Proposals', 'Invoices', 'Vendor Quotes', 'Drawings'];
+    await admin.from("document_folders").insert(
+      defaultNames.map((name) => ({
+        workspace_id: scoped.access.workspaceId,
+        name,
+        created_by: scoped.access.userId,
+        updated_by: scoped.access.userId,
+      }))
+    );
+    folders = await admin.from("document_folders").select("id,parent_id,name,created_at,updated_at").eq("workspace_id", scoped.access.workspaceId).is("parent_id", null).order("updated_at", { ascending: false });
+  }
+
   const ids = (folders.data ?? []).map((folder) => folder.id);
-  const docs = ids.length ? await supabase.from("documents").select("folder_id,size_bytes").eq("workspace_id", scoped.access.workspaceId).in("folder_id", ids) : { data: [], error: null };
+
+  let docsQuery = admin.from("documents").select("folder_id,size_bytes,project_id").eq("workspace_id", scoped.access.workspaceId);
+  if (scoped.access.role === "client") {
+    const userEmail = (scoped.access.email ?? "").toLowerCase();
+    const accessibleProjectIds = await getClientAccessibleProjectIds(admin, userEmail, scoped.access.userId);
+    docsQuery = accessibleProjectIds.length > 0
+      ? docsQuery.in("project_id", accessibleProjectIds)
+      : docsQuery.eq("id", "00000000-0000-0000-0000-000000000000");
+  }
+
+  const docs = ids.length ? await docsQuery.in("folder_id", ids) : { data: [], error: null };
   if (docs.error) return fail("INTERNAL_ERROR", "Folder totals could not be loaded.", 500, id);
   return ok({
     items: (folders.data ?? []).map((folder) => {
@@ -4783,11 +4832,12 @@ async function listFolders(request: NextRequest, supabase: SupabaseClient, id: s
 async function createFolder(request: Request, supabase: SupabaseClient, id: string) {
   const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
   const input = await parsed(request, folderCreateSchema, id); if (input.response) return input.response;
+  const admin = createSupabaseAdminClient();
   if (input.data.parentId) {
-    const parent = await supabase.from("document_folders").select("id").eq("workspace_id", scoped.access.workspaceId).eq("id", input.data.parentId).single();
+    const parent = await admin.from("document_folders").select("id").eq("workspace_id", scoped.access.workspaceId).eq("id", input.data.parentId).single();
     if (parent.error) return fail("NOT_FOUND", "Parent folder was not found.", 404, id);
   }
-  const { data, error } = await supabase.from("document_folders").insert({
+  const { data, error } = await admin.from("document_folders").insert({
     workspace_id: scoped.access.workspaceId, parent_id: input.data.parentId ?? null,
     name: input.data.name, created_by: scoped.access.userId, updated_by: scoped.access.userId
   }).select("id,parent_id,name,created_at,updated_at").single();
@@ -4799,17 +4849,18 @@ async function createFolder(request: Request, supabase: SupabaseClient, id: stri
 async function updateFolder(request: Request, supabase: SupabaseClient, id: string, folderId: string) {
   const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
   const input = await parsed(request, folderPatchSchema, id); if (input.response) return input.response;
+  const admin = createSupabaseAdminClient();
   if (input.data.parentId === folderId) return fail("VALIDATION_ERROR", "A folder cannot be its own parent.", 400, id);
   if (input.data.parentId) {
-    const parent = await supabase.from("document_folders").select("id,parent_id").eq("workspace_id", scoped.access.workspaceId).eq("id", input.data.parentId).single();
+    const parent = await admin.from("document_folders").select("id,parent_id").eq("workspace_id", scoped.access.workspaceId).eq("id", input.data.parentId).single();
     if (parent.error) return fail("NOT_FOUND", "Parent folder was not found.", 404, id);
     try {
-      const descendants = await descendantFolderIds(supabase, scoped.access.workspaceId, folderId);
+      const descendants = await descendantFolderIds(admin, scoped.access.workspaceId, folderId);
       if (descendants.includes(input.data.parentId)) return fail("VALIDATION_ERROR", "A folder cannot be moved into its own descendant.", 400, id);
     } catch { return fail("INTERNAL_ERROR", "Folder hierarchy could not be validated.", 500, id); }
   }
   const values = { ...(input.data.name !== undefined ? { name: input.data.name } : {}), ...(input.data.parentId !== undefined ? { parent_id: input.data.parentId } : {}), updated_by: scoped.access.userId };
-  const { data, error } = await supabase.from("document_folders").update(values).eq("workspace_id", scoped.access.workspaceId).eq("id", folderId).select("id,parent_id,name,created_at,updated_at").single();
+  const { data, error } = await admin.from("document_folders").update(values).eq("workspace_id", scoped.access.workspaceId).eq("id", folderId).select("id,parent_id,name,created_at,updated_at").single();
   if (error) return fail(error.code === "23505" ? "CONFLICT" : "NOT_FOUND", error.code === "23505" ? "A folder with this name already exists here." : "Folder was not found.", error.code === "23505" ? 409 : 404, id);
   await audit(supabase, "document_folder.updated", id);
   return ok(folderDto(data as Record<string, unknown>), 200, id);
@@ -4826,25 +4877,36 @@ async function descendantFolderIds(supabase: SupabaseClient, workspaceId: string
 }
 
 async function deleteFolder(request: Request, supabase: SupabaseClient, id: string, folderId: string) {
-  const scoped = await workspaceAccess(supabase, id, true, true); if ("response" in scoped) return scoped.response;
+  const scoped = await workspaceAccess(supabase, id, true, false); if ("response" in scoped) return scoped.response;
   const input = await parsed(request, folderDeleteSchema, id); if (input.response) return input.response;
-  const folder = await supabase.from("document_folders").select("id,name").eq("workspace_id", scoped.access.workspaceId).eq("id", folderId).single();
+  const admin = createSupabaseAdminClient();
+  const folder = await admin.from("document_folders").select("id,name,created_by").eq("workspace_id", scoped.access.workspaceId).eq("id", folderId).single();
   if (folder.error) return fail("NOT_FOUND", "Folder was not found.", 404, id);
   if (input.data.confirmation !== folder.data.name) return fail("VALIDATION_ERROR", "Folder name confirmation does not match.", 400, id);
+
+  const defaultFolderNames = new Set(["projects", "boq files", "proposals", "invoices", "vendor quotes", "drawings"]);
+  if (scoped.access.role === "client") {
+    if (defaultFolderNames.has(folder.data.name.toLowerCase()) || folder.data.created_by !== scoped.access.userId) {
+      return fail("FORBIDDEN", "You cannot delete this folder.", 403, id);
+    }
+  } else if (!["owner", "admin"].includes(scoped.access.role)) {
+    return fail("FORBIDDEN", "Your workspace role cannot perform this action.", 403, id);
+  }
+
   let folderIds: string[];
-  try { folderIds = await descendantFolderIds(supabase, scoped.access.workspaceId, folderId); }
+  try { folderIds = await descendantFolderIds(admin, scoped.access.workspaceId, folderId); }
   catch { return fail("INTERNAL_ERROR", "Folder contents could not be resolved.", 500, id); }
-  const files = await supabase.from("documents").select("storage_path").eq("workspace_id", scoped.access.workspaceId).in("folder_id", folderIds);
+  const files = await admin.from("documents").select("storage_path").eq("workspace_id", scoped.access.workspaceId).in("folder_id", folderIds);
   if (files.error) return fail("INTERNAL_ERROR", "Folder contents could not be loaded.", 500, id);
   const paths = (files.data ?? []).map((file) => file.storage_path);
   if (paths.length) {
-    const storage = createSupabaseAdminClient().storage.from("workspace-documents");
+    const storage = admin.storage.from("workspace-documents");
     for (let offset = 0; offset < paths.length; offset += 100) {
       const removed = await storage.remove(paths.slice(offset, offset + 100));
       if (removed.error) return fail("INTERNAL_ERROR", "Stored files could not be deleted.", 500, id);
     }
   }
-  const deleted = await supabase.from("document_folders").delete().eq("workspace_id", scoped.access.workspaceId).eq("id", folderId);
+  const deleted = await admin.from("document_folders").delete().eq("workspace_id", scoped.access.workspaceId).eq("id", folderId);
   if (deleted.error) return fail("INTERNAL_ERROR", "Folder could not be deleted.", 500, id);
   await audit(supabase, "document_folder.deleted", id);
   return ok({ deleted: true, filesDeleted: paths.length }, 200, id);
@@ -4857,9 +4919,28 @@ async function listDocuments(request: NextRequest, supabase: SupabaseClient, id:
   if (!folderId) return fail("VALIDATION_ERROR", "folderId is required.", 400, id);
   const { page, pageSize, from, to } = pagination(request.nextUrl.searchParams);
   const search = request.nextUrl.searchParams.get("search")?.trim().slice(0, 120);
-  let query = supabase.from("documents").select("id,folder_id,proposal_id,project_id,project_name,name,mime_type,size_bytes,created_at,updated_at", { count: "exact" })
+  const admin = createSupabaseAdminClient();
+  let query = admin.from("documents").select("id,folder_id,proposal_id,project_id,project_name,name,mime_type,size_bytes,created_at,updated_at", { count: "exact" })
     .eq("workspace_id", scoped.access.workspaceId).eq("folder_id", folderId).order("updated_at", { ascending: false }).range(from, to);
-  if (projectId) query = query.eq("project_id", projectId);
+
+  if (scoped.access.role === "client") {
+    const userEmail = (scoped.access.email ?? "").toLowerCase();
+    const accessibleProjectIds = await getClientAccessibleProjectIds(admin, userEmail, scoped.access.userId);
+    if (accessibleProjectIds.length === 0) {
+      return ok({ items: [], page, pageSize, total: 0, hasMore: false }, 200, id);
+    }
+    if (projectId) {
+      if (!accessibleProjectIds.includes(projectId)) {
+        return fail("FORBIDDEN", "You do not have access to this project.", 403, id);
+      }
+      query = query.eq("project_id", projectId);
+    } else {
+      query = query.in("project_id", accessibleProjectIds);
+    }
+  } else {
+    if (projectId) query = query.eq("project_id", projectId);
+  }
+
   if (search) query = query.ilike("name", `%${search.replace(/[%_]/g, " ")}%`);
   const result = await query;
   if (result.error) return fail("INTERNAL_ERROR", "Documents could not be loaded.", 500, id);
@@ -4880,22 +4961,45 @@ async function uploadDocument(request: Request, supabase: SupabaseClient, id: st
   const safeName = file.name.replace(/[\\/\u0000-\u001f]/g, "_").trim().slice(0, 255);
   const extension = safeName.includes(".") ? safeName.split(".").pop()!.toLowerCase() : "";
   if (!safeName || !allowedDocumentExtensions.has(extension)) return fail("VALIDATION_ERROR", "This file type is not supported.", 400, id);
-  const folder = await supabase.from("document_folders").select("id").eq("workspace_id", scoped.access.workspaceId).eq("id", folderId).single();
+  const admin = createSupabaseAdminClient();
+  const folder = await admin.from("document_folders").select("id").eq("workspace_id", scoped.access.workspaceId).eq("id", folderId).single();
   if (folder.error) return fail("NOT_FOUND", "Upload folder was not found.", 404, id);
+
+  let projectId = form.get("projectId") ? String(form.get("projectId")) : null;
+  let projectName = form.get("projectName") ? String(form.get("projectName")).trim().slice(0, 200) : null;
+
+  if (scoped.access.role === "client") {
+    const userEmail = (scoped.access.email ?? "").toLowerCase();
+    const accessibleProjectIds = await getClientAccessibleProjectIds(admin, userEmail, scoped.access.userId);
+    if (accessibleProjectIds.length === 0) {
+      return fail("FORBIDDEN", "No accessible project found for upload.", 403, id);
+    }
+    if (projectId) {
+      if (!accessibleProjectIds.includes(projectId)) {
+        return fail("FORBIDDEN", "You do not have access to this project.", 403, id);
+      }
+    } else {
+      projectId = accessibleProjectIds[0];
+    }
+    if (!projectName && projectId) {
+      const { data: p } = await admin.from("projects").select("name").eq("id", projectId).maybeSingle();
+      if (p?.name) projectName = p.name;
+    }
+  }
+
   const bytes = Buffer.from(await file.arrayBuffer());
   const storagePath = `${scoped.access.workspaceId}/${folderId}/${randomUUID()}-${safeName}`;
-  const storage = createSupabaseAdminClient().storage.from("workspace-documents");
+  const storage = admin.storage.from("workspace-documents");
   const uploaded = await storage.upload(storagePath, bytes, { contentType: file.type || "application/octet-stream", upsert: false });
   if (uploaded.error) return fail("INTERNAL_ERROR", "File could not be stored.", 500, id);
-  const projectId = form.get("projectId") ? String(form.get("projectId")) : null;
   const proposalId = form.get("proposalId") ? String(form.get("proposalId")) : null;
   if ((projectId && !z.string().uuid().safeParse(projectId).success) || (proposalId && !z.string().uuid().safeParse(proposalId).success)) {
     await storage.remove([storagePath]);
     return fail("VALIDATION_ERROR", "projectId and proposalId must be UUIDs.", 400, id);
   }
-  const inserted = await supabase.from("documents").insert({
+  const inserted = await admin.from("documents").insert({
     workspace_id: scoped.access.workspaceId, folder_id: folderId, proposal_id: proposalId,
-    project_id: projectId, project_name: form.get("projectName") ? String(form.get("projectName")).trim().slice(0, 200) : null,
+    project_id: projectId, project_name: projectName,
     name: safeName, storage_path: storagePath, mime_type: file.type || "application/octet-stream", size_bytes: file.size,
     checksum_sha256: createHash("sha256").update(bytes).digest("hex"), uploaded_by: scoped.access.userId
   })
@@ -4908,15 +5012,16 @@ async function uploadDocument(request: Request, supabase: SupabaseClient, id: st
 async function updateDocument(request: Request, supabase: SupabaseClient, id: string, documentId: string) {
   const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
   const input = await parsed(request, documentPatchSchema, id); if (input.response) return input.response;
+  const admin = createSupabaseAdminClient();
   if (input.data.folderId) {
-    const folder = await supabase.from("document_folders").select("id").eq("workspace_id", scoped.access.workspaceId).eq("id", input.data.folderId).single();
+    const folder = await admin.from("document_folders").select("id").eq("workspace_id", scoped.access.workspaceId).eq("id", input.data.folderId).single();
     if (folder.error) return fail("NOT_FOUND", "Destination folder was not found.", 404, id);
   }
   const values = {
     ...(input.data.name !== undefined ? { name: input.data.name } : {}), ...(input.data.folderId !== undefined ? { folder_id: input.data.folderId } : {}),
     ...(input.data.projectId !== undefined ? { project_id: input.data.projectId } : {}), ...(input.data.projectName !== undefined ? { project_name: input.data.projectName } : {})
   };
-  const result = await supabase.from("documents").update(values).eq("workspace_id", scoped.access.workspaceId).eq("id", documentId)
+  const result = await admin.from("documents").update(values).eq("workspace_id", scoped.access.workspaceId).eq("id", documentId)
     .select("id,folder_id,proposal_id,project_id,project_name,name,mime_type,size_bytes,created_at,updated_at").single();
   if (result.error) return fail("NOT_FOUND", "Document was not found.", 404, id);
   await audit(supabase, "document.updated", id);
@@ -4925,19 +5030,43 @@ async function updateDocument(request: Request, supabase: SupabaseClient, id: st
 
 async function downloadDocument(supabase: SupabaseClient, id: string, documentId: string) {
   const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
-  const result = await supabase.from("documents").select("name,storage_path").eq("workspace_id", scoped.access.workspaceId).eq("id", documentId).single();
+  const admin = createSupabaseAdminClient();
+  const result = await admin.from("documents").select("name,storage_path,project_id").eq("workspace_id", scoped.access.workspaceId).eq("id", documentId).single();
   if (result.error) return fail("NOT_FOUND", "Document was not found.", 404, id);
-  const signed = await createSupabaseAdminClient().storage.from("workspace-documents").createSignedUrl(result.data.storage_path, 60, { download: result.data.name });
+
+  if (scoped.access.role === "client") {
+    const userEmail = (scoped.access.email ?? "").toLowerCase();
+    const accessibleProjectIds = await getClientAccessibleProjectIds(admin, userEmail, scoped.access.userId);
+    if (!result.data.project_id || !accessibleProjectIds.includes(result.data.project_id)) {
+      return fail("FORBIDDEN", "You do not have permission to access this document.", 403, id);
+    }
+  }
+
+  const signed = await admin.storage.from("workspace-documents").createSignedUrl(result.data.storage_path, 60, { download: result.data.name });
   return signed.error ? fail("INTERNAL_ERROR", "Download link could not be created.", 500, id) : ok({ url: signed.data.signedUrl, expiresIn: 60, fileName: result.data.name }, 200, id);
 }
 
 async function deleteDocument(supabase: SupabaseClient, id: string, documentId: string) {
-  const scoped = await workspaceAccess(supabase, id, true, true); if ("response" in scoped) return scoped.response;
-  const result = await supabase.from("documents").select("storage_path").eq("workspace_id", scoped.access.workspaceId).eq("id", documentId).single();
+  const scoped = await workspaceAccess(supabase, id, true, false); if ("response" in scoped) return scoped.response;
+  const admin = createSupabaseAdminClient();
+  const result = await admin.from("documents").select("storage_path,uploaded_by,project_id").eq("workspace_id", scoped.access.workspaceId).eq("id", documentId).single();
   if (result.error) return fail("NOT_FOUND", "Document was not found.", 404, id);
-  const removed = await createSupabaseAdminClient().storage.from("workspace-documents").remove([result.data.storage_path]);
+
+  if (scoped.access.role === "client") {
+    const userEmail = (scoped.access.email ?? "").toLowerCase();
+    const accessibleProjectIds = await getClientAccessibleProjectIds(admin, userEmail, scoped.access.userId);
+    const isOwner = result.data.uploaded_by === scoped.access.userId;
+    const hasProject = result.data.project_id && accessibleProjectIds.includes(result.data.project_id);
+    if (!isOwner || !hasProject) {
+      return fail("FORBIDDEN", "You can only delete documents that you uploaded.", 403, id);
+    }
+  } else if (!["owner", "admin"].includes(scoped.access.role)) {
+    return fail("FORBIDDEN", "Your workspace role cannot perform this action.", 403, id);
+  }
+
+  const removed = await admin.storage.from("workspace-documents").remove([result.data.storage_path]);
   if (removed.error) return fail("INTERNAL_ERROR", "Stored file could not be deleted.", 500, id);
-  const deleted = await supabase.from("documents").delete().eq("workspace_id", scoped.access.workspaceId).eq("id", documentId);
+  const deleted = await admin.from("documents").delete().eq("workspace_id", scoped.access.workspaceId).eq("id", documentId);
   if (deleted.error) return fail("INTERNAL_ERROR", "Document metadata could not be deleted.", 500, id);
   await audit(supabase, "document.deleted", id);
   return ok({ deleted: true }, 200, id);
