@@ -21,10 +21,14 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
-import { getApiErrorMessage, parseApiResponse } from "@/lib/api/auth";
+import { getApiErrorMessage, parseApiResponse, getWorkspaceUsers, type WorkspaceUserItem } from "@/lib/api/auth";
 import { BoqStatusUi, mapBoqListItem, type BoqListItem } from "@/lib/domain/boq-data";
 import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
+import BoqRowActionMenu from "@/components/boqs/BoqRowActionMenu";
+import BoqDetailsModal from "@/components/boqs/BoqDetailsModal";
+import BoqTemplatesDrawer from "@/components/boqs/BoqTemplatesDrawer";
+import BoqRoomCategoryView from "@/components/boqs/BoqRoomCategoryView";
 
 type CreateMode = "blank" | "template";
 
@@ -58,6 +62,8 @@ export default function BoqsPage() {
     const [openStatusId, setOpenStatusId] = useState<string | null>(null);
     const [projects, setProjects] = useState<{ id: string; name: string; assignedDesignerId?: string | null; clientName?: string | null }[]>([]);
     const [templates, setTemplates] = useState<{ id: string; name: string; description: string | null; tags: string[] | null; use_count: number }[]>([]);
+    const [workspaceUsers, setWorkspaceUsers] = useState<WorkspaceUserItem[]>([]);
+    const [selectedTemplateId, setSelectedTemplateId] = useState("");
 
     // Form inputs for creation
     const [newBoqNumber, setNewBoqNumber] = useState("");
@@ -119,8 +125,17 @@ export default function BoqsPage() {
                 }
             } catch (e) {}
         };
+        const loadUsers = async () => {
+            try {
+                const res = await getWorkspaceUsers();
+                if (res.items) {
+                    setWorkspaceUsers(res.items);
+                }
+            } catch (e) {}
+        };
         void loadProj();
         void loadTemplates();
+        void loadUsers();
 
         const handleClick = () => {
             setOpenMenuId(null);
@@ -357,80 +372,32 @@ export default function BoqsPage() {
                                                         </div>
                                                     </td>
                                                     <td>
-                                                        <div className="boq-cell-dropdown-anchor" onClick={(e) => e.stopPropagation()}>
-                                                            <button
-                                                                type="button"
-                                                                className="boq-row-menu"
-                                                                aria-label="More options"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setOpenMenuId(openMenuId === boq.id ? null : boq.id);
-                                                                    setOpenStatusId(null);
-                                                                }}
-                                                            >
-                                                                <MoreHorizontal size={16} />
-                                                            </button>
-                                                            {openMenuId === boq.id && (
-                                                                <div
-                                                                    className="boq-dropdown-menu"
-                                                                    style={{
-                                                                        right: 0,
-                                                                        ...(isNearBottom
-                                                                            ? { bottom: "100%", marginBottom: "6px" }
-                                                                            : { top: "100%", marginTop: "6px" })
-                                                                    }}
-                                                                >
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            openBoq(boq.id);
-                                                                            setOpenMenuId(null);
-                                                                        }}
-                                                                    >
-                                                                        <Edit2 size={14} color="#6b7280" /> Open Editor
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={async (e) => {
-                                                                            e.stopPropagation();
-                                                                            setOpenMenuId(null);
-                                                                            try {
-                                                                                const res = await fetch(`/api/v1/boqs/${boq.id}/duplicate`, {
-                                                                                    method: "POST",
-                                                                                    credentials: "include",
-                                                                                });
-                                                                                if (res.ok) void loadBoqs();
-                                                                                else {
-                                                                                    const p = await res.json().catch(() => ({}));
-                                                                                    setError(getApiErrorMessage(p));
-                                                                                }
-                                                                            } catch (err) {
-                                                                                setError("Failed to duplicate BOQ");
-                                                                            }
-                                                                        }}
-                                                                    >
-                                                                        <Copy size={14} color="#6b7280" /> Duplicate BOQ
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            setOpenMenuId(null);
-                                                                            window.open(`/api/v1/boqs/${boq.id}/pdf`, "_blank");
-                                                                        }}
-                                                                    >
-                                                                        <FileDown size={14} color="#6b7280" /> Export as PDF
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            setOpenMenuId(null);
-                                                                            window.open(`/api/v1/boqs/${boq.id}/excel`, "_blank");
-                                                                        }}
-                                                                    >
-                                                                        <FileSpreadsheet size={14} color="#6b7280" /> Export Excel
-                                                                    </button>
-                                                                </div>
-                                                            )}
-                                                        </div>
+                                                        <BoqRowActionMenu
+                                                            boqId={boq.id}
+                                                            onOpenEditor={() => openBoq(boq.id)}
+                                                            onDuplicate={async () => {
+                                                                try {
+                                                                    const res = await fetch(`/api/v1/boqs/${boq.id}/duplicate`, {
+                                                                        method: "POST",
+                                                                        credentials: "include",
+                                                                    });
+                                                                    if (res.ok) {
+                                                                        void loadBoqs();
+                                                                    } else {
+                                                                        const p = await res.json().catch(() => ({}));
+                                                                        setError(getApiErrorMessage(p));
+                                                                    }
+                                                                } catch {
+                                                                    setError("Failed to duplicate BOQ");
+                                                                }
+                                                            }}
+                                                            onExportPdf={() => {
+                                                                window.open(`/api/v1/boqs/${boq.id}/pdf`, "_blank");
+                                                            }}
+                                                            onExportExcel={() => {
+                                                                window.open(`/api/v1/boqs/${boq.id}/excel`, "_blank");
+                                                            }}
+                                                        />
                                                     </td>
                                                 </tr>
                                             );
@@ -541,184 +508,50 @@ export default function BoqsPage() {
                 </div>
             ) : null}
 
-            {showTemplateModal ? (
-                <div className="boq-modal-backdrop" onClick={() => setShowTemplateModal(false)}>
-                    <div className="boq-template-modal" onClick={(event) => event.stopPropagation()}>
-                        <div className="boq-create-header">
-                            <div>
-                                <h3>Templates</h3>
-                                <p>{templates.length} templates</p>
-                            </div>
-                            <button type="button" className="boq-close-button" onClick={() => setShowTemplateModal(false)}>
-                                <X size={18} />
-                            </button>
-                        </div>
+            {/* Sliding Templates Drawer matching Screenshot 2 */}
+            <BoqTemplatesDrawer
+                isOpen={showTemplateModal}
+                onClose={() => setShowTemplateModal(false)}
+                templates={templates}
+                onSelectTemplate={(templateId) => {
+                    setSelectedTemplateId(templateId);
+                    setShowTemplateModal(false);
+                    setCreateMode("template");
+                    setShowDetailsModal(true);
+                }}
+                onCreateNewTemplate={() => {
+                    setShowTemplateModal(false);
+                    setCreateMode("blank");
+                    setShowDetailsModal(true);
+                }}
+            />
 
-                        <div className="boq-template-search">
-                            <Search size={16} />
-                            <input placeholder="Select..." aria-label="Select template" />
-                        </div>
-
-                        <div className="boq-template-list">
-                            {templates.length === 0 ? (
-                                <div style={{ textAlign: "center", padding: "32px", color: "#6b7280" }}>
-                                    No templates found. Create a BOQ first, then save it as a template.
-                                </div>
-                            ) : (
-                                templates.map((template) => (
-                                    <div key={template.id} className="boq-template-item">
-                                        <div className="boq-template-meta">
-                                            <div className="boq-template-name-row">
-                                                <strong>{template.name}</strong>
-                                                <button
-                                                    type="button"
-                                                    className="boq-template-use"
-                                                    onClick={() => {
-                                                        setShowTemplateModal(false);
-                                                        setShowDetailsModal(true);
-                                                    }}
-                                                >
-                                                    Use
-                                                </button>
-                                            </div>
-                                            <div className="boq-template-detail-line">
-                                                <span>{template.description || "No description"}</span>
-                                                <span>Used {template.use_count} times</span>
-                                            </div>
-                                            {template.tags && template.tags.length > 0 && (
-                                                <div className="boq-template-tags">
-                                                    {template.tags.map((tag) => <span key={tag}>{tag}</span>)}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </div>
-                </div>
-            ) : null}
-
-            {showDetailsModal ? (
-                <div className="boq-modal-backdrop" onClick={() => setShowDetailsModal(false)}>
-                    <div className="boq-details-modal" onClick={(event) => event.stopPropagation()}>
-                        <div className="boq-create-header">
-                            <h3>BOQ Details</h3>
-                            <button type="button" className="boq-close-button" onClick={() => setShowDetailsModal(false)}>
-                                <X size={18} />
-                            </button>
-                        </div>
-                        <p>Fill in the details to get started</p>
-
-                        <div className="boq-form-grid">
-                            <label className="boq-form-field">
-                                <span>BOQ Number <em>*</em></span>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. BOQ-0071"
-                                    value={newBoqNumber}
-                                    onChange={(e) => setNewBoqNumber(e.target.value)}
-                                />
-                            </label>
-
-                            <label className="boq-form-field">
-                                <span>Project <em>*</em></span>
-                                <select
-                                    value={selectedProjId}
-                                    onChange={(e) => setSelectedProjId(e.target.value)}
-                                >
-                                    {projects.length > 0 ? (
-                                        projects.map((p) => (
-                                            <option key={p.id} value={p.id}>{p.name}</option>
-                                        ))
-                                    ) : (
-                                        <option value="">Create a Project first...</option>
-                                    )}
-                                </select>
-                            </label>
-
-                            <div className="boq-form-row">
-                                <label className="boq-form-field">
-                                    <span>Version</span>
-                                    <input
-                                        type="text"
-                                        value={selectedVersion}
-                                        onChange={(e) => setSelectedVersion(e.target.value)}
-                                    />
-                                </label>
-                            </div>
-
-                            {createMode === "template" ? (
-                                <label className="boq-form-field">
-                                    <span>Select Template <em>*</em></span>
-                                    <select id="createBoqTemplateId">
-                                        {templates.length === 0 ? (
-                                            <option value="">No templates available</option>
-                                        ) : (
-                                            templates.map((t) => (
-                                                <option key={t.id} value={t.id}>{t.name}</option>
-                                            ))
-                                        )}
-                                    </select>
-                                </label>
-                            ) : null}
-
-                            <div className="boq-method-box">
-                                Method: {createMode === "template" ? "From Template" : "Blank BOQ (Inherits Project Rooms)"}
-                            </div>
-                        </div>
-
-                        <div className="boq-create-footer">
-                            <button type="button" className="boq-cancel-button" onClick={() => setShowDetailsModal(false)}>
-                                Cancel
-                            </button>
-                            <button
-                                type="button"
-                                className="fig-dashboard-new"
-                                onClick={async () => {
-                                    const projId = selectedProjId || projects[0]?.id;
-                                    const version = selectedVersion.trim() || "v1";
-
-                                    if (!projId) {
-                                        setError("Please create a Project first!");
-                                        setShowDetailsModal(false);
-                                        return;
-                                    }
-
-                                    try {
-                                        const templateId = createMode === "template"
-                                            ? (document.getElementById("createBoqTemplateId") as HTMLSelectElement)?.value
-                                            : undefined;
-                                        const res = await fetch("/api/v1/boqs", {
-                                            method: "POST",
-                                            headers: { "Content-Type": "application/json" },
-                                            body: JSON.stringify({
-                                                ...(newBoqNumber.trim() ? { boqNumber: newBoqNumber.trim() } : {}),
-                                                projectId: projId,
-                                                version,
-                                                method: createMode || "blank",
-                                                templateId: templateId || undefined,
-                                            }),
-                                            credentials: "include",
-                                        });
-                                        if (!res.ok) {
-                                            const payload = await res.json().catch(() => ({}));
-                                            throw new Error(getApiErrorMessage(payload));
-                                        }
-                                        setShowDetailsModal(false);
-                                        void loadBoqs();
-                                    } catch (e) {
-                                        setError(e instanceof Error ? e.message : "Could not create BOQ.");
-                                        setShowDetailsModal(false);
-                                    }
-                                }}
-                            >
-                                Create BOQ
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            ) : null}
+            {/* Redesigned BOQ Details Modal matching Screenshots 3 & 4 */}
+            <BoqDetailsModal
+                isOpen={showDetailsModal}
+                onClose={() => setShowDetailsModal(false)}
+                onBack={() => {
+                    setShowDetailsModal(false);
+                    if (createMode === "template") {
+                        setShowTemplateModal(true);
+                    } else {
+                        setShowCreateModal(true);
+                    }
+                }}
+                createMode={createMode || "blank"}
+                projects={projects}
+                templates={templates}
+                workspaceUsers={workspaceUsers}
+                initialProjectId={selectedProjId}
+                initialTemplateId={selectedTemplateId}
+                onSuccess={(newBoq) => {
+                    setShowDetailsModal(false);
+                    void loadBoqs();
+                    if (newBoq?.id) {
+                        openBoq(newBoq.id);
+                    }
+                }}
+            />
         </main>
     );
 }
@@ -839,9 +672,20 @@ function BoqDetail({ activeBoq, onBack }: { activeBoq: BoqListItem; onBack: () =
     const [addingRoom, setAddingRoom] = useState(false);
     const [newRoomName, setNewRoomName] = useState("");
     const [selectedRoomForItems, setSelectedRoomForItems] = useState<any | null>(null);
+    const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
     const [openRowMenuId, setOpenRowMenuId] = useState<string | null>(null);
     const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
     const [editRoomName, setEditRoomName] = useState("");
+
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            const sp = new URLSearchParams(window.location.search);
+            const rId = sp.get("roomId");
+            if (rId) {
+                setSelectedRoomId(rId);
+            }
+        }
+    }, []);
 
     // Add item form state inside Manage Items Modal
     const [itemName, setItemName] = useState("");
@@ -1263,6 +1107,19 @@ function BoqDetail({ activeBoq, onBack }: { activeBoq: BoqListItem; onBack: () =
         });
     }, [rooms, searchQuery]);
 
+    const selectedRoom = rooms.find((r: any) => r.id === selectedRoomId);
+    if (selectedRoom) {
+        return (
+            <BoqRoomCategoryView
+                activeBoq={activeBoq}
+                room={selectedRoom}
+                onBackToBoq={() => setSelectedRoomId(null)}
+                onBackToList={onBack}
+                onRefreshBoq={loadDetail}
+            />
+        );
+    }
+
     return (
         <section className="boq-detail-shell">
             {/* Breadcrumb */}
@@ -1452,7 +1309,7 @@ function BoqDetail({ activeBoq, onBack }: { activeBoq: BoqListItem; onBack: () =
                                             <tr
                                                 key={room.id}
                                                 style={{ cursor: "pointer" }}
-                                                onClick={() => setSelectedRoomForItems(room)}
+                                                onClick={() => setSelectedRoomId(room.id)}
                                             >
                                                 <td style={{ textAlign: "center", color: "#64748b", fontWeight: 500 }}>
                                                     {idx + 1}
@@ -1503,7 +1360,7 @@ function BoqDetail({ activeBoq, onBack }: { activeBoq: BoqListItem; onBack: () =
                                                                 type="button"
                                                                 onClick={() => {
                                                                     setOpenRowMenuId(null);
-                                                                    setSelectedRoomForItems(room);
+                                                                    setSelectedRoomId(room.id);
                                                                 }}
                                                             >
                                                                 <FileText size={14} color="#64748b" /> View / Manage Items
@@ -1512,7 +1369,7 @@ function BoqDetail({ activeBoq, onBack }: { activeBoq: BoqListItem; onBack: () =
                                                                 type="button"
                                                                 onClick={() => {
                                                                     setOpenRowMenuId(null);
-                                                                    setSelectedRoomForItems(room);
+                                                                    setSelectedRoomId(room.id);
                                                                 }}
                                                             >
                                                                 <Plus size={14} color="#64748b" /> Add Item

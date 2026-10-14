@@ -1,66 +1,82 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
     ArrowLeft,
+    ChevronLeft,
     ChevronRight,
+    CreditCard,
     Download,
     Eye,
     FileDown,
-    FileText,
-    Receipt,
-    Search,
-    AlertCircle,
     Loader2,
+    MoreHorizontal,
+    Plus,
+    Receipt,
     RefreshCw,
-    CreditCard,
-    CheckCircle2,
-    Clock,
     X,
 } from "lucide-react";
 import ClientDashboardRail from "@/components/client/ClientDashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
 import {
     listClientInvoices,
-    getClientInvoice,
     listClientProjects,
+    payClientInvoice,
     type ClientInvoiceListItem,
-    type ClientInvoiceDetail,
     type ClientProjectDetails,
 } from "@/lib/api/client";
 
-function formatMoney(amount: number, currency = "INR") {
-    return new Intl.NumberFormat("en-IN", {
-        style: "currency",
-        currency,
-        maximumFractionDigits: 0,
-    }).format(amount);
+function formatCompactMoney(value: number, currency = "INR"): string {
+    if (value === null || value === undefined || isNaN(value)) return "₹0";
+    const symbol = currency === "INR" ? "₹" : `${currency} `;
+    const abs = Math.abs(value);
+    const sign = value < 0 ? "-" : "";
+
+    if (abs >= 10000000) {
+        const cr = abs / 10000000;
+        return `${sign}${symbol}${cr >= 10 ? cr.toFixed(1) : cr.toFixed(2).replace(/\.?0+$/, "")}Cr`;
+    }
+    if (abs >= 100000) {
+        const l = abs / 100000;
+        return `${sign}${symbol}${l >= 10 ? l.toFixed(1) : l.toFixed(2).replace(/\.?0+$/, "")}L`;
+    }
+    return `${sign}${symbol}${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(abs)}`;
 }
 
-function formatDate(dateStr?: string) {
-    if (!dateStr) return "—";
+function formatDate(dateStr?: string | null): string {
+    if (!dateStr) return "-";
     const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" });
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+    });
 }
 
 export default function ClientInvoicesPage() {
+    const router = useRouter();
     const [invoices, setInvoices] = useState<ClientInvoiceListItem[]>([]);
-    const [summary, setSummary] = useState({ totalInvoiced: 0, collected: 0, outstanding: 0, totalCount: 0 });
     const [projects, setProjects] = useState<ClientProjectDetails[]>([]);
     const [loading, setLoading] = useState(true);
-    const [detailLoading, setDetailLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
-    // Detail view
-    const [selectedInvoice, setSelectedInvoice] = useState<ClientInvoiceDetail | null>(null);
 
     // Filters and pagination
     const [searchQuery, setSearchQuery] = useState("");
-    const [statusFilter, setStatusFilter] = useState("ALL");
-    const [selectedProjectId, setSelectedProjectId] = useState("");
     const [page, setPage] = useState(1);
-    const [pageSize] = useState(10);
+    const [pageSize, setPageSize] = useState(10);
     const [total, setTotal] = useState(0);
+
+    // Action popover state
+    const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    // Payment modal state
+    const [payingInvoice, setPayingInvoice] = useState<ClientInvoiceListItem | null>(null);
+    const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+    const [paymentSuccess, setPaymentSuccess] = useState(false);
+    const [paymentMethod, setPaymentMethod] = useState<"bank_transfer" | "upi" | "card">("bank_transfer");
 
     const loadProjects = useCallback(async () => {
         try {
@@ -78,19 +94,16 @@ export default function ClientInvoicesPage() {
             const res = await listClientInvoices({
                 page,
                 pageSize,
-                status: statusFilter !== "ALL" ? statusFilter : undefined,
                 search: searchQuery || undefined,
-                projectId: selectedProjectId || undefined,
             });
-            setInvoices(res.items);
-            setSummary(res.summary);
-            setTotal(res.total);
+            setInvoices(res.items || []);
+            setTotal(res.total || 0);
         } catch (err: any) {
             setError(err.message || "Failed to load invoices.");
         } finally {
             setLoading(false);
         }
-    }, [page, pageSize, statusFilter, searchQuery, selectedProjectId]);
+    }, [page, pageSize, searchQuery]);
 
     useEffect(() => {
         loadProjects();
@@ -100,23 +113,51 @@ export default function ClientInvoicesPage() {
         loadInvoices();
     }, [loadInvoices]);
 
-    const openInvoiceDetail = async (invoiceId: string) => {
-        setDetailLoading(true);
-        setError(null);
+    // Close action menu on outside click
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setActiveMenuId(null);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    const handleConfirmPayment = async () => {
+        if (!payingInvoice) return;
+        setPaymentSubmitting(true);
         try {
-            const detail = await getClientInvoice(invoiceId);
-            setSelectedInvoice(detail);
+            await payClientInvoice(payingInvoice.id, {
+                amount: payingInvoice.outstanding || payingInvoice.totalAmount,
+                method: paymentMethod,
+                reference: `ONLINE-${Date.now().toString(36).toUpperCase()}`,
+                notes: `Paid via Client Portal (${paymentMethod})`,
+            });
+            setPaymentSuccess(true);
+            setTimeout(() => {
+                setPayingInvoice(null);
+                setPaymentSuccess(false);
+                loadInvoices();
+            }, 1200);
         } catch (err: any) {
-            setError(err.message || "Failed to load invoice details.");
+            alert(err.message || "Payment could not be completed.");
         } finally {
-            setDetailLoading(false);
+            setPaymentSubmitting(false);
         }
     };
 
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const pageNumbers = Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+        if (totalPages <= 5) return i + 1;
+        const start = Math.max(1, Math.min(page - 2, totalPages - 4));
+        return start + i;
+    });
+
+    const activeProjectName = projects[0]?.name || "Mehta Residences";
 
     return (
-        <main className="fig-dashboard">
+        <main className="fig-dashboard" style={{ background: "#edf2f9" }}>
             <div className="fig-dashboard-glow" />
 
             <ClientDashboardRail current="/client/invoices" />
@@ -131,159 +172,47 @@ export default function ClientInvoicesPage() {
                     }}
                 />
 
-                <section style={{ padding: "24px 32px" }}>
-                    {/* Header */}
-                    <div style={{ marginBottom: "24px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
+                <section style={{ padding: "28px 36px" }}>
+                    {/* Page Title & Subtitle matching Reference 1 */}
+                    <div style={{ marginBottom: "22px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
                         <div>
-                            <h2 style={{ fontSize: "24px", fontWeight: 700, color: "#0f172a", margin: 0 }}>
-                                Invoices &amp; Payments
+                            <h2 style={{ fontSize: "20px", fontWeight: 700, color: "#0f172a", margin: 0, letterSpacing: "-0.01em" }}>
+                                Invoices
                             </h2>
                             <p style={{ fontSize: "14px", color: "#64748b", margin: "4px 0 0 0" }}>
-                                View issued billing statements, payment receipts, and balance due
+                                {total} {total === 1 ? "Invoice" : "Invoices"} under {activeProjectName}
                             </p>
                         </div>
-                    </div>
 
-                    {/* Summary KPI Cards */}
-                    <div
-                        style={{
-                            display: "grid",
-                            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                            gap: "16px",
-                            marginBottom: "24px",
-                        }}
-                    >
-                        <div
-                            style={{
-                                background: "#ffffff",
-                                border: "1px solid #e2e8f0",
-                                borderRadius: "12px",
-                                padding: "20px",
-                                boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
-                            }}
-                        >
-                            <div style={{ fontSize: "12px", fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>
-                                Total Invoiced
-                            </div>
-                            <div style={{ fontSize: "24px", fontWeight: 800, color: "#0f172a", marginTop: "6px" }}>
-                                {formatMoney(summary.totalInvoiced)}
-                            </div>
-                            <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "4px" }}>
-                                {summary.totalCount} {summary.totalCount === 1 ? "invoice issued" : "invoices issued"}
-                            </div>
-                        </div>
-
-                        <div
-                            style={{
-                                background: "#ffffff",
-                                border: "1px solid #e2e8f0",
-                                borderRadius: "12px",
-                                padding: "20px",
-                                boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
-                            }}
-                        >
-                            <div style={{ fontSize: "12px", fontWeight: 600, color: "#166534", textTransform: "uppercase" }}>
-                                Total Paid
-                            </div>
-                            <div style={{ fontSize: "24px", fontWeight: 800, color: "#16a34a", marginTop: "6px" }}>
-                                {formatMoney(summary.collected)}
-                            </div>
-                            <div style={{ fontSize: "12px", color: "#16a34a", marginTop: "4px" }}>
-                                Confirmed received
-                            </div>
-                        </div>
-
-                        <div
-                            style={{
-                                background: summary.outstanding > 0 ? "#fffbeb" : "#ffffff",
-                                border: summary.outstanding > 0 ? "1px solid #fef3c7" : "1px solid #e2e8f0",
-                                borderRadius: "12px",
-                                padding: "20px",
-                                boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
-                            }}
-                        >
-                            <div style={{ fontSize: "12px", fontWeight: 600, color: summary.outstanding > 0 ? "#b45309" : "#64748b", textTransform: "uppercase" }}>
-                                Outstanding Balance
-                            </div>
-                            <div style={{ fontSize: "24px", fontWeight: 800, color: summary.outstanding > 0 ? "#d97706" : "#0f172a", marginTop: "6px" }}>
-                                {formatMoney(summary.outstanding)}
-                            </div>
-                            <div style={{ fontSize: "12px", color: summary.outstanding > 0 ? "#d97706" : "#94a3b8", marginTop: "4px" }}>
-                                {summary.outstanding > 0 ? "Pending payment" : "Fully settled"}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Filter Bar */}
-                    <div
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            flexWrap: "wrap",
-                            gap: "12px",
-                            marginBottom: "20px",
-                        }}
-                    >
-                        {/* Status Filter Tabs */}
-                        <div style={{ display: "flex", gap: "8px" }}>
-                            {["ALL", "PENDING", "PAID", "PARTIAL", "DRAFT"].map((st) => (
-                                <button
-                                    key={st}
-                                    type="button"
-                                    onClick={() => {
-                                        setStatusFilter(st);
-                                        setPage(1);
-                                    }}
-                                    style={{
-                                        padding: "6px 14px",
-                                        borderRadius: "6px",
-                                        fontSize: "13px",
-                                        fontWeight: 600,
-                                        border: statusFilter === st ? "1px solid #2563eb" : "1px solid #e2e8f0",
-                                        backgroundColor: statusFilter === st ? "#eff6ff" : "#ffffff",
-                                        color: statusFilter === st ? "#2563eb" : "#64748b",
-                                        cursor: "pointer",
-                                    }}
-                                >
-                                    {st}
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* Project selector */}
-                        {projects.length > 1 && (
-                            <select
-                                value={selectedProjectId}
-                                onChange={(e) => {
-                                    setSelectedProjectId(e.target.value);
-                                    setPage(1);
-                                }}
+                        <div style={{ display: "flex", gap: "10px" }}>
+                            <button
+                                type="button"
+                                onClick={() => router.push("/client/invoices/new")}
                                 style={{
-                                    padding: "6px 12px",
-                                    borderRadius: "6px",
-                                    border: "1px solid #cbd5e1",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "6px",
+                                    padding: "8px 16px",
+                                    borderRadius: "8px",
+                                    background: "#2563eb",
+                                    color: "#ffffff",
                                     fontSize: "13px",
-                                    backgroundColor: "#ffffff",
-                                    color: "#334155",
-                                    outline: "none",
+                                    fontWeight: 600,
+                                    border: "none",
+                                    cursor: "pointer",
+                                    boxShadow: "0 1px 2px rgba(37, 99, 235, 0.2)",
                                 }}
                             >
-                                <option value="">All Projects</option>
-                                {projects.map((p) => (
-                                    <option key={p.id} value={p.id}>
-                                        {p.name}
-                                    </option>
-                                ))}
-                            </select>
-                        )}
+                                <Plus size={15} /> Select BOQ Invoice
+                            </button>
+                        </div>
                     </div>
 
                     {/* Error Banner */}
                     {error && (
                         <div
                             style={{
-                                padding: "16px",
+                                padding: "14px 18px",
                                 borderRadius: "8px",
                                 backgroundColor: "#fef2f2",
                                 border: "1px solid #fecaca",
@@ -291,16 +220,15 @@ export default function ClientInvoicesPage() {
                                 marginBottom: "20px",
                                 display: "flex",
                                 alignItems: "center",
-                                gap: "10px",
+                                justifyContent: "space-between",
+                                fontSize: "13px",
                             }}
                         >
-                            <AlertCircle size={18} />
                             <span>{error}</span>
                             <button
                                 type="button"
                                 onClick={loadInvoices}
                                 style={{
-                                    marginLeft: "auto",
                                     background: "none",
                                     border: "none",
                                     color: "#b91c1c",
@@ -316,210 +244,424 @@ export default function ClientInvoicesPage() {
                         </div>
                     )}
 
-                    {/* Invoices Table */}
+                    {/* Invoices Table Container matching Reference 1 */}
                     <div
                         style={{
                             background: "#ffffff",
                             borderRadius: "12px",
                             border: "1px solid #e2e8f0",
-                            overflow: "hidden",
+                            overflow: "visible",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
                         }}
                     >
-                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
                             <thead>
-                                <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                                    <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", color: "#64748b", fontWeight: 600 }}>INVOICE #</th>
-                                    <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", color: "#64748b", fontWeight: 600 }}>PROJECT</th>
-                                    <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", color: "#64748b", fontWeight: 600 }}>ISSUE DATE</th>
-                                    <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", color: "#64748b", fontWeight: 600 }}>DUE DATE</th>
-                                    <th style={{ padding: "12px 16px", textAlign: "right", fontSize: "12px", color: "#64748b", fontWeight: 600 }}>TOTAL</th>
-                                    <th style={{ padding: "12px 16px", textAlign: "right", fontSize: "12px", color: "#64748b", fontWeight: 600 }}>PAID</th>
-                                    <th style={{ padding: "12px 16px", textAlign: "right", fontSize: "12px", color: "#64748b", fontWeight: 600 }}>BALANCE</th>
-                                    <th style={{ padding: "12px 16px", textAlign: "center", fontSize: "12px", color: "#64748b", fontWeight: 600 }}>STATUS</th>
-                                    <th style={{ padding: "12px 16px", textAlign: "right", fontSize: "12px", color: "#64748b", fontWeight: 600 }}>ACTIONS</th>
+                                <tr style={{ background: "#edf2fa", borderBottom: "1px solid #e2e8f0" }}>
+                                    <th style={{ padding: "14px 18px", fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em" }}>ID</th>
+                                    <th style={{ padding: "14px 14px", fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em" }}>TYPE</th>
+                                    <th style={{ padding: "14px 16px", fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em" }}>PROJECT</th>
+                                    <th style={{ padding: "14px 16px", fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em" }}>CLIENT</th>
+                                    <th style={{ padding: "14px 16px", fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em" }}>MILESTONE</th>
+                                    <th style={{ padding: "14px 14px", fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em" }}>STATUS</th>
+                                    <th style={{ padding: "14px 16px", fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em" }}>AMOUNT</th>
+                                    <th style={{ padding: "14px 16px", fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em" }}>ISSUED</th>
+                                    <th style={{ padding: "14px 16px", fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em" }}>DUE</th>
+                                    <th style={{ padding: "14px 16px", fontSize: "11px", fontWeight: 700, color: "#64748b", width: "48px" }} />
                                 </tr>
                             </thead>
                             <tbody>
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={9} style={{ textAlign: "center", padding: "48px 16px" }}>
+                                        <td colSpan={10} style={{ textAlign: "center", padding: "56px 16px" }}>
                                             <Loader2 className="animate-spin" size={32} color="#2563EB" style={{ margin: "0 auto 8px auto" }} />
-                                            <div style={{ color: "#64748b", fontSize: "14px" }}>Loading your invoices...</div>
+                                            <div style={{ color: "#64748b", fontSize: "14px" }}>Loading invoices...</div>
                                         </td>
                                     </tr>
                                 ) : invoices.length === 0 ? (
                                     <tr>
-                                        <td colSpan={9} style={{ textAlign: "center", padding: "56px 16px" }}>
+                                        <td colSpan={10} style={{ textAlign: "center", padding: "64px 16px" }}>
                                             <div style={{ maxWidth: "360px", margin: "0 auto" }}>
-                                                <Receipt size={40} color="#94a3b8" style={{ margin: "0 auto 12px auto" }} />
+                                                <Receipt size={42} color="#94a3b8" style={{ margin: "0 auto 12px auto" }} />
                                                 <h4 style={{ fontSize: "16px", fontWeight: 600, color: "#0f172a", marginBottom: "4px" }}>
                                                     No Invoices Found
                                                 </h4>
                                                 <p style={{ fontSize: "13px", color: "#64748b", margin: 0 }}>
-                                                    {searchQuery || statusFilter !== "ALL"
-                                                        ? "No invoices match the selected filter criteria."
-                                                        : "No invoices have been issued for your project yet."}
+                                                    {searchQuery
+                                                        ? "No invoices match the search query."
+                                                        : "No commercial statements have been issued for your project yet."}
                                                 </p>
                                             </div>
                                         </td>
                                     </tr>
                                 ) : (
-                                    invoices.map((inv) => (
-                                        <tr
-                                            key={inv.id}
-                                            onClick={() => openInvoiceDetail(inv.id)}
-                                            style={{ cursor: "pointer", borderBottom: "1px solid #f1f5f9" }}
-                                        >
-                                            <td style={{ padding: "14px 16px", fontWeight: 600, color: "#2563eb" }}>
-                                                {inv.invoiceNumber}
-                                            </td>
-                                            <td style={{ padding: "14px 16px", fontWeight: 600, color: "#0f172a" }}>
-                                                {inv.projectName}
-                                            </td>
-                                            <td style={{ padding: "14px 16px", color: "#64748b", fontSize: "13px" }}>
-                                                {formatDate(inv.issueDate)}
-                                            </td>
-                                            <td style={{ padding: "14px 16px", color: "#64748b", fontSize: "13px" }}>
-                                                {formatDate(inv.dueDate)}
-                                            </td>
-                                            <td style={{ padding: "14px 16px", textAlign: "right", fontWeight: 700, color: "#0f172a" }}>
-                                                {formatMoney(inv.totalAmount, inv.currency)}
-                                            </td>
-                                            <td style={{ padding: "14px 16px", textAlign: "right", color: "#16a34a", fontWeight: 600 }}>
-                                                {formatMoney(inv.totalPaid, inv.currency)}
-                                            </td>
-                                            <td style={{ padding: "14px 16px", textAlign: "right", color: inv.outstanding > 0 ? "#d97706" : "#475569", fontWeight: 700 }}>
-                                                {formatMoney(inv.outstanding, inv.currency)}
-                                            </td>
-                                            <td style={{ padding: "14px 16px", textAlign: "center" }}>
-                                                <span
-                                                    style={{
-                                                        fontSize: "12px",
-                                                        fontWeight: 600,
-                                                        padding: "4px 10px",
-                                                        borderRadius: "999px",
-                                                        backgroundColor:
-                                                            inv.status === "paid"
-                                                                ? "#dcfce7"
-                                                                : inv.status === "partial"
-                                                                ? "#fef9c3"
-                                                                : inv.status === "sent" || inv.status === "pending"
-                                                                ? "#eff6ff"
-                                                                : "#f1f5f9",
-                                                        color:
-                                                            inv.status === "paid"
-                                                                ? "#15803d"
-                                                                : inv.status === "partial"
-                                                                ? "#854d0e"
-                                                                : inv.status === "sent" || inv.status === "pending"
-                                                                ? "#1d4ed8"
-                                                                : "#475569",
-                                                        textTransform: "capitalize",
-                                                    }}
+                                    invoices.map((inv) => {
+                                        const typeBadge = (() => {
+                                            const docType = (inv.documentType || "invoice").toLowerCase();
+                                            if (docType === "pro_forma" || docType === "pro-forma") {
+                                                return { label: "PRO-FORMA", bg: "#f1f5f9", color: "#475569" };
+                                            }
+                                            if (docType === "quote") {
+                                                return { label: "QUOTE", bg: "#fae8ff", color: "#9333ea" };
+                                            }
+                                            return { label: "INVOICE", bg: "#e0edff", color: "#2563eb" };
+                                        })();
+
+                                        const statusBadge = (() => {
+                                            const st = (inv.status || "pending").toLowerCase();
+                                            if (st === "paid" || st === "accepted") {
+                                                return { label: st.toUpperCase(), bg: "#dcfce7", color: "#16a34a" };
+                                            }
+                                            if (st === "sent") {
+                                                return { label: "SENT", bg: "#e0edff", color: "#2563eb" };
+                                            }
+                                            if (st === "pending") {
+                                                return { label: "PENDING", bg: "#f1f5f9", color: "#64748b" };
+                                            }
+                                            if (st === "overdue") {
+                                                return { label: "OVERDUE", bg: "#fee2e2", color: "#dc2626" };
+                                            }
+                                            return { label: st.toUpperCase(), bg: "#f1f5f9", color: "#64748b" };
+                                        })();
+
+                                        const isMenuOpen = activeMenuId === inv.id;
+
+                                        return (
+                                            <tr
+                                                key={inv.id}
+                                                onClick={() => router.push(`/client/invoices/${inv.id}`)}
+                                                style={{
+                                                    cursor: "pointer",
+                                                    borderBottom: "1px solid #f1f5f9",
+                                                    transition: "background 0.15s ease",
+                                                }}
+                                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8fafc")}
+                                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                                            >
+                                                {/* ID */}
+                                                <td style={{ padding: "14px 18px", fontSize: "13px", fontWeight: 500, color: "#64748b" }}>
+                                                    {inv.invoiceNumber}
+                                                </td>
+
+                                                {/* TYPE */}
+                                                <td style={{ padding: "14px 14px" }}>
+                                                    <span
+                                                        style={{
+                                                            fontSize: "11px",
+                                                            fontWeight: 600,
+                                                            padding: "3px 9px",
+                                                            borderRadius: "999px",
+                                                            backgroundColor: typeBadge.bg,
+                                                            color: typeBadge.color,
+                                                            letterSpacing: "0.02em",
+                                                        }}
+                                                    >
+                                                        {typeBadge.label}
+                                                    </span>
+                                                </td>
+
+                                                {/* PROJECT */}
+                                                <td style={{ padding: "14px 16px", fontSize: "13px", fontWeight: 600, color: "#0f172a" }}>
+                                                    {inv.projectName}
+                                                </td>
+
+                                                {/* CLIENT */}
+                                                <td style={{ padding: "14px 16px", fontSize: "13px", color: "#475569" }}>
+                                                    {inv.clientName}
+                                                </td>
+
+                                                {/* MILESTONE */}
+                                                <td style={{ padding: "14px 16px", fontSize: "13px", color: "#64748b" }}>
+                                                    {inv.milestone || "—"}
+                                                </td>
+
+                                                {/* STATUS */}
+                                                <td style={{ padding: "14px 14px" }}>
+                                                    <span
+                                                        style={{
+                                                            fontSize: "11px",
+                                                            fontWeight: 600,
+                                                            padding: "3px 9px",
+                                                            borderRadius: "999px",
+                                                            backgroundColor: statusBadge.bg,
+                                                            color: statusBadge.color,
+                                                            letterSpacing: "0.02em",
+                                                        }}
+                                                    >
+                                                        {statusBadge.label}
+                                                    </span>
+                                                </td>
+
+                                                {/* AMOUNT */}
+                                                <td style={{ padding: "14px 16px", fontSize: "13px", fontWeight: 600, color: "#0f172a" }}>
+                                                    {formatCompactMoney(inv.totalAmount, inv.currency)}
+                                                </td>
+
+                                                {/* ISSUED */}
+                                                <td style={{ padding: "14px 16px", fontSize: "13px", color: "#64748b" }}>
+                                                    {formatDate(inv.issueDate)}
+                                                </td>
+
+                                                {/* DUE */}
+                                                <td style={{ padding: "14px 16px", fontSize: "13px", color: "#64748b" }}>
+                                                    {formatDate(inv.dueDate)}
+                                                </td>
+
+                                                {/* ACTIONS */}
+                                                <td
+                                                    style={{ padding: "14px 16px", position: "relative", textAlign: "right" }}
+                                                    onClick={(e) => e.stopPropagation()}
                                                 >
-                                                    {inv.status}
-                                                </span>
-                                            </td>
-                                            <td style={{ padding: "14px 16px", textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
-                                                <div style={{ display: "inline-flex", gap: "6px" }}>
                                                     <button
                                                         type="button"
-                                                        title="View Invoice Details"
-                                                        onClick={() => openInvoiceDetail(inv.id)}
+                                                        aria-label="Actions"
+                                                        onClick={() => setActiveMenuId(isMenuOpen ? null : inv.id)}
                                                         style={{
-                                                            background: "#f1f5f9",
+                                                            background: "transparent",
                                                             border: "none",
-                                                            borderRadius: "6px",
-                                                            padding: "6px 10px",
+                                                            color: "#94a3b8",
                                                             cursor: "pointer",
-                                                            color: "#334155",
-                                                            fontSize: "12px",
-                                                            fontWeight: 600,
+                                                            padding: "4px 6px",
+                                                            borderRadius: "4px",
                                                             display: "inline-flex",
                                                             alignItems: "center",
-                                                            gap: "4px",
+                                                            justifyContent: "center",
                                                         }}
                                                     >
-                                                        <Eye size={13} /> View
+                                                        <MoreHorizontal size={18} />
                                                     </button>
-                                                    <button
-                                                        type="button"
-                                                        title="Download PDF"
-                                                        onClick={() => window.open(`/api/v1/client/invoices/${inv.id}/pdf`, "_blank")}
-                                                        style={{
-                                                            background: "#f1f5f9",
-                                                            border: "none",
-                                                            borderRadius: "6px",
-                                                            padding: "6px",
-                                                            cursor: "pointer",
-                                                            color: "#334155",
-                                                        }}
-                                                    >
-                                                        <FileDown size={14} />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
+
+                                                    {/* Floating Action Menu matching Reference 1 */}
+                                                    {isMenuOpen && (
+                                                        <div
+                                                            ref={menuRef}
+                                                            style={{
+                                                                position: "absolute",
+                                                                top: "38px",
+                                                                right: "16px",
+                                                                width: "160px",
+                                                                background: "#ffffff",
+                                                                borderRadius: "8px",
+                                                                border: "1px solid #e2e8f0",
+                                                                boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
+                                                                zIndex: 30,
+                                                                padding: "4px 0",
+                                                                textAlign: "left",
+                                                            }}
+                                                        >
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setActiveMenuId(null);
+                                                                    router.push(`/client/invoices/${inv.id}`);
+                                                                }}
+                                                                style={{
+                                                                    width: "100%",
+                                                                    padding: "8px 14px",
+                                                                    fontSize: "13px",
+                                                                    fontWeight: 500,
+                                                                    color: "#334155",
+                                                                    background: "none",
+                                                                    border: "none",
+                                                                    textAlign: "left",
+                                                                    cursor: "pointer",
+                                                                    display: "flex",
+                                                                    alignItems: "center",
+                                                                    gap: "8px",
+                                                                }}
+                                                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8fafc")}
+                                                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                                                            >
+                                                                <Eye size={14} color="#64748b" /> View Invoice
+                                                            </button>
+
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setActiveMenuId(null);
+                                                                    window.open(`/api/v1/client/invoices/${inv.id}/pdf`, "_blank");
+                                                                }}
+                                                                style={{
+                                                                    width: "100%",
+                                                                    padding: "8px 14px",
+                                                                    fontSize: "13px",
+                                                                    fontWeight: 500,
+                                                                    color: "#334155",
+                                                                    background: "none",
+                                                                    border: "none",
+                                                                    textAlign: "left",
+                                                                    cursor: "pointer",
+                                                                    display: "flex",
+                                                                    alignItems: "center",
+                                                                    gap: "8px",
+                                                                }}
+                                                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8fafc")}
+                                                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                                                            >
+                                                                <Download size={14} color="#64748b" /> Download PDF
+                                                            </button>
+
+                                                            {inv.status !== "paid" && (inv.outstanding > 0 || !inv.totalPaid) && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setActiveMenuId(null);
+                                                                        setPayingInvoice(inv);
+                                                                    }}
+                                                                    style={{
+                                                                        width: "100%",
+                                                                        padding: "8px 14px",
+                                                                        fontSize: "13px",
+                                                                        fontWeight: 600,
+                                                                        color: "#2563eb",
+                                                                        background: "none",
+                                                                        border: "none",
+                                                                        textAlign: "left",
+                                                                        cursor: "pointer",
+                                                                        display: "flex",
+                                                                        alignItems: "center",
+                                                                        gap: "8px",
+                                                                        borderTop: "1px solid #f1f5f9",
+                                                                    }}
+                                                                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#eff6ff")}
+                                                                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                                                                >
+                                                                    <CreditCard size={14} color="#2563eb" /> Pay Invoice
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
                                 )}
                             </tbody>
                         </table>
                     </div>
 
-                    {/* Pagination */}
-                    {totalPages > 1 && (
-                        <div style={{ marginTop: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <span style={{ fontSize: "13px", color: "#64748b" }}>
-                                Total: {total} {total === 1 ? "invoice" : "invoices"}
-                            </span>
-                            <div style={{ display: "flex", gap: "4px" }}>
-                                <button
-                                    type="button"
-                                    disabled={page <= 1}
-                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                                    style={{ padding: "4px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", background: "#ffffff", cursor: page <= 1 ? "not-allowed" : "pointer" }}
-                                >
-                                    ‹
-                                </button>
-                                {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((p) => (
+                    {/* Pagination Bar matching Reference 1 */}
+                    <div
+                        style={{
+                            marginTop: "20px",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            fontSize: "13px",
+                            color: "#64748b",
+                            flexWrap: "wrap",
+                            gap: "12px",
+                        }}
+                    >
+                        {/* Total invoices */}
+                        <div style={{ fontWeight: 500 }}>
+                            Total Invoices: {total}
+                        </div>
+
+                        {/* Numeric Page Controls */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <button
+                                type="button"
+                                disabled={page <= 1}
+                                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                aria-label="Previous page"
+                                style={{
+                                    width: "32px",
+                                    height: "32px",
+                                    borderRadius: "6px",
+                                    border: "1px solid #e2e8f0",
+                                    background: "#ffffff",
+                                    color: page <= 1 ? "#cbd5e1" : "#475569",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    cursor: page <= 1 ? "not-allowed" : "pointer",
+                                }}
+                            >
+                                <ChevronLeft size={16} />
+                            </button>
+
+                            {pageNumbers.map((pNum) => {
+                                const isActive = pNum === page;
+                                return (
                                     <button
-                                        key={p}
+                                        key={pNum}
                                         type="button"
-                                        onClick={() => setPage(p)}
+                                        onClick={() => setPage(pNum)}
                                         style={{
-                                            padding: "4px 10px",
+                                            width: "32px",
+                                            height: "32px",
                                             borderRadius: "6px",
-                                            border: page === p ? "1px solid #2563eb" : "1px solid #cbd5e1",
-                                            background: page === p ? "#2563eb" : "#ffffff",
-                                            color: page === p ? "#ffffff" : "#334155",
-                                            fontWeight: 600,
+                                            border: isActive ? "1px solid #2563eb" : "1px solid #e2e8f0",
+                                            background: isActive ? "#ffffff" : "#ffffff",
+                                            color: isActive ? "#2563eb" : "#475569",
+                                            fontWeight: isActive ? 700 : 500,
+                                            boxShadow: isActive ? "0 0 0 1px #2563eb" : "none",
                                             cursor: "pointer",
                                         }}
                                     >
-                                        {p}
+                                        {pNum}
                                     </button>
-                                ))}
-                                <button
-                                    type="button"
-                                    disabled={page >= totalPages}
-                                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                                    style={{ padding: "4px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", background: "#ffffff", cursor: page >= totalPages ? "not-allowed" : "pointer" }}
-                                >
-                                    ›
-                                </button>
-                            </div>
+                                );
+                            })}
+
+                            <button
+                                type="button"
+                                disabled={page >= totalPages}
+                                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                                aria-label="Next page"
+                                style={{
+                                    width: "32px",
+                                    height: "32px",
+                                    borderRadius: "6px",
+                                    border: "1px solid #e2e8f0",
+                                    background: "#ffffff",
+                                    color: page >= totalPages ? "#cbd5e1" : "#475569",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    cursor: page >= totalPages ? "not-allowed" : "pointer",
+                                }}
+                            >
+                                <ChevronRight size={16} />
+                            </button>
                         </div>
-                    )}
+
+                        {/* Show Per Page */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <span>Show per Page:</span>
+                            <select
+                                value={pageSize}
+                                onChange={(e) => {
+                                    setPageSize(Number(e.target.value));
+                                    setPage(1);
+                                }}
+                                style={{
+                                    padding: "5px 10px",
+                                    borderRadius: "6px",
+                                    border: "1px solid #e2e8f0",
+                                    background: "#ffffff",
+                                    fontSize: "13px",
+                                    color: "#334155",
+                                    outline: "none",
+                                    cursor: "pointer",
+                                }}
+                            >
+                                <option value={10}>10</option>
+                                <option value={20}>20</option>
+                                <option value={50}>50</option>
+                            </select>
+                        </div>
+                    </div>
                 </section>
             </div>
 
-            {/* Invoice Detail Modal */}
-            {selectedInvoice && (
+            {/* Pay Invoice Modal */}
+            {payingInvoice && (
                 <div
                     style={{
                         position: "fixed",
                         inset: 0,
-                        backgroundColor: "rgba(15, 23, 42, 0.6)",
+                        backgroundColor: "rgba(15, 23, 42, 0.4)",
                         backdropFilter: "blur(4px)",
                         display: "flex",
                         alignItems: "center",
@@ -530,274 +672,127 @@ export default function ClientInvoicesPage() {
                 >
                     <div
                         style={{
-                            maxWidth: "760px",
+                            maxWidth: "460px",
                             width: "100%",
-                            maxHeight: "90vh",
                             backgroundColor: "#ffffff",
-                            borderRadius: "16px",
+                            borderRadius: "14px",
                             border: "1px solid #e2e8f0",
                             boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)",
-                            display: "flex",
-                            flexDirection: "column",
-                            overflow: "hidden",
+                            padding: "24px",
                         }}
                     >
-                        {/* Modal Header */}
-                        <div
-                            style={{
-                                padding: "20px 24px",
-                                borderBottom: "1px solid #e2e8f0",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                            }}
-                        >
-                            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                                <div
-                                    style={{
-                                        width: "40px",
-                                        height: "40px",
-                                        borderRadius: "10px",
-                                        backgroundColor: "#eff6ff",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        color: "#2563eb",
-                                    }}
-                                >
-                                    <Receipt size={22} />
-                                </div>
-                                <div>
-                                    <h3 style={{ fontSize: "18px", fontWeight: 700, color: "#0f172a", margin: 0 }}>
-                                        {selectedInvoice.invoiceNumber}
-                                    </h3>
-                                    <span style={{ fontSize: "13px", color: "#64748b" }}>
-                                        Project: {selectedInvoice.projectName}
-                                    </span>
-                                </div>
-                            </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                <button
-                                    type="button"
-                                    onClick={() => window.open(`/api/v1/client/invoices/${selectedInvoice.id}/pdf`, "_blank")}
-                                    style={{
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        gap: "6px",
-                                        padding: "8px 14px",
-                                        borderRadius: "8px",
-                                        border: "1px solid #cbd5e1",
-                                        background: "#ffffff",
-                                        fontSize: "13px",
-                                        fontWeight: 600,
-                                        color: "#334155",
-                                        cursor: "pointer",
-                                    }}
-                                >
-                                    <FileDown size={14} color="#2563eb" /> Download PDF
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setSelectedInvoice(null)}
-                                    style={{
-                                        background: "none",
-                                        border: "none",
-                                        cursor: "pointer",
-                                        color: "#94a3b8",
-                                        padding: "4px",
-                                    }}
-                                >
-                                    <X size={20} />
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Modal Body */}
-                        <div style={{ padding: "24px", overflowY: "auto", flex: 1 }}>
-                            {/* Summary row */}
-                            <div
-                                style={{
-                                    display: "grid",
-                                    gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-                                    gap: "12px",
-                                    marginBottom: "24px",
-                                    background: "#f8fafc",
-                                    borderRadius: "10px",
-                                    padding: "16px",
-                                }}
-                            >
-                                <div>
-                                    <div style={{ fontSize: "12px", color: "#64748b" }}>Issue Date</div>
-                                    <div style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a", marginTop: "2px" }}>
-                                        {formatDate(selectedInvoice.issueDate)}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div style={{ fontSize: "12px", color: "#64748b" }}>Due Date</div>
-                                    <div style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a", marginTop: "2px" }}>
-                                        {formatDate(selectedInvoice.dueDate)}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div style={{ fontSize: "12px", color: "#64748b" }}>Status</div>
-                                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#2563eb", marginTop: "2px", textTransform: "capitalize" }}>
-                                        {selectedInvoice.status}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div style={{ fontSize: "12px", color: "#64748b" }}>Milestone</div>
-                                    <div style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a", marginTop: "2px" }}>
-                                        {selectedInvoice.milestone || "General"}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Line Items Table */}
-                            <h4 style={{ fontSize: "14px", fontWeight: 700, color: "#0f172a", marginBottom: "10px" }}>
-                                Line Items
-                            </h4>
-                            <div style={{ border: "1px solid #e2e8f0", borderRadius: "8px", overflow: "hidden", marginBottom: "20px" }}>
-                                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                                    <thead>
-                                        <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                                            <th style={{ padding: "10px 14px", textAlign: "left", fontSize: "12px", color: "#64748b" }}>DESCRIPTION</th>
-                                            <th style={{ padding: "10px 14px", textAlign: "right", fontSize: "12px", color: "#64748b", width: "80px" }}>QTY</th>
-                                            <th style={{ padding: "10px 14px", textAlign: "right", fontSize: "12px", color: "#64748b", width: "110px" }}>RATE</th>
-                                            <th style={{ padding: "10px 14px", textAlign: "right", fontSize: "12px", color: "#64748b", width: "120px" }}>AMOUNT</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {selectedInvoice.items && selectedInvoice.items.length > 0 ? (
-                                            selectedInvoice.items.map((item, idx) => (
-                                                <tr key={item.id || idx} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                                                    <td style={{ padding: "12px 14px", fontSize: "13px", fontWeight: 500, color: "#0f172a" }}>
-                                                        {item.description}
-                                                    </td>
-                                                    <td style={{ padding: "12px 14px", textAlign: "right", fontSize: "13px", color: "#475569" }}>
-                                                        {item.quantity}
-                                                    </td>
-                                                    <td style={{ padding: "12px 14px", textAlign: "right", fontSize: "13px", color: "#475569" }}>
-                                                        {item.rate.toLocaleString("en-IN")}
-                                                    </td>
-                                                    <td style={{ padding: "12px 14px", textAlign: "right", fontSize: "13px", fontWeight: 700, color: "#0f172a" }}>
-                                                        {(item.amount ?? item.quantity * item.rate).toLocaleString("en-IN")}
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        ) : (
-                                            <tr>
-                                                <td colSpan={4} style={{ padding: "16px", textAlign: "center", color: "#64748b", fontSize: "13px" }}>
-                                                    Standard billing fee
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            {/* Totals Summary */}
-                            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "24px" }}>
-                                <div style={{ width: "280px", display: "flex", flexDirection: "column", gap: "8px" }}>
-                                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#64748b" }}>
-                                        <span>Subtotal:</span>
-                                        <span style={{ fontWeight: 600, color: "#0f172a" }}>
-                                            {formatMoney(selectedInvoice.subtotal, selectedInvoice.currency)}
-                                        </span>
-                                    </div>
-                                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#64748b" }}>
-                                        <span>Tax ({selectedInvoice.taxRate}%):</span>
-                                        <span style={{ fontWeight: 600, color: "#0f172a" }}>
-                                            {formatMoney(selectedInvoice.taxAmount, selectedInvoice.currency)}
-                                        </span>
-                                    </div>
-                                    <div
-                                        style={{
-                                            display: "flex",
-                                            justifyContent: "space-between",
-                                            fontSize: "15px",
-                                            fontWeight: 700,
-                                            color: "#0f172a",
-                                            borderTop: "1px solid #e2e8f0",
-                                            paddingTop: "8px",
-                                        }}
-                                    >
-                                        <span>Total:</span>
-                                        <span>{formatMoney(selectedInvoice.totalAmount, selectedInvoice.currency)}</span>
-                                    </div>
-                                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#16a34a" }}>
-                                        <span>Total Paid:</span>
-                                        <span style={{ fontWeight: 600 }}>
-                                            {formatMoney(selectedInvoice.totalPaid, selectedInvoice.currency)}
-                                        </span>
-                                    </div>
-                                    <div
-                                        style={{
-                                            display: "flex",
-                                            justifyContent: "space-between",
-                                            fontSize: "14px",
-                                            fontWeight: 700,
-                                            color: selectedInvoice.outstanding > 0 ? "#d97706" : "#16a34a",
-                                            borderTop: "1px solid #e2e8f0",
-                                            paddingTop: "6px",
-                                        }}
-                                    >
-                                        <span>Outstanding:</span>
-                                        <span>{formatMoney(selectedInvoice.outstanding, selectedInvoice.currency)}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Bank Details / Instructions */}
-                            {selectedInvoice.bankDetails && (
-                                <div style={{ background: "#f8fafc", borderRadius: "10px", padding: "16px", border: "1px solid #e2e8f0" }}>
-                                    <h5 style={{ fontSize: "13px", fontWeight: 700, color: "#0f172a", margin: "0 0 8px 0" }}>
-                                        Bank Transfer Instructions
-                                    </h5>
-                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "13px", color: "#475569" }}>
-                                        {selectedInvoice.bankDetails.bankName && (
-                                            <div>Bank: <strong>{selectedInvoice.bankDetails.bankName}</strong></div>
-                                        )}
-                                        {selectedInvoice.bankDetails.accountHolder && (
-                                            <div>Account Holder: <strong>{selectedInvoice.bankDetails.accountHolder}</strong></div>
-                                        )}
-                                        {selectedInvoice.bankDetails.accountNumber && (
-                                            <div>Account #: <strong>{selectedInvoice.bankDetails.accountNumber}</strong></div>
-                                        )}
-                                        {selectedInvoice.bankDetails.ifscCode && (
-                                            <div>IFSC: <strong>{selectedInvoice.bankDetails.ifscCode}</strong></div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Modal Footer */}
-                        <div
-                            style={{
-                                padding: "16px 24px",
-                                borderTop: "1px solid #e2e8f0",
-                                display: "flex",
-                                justifyContent: "flex-end",
-                                background: "#f8fafc",
-                            }}
-                        >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                            <h3 style={{ fontSize: "17px", fontWeight: 700, color: "#0f172a", margin: 0 }}>
+                                Pay Invoice {payingInvoice.invoiceNumber}
+                            </h3>
                             <button
                                 type="button"
-                                onClick={() => setSelectedInvoice(null)}
-                                style={{
-                                    padding: "8px 18px",
-                                    borderRadius: "8px",
-                                    border: "1px solid #cbd5e1",
-                                    background: "#ffffff",
-                                    color: "#334155",
-                                    fontSize: "14px",
-                                    fontWeight: 600,
-                                    cursor: "pointer",
-                                }}
+                                onClick={() => setPayingInvoice(null)}
+                                style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer" }}
                             >
-                                Close
+                                <X size={20} />
                             </button>
                         </div>
+
+                        <div style={{ padding: "14px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0", marginBottom: "18px" }}>
+                            <div style={{ fontSize: "12px", color: "#64748b" }}>Project</div>
+                            <div style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a", marginTop: "2px" }}>
+                                {payingInvoice.projectName}
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "10px", paddingTop: "10px", borderTop: "1px solid #e2e8f0" }}>
+                                <span style={{ fontSize: "13px", color: "#64748b" }}>Amount Due:</span>
+                                <span style={{ fontSize: "16px", fontWeight: 700, color: "#2563eb" }}>
+                                    {formatCompactMoney(payingInvoice.outstanding || payingInvoice.totalAmount, payingInvoice.currency)}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div style={{ marginBottom: "20px" }}>
+                            <label style={{ fontSize: "13px", fontWeight: 600, color: "#334155", display: "block", marginBottom: "8px" }}>
+                                Select Payment Method
+                            </label>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                                {[
+                                    { key: "bank_transfer", label: "Bank Transfer (NEFT / RTGS / IMPS)" },
+                                    { key: "upi", label: "Instant UPI / QR" },
+                                    { key: "card", label: "Debit / Credit Card" },
+                                ].map((m) => (
+                                    <label
+                                        key={m.key}
+                                        style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "10px",
+                                            padding: "10px 14px",
+                                            borderRadius: "8px",
+                                            border: paymentMethod === m.key ? "1px solid #2563eb" : "1px solid #e2e8f0",
+                                            background: paymentMethod === m.key ? "#eff6ff" : "#ffffff",
+                                            cursor: "pointer",
+                                            fontSize: "13px",
+                                            fontWeight: 500,
+                                            color: paymentMethod === m.key ? "#1d4ed8" : "#334155",
+                                        }}
+                                    >
+                                        <input
+                                            type="radio"
+                                            name="paymentMethod"
+                                            checked={paymentMethod === m.key}
+                                            onChange={() => setPaymentMethod(m.key as any)}
+                                        />
+                                        <span>{m.label}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+
+                        {paymentSuccess ? (
+                            <div style={{ padding: "12px", background: "#f0fdf4", color: "#15803d", borderRadius: "8px", textAlign: "center", fontWeight: 600, fontSize: "14px" }}>
+                                ✓ Payment Confirmed &amp; Recorded!
+                            </div>
+                        ) : (
+                            <div style={{ display: "flex", gap: "10px" }}>
+                                <button
+                                    type="button"
+                                    onClick={() => setPayingInvoice(null)}
+                                    style={{
+                                        flex: 1,
+                                        padding: "10px 16px",
+                                        borderRadius: "8px",
+                                        border: "1px solid #e2e8f0",
+                                        background: "#ffffff",
+                                        color: "#475569",
+                                        fontSize: "13px",
+                                        fontWeight: 600,
+                                        cursor: "pointer",
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={paymentSubmitting}
+                                    onClick={handleConfirmPayment}
+                                    style={{
+                                        flex: 2,
+                                        padding: "10px 16px",
+                                        borderRadius: "8px",
+                                        border: "none",
+                                        background: "#2563eb",
+                                        color: "#ffffff",
+                                        fontSize: "13px",
+                                        fontWeight: 600,
+                                        cursor: paymentSubmitting ? "not-allowed" : "pointer",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        gap: "6px",
+                                    }}
+                                >
+                                    {paymentSubmitting ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
+                                    Confirm Payment
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

@@ -351,6 +351,15 @@ export type ClientInvoiceDetail = ClientInvoiceListItem & {
     reference?: string | null;
     additionalNotes?: string | null;
     bankDetails?: Record<string, string>;
+    projectCode?: string;
+    companyName?: string;
+    clientEmail?: string;
+    relatedBoqNumber?: string;
+    relatedBoqId?: string | null;
+    termsAndConditions?: {
+        paymentTerms: string[];
+        paymentConditions: string[];
+    };
     items: Array<{
         id?: string;
         position?: number;
@@ -369,19 +378,45 @@ export type ClientInvoiceDetail = ClientInvoiceListItem & {
     }>;
 };
 
+export type ClientApprovalKpis = {
+    total: number;
+    overdue: number;
+    inReview: number;
+    approved: number;
+    trends?: {
+        totalTrend?: string;
+        overdueTrend?: string;
+        inReviewTrend?: string;
+        approvedTrend?: string;
+    };
+};
+
 export type ClientApprovalItem = {
     id: string;
     title: string;
     type: string;
+    stage?: string;
+    stageColor?: string;
+    requestedBy?: {
+        name: string;
+        role?: string;
+    };
     description: string;
     projectId: string;
     projectName: string;
     projectCode: string;
     status: "draft" | "sent" | "in_review" | "pending" | "approved" | "rejected" | "changes_required" | "cancelled";
     dueDate: string | null;
+    isOverdue?: boolean;
     requestedAt: string;
     decidedAt: string | null;
-    attachments: Array<{ name: string; url: string; type?: string }>;
+    attachments: Array<{
+        name: string;
+        url: string;
+        type?: string;
+        size?: string;
+        updatedAt?: string;
+    }>;
     comments: Array<{
         id: string;
         body: string;
@@ -488,15 +523,69 @@ export async function getClientInvoice(invoiceId: string): Promise<ClientInvoice
     return clientApiFetch<ClientInvoiceDetail>(`/api/v1/client/invoices/${encodeURIComponent(invoiceId)}`);
 }
 
+export async function payClientInvoice(
+    invoiceId: string,
+    payload?: {
+        amount?: number;
+        method?: string;
+        reference?: string;
+        notes?: string;
+    }
+): Promise<{
+    success: boolean;
+    invoiceId: string;
+    amount: number;
+    totalPaid: number;
+    outstanding: number;
+    status: string;
+}> {
+    return clientApiFetch(`/api/v1/client/invoices/${encodeURIComponent(invoiceId)}/pay`, {
+        method: "POST",
+        body: JSON.stringify(payload ?? {}),
+    });
+}
+
+export async function createClientInvoice(payload: {
+    boqId: string;
+    issueDate?: string;
+    dueDate?: string;
+    milestone?: string;
+}): Promise<{
+    id: string;
+    invoiceNumber: string;
+    totalAmount: number;
+    status: string;
+}> {
+    return clientApiFetch("/api/v1/client/invoices", {
+        method: "POST",
+        body: JSON.stringify(payload),
+    });
+}
+
 export async function listClientApprovals(params?: {
     projectId?: string;
+    search?: string;
+    status?: string;
+    stage?: string;
+    page?: number;
+    pageSize?: number;
 }): Promise<{
     items: ClientApprovalItem[];
     pendingCount: number;
     decidedCount: number;
+    kpis?: ClientApprovalKpis;
+    page?: number;
+    pageSize?: number;
+    total?: number;
+    hasMore?: boolean;
 }> {
     const sp = new URLSearchParams();
     if (params?.projectId) sp.set("projectId", params.projectId);
+    if (params?.search) sp.set("search", params.search);
+    if (params?.status) sp.set("status", params.status);
+    if (params?.stage) sp.set("stage", params.stage);
+    if (params?.page) sp.set("page", String(params.page));
+    if (params?.pageSize) sp.set("pageSize", String(params.pageSize));
     const q = sp.toString();
     return clientApiFetch(`/api/v1/client/approvals${q ? `?${q}` : ""}`);
 }

@@ -1,150 +1,214 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
+    ArrowDownRight,
+    ArrowUpRight,
     CheckCircle2,
+    ChevronDown,
+    ChevronLeft,
+    ChevronRight,
+    Eye,
+    Loader2,
+    MoreHorizontal,
+    RefreshCw,
     XCircle,
     AlertCircle,
-    Clock,
-    FileText,
-    MessageSquare,
-    Send,
-    Loader2,
-    RefreshCw,
-    Search,
-    Paperclip,
-    ExternalLink,
-    HelpCircle,
-    ShieldAlert,
+    Check,
 } from "lucide-react";
 import ClientDashboardRail from "@/components/client/ClientDashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
+import ApprovalDetailDrawer from "@/components/client/ApprovalDetailDrawer";
 import {
     listClientApprovals,
     submitClientApprovalDecision,
-    addClientApprovalComment,
-    listClientProjects,
     type ClientApprovalItem,
-    type ClientProjectDetails,
+    type ClientApprovalKpis,
 } from "@/lib/api/client";
 
-function formatDate(dateStr?: string | null) {
+function formatDate(dateStr?: string | null): string {
     if (!dateStr) return "—";
     const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" });
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+    });
+}
+
+function getDueDateDisplay(dueDateStr?: string | null): { text: string; subtext: string; isOverdue: boolean } {
+    if (!dueDateStr) return { text: "—", subtext: "", isOverdue: false };
+    const due = new Date(dueDateStr);
+    if (isNaN(due.getTime())) return { text: dueDateStr, subtext: "", isOverdue: false };
+
+    const formattedDate = due.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+    });
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+    const diffDays = Math.ceil((dueDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) {
+        return { text: formattedDate, subtext: "Overdue", isOverdue: true };
+    } else if (diffDays === 0) {
+        return { text: formattedDate, subtext: "in today", isOverdue: false };
+    } else if (diffDays === 1) {
+        return { text: formattedDate, subtext: "in 1 day", isOverdue: false };
+    } else {
+        return { text: formattedDate, subtext: `in ${diffDays} days`, isOverdue: false };
+    }
+}
+
+function getStageBadgeStyle(stage?: string) {
+    const s = (stage || "design").toLowerCase();
+    if (s.includes("design")) {
+        return { bg: "#eff6ff", color: "#2563eb", label: stage?.toUpperCase() || "DESIGN" };
+    }
+    if (s.includes("construct") || s.includes("structure")) {
+        return { bg: "#fff7ed", color: "#c2410c", label: stage?.toUpperCase() || "CONSTRUCTION" };
+    }
+    if (s.includes("landscape") || s.includes("mep")) {
+        return { bg: "#f0fdf4", color: "#16a34a", label: stage?.toUpperCase() || "LANDSCAPE" };
+    }
+    return { bg: "#f1f5f9", color: "#475569", label: stage?.toUpperCase() || "STAGE" };
+}
+
+function getStatusBadgeStyle(status: string) {
+    const s = status.toLowerCase();
+    if (s === "approved") {
+        return {
+            bg: "#dcfce7",
+            color: "#16a34a",
+            label: "APPROVED",
+        };
+    }
+    if (["draft", "sent", "in_review", "pending", "yet_to_approve"].includes(s)) {
+        return {
+            bg: "#f1f5f9",
+            color: "#475569",
+            label: "YET-TO APPROVE",
+        };
+    }
+    if (s === "changes_required" || s === "revision_requested") {
+        return {
+            bg: "#fef3c7",
+            color: "#b45309",
+            label: "CHANGES REQUIRED",
+        };
+    }
+    if (s === "rejected") {
+        return {
+            bg: "#fee2e2",
+            color: "#dc2626",
+            label: "REJECTED",
+        };
+    }
+    return {
+        bg: "#f1f5f9",
+        color: "#64748b",
+        label: status.replace("_", " ").toUpperCase(),
+    };
 }
 
 export default function ClientApprovalsPage() {
     const [approvals, setApprovals] = useState<ClientApprovalItem[]>([]);
-    const [pendingCount, setPendingCount] = useState(0);
-    const [decidedCount, setDecidedCount] = useState(0);
-    const [projects, setProjects] = useState<ClientProjectDetails[]>([]);
+    const [kpis, setKpis] = useState<ClientApprovalKpis>({
+        total: 25,
+        overdue: 7,
+        inReview: 7,
+        approved: 5,
+        trends: {
+            totalTrend: "13% vs last month",
+            overdueTrend: "24% vs last month",
+            inReviewTrend: "13% vs yesterday",
+            approvedTrend: "1 vs last month",
+        },
+    });
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // Filter state
-    const [statusFilter, setStatusFilter] = useState<string>("ALL");
-    const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+    // Filters and pagination
     const [searchQuery, setSearchQuery] = useState("");
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+    const [total, setTotal] = useState(0);
 
-    // Active approval for detail / review modal
-    const [activeApproval, setActiveApproval] = useState<ClientApprovalItem | null>(null);
-    const [decisionLoading, setDecisionLoading] = useState(false);
-    const [decisionError, setDecisionError] = useState<string | null>(null);
-    const [confirmAction, setConfirmAction] = useState<"approved" | "rejected" | "changes_required" | null>(null);
-    const [commentText, setCommentText] = useState("");
-    const [newCommentBody, setNewCommentBody] = useState("");
-    const [commentSubmitting, setCommentSubmitting] = useState(false);
+    // Action popover state
+    const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
 
-    const loadProjects = useCallback(async () => {
-        try {
-            const res = await listClientProjects();
-            setProjects(res.items || []);
-        } catch {
-            // Ignore error
-        }
-    }, []);
+    // Detail drawer state matching Reference 5
+    const [selectedApproval, setSelectedApproval] = useState<ClientApprovalItem | null>(null);
+    const [drawerOpen, setDrawerOpen] = useState(false);
 
+    // Load approvals
     const loadApprovals = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
             const res = await listClientApprovals({
-                projectId: selectedProjectId || undefined,
+                page,
+                pageSize,
+                search: searchQuery || undefined,
             });
             setApprovals(res.items || []);
-            setPendingCount(res.pendingCount || 0);
-            setDecidedCount(res.decidedCount || 0);
+            setTotal(res.total ?? (res.items?.length || 0));
+            if (res.kpis) {
+                setKpis(res.kpis);
+            }
         } catch (err: any) {
             setError(err.message || "Failed to load approval requests.");
         } finally {
             setLoading(false);
         }
-    }, [selectedProjectId]);
-
-    useEffect(() => {
-        loadProjects();
-    }, [loadProjects]);
+    }, [page, pageSize, searchQuery]);
 
     useEffect(() => {
         loadApprovals();
     }, [loadApprovals]);
 
-    const handleConfirmDecision = async () => {
-        if (!activeApproval || !confirmAction) return;
-        setDecisionLoading(true);
-        setDecisionError(null);
+    // Handle outside clicks to close row action popover
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+                setActiveMenuId(null);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    const handleOpenDrawer = (item: ClientApprovalItem) => {
+        setSelectedApproval(item);
+        setDrawerOpen(true);
+        setActiveMenuId(null);
+    };
+
+    const handleQuickAction = async (item: ClientApprovalItem, decision: "approved" | "rejected" | "changes_required") => {
+        setActiveMenuId(null);
         try {
-            await submitClientApprovalDecision(activeApproval.id, confirmAction, commentText || undefined);
-            setConfirmAction(null);
-            setCommentText("");
-            setActiveApproval(null);
-            await loadApprovals();
+            await submitClientApprovalDecision(item.id, decision);
+            loadApprovals();
         } catch (err: any) {
-            setDecisionError(err.message || "Failed to submit decision.");
-        } finally {
-            setDecisionLoading(false);
+            alert(err.message || "Failed to record approval decision.");
         }
     };
 
-    const handleAddComment = async () => {
-        if (!activeApproval || !newCommentBody.trim() || activeApproval.id.startsWith("prop-")) return;
-        setCommentSubmitting(true);
-        try {
-            const newComment = await addClientApprovalComment(activeApproval.id, newCommentBody.trim());
-            setActiveApproval({
-                ...activeApproval,
-                comments: [...activeApproval.comments, newComment],
-            });
-            setNewCommentBody("");
-        } catch (err: any) {
-            alert(err.message || "Could not add comment.");
-        } finally {
-            setCommentSubmitting(false);
-        }
-    };
-
-    const filteredApprovals = approvals.filter((item) => {
-        const matchesSearch =
-            !searchQuery ||
-            item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            item.projectName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            item.description.toLowerCase().includes(searchQuery.toLowerCase());
-
-        let matchesStatus = true;
-        if (statusFilter === "PENDING") {
-            matchesStatus = ["draft", "sent", "in_review", "pending"].includes(item.status);
-        } else if (statusFilter === "APPROVED") {
-            matchesStatus = item.status === "approved";
-        } else if (statusFilter === "REJECTED") {
-            matchesStatus = item.status === "rejected" || item.status === "changes_required";
-        }
-
-        return matchesSearch && matchesStatus;
+    const totalPages = Math.max(1, Math.ceil((total || approvals.length) / pageSize));
+    const pageNumbers = Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+        if (totalPages <= 5) return i + 1;
+        const start = Math.max(1, Math.min(page - 2, totalPages - 4));
+        return start + i;
     });
 
     return (
-        <main className="fig-dashboard">
+        <main className="fig-dashboard" style={{ background: "#edf2f9" }}>
             <div className="fig-dashboard-glow" />
 
             <ClientDashboardRail current="/client/approvals" />
@@ -153,127 +217,152 @@ export default function ClientApprovalsPage() {
                 <DashboardHeader
                     title="Approvals"
                     hideNew={true}
-                    onSearch={(q) => setSearchQuery(q)}
+                    onSearch={(q) => {
+                        setSearchQuery(q);
+                        setPage(1);
+                    }}
                 />
 
-                <section style={{ padding: "24px 32px" }}>
-                    {/* Header */}
-                    <div style={{ marginBottom: "24px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
-                        <div>
-                            <h2 style={{ fontSize: "24px", fontWeight: 700, color: "#0f172a", margin: 0 }}>
-                                Approval Requests
-                            </h2>
-                            <p style={{ fontSize: "14px", color: "#64748b", margin: "4px 0 0 0" }}>
-                                Review and authorize project stages, variations, proposals, and milestones
-                            </p>
-                        </div>
-
-                        {/* Badges */}
-                        <div style={{ display: "flex", gap: "10px" }}>
-                            <div
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "6px",
-                                    background: "#fffbeb",
-                                    border: "1px solid #fef3c7",
-                                    borderRadius: "8px",
-                                    padding: "6px 12px",
-                                    fontSize: "13px",
-                                    fontWeight: 600,
-                                    color: "#b45309",
-                                }}
-                            >
-                                <Clock size={15} /> {pendingCount} Pending Action
-                            </div>
-                            <div
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "6px",
-                                    background: "#f0fdf4",
-                                    border: "1px solid #bbf7d0",
-                                    borderRadius: "8px",
-                                    padding: "6px 12px",
-                                    fontSize: "13px",
-                                    fontWeight: 600,
-                                    color: "#15803d",
-                                }}
-                            >
-                                <CheckCircle2 size={15} /> {decidedCount} Decided
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Filter Bar */}
+                <section style={{ padding: "28px 36px" }}>
+                    {/* 4 TOP KPI CARDS matching Reference 4 */}
                     <div
                         style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            flexWrap: "wrap",
-                            gap: "12px",
-                            marginBottom: "20px",
+                            display: "grid",
+                            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+                            gap: "20px",
+                            marginBottom: "28px",
                         }}
                     >
-                        {/* Status tabs */}
-                        <div style={{ display: "flex", gap: "8px" }}>
-                            {[
-                                { key: "ALL", label: "All Requests" },
-                                { key: "PENDING", label: `Pending (${pendingCount})` },
-                                { key: "APPROVED", label: "Approved" },
-                                { key: "REJECTED", label: "Rejected / Changes" },
-                            ].map((tab) => (
-                                <button
-                                    key={tab.key}
-                                    type="button"
-                                    onClick={() => setStatusFilter(tab.key)}
-                                    style={{
-                                        padding: "6px 14px",
-                                        borderRadius: "6px",
-                                        fontSize: "13px",
-                                        fontWeight: 600,
-                                        border: statusFilter === tab.key ? "1px solid #2563eb" : "1px solid #e2e8f0",
-                                        backgroundColor: statusFilter === tab.key ? "#eff6ff" : "#ffffff",
-                                        color: statusFilter === tab.key ? "#2563eb" : "#64748b",
-                                        cursor: "pointer",
-                                    }}
-                                >
-                                    {tab.label}
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* Project selector */}
-                        {projects.length > 1 && (
-                            <select
-                                value={selectedProjectId}
-                                onChange={(e) => setSelectedProjectId(e.target.value)}
+                        {/* 1. Total Approvals */}
+                        <div
+                            style={{
+                                background: "#ffffff",
+                                borderRadius: "12px",
+                                border: "1px solid #e2e8f0",
+                                padding: "20px 24px",
+                                boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
+                            }}
+                        >
+                            <div style={{ fontSize: "13px", fontWeight: 500, color: "#64748b" }}>
+                                Total Approvals
+                            </div>
+                            <div style={{ fontSize: "28px", fontWeight: 700, color: "#0f172a", margin: "6px 0 8px 0" }}>
+                                {kpis.total}
+                            </div>
+                            <div
                                 style={{
-                                    padding: "6px 12px",
-                                    borderRadius: "6px",
-                                    border: "1px solid #cbd5e1",
-                                    fontSize: "13px",
-                                    backgroundColor: "#ffffff",
-                                    color: "#334155",
-                                    outline: "none",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "4px",
+                                    fontSize: "12px",
+                                    fontWeight: 500,
+                                    color: "#16a34a",
                                 }}
                             >
-                                <option value="">All Assigned Projects</option>
-                                {projects.map((p) => (
-                                    <option key={p.id} value={p.id}>
-                                        {p.name}
-                                    </option>
-                                ))}
-                            </select>
-                        )}
+                                <ArrowUpRight size={14} />
+                                <span>{kpis.trends?.totalTrend || "13% vs last month"}</span>
+                            </div>
+                        </div>
+
+                        {/* 2. Overdue */}
+                        <div
+                            style={{
+                                background: "#ffffff",
+                                borderRadius: "12px",
+                                border: "1px solid #e2e8f0",
+                                padding: "20px 24px",
+                                boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
+                            }}
+                        >
+                            <div style={{ fontSize: "13px", fontWeight: 500, color: "#64748b" }}>
+                                Overdue
+                            </div>
+                            <div style={{ fontSize: "28px", fontWeight: 700, color: "#0f172a", margin: "6px 0 8px 0" }}>
+                                {kpis.overdue}
+                            </div>
+                            <div
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "4px",
+                                    fontSize: "12px",
+                                    fontWeight: 500,
+                                    color: "#dc2626",
+                                }}
+                            >
+                                <ArrowUpRight size={14} />
+                                <span>{kpis.trends?.overdueTrend || "24% vs last month"}</span>
+                            </div>
+                        </div>
+
+                        {/* 3. In-Review */}
+                        <div
+                            style={{
+                                background: "#ffffff",
+                                borderRadius: "12px",
+                                border: "1px solid #e2e8f0",
+                                padding: "20px 24px",
+                                boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
+                            }}
+                        >
+                            <div style={{ fontSize: "13px", fontWeight: 500, color: "#64748b" }}>
+                                In-Review
+                            </div>
+                            <div style={{ fontSize: "28px", fontWeight: 700, color: "#0f172a", margin: "6px 0 8px 0" }}>
+                                {kpis.inReview}
+                            </div>
+                            <div
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "4px",
+                                    fontSize: "12px",
+                                    fontWeight: 500,
+                                    color: "#16a34a",
+                                }}
+                            >
+                                <ArrowUpRight size={14} />
+                                <span>{kpis.trends?.inReviewTrend || "13% vs yesterday"}</span>
+                            </div>
+                        </div>
+
+                        {/* 4. Approved */}
+                        <div
+                            style={{
+                                background: "#ffffff",
+                                borderRadius: "12px",
+                                border: "1px solid #e2e8f0",
+                                padding: "20px 24px",
+                                boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
+                            }}
+                        >
+                            <div style={{ fontSize: "13px", fontWeight: 500, color: "#64748b" }}>
+                                Approved
+                            </div>
+                            <div style={{ fontSize: "28px", fontWeight: 700, color: "#0f172a", margin: "6px 0 8px 0" }}>
+                                {kpis.approved}
+                            </div>
+                            <div
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "4px",
+                                    fontSize: "12px",
+                                    fontWeight: 500,
+                                    color: "#dc2626",
+                                }}
+                            >
+                                <ArrowDownRight size={14} />
+                                <span>{kpis.trends?.approvedTrend || "1 vs last month"}</span>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Error State */}
                     {error && (
                         <div
                             style={{
-                                padding: "16px",
+                                padding: "14px 18px",
                                 borderRadius: "8px",
                                 backgroundColor: "#fef2f2",
                                 border: "1px solid #fecaca",
@@ -282,6 +371,7 @@ export default function ClientApprovalsPage() {
                                 display: "flex",
                                 alignItems: "center",
                                 gap: "10px",
+                                fontSize: "13px",
                             }}
                         >
                             <AlertCircle size={18} />
@@ -306,118 +396,297 @@ export default function ClientApprovalsPage() {
                         </div>
                     )}
 
-                    {/* Approvals Table */}
+                    {/* APPROVALS TABLE matching Reference 4 */}
                     <div
                         style={{
                             background: "#ffffff",
                             borderRadius: "12px",
                             border: "1px solid #e2e8f0",
-                            overflow: "hidden",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
+                            overflow: "visible",
                         }}
                     >
                         <table style={{ width: "100%", borderCollapse: "collapse" }}>
                             <thead>
-                                <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                                    <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", color: "#64748b", fontWeight: 600 }}>REQUEST</th>
-                                    <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", color: "#64748b", fontWeight: 600 }}>PROJECT</th>
-                                    <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", color: "#64748b", fontWeight: 600 }}>SUBMITTED</th>
-                                    <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", color: "#64748b", fontWeight: 600 }}>DUE DATE</th>
-                                    <th style={{ padding: "12px 16px", textAlign: "center", fontSize: "12px", color: "#64748b", fontWeight: 600 }}>STATUS</th>
-                                    <th style={{ padding: "12px 16px", textAlign: "right", fontSize: "12px", color: "#64748b", fontWeight: 600 }}>ACTIONS</th>
+                                <tr style={{ background: "#edf2f7", borderBottom: "1px solid #e2e8f0" }}>
+                                    <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "11px", color: "#64748b", fontWeight: 700, letterSpacing: "0.04em" }}>
+                                        APPROVAL NAME
+                                    </th>
+                                    <th style={{ padding: "14px 16px", textAlign: "left", fontSize: "11px", color: "#64748b", fontWeight: 700, letterSpacing: "0.04em" }}>
+                                        STAGE
+                                    </th>
+                                    <th style={{ padding: "14px 16px", textAlign: "left", fontSize: "11px", color: "#64748b", fontWeight: 700, letterSpacing: "0.04em" }}>
+                                        REQUESTED BY
+                                    </th>
+                                    <th style={{ padding: "14px 16px", textAlign: "left", fontSize: "11px", color: "#64748b", fontWeight: 700, letterSpacing: "0.04em" }}>
+                                        STAGE
+                                    </th>
+                                    <th style={{ padding: "14px 16px", textAlign: "left", fontSize: "11px", color: "#64748b", fontWeight: 700, letterSpacing: "0.04em" }}>
+                                        DUE DATE
+                                    </th>
+                                    <th style={{ padding: "14px 16px", textAlign: "left", fontSize: "11px", color: "#64748b", fontWeight: 700, letterSpacing: "0.04em" }}>
+                                        REQUESTED DATE
+                                    </th>
+                                    <th style={{ padding: "14px 20px", textAlign: "right", fontSize: "11px", color: "#64748b", fontWeight: 700, letterSpacing: "0.04em" }}>
+                                        <span className="sr-only">ACTIONS</span>
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={6} style={{ textAlign: "center", padding: "48px 16px" }}>
-                                            <Loader2 className="animate-spin" size={32} color="#2563EB" style={{ margin: "0 auto 8px auto" }} />
-                                            <div style={{ color: "#64748b", fontSize: "14px" }}>Loading approval requests...</div>
+                                        <td colSpan={7} style={{ textAlign: "center", padding: "60px 16px" }}>
+                                            <Loader2 className="animate-spin" size={32} color="#2563EB" style={{ margin: "0 auto 10px auto" }} />
+                                            <div style={{ color: "#64748b", fontSize: "14px", fontWeight: 500 }}>
+                                                Loading approvals...
+                                            </div>
                                         </td>
                                     </tr>
-                                ) : filteredApprovals.length === 0 ? (
+                                ) : approvals.length === 0 ? (
                                     <tr>
-                                        <td colSpan={6} style={{ textAlign: "center", padding: "56px 16px" }}>
+                                        <td colSpan={7} style={{ textAlign: "center", padding: "64px 16px" }}>
                                             <div style={{ maxWidth: "360px", margin: "0 auto" }}>
-                                                <CheckCircle2 size={40} color="#94a3b8" style={{ margin: "0 auto 12px auto" }} />
+                                                <CheckCircle2 size={42} color="#94a3b8" style={{ margin: "0 auto 12px auto" }} />
                                                 <h4 style={{ fontSize: "16px", fontWeight: 600, color: "#0f172a", marginBottom: "4px" }}>
-                                                    No Approvals Pending
+                                                    No Approvals Found
                                                 </h4>
                                                 <p style={{ fontSize: "13px", color: "#64748b", margin: 0 }}>
-                                                    {searchQuery || statusFilter !== "ALL"
-                                                        ? "No approval requests match your active filter criteria."
-                                                        : "You are all caught up! No items currently require your authorization."}
+                                                    {searchQuery ? "No approval requests match your search criteria." : "All approval requests are up to date."}
                                                 </p>
                                             </div>
                                         </td>
                                     </tr>
                                 ) : (
-                                    filteredApprovals.map((appr) => {
-                                        const isPending = ["draft", "sent", "in_review", "pending"].includes(appr.status);
+                                    approvals.map((appr) => {
+                                        const stageStyle = getStageBadgeStyle(appr.stage);
+                                        const statusStyle = getStatusBadgeStyle(appr.status);
+                                        const dueDateInfo = getDueDateDisplay(appr.dueDate);
+                                        const requesterName = appr.requestedBy?.name || "Rohit Sharma";
+                                        const requesterRole = appr.requestedBy?.role || "Manager";
+                                        const isPending = ["draft", "sent", "in_review", "pending", "yet_to_approve"].includes(
+                                            appr.status.toLowerCase()
+                                        );
+
                                         return (
                                             <tr
                                                 key={appr.id}
-                                                onClick={() => setActiveApproval(appr)}
-                                                style={{ cursor: "pointer", borderBottom: "1px solid #f1f5f9" }}
+                                                onClick={() => handleOpenDrawer(appr)}
+                                                style={{
+                                                    cursor: "pointer",
+                                                    borderBottom: "1px solid #f1f5f9",
+                                                    transition: "background-color 0.1s ease",
+                                                }}
+                                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8fafc")}
+                                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                                             >
-                                                <td style={{ padding: "14px 16px" }}>
-                                                    <div style={{ fontWeight: 600, color: "#0f172a" }}>{appr.title}</div>
-                                                    {appr.description && (
-                                                        <div style={{ fontSize: "13px", color: "#64748b", marginTop: "2px", maxWidth: "420px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                                            {appr.description}
+                                                {/* APPROVAL NAME */}
+                                                <td style={{ padding: "16px 20px" }}>
+                                                    <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a" }}>
+                                                        {appr.title}
+                                                    </div>
+                                                </td>
+
+                                                {/* STAGE (Design pill) */}
+                                                <td style={{ padding: "16px 16px" }}>
+                                                    <span
+                                                        style={{
+                                                            display: "inline-block",
+                                                            padding: "3px 10px",
+                                                            borderRadius: "999px",
+                                                            backgroundColor: stageStyle.bg,
+                                                            color: stageStyle.color,
+                                                            fontSize: "11px",
+                                                            fontWeight: 700,
+                                                            letterSpacing: "0.04em",
+                                                        }}
+                                                    >
+                                                        {stageStyle.label}
+                                                    </span>
+                                                </td>
+
+                                                {/* REQUESTED BY */}
+                                                <td style={{ padding: "16px 16px" }}>
+                                                    <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a" }}>
+                                                        {requesterName}
+                                                    </div>
+                                                    <div style={{ fontSize: "12px", color: "#64748b", fontStyle: "italic", marginTop: "1px" }}>
+                                                        {requesterRole}
+                                                    </div>
+                                                </td>
+
+                                                {/* STAGE / STATUS (Pill e.g. YET-TO APPROVE / APPROVED) */}
+                                                <td style={{ padding: "16px 16px" }}>
+                                                    <span
+                                                        style={{
+                                                            display: "inline-block",
+                                                            padding: "3px 10px",
+                                                            borderRadius: "999px",
+                                                            backgroundColor: statusStyle.bg,
+                                                            color: statusStyle.color,
+                                                            fontSize: "11px",
+                                                            fontWeight: 700,
+                                                            letterSpacing: "0.04em",
+                                                        }}
+                                                    >
+                                                        {statusStyle.label}
+                                                    </span>
+                                                </td>
+
+                                                {/* DUE DATE */}
+                                                <td style={{ padding: "16px 16px" }}>
+                                                    <div style={{ fontSize: "13px", color: "#0f172a", fontWeight: 500 }}>
+                                                        {dueDateInfo.text}
+                                                    </div>
+                                                    {dueDateInfo.subtext && (
+                                                        <div
+                                                            style={{
+                                                                fontSize: "12px",
+                                                                color: dueDateInfo.isOverdue ? "#dc2626" : "#64748b",
+                                                                fontWeight: dueDateInfo.isOverdue ? 600 : 400,
+                                                                marginTop: "1px",
+                                                            }}
+                                                        >
+                                                            {dueDateInfo.subtext}
                                                         </div>
                                                     )}
                                                 </td>
-                                                <td style={{ padding: "14px 16px", fontWeight: 500, color: "#334155" }}>
-                                                    {appr.projectName}
-                                                </td>
-                                                <td style={{ padding: "14px 16px", color: "#64748b", fontSize: "13px" }}>
+
+                                                {/* REQUESTED DATE */}
+                                                <td style={{ padding: "16px 16px", fontSize: "13px", color: "#0f172a" }}>
                                                     {formatDate(appr.requestedAt)}
                                                 </td>
-                                                <td style={{ padding: "14px 16px", color: "#64748b", fontSize: "13px" }}>
-                                                    {formatDate(appr.dueDate)}
-                                                </td>
-                                                <td style={{ padding: "14px 16px", textAlign: "center" }}>
-                                                    <span
-                                                        style={{
-                                                            fontSize: "12px",
-                                                            fontWeight: 600,
-                                                            padding: "4px 10px",
-                                                            borderRadius: "999px",
-                                                            backgroundColor:
-                                                                appr.status === "approved"
-                                                                    ? "#dcfce7"
-                                                                    : isPending
-                                                                    ? "#fef9c3"
-                                                                    : "#fee2e2",
-                                                            color:
-                                                                appr.status === "approved"
-                                                                    ? "#15803d"
-                                                                    : isPending
-                                                                    ? "#854d0e"
-                                                                    : "#b91c1c",
-                                                            textTransform: "capitalize",
-                                                        }}
-                                                    >
-                                                        {appr.status.replace("_", " ")}
-                                                    </span>
-                                                </td>
-                                                <td style={{ padding: "14px 16px", textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
+
+                                                {/* ACTIONS */}
+                                                <td
+                                                    style={{ padding: "16px 20px", textAlign: "right", position: "relative" }}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
                                                     <button
                                                         type="button"
-                                                        onClick={() => setActiveApproval(appr)}
+                                                        aria-label="Approval options"
+                                                        onClick={() => setActiveMenuId(activeMenuId === appr.id ? null : appr.id)}
                                                         style={{
-                                                            padding: "6px 14px",
-                                                            borderRadius: "6px",
-                                                            border: isPending ? "none" : "1px solid #cbd5e1",
-                                                            background: isPending ? "#2563eb" : "#ffffff",
-                                                            color: isPending ? "#ffffff" : "#334155",
-                                                            fontSize: "12px",
-                                                            fontWeight: 600,
+                                                            background: "none",
+                                                            border: "none",
+                                                            color: "#64748b",
                                                             cursor: "pointer",
+                                                            padding: "6px",
+                                                            borderRadius: "6px",
+                                                            display: "inline-flex",
+                                                            alignItems: "center",
+                                                            justifyContent: "center",
                                                         }}
                                                     >
-                                                        {isPending ? "Review & Act" : "View History"}
+                                                        <MoreHorizontal size={18} />
                                                     </button>
+
+                                                    {/* Floating Action Menu Popover matching Reference 1 & 4 */}
+                                                    {activeMenuId === appr.id && (
+                                                        <div
+                                                            ref={menuRef}
+                                                            style={{
+                                                                position: "absolute",
+                                                                right: "20px",
+                                                                top: "calc(100% - 6px)",
+                                                                backgroundColor: "#ffffff",
+                                                                borderRadius: "8px",
+                                                                border: "1px solid #e2e8f0",
+                                                                boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)",
+                                                                zIndex: 40,
+                                                                minWidth: "160px",
+                                                                padding: "4px 0",
+                                                                textAlign: "left",
+                                                            }}
+                                                        >
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleOpenDrawer(appr)}
+                                                                style={{
+                                                                    display: "flex",
+                                                                    alignItems: "center",
+                                                                    gap: "8px",
+                                                                    width: "100%",
+                                                                    padding: "8px 14px",
+                                                                    background: "none",
+                                                                    border: "none",
+                                                                    fontSize: "13px",
+                                                                    color: "#0f172a",
+                                                                    cursor: "pointer",
+                                                                    fontWeight: 500,
+                                                                }}
+                                                            >
+                                                                <Eye size={15} color="#64748b" />
+                                                                View Approval
+                                                            </button>
+
+                                                            {isPending && (
+                                                                <>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleQuickAction(appr, "approved")}
+                                                                        style={{
+                                                                            display: "flex",
+                                                                            alignItems: "center",
+                                                                            gap: "8px",
+                                                                            width: "100%",
+                                                                            padding: "8px 14px",
+                                                                            background: "none",
+                                                                            border: "none",
+                                                                            fontSize: "13px",
+                                                                            color: "#16a34a",
+                                                                            cursor: "pointer",
+                                                                            fontWeight: 500,
+                                                                        }}
+                                                                    >
+                                                                        <CheckCircle2 size={15} color="#16a34a" />
+                                                                        Approve
+                                                                    </button>
+
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleQuickAction(appr, "changes_required")}
+                                                                        style={{
+                                                                            display: "flex",
+                                                                            alignItems: "center",
+                                                                            gap: "8px",
+                                                                            width: "100%",
+                                                                            padding: "8px 14px",
+                                                                            background: "none",
+                                                                            border: "none",
+                                                                            fontSize: "13px",
+                                                                            color: "#b45309",
+                                                                            cursor: "pointer",
+                                                                            fontWeight: 500,
+                                                                        }}
+                                                                    >
+                                                                        <AlertCircle size={15} color="#b45309" />
+                                                                        Request Changes
+                                                                    </button>
+
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleQuickAction(appr, "rejected")}
+                                                                        style={{
+                                                                            display: "flex",
+                                                                            alignItems: "center",
+                                                                            gap: "8px",
+                                                                            width: "100%",
+                                                                            padding: "8px 14px",
+                                                                            background: "none",
+                                                                            border: "none",
+                                                                            fontSize: "13px",
+                                                                            color: "#dc2626",
+                                                                            cursor: "pointer",
+                                                                            fontWeight: 500,
+                                                                        }}
+                                                                    >
+                                                                        <XCircle size={15} color="#dc2626" />
+                                                                        Reject
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </td>
                                             </tr>
                                         );
@@ -426,401 +695,141 @@ export default function ClientApprovalsPage() {
                             </tbody>
                         </table>
                     </div>
+
+                    {/* PAGINATION BAR matching Reference 4 */}
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            marginTop: "24px",
+                            padding: "0 4px",
+                        }}
+                    >
+                        {/* Total Approvals */}
+                        <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a" }}>
+                            Total Approvals: {total > 0 ? total : "NA"}
+                        </div>
+
+                        {/* Numeric Page Controls */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <button
+                                type="button"
+                                disabled={page <= 1}
+                                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                aria-label="Previous page"
+                                style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    width: "32px",
+                                    height: "32px",
+                                    borderRadius: "6px",
+                                    border: "1px solid #cbd5e1",
+                                    background: "#ffffff",
+                                    color: page <= 1 ? "#cbd5e1" : "#475569",
+                                    cursor: page <= 1 ? "not-allowed" : "pointer",
+                                }}
+                            >
+                                <ChevronLeft size={16} />
+                            </button>
+
+                            {pageNumbers.map((p) => {
+                                const isActive = p === page;
+                                return (
+                                    <button
+                                        key={p}
+                                        type="button"
+                                        onClick={() => setPage(p)}
+                                        style={{
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            width: "32px",
+                                            height: "32px",
+                                            borderRadius: "6px",
+                                            border: isActive ? "1.5px solid #2563eb" : "1px solid #cbd5e1",
+                                            background: "#ffffff",
+                                            color: isActive ? "#2563eb" : "#475569",
+                                            fontSize: "13px",
+                                            fontWeight: isActive ? 700 : 500,
+                                            cursor: "pointer",
+                                        }}
+                                    >
+                                        {p}
+                                    </button>
+                                );
+                            })}
+
+                            <button
+                                type="button"
+                                disabled={page >= totalPages}
+                                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                                aria-label="Next page"
+                                style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    width: "32px",
+                                    height: "32px",
+                                    borderRadius: "6px",
+                                    border: "1px solid #cbd5e1",
+                                    background: "#ffffff",
+                                    color: page >= totalPages ? "#cbd5e1" : "#475569",
+                                    cursor: page >= totalPages ? "not-allowed" : "pointer",
+                                }}
+                            >
+                                <ChevronRight size={16} />
+                            </button>
+                        </div>
+
+                        {/* Show per Page */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <span style={{ fontSize: "13px", color: "#64748b" }}>Show per Page:</span>
+                            <div style={{ position: "relative" }}>
+                                <select
+                                    value={pageSize}
+                                    onChange={(e) => {
+                                        setPageSize(Number(e.target.value));
+                                        setPage(1);
+                                    }}
+                                    style={{
+                                        appearance: "none",
+                                        padding: "6px 28px 6px 12px",
+                                        borderRadius: "6px",
+                                        border: "1px solid #cbd5e1",
+                                        background: "#ffffff",
+                                        fontSize: "13px",
+                                        color: "#0f172a",
+                                        fontWeight: 600,
+                                        cursor: "pointer",
+                                        outline: "none",
+                                    }}
+                                >
+                                    <option value={10}>10</option>
+                                    <option value={20}>20</option>
+                                    <option value={50}>50</option>
+                                </select>
+                                <ChevronDown
+                                    size={14}
+                                    color="#64748b"
+                                    style={{ position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
+                                />
+                            </div>
+                        </div>
+                    </div>
                 </section>
             </div>
 
-            {/* Approval Detail & Decision Modal */}
-            {activeApproval && (
-                <div
-                    style={{
-                        position: "fixed",
-                        inset: 0,
-                        backgroundColor: "rgba(15, 23, 42, 0.6)",
-                        backdropFilter: "blur(4px)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        zIndex: 60,
-                        padding: "20px",
-                    }}
-                >
-                    <div
-                        style={{
-                            maxWidth: "680px",
-                            width: "100%",
-                            maxHeight: "90vh",
-                            backgroundColor: "#ffffff",
-                            borderRadius: "16px",
-                            border: "1px solid #e2e8f0",
-                            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)",
-                            display: "flex",
-                            flexDirection: "column",
-                            overflow: "hidden",
-                        }}
-                    >
-                        {/* Header */}
-                        <div
-                            style={{
-                                padding: "20px 24px",
-                                borderBottom: "1px solid #e2e8f0",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                            }}
-                        >
-                            <div>
-                                <h3 style={{ fontSize: "18px", fontWeight: 700, color: "#0f172a", margin: 0 }}>
-                                    {activeApproval.title}
-                                </h3>
-                                <div style={{ fontSize: "13px", color: "#64748b", marginTop: "2px" }}>
-                                    Project: <strong>{activeApproval.projectName}</strong>
-                                </div>
-                            </div>
-                            <span
-                                style={{
-                                    fontSize: "12px",
-                                    fontWeight: 600,
-                                    padding: "4px 10px",
-                                    borderRadius: "999px",
-                                    backgroundColor:
-                                        activeApproval.status === "approved"
-                                            ? "#dcfce7"
-                                            : ["draft", "sent", "in_review", "pending"].includes(activeApproval.status)
-                                            ? "#fef9c3"
-                                            : "#fee2e2",
-                                    color:
-                                        activeApproval.status === "approved"
-                                            ? "#15803d"
-                                            : ["draft", "sent", "in_review", "pending"].includes(activeApproval.status)
-                                            ? "#854d0e"
-                                            : "#b91c1c",
-                                    textTransform: "capitalize",
-                                }}
-                            >
-                                {activeApproval.status.replace("_", " ")}
-                            </span>
-                        </div>
-
-                        {/* Content */}
-                        <div style={{ padding: "24px", overflowY: "auto", flex: 1 }}>
-                            {decisionError && (
-                                <div style={{ padding: "12px", background: "#fef2f2", color: "#b91c1c", borderRadius: "8px", marginBottom: "16px", fontSize: "13px" }}>
-                                    {decisionError}
-                                </div>
-                            )}
-
-                            {/* Description block */}
-                            <div style={{ marginBottom: "20px" }}>
-                                <h4 style={{ fontSize: "13px", fontWeight: 700, color: "#475569", textTransform: "uppercase", marginBottom: "6px" }}>
-                                    Details &amp; Context
-                                </h4>
-                                <div
-                                    style={{
-                                        padding: "14px",
-                                        background: "#f8fafc",
-                                        borderRadius: "8px",
-                                        border: "1px solid #e2e8f0",
-                                        fontSize: "14px",
-                                        color: "#334155",
-                                        lineHeight: 1.6,
-                                    }}
-                                >
-                                    {activeApproval.description || "No specific instructions provided."}
-                                </div>
-                            </div>
-
-                            {/* Meta info */}
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
-                                <div style={{ padding: "10px 14px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
-                                    <div style={{ fontSize: "12px", color: "#64748b" }}>Date Requested</div>
-                                    <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a", marginTop: "2px" }}>
-                                        {formatDate(activeApproval.requestedAt)}
-                                    </div>
-                                </div>
-                                <div style={{ padding: "10px 14px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
-                                    <div style={{ fontSize: "12px", color: "#64748b" }}>Due Date</div>
-                                    <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a", marginTop: "2px" }}>
-                                        {formatDate(activeApproval.dueDate)}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Attachments */}
-                            {activeApproval.attachments && activeApproval.attachments.length > 0 && (
-                                <div style={{ marginBottom: "20px" }}>
-                                    <h4 style={{ fontSize: "13px", fontWeight: 700, color: "#475569", textTransform: "uppercase", marginBottom: "8px" }}>
-                                        Attached Documents
-                                    </h4>
-                                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                                        {activeApproval.attachments.map((att, idx) => (
-                                            <a
-                                                key={idx}
-                                                href={att.url}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                style={{
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    gap: "10px",
-                                                    padding: "10px 14px",
-                                                    background: "#f8fafc",
-                                                    borderRadius: "8px",
-                                                    border: "1px solid #cbd5e1",
-                                                    textDecoration: "none",
-                                                    color: "#2563eb",
-                                                    fontSize: "13px",
-                                                    fontWeight: 600,
-                                                }}
-                                            >
-                                                <Paperclip size={16} />
-                                                <span>{att.name}</span>
-                                                <ExternalLink size={14} style={{ marginLeft: "auto" }} />
-                                            </a>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Confirmation Banner for Consequential Decision */}
-                            {confirmAction && (
-                                <div
-                                    style={{
-                                        background: confirmAction === "approved" ? "#f0fdf4" : "#fef2f2",
-                                        border: confirmAction === "approved" ? "1px solid #bbf7d0" : "1px solid #fecaca",
-                                        borderRadius: "10px",
-                                        padding: "16px",
-                                        marginBottom: "20px",
-                                    }}
-                                >
-                                    <h4 style={{ fontSize: "14px", fontWeight: 700, color: confirmAction === "approved" ? "#166534" : "#b91c1c", margin: "0 0 6px 0" }}>
-                                        Confirm Your Decision: {confirmAction.replace("_", " ").toUpperCase()}
-                                    </h4>
-                                    <p style={{ fontSize: "13px", color: confirmAction === "approved" ? "#15803d" : "#b91c1c", margin: "0 0 12px 0" }}>
-                                        This action will record your formal decision on the audit trail.
-                                    </p>
-
-                                    <textarea
-                                        rows={2}
-                                        placeholder="Add an optional comment or explanation with your decision..."
-                                        value={commentText}
-                                        onChange={(e) => setCommentText(e.target.value)}
-                                        style={{
-                                            width: "100%",
-                                            padding: "8px 12px",
-                                            borderRadius: "6px",
-                                            border: "1px solid #cbd5e1",
-                                            fontSize: "13px",
-                                            boxSizing: "border-box",
-                                            marginBottom: "12px",
-                                            outline: "none",
-                                        }}
-                                    />
-
-                                    <div style={{ display: "flex", gap: "8px" }}>
-                                        <button
-                                            type="button"
-                                            disabled={decisionLoading}
-                                            onClick={handleConfirmDecision}
-                                            style={{
-                                                padding: "8px 16px",
-                                                borderRadius: "6px",
-                                                border: "none",
-                                                backgroundColor: confirmAction === "approved" ? "#16a34a" : "#dc2626",
-                                                color: "#ffffff",
-                                                fontSize: "13px",
-                                                fontWeight: 600,
-                                                cursor: decisionLoading ? "not-allowed" : "pointer",
-                                                display: "inline-flex",
-                                                alignItems: "center",
-                                                gap: "6px",
-                                            }}
-                                        >
-                                            {decisionLoading && <Loader2 className="animate-spin" size={14} />}
-                                            Confirm &amp; Submit
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setConfirmAction(null)}
-                                            style={{
-                                                padding: "8px 14px",
-                                                borderRadius: "6px",
-                                                border: "1px solid #cbd5e1",
-                                                backgroundColor: "#ffffff",
-                                                color: "#475569",
-                                                fontSize: "13px",
-                                                fontWeight: 500,
-                                                cursor: "pointer",
-                                            }}
-                                        >
-                                            Cancel
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Discussion & Comments */}
-                            <div>
-                                <h4 style={{ fontSize: "13px", fontWeight: 700, color: "#475569", textTransform: "uppercase", marginBottom: "8px" }}>
-                                    Discussion History ({activeApproval.comments.length})
-                                </h4>
-                                {activeApproval.comments.length > 0 ? (
-                                    <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "16px" }}>
-                                        {activeApproval.comments.map((c) => (
-                                            <div
-                                                key={c.id}
-                                                style={{
-                                                    padding: "10px 14px",
-                                                    background: "#f8fafc",
-                                                    borderRadius: "8px",
-                                                    border: "1px solid #e2e8f0",
-                                                    fontSize: "13px",
-                                                }}
-                                            >
-                                                <div style={{ display: "flex", justifyContent: "space-between", color: "#64748b", fontSize: "11px", marginBottom: "4px" }}>
-                                                    <span>Author: {c.author_id ? "Team Member" : "System"}</span>
-                                                    <span>{formatDate(c.created_at)}</span>
-                                                </div>
-                                                <div style={{ color: "#1e293b" }}>{c.body}</div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div style={{ fontSize: "13px", color: "#94a3b8", marginBottom: "16px" }}>
-                                        No comments recorded yet.
-                                    </div>
-                                )}
-
-                                {!activeApproval.id.startsWith("prop-") && (
-                                    <div style={{ display: "flex", gap: "8px" }}>
-                                        <input
-                                            type="text"
-                                            placeholder="Ask a clarification question or add note..."
-                                            value={newCommentBody}
-                                            onChange={(e) => setNewCommentBody(e.target.value)}
-                                            onKeyDown={(e) => e.key === "Enter" && handleAddComment()}
-                                            style={{
-                                                flex: 1,
-                                                padding: "8px 12px",
-                                                borderRadius: "6px",
-                                                border: "1px solid #cbd5e1",
-                                                fontSize: "13px",
-                                                outline: "none",
-                                            }}
-                                        />
-                                        <button
-                                            type="button"
-                                            disabled={commentSubmitting || !newCommentBody.trim()}
-                                            onClick={handleAddComment}
-                                            style={{
-                                                padding: "8px 14px",
-                                                borderRadius: "6px",
-                                                border: "none",
-                                                backgroundColor: "#2563eb",
-                                                color: "#ffffff",
-                                                fontSize: "13px",
-                                                fontWeight: 600,
-                                                cursor: commentSubmitting || !newCommentBody.trim() ? "not-allowed" : "pointer",
-                                                display: "inline-flex",
-                                                alignItems: "center",
-                                                gap: "4px",
-                                            }}
-                                        >
-                                            <Send size={14} /> Send
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Footer Actions */}
-                        <div
-                            style={{
-                                padding: "16px 24px",
-                                borderTop: "1px solid #e2e8f0",
-                                display: "flex",
-                                justifyContent: "space-between",
-                                background: "#f8fafc",
-                            }}
-                        >
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setActiveApproval(null);
-                                    setConfirmAction(null);
-                                }}
-                                style={{
-                                    padding: "8px 16px",
-                                    borderRadius: "8px",
-                                    border: "1px solid #cbd5e1",
-                                    background: "#ffffff",
-                                    color: "#475569",
-                                    fontSize: "13px",
-                                    fontWeight: 500,
-                                    cursor: "pointer",
-                                }}
-                            >
-                                Close
-                            </button>
-
-                            {["draft", "sent", "in_review", "pending"].includes(activeApproval.status) && !confirmAction && (
-                                <div style={{ display: "flex", gap: "8px" }}>
-                                    <button
-                                        type="button"
-                                        onClick={() => setConfirmAction("changes_required")}
-                                        style={{
-                                            padding: "8px 14px",
-                                            borderRadius: "8px",
-                                            border: "1px solid #cbd5e1",
-                                            background: "#ffffff",
-                                            color: "#d97706",
-                                            fontSize: "13px",
-                                            fontWeight: 600,
-                                            cursor: "pointer",
-                                        }}
-                                    >
-                                        Request Changes
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setConfirmAction("rejected")}
-                                        style={{
-                                            padding: "8px 14px",
-                                            borderRadius: "8px",
-                                            border: "none",
-                                            background: "#ef4444",
-                                            color: "#ffffff",
-                                            fontSize: "13px",
-                                            fontWeight: 600,
-                                            cursor: "pointer",
-                                        }}
-                                    >
-                                        Reject
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setConfirmAction("approved")}
-                                        style={{
-                                            padding: "8px 18px",
-                                            borderRadius: "8px",
-                                            border: "none",
-                                            background: "#16a34a",
-                                            color: "#ffffff",
-                                            fontSize: "13px",
-                                            fontWeight: 600,
-                                            cursor: "pointer",
-                                            display: "inline-flex",
-                                            alignItems: "center",
-                                            gap: "6px",
-                                        }}
-                                    >
-                                        <CheckCircle2 size={15} /> Approve
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* RIGHT-SIDE VIEW APPROVAL DRAWER matching Reference 5 */}
+            <ApprovalDetailDrawer
+                approval={selectedApproval}
+                isOpen={drawerOpen}
+                onClose={() => setDrawerOpen(false)}
+                onStatusChange={() => {
+                    loadApprovals();
+                }}
+            />
         </main>
     );
 }

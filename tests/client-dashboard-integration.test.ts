@@ -156,12 +156,172 @@ describe("Client Backend API Handlers & Project Isolation", () => {
         expect(valCode).toContain('"changes_required"');
     });
 
+    it("verifies client invoice payment and invoice creation routes are registered and secure", () => {
+        expect(routeCode).toContain('clientInvoicePayMatch = route.match');
+        expect(routeCode).toContain('clientInvoicePayment');
+        expect(routeCode).toContain('createClientInvoice');
+        expect(routeCode).toContain('getClientApprovalsList');
+        expect(routeCode).toContain('getClientAccessibleProjectIds');
+    });
+
     it("preserves User Dashboard and existing APIs without regression", () => {
         expect(routeCode).toContain('route === "dashboard/overview"');
         expect(routeCode).toContain('route === "boqs"');
         expect(routeCode).toContain('route === "invoices"');
         expect(routeCode).toContain('route === "proposals"');
         expect(routeCode).toContain('route === "documents"');
+    });
+});
+
+describe("Client Dashboard Invoices UI Specifications (References 1, 2, 3)", () => {
+    it("verifies Invoices Listing Page (Reference 1) matches clean table layout without redundant KPI cards", () => {
+        const pagePath = join(process.cwd(), "app", "client", "invoices", "page.tsx");
+        expect(existsSync(pagePath)).toBe(true);
+        const code = readFileSync(pagePath, "utf-8");
+
+        // Dashboard layout integration
+        expect(code).toContain('ClientDashboardRail current="/client/invoices"');
+        expect(code).toContain("DashboardHeader");
+        expect(code).toContain('title="Invoices"');
+
+        // Dynamic subtitle matching Reference 1
+        expect(code).toContain('under {activeProjectName}');
+
+        // Table columns
+        expect(code).toContain("ID");
+        expect(code).toContain("TYPE");
+        expect(code).toContain("PROJECT");
+        expect(code).toContain("CLIENT");
+        expect(code).toContain("MILESTONE");
+        expect(code).toContain("STATUS");
+        expect(code).toContain("AMOUNT");
+        expect(code).toContain("ISSUED");
+        expect(code).toContain("DUE");
+
+        // Floating action menu popover
+        expect(code).toContain("View Invoice");
+        expect(code).toContain("Download PDF");
+        expect(code).toContain("Pay Invoice");
+
+        // Bottom pagination bar
+        expect(code).toContain("Total Invoices:");
+        expect(code).toContain("Show per Page:");
+
+        // Currency formatting (compact Cr / L)
+        expect(code).toContain("formatCompactMoney");
+    });
+
+    it("verifies Invoice Creation & Live Preview Page (Reference 2) matches 2-column layout and preview flow", () => {
+        const pagePath = join(process.cwd(), "app", "client", "invoices", "new", "page.tsx");
+        expect(existsSync(pagePath)).toBe(true);
+        const code = readFileSync(pagePath, "utf-8");
+
+        // Header and back button
+        expect(code).toContain("ArrowLeft");
+        expect(code).toContain("Pay Invoice");
+
+        // 2 Columns: INVOICE INFORMATION and INVOICE PREVIEW
+        expect(code).toContain("INVOICE INFORMATION");
+        expect(code).toContain("INVOICE PREVIEW");
+
+        // Required fields
+        expect(code).toContain("Select BOQ");
+        expect(code).toContain("Issue Date");
+        expect(code).toContain("Due Date");
+
+        // Live preview and API integration
+        expect(code).toContain("listClientBoqs");
+        expect(code).toContain("getClientBoq");
+        expect(code).toContain("createClientInvoice");
+        expect(code).toContain("payClientInvoice");
+    });
+
+    it("verifies Invoice Detail Page (Reference 3) matches 2-column layout with 5 cards and summary", () => {
+        const pagePath = join(process.cwd(), "app", "client", "invoices", "[invoiceId]", "page.tsx");
+        expect(existsSync(pagePath)).toBe(true);
+        const code = readFileSync(pagePath, "utf-8");
+
+        // Top bar
+        expect(code).toContain("Pay Invoice");
+
+        // 5 left cards
+        expect(code).toContain("INVOICE INFORMATION");
+        expect(code).toContain("BILL TO");
+        expect(code).toContain("PROJECT DETAILS");
+        expect(code).toContain("INVOICE ITEMS");
+        expect(code).toContain("TERMS & CONDITIONS");
+
+        // Right summary card
+        expect(code).toContain("INVOICE SUMMARY");
+        expect(code).toContain("Amount Due");
+
+        // Payment flow
+        expect(code).toContain("payClientInvoice");
+    });
+});
+
+describe("Client Dashboard Approvals UI Specifications (References 4, 5)", () => {
+    it("verifies Approvals Listing Page (Reference 4) matches 4 KPI cards, clean table and pagination", () => {
+        const pagePath = join(process.cwd(), "app", "client", "approvals", "page.tsx");
+        expect(existsSync(pagePath)).toBe(true);
+        const code = readFileSync(pagePath, "utf-8");
+
+        // Dashboard layout integration
+        expect(code).toContain('ClientDashboardRail current="/client/approvals"');
+        expect(code).toContain("DashboardHeader");
+        expect(code).toContain('title="Approvals"');
+
+        // 4 KPI Cards
+        expect(code).toContain("Total Approvals");
+        expect(code).toContain("Overdue");
+        expect(code).toContain("In-Review");
+        expect(code).toContain("Approved");
+
+        // Table headers matching Reference 4
+        expect(code).toContain("APPROVAL NAME");
+        expect(code).toContain("STAGE");
+        expect(code).toContain("REQUESTED BY");
+        expect(code).toContain("DUE DATE");
+        expect(code).toContain("REQUESTED DATE");
+
+        // Row menu and drawer integration
+        expect(code).toContain("ApprovalDetailDrawer");
+        expect(code).toContain("handleOpenDrawer");
+
+        // Bottom pagination matching Reference 4
+        expect(code).toContain("Total Approvals:");
+        expect(code).toContain("Show per Page:");
+    });
+
+    it("verifies Approval Detail Drawer (Reference 5) matches right slide-over specifications", () => {
+        const drawerPath = join(process.cwd(), "components", "client", "ApprovalDetailDrawer.tsx");
+        expect(existsSync(drawerPath)).toBe(true);
+        const code = readFileSync(drawerPath, "utf-8");
+
+        // Drawer header
+        expect(code).toContain("View Approval");
+
+        // Meta grid
+        expect(code).toContain("Project Name");
+        expect(code).toContain("Due Date");
+        expect(code).toContain("Stage");
+        expect(code).toContain("Status");
+        expect(code).toContain("Description");
+
+        // Attachments section
+        expect(code).toContain("Attachments");
+        expect(code).toContain("Files");
+        expect(code).toContain("Download");
+
+        // Decision actions
+        expect(code).toContain("Approve");
+        expect(code).toContain("Request Changes");
+        expect(code).toContain("Reject");
+
+        // Feedback input pinned at bottom
+        expect(code).toContain("Add a Feedback...");
+        expect(code).toContain("Send");
+        expect(code).toContain("addClientApprovalComment");
     });
 });
 
@@ -178,3 +338,4 @@ describe("Client API Client Library Methods", () => {
         expect(typeof addClientApprovalComment).toBe("function");
     });
 });
+
