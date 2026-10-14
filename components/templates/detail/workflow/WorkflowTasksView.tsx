@@ -109,25 +109,46 @@ export default function WorkflowTasksView({
     return name.slice(0, 2).toUpperCase();
   };
 
+  const totalTasks = tasks.length;
+  const criticalTasks = tasks.filter(
+    (t) => (t.criticality || "").toUpperCase() === "CRITICAL"
+  ).length;
+
+  const avgDuration = useMemo(() => {
+    if (tasks.length === 0) return "0 Days";
+    let totalDays = 0;
+    let counted = 0;
+    tasks.forEach((t) => {
+      const match = (t.duration || "").match(/(\d+(\.\d+)?)/);
+      if (match) {
+        totalDays += parseFloat(match[1]);
+        counted++;
+      }
+    });
+    if (counted === 0) return "0 Days";
+    const avg = totalDays / counted;
+    return `${avg.toFixed(1)} Days`;
+  }, [tasks]);
+
   return (
     <div className="td-wf-tasks-container">
       {/* ── 4 KPI Summary Cards (Reference 1 & 2) ─────────────────── */}
       <div className="td-wf-kpi-grid">
         <div className="td-wf-kpi-card">
           <span className="label">Total Tasks</span>
-          <span className="val">48</span>
+          <span className="val">{String(totalTasks).padStart(2, "0")}</span>
           <span className="sub">All Workflow Stages</span>
         </div>
 
         <div className="td-wf-kpi-card">
           <span className="label">Critical Tasks</span>
-          <span className="val">09</span>
+          <span className="val">{String(criticalTasks).padStart(2, "0")}</span>
           <span className="sub">Requires Attention</span>
         </div>
 
         <div className="td-wf-kpi-card">
           <span className="label">Avg. Duration</span>
-          <span className="val">8.4 Days</span>
+          <span className="val">{avgDuration}</span>
           <span className="sub">Estimated Average</span>
         </div>
 

@@ -23,9 +23,17 @@ export async function getTemplateSection(id: string, section: string) {
 }
 
 export async function updateTemplateSection(id: string, section: string, data: Record<string, unknown>) {
+  const payload = 'data' in data ? data : { data };
   return fetchApi<Record<string, unknown>>(`/api/v1/project-templates/${id}/${section}`, {
     method: 'PATCH',
-    body: JSON.stringify(data),
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateTemplateDocuments(id: string, documents: any[]) {
+  return fetchApi<Record<string, unknown>>(`/api/v1/project-templates/${id}/documents`, {
+    method: 'PATCH',
+    body: JSON.stringify({ documents }),
   });
 }
 
@@ -68,17 +76,26 @@ export async function getTemplatesOverview() {
   }>('/api/v1/project-templates/overview');
 }
 
-export async function listProjectTemplates(params?: { search?: string; status?: string; type?: string; page?: number; pageSize?: number }) {
+export async function listProjectTemplates(params?: { search?: string; status?: string; type?: string; region?: string; visibility?: string; page?: number; pageSize?: number }) {
   const q = new URLSearchParams();
   if (params?.search) q.set('search', params.search);
   if (params?.status) q.set('status', params.status);
   if (params?.type) q.set('type', params.type);
+  if (params?.region) q.set('region', params.region);
+  if (params?.visibility) q.set('visibility', params.visibility);
   if (params?.page) q.set('page', String(params.page));
   if (params?.pageSize) q.set('pageSize', String(params.pageSize));
   const qs = q.toString();
   return fetchApi<{ items: any[]; total: number; page: number; pageSize: number; hasMore: boolean }>(
     `/api/v1/project-templates${qs ? `?${qs}` : ''}`
   );
+}
+
+export async function updateProjectTemplate(id: string, data: Record<string, unknown>) {
+  return fetchApi<Record<string, unknown>>(`/api/v1/project-templates/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
 }
 
 export async function createProjectTemplate(data: Record<string, unknown>) {

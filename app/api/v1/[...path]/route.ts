@@ -8334,7 +8334,11 @@ function projectTemplateDto(row: Record<string, unknown>, includeContent = false
     composition: {
       rooms: Array.isArray(structure.areas) ? structure.areas.length : Number(structure.roomCount ?? 0),
       boqSections: Array.isArray(costingBoq.sections) ? costingBoq.sections.length : Number(costingBoq.sectionCount ?? 0),
-      items: Number(costingBoq.itemCount ?? 0),
+      items: Array.isArray(costingBoq.items)
+        ? costingBoq.items.length
+        : (Array.isArray(costingBoq.sections)
+            ? costingBoq.sections.reduce((sum: number, s: any) => sum + (Array.isArray(s.items) ? s.items.length : 0), 0)
+            : Number(costingBoq.itemCount ?? 0)),
       stages: Array.isArray(workflow.stages) ? workflow.stages.length : 0,
       tasks: Array.isArray(workflow.tasks) ? workflow.tasks.length : 0,
       milestones: Array.isArray(workflow.milestones) ? workflow.milestones.length : 0,
@@ -8353,10 +8357,14 @@ async function listProjectTemplates(request: NextRequest, supabase: SupabaseClie
   const search = request.nextUrl.searchParams.get("search")?.trim().slice(0, 120);
   const status = request.nextUrl.searchParams.get("status");
   const type = request.nextUrl.searchParams.get("type")?.trim().slice(0, 80);
+  const region = request.nextUrl.searchParams.get("region")?.trim();
+  const visibility = request.nextUrl.searchParams.get("visibility")?.trim();
   let query = supabase.from("project_templates").select(projectTemplateSelect, { count: "exact" })
     .eq("workspace_id", scoped.access.workspaceId).is("archived_at", null).order("updated_at", { ascending: false }).range(from, to);
   if (status && ["draft", "active", "needs_review"].includes(status)) query = query.eq("status", status);
   if (type) query = query.eq("business_type", type);
+  if (region) query = query.eq("region", region);
+  if (visibility) query = query.eq("visibility", visibility);
   if (search) {
     const safe = search.replace(/[%_,()]/g, " ");
     query = query.or(`template_code.ilike.%${safe}%,name.ilike.%${safe}%,description.ilike.%${safe}%`);
@@ -8370,117 +8378,13 @@ async function listProjectTemplates(request: NextRequest, supabase: SupabaseClie
 async function listArchivedTemplates(request: NextRequest, supabase: SupabaseClient, id: string) {
   const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
   const search = request.nextUrl.searchParams.get("search")?.trim().toLowerCase();
-  
-  const defaultArchived = [
-    {
-      id: "arc-1",
-      name: "Standard 3BHK Interior BOQ",
-      description: "Premium 3BHK Residential Interiors",
-      category: "Residential",
-      subcategory: "Interior Design",
-      templateType: "BOQ TEMPLATE",
-      version: "v2.4",
-      archivedBy: "Pradhyumn D",
-      archivedByRole: "Project Manager",
-      archivedOn: "06 Aug 2026",
-      archivedRelative: "12 Days Ago",
-      usedIn: "12 Projects",
-      imageUrl: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=600&q=80"
-    },
-    {
-      id: "arc-2",
-      name: "Standard 2BHK Interior BOQ",
-      description: "Standard Finish 2BHK Package",
-      category: "Residential",
-      subcategory: "Interior Design",
-      templateType: "BOQ TEMPLATE",
-      version: "v2.3",
-      archivedBy: "Pradhyumn D",
-      archivedByRole: "Project Manager",
-      archivedOn: "05 Aug 2026",
-      archivedRelative: "11 Days Ago",
-      usedIn: "17 Projects",
-      imageUrl: "https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=600&q=80"
-    },
-    {
-      id: "arc-3",
-      name: "Commercial Office Template",
-      description: "Standard commercial workflow",
-      category: "Commercial",
-      subcategory: "Office",
-      templateType: "PROJECT TEMPLATE",
-      version: "v1.3",
-      archivedBy: "Pradhyumn D",
-      archivedByRole: "Project Manager",
-      archivedOn: "15 Aug 2026",
-      archivedRelative: "36 Days Ago",
-      usedIn: "32 Projects",
-      imageUrl: "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=600&q=80"
-    },
-    {
-      id: "arc-4",
-      name: "3BHK Residential",
-      description: "Standard premium 3BHK interior template",
-      category: "Residential",
-      subcategory: "Interior Design",
-      templateType: "BOQ TEMPLATE",
-      version: "v2.3",
-      archivedBy: "Pradhyumn D",
-      archivedByRole: "Project Manager",
-      archivedOn: "06 Aug 2026",
-      archivedRelative: "12 Days Ago",
-      usedIn: "12 Projects",
-      imageUrl: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=600&q=80"
-    },
-    {
-      id: "arc-5",
-      name: "3BHK Residential",
-      description: "Standard premium 3BHK interior template",
-      category: "Residential",
-      subcategory: "Interior Design",
-      templateType: "BOQ TEMPLATE",
-      version: "v2.3",
-      archivedBy: "Pradhyumn D",
-      archivedByRole: "Project Manager",
-      archivedOn: "06 Aug 2026",
-      archivedRelative: "12 Days Ago",
-      usedIn: "12 Projects",
-      imageUrl: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=600&q=80"
-    },
-    {
-      id: "arc-6",
-      name: "3BHK Residential",
-      description: "Standard premium 3BHK interior template",
-      category: "Residential",
-      subcategory: "Interior Design",
-      templateType: "BOQ TEMPLATE",
-      version: "v2.3",
-      archivedBy: "Pradhyumn D",
-      archivedByRole: "Project Manager",
-      archivedOn: "06 Aug 2026",
-      archivedRelative: "12 Days Ago",
-      usedIn: "12 Projects",
-      imageUrl: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=600&q=80"
-    },
-    {
-      id: "arc-7",
-      name: "3BHK Residential",
-      description: "Standard premium 3BHK interior template",
-      category: "Residential",
-      subcategory: "Interior Design",
-      templateType: "BOQ TEMPLATE",
-      version: "v2.3",
-      archivedBy: "Pradhyumn D",
-      archivedByRole: "Project Manager",
-      archivedOn: "06 Aug 2026",
-      archivedRelative: "12 Days Ago",
-      usedIn: "12 Projects",
-      imageUrl: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=600&q=80"
-    }
-  ];
 
-  const realRes = await supabase.from("project_templates").select("*").eq("workspace_id", scoped.access.workspaceId).or("status.eq.archived,archived_at.not.is.null");
-  const realItems = (realRes.data || []).map((row: Record<string, unknown>) => ({
+  const [projectArchivedRes, boqArchivedRes] = await Promise.all([
+    supabase.from("project_templates").select("*").eq("workspace_id", scoped.access.workspaceId).or("status.eq.archived,archived_at.not.is.null"),
+    supabase.from("boq_templates").select("*").eq("workspace_id", scoped.access.workspaceId).or("status.eq.archived,archived_at.not.is.null")
+  ]);
+
+  const realProjectItems = (projectArchivedRes.data || []).map((row: Record<string, unknown>) => ({
     id: String(row.id),
     name: String(row.name || "Template"),
     description: String(row.description || ""),
@@ -8488,15 +8392,31 @@ async function listArchivedTemplates(request: NextRequest, supabase: SupabaseCli
     subcategory: String(row.project_type || "Interior Design"),
     templateType: "PROJECT TEMPLATE",
     version: `v${row.current_version || 1}.0`,
-    archivedBy: "Pradhyumn D",
+    archivedBy: "Team Member",
     archivedByRole: "Project Manager",
-    archivedOn: row.archived_at ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(String(row.archived_at))) : "06 Aug 2026",
+    archivedOn: row.archived_at ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(String(row.archived_at))) : "Recently",
     archivedRelative: "Recently",
-    usedIn: `${row.usage_count || 0} Projects`,
-    imageUrl: String(row.image_url || defaultArchived[0].imageUrl)
+    usedIn: `${row.use_count || row.usage_count || 0} Projects`,
+    imageUrl: String(row.image_url || "")
   }));
 
-  let combined = [...realItems, ...defaultArchived];
+  const realBoqItems = (boqArchivedRes.data || []).map((row: Record<string, unknown>) => ({
+    id: String(row.id),
+    name: String(row.name || "BOQ Template"),
+    description: String(row.description || ""),
+    category: String(row.category || "Residential"),
+    subcategory: String(row.subcategory || "Interior Design"),
+    templateType: "BOQ TEMPLATE",
+    version: `v${row.version || "1.0"}`,
+    archivedBy: "Team Member",
+    archivedByRole: "Project Manager",
+    archivedOn: row.archived_at ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(String(row.archived_at))) : "Recently",
+    archivedRelative: "Recently",
+    usedIn: `${row.use_count || 0} Projects`,
+    imageUrl: String(row.image_url || "")
+  }));
+
+  let combined = [...realProjectItems, ...realBoqItems];
   if (search) {
     combined = combined.filter(it => it.name.toLowerCase().includes(search) || it.description.toLowerCase().includes(search) || it.category.toLowerCase().includes(search));
   }
@@ -8533,7 +8453,7 @@ async function projectTemplatesOverview(supabase: SupabaseClient, id: string) {
   const sortedProjectsByUsage = [...rows].sort((a, b) => Number(b.use_count ?? 0) - Number(a.use_count ?? 0));
   const mostUsedProject = sortedProjectsByUsage.length > 0 ? String(sortedProjectsByUsage[0].name) : null;
   const mostUsedBoq = boqRows.length > 0 ? String(boqRows[0].name) : null;
-  const mostUsedDoc = docRows.length > 0 ? String(docRows[0].project_name) : "BOQ (Detailed)";
+  const mostUsedDoc = docRows.length > 0 ? String(docRows[0].project_name) : null;
 
   const withLastUsed = rows.filter(r => r.last_used_at);
   const withoutLastUsed = rows.filter(r => !r.last_used_at).sort((a, b) => (Number(b.use_count ?? 0) - Number(a.use_count ?? 0)) || String(b.updated_at).localeCompare(String(a.updated_at)));
@@ -8548,8 +8468,8 @@ async function projectTemplatesOverview(supabase: SupabaseClient, id: string) {
     byType,
     recentlyUsed: recentlyUsedCombined.map((row) => projectTemplateDto(row as Record<string, unknown>)),
     projectTemplatesCount: rows.length,
-    boqTemplatesCount: boqRows.length > 0 ? boqRows.length : 7,
-    documentTemplatesCount: docRows.length > 0 ? docRows.length : 1,
+    boqTemplatesCount: boqRows.length,
+    documentTemplatesCount: docRows.length,
     recentlyUpdatedCount,
     mostUsedProject,
     mostUsedBoq,

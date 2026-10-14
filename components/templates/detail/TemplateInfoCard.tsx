@@ -35,6 +35,10 @@ export default function TemplateInfoCard({
   const [imgSrc, setImgSrc] = useState<string>(template.imageUrl || fallbackCover);
   const [uploading, setUploading] = useState(false);
 
+  React.useEffect(() => {
+    setImgSrc(template.imageUrl || fallbackCover);
+  }, [template.imageUrl]);
+
   const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;

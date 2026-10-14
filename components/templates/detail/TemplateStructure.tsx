@@ -170,32 +170,7 @@ export default function TemplateStructure({
     a.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const sectionsToRender =
-    selectedArea?.sections && selectedArea.sections.length > 0
-      ? selectedArea.sections
-      : [
-          {
-            id: "sec-furniture",
-            name: "Furniture",
-            itemsCount: 24,
-            totalValue: 482000,
-            items: [],
-          },
-          {
-            id: "sec-electrical",
-            name: "Electrical",
-            itemsCount: 28,
-            totalValue: 125000,
-            items: [],
-          },
-          {
-            id: "sec-painting",
-            name: "Painting",
-            itemsCount: 12,
-            totalValue: 95000,
-            items: [],
-          },
-        ];
+  const sectionsToRender = selectedArea?.sections || [];
 
   return (
     <div className="td-structure-layout">
@@ -304,8 +279,7 @@ export default function TemplateStructure({
           {sectionsToRender.map((section, idx) => {
             const isExpanded = !!expandedSectionIds[section.id];
             const sectionNumber = String(idx + 1).padStart(2, "0");
-            const itemsCount =
-              section.items?.length || section.itemsCount || 24;
+            const itemsCount = section.items?.length ?? section.itemsCount ?? 0;
 
             return (
               <div key={section.id} className="td-section-card">
@@ -352,43 +326,51 @@ export default function TemplateStructure({
                         </tr>
                       </thead>
                       <tbody>
-                        {(section.items || []).map((item, itemIdx) => (
-                          <tr key={item.id || itemIdx}>
-                            <td>
-                              <div className="td-item-name-cell">
-                                <div className="td-item-thumb-box" />
-                                <div className="td-item-name-text-col">
-                                  <span className="item-title">{item.name}</span>
-                                  <span className="item-code">
-                                    {item.code || `MAT-BRD-${itemIdx + 1}`}
-                                  </span>
-                                </div>
-                              </div>
-                            </td>
-                            <td>
-                              <span className="cell-muted">{item.type || "Material"}</span>
-                            </td>
-                            <td>
-                              <span className="cell-muted">{item.unit || "Sheet"}</span>
-                            </td>
-                            <td>
-                              <span className="cell-num">
-                                {Number(item.baseCost || 1200).toLocaleString("en-IN", {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}
-                              </span>
-                            </td>
-                            <td>
-                              <span className="cell-num">
-                                {Number(item.sellingRate || 1650).toLocaleString("en-IN", {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}
-                              </span>
+                        {(section.items || []).length === 0 ? (
+                          <tr>
+                            <td colSpan={5} style={{ textAlign: "center", padding: "16px 0", color: "#94a3b8" }}>
+                              No items in this section.
                             </td>
                           </tr>
-                        ))}
+                        ) : (
+                          (section.items || []).map((item, itemIdx) => (
+                            <tr key={item.id || itemIdx}>
+                              <td>
+                                <div className="td-item-name-cell">
+                                  <div className="td-item-thumb-box" />
+                                  <div className="td-item-name-text-col">
+                                    <span className="item-title">{item.name}</span>
+                                    <span className="item-code">
+                                      {item.code || `ITM-${itemIdx + 1}`}
+                                    </span>
+                                  </div>
+                                </div>
+                              </td>
+                              <td>
+                                <span className="cell-muted">{item.type || "Material"}</span>
+                              </td>
+                              <td>
+                                <span className="cell-muted">{item.unit || "Nos"}</span>
+                              </td>
+                              <td>
+                                <span className="cell-num">
+                                  {Number(item.baseCost ?? 0).toLocaleString("en-IN", {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                </span>
+                              </td>
+                              <td>
+                                <span className="cell-num">
+                                  {Number(item.sellingRate ?? item.rate ?? 0).toLocaleString("en-IN", {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -396,6 +378,11 @@ export default function TemplateStructure({
               </div>
             );
           })}
+          {sectionsToRender.length === 0 && (
+            <div style={{ padding: "32px 16px", textAlign: "center", color: "#64748b", background: "#f8fafc", borderRadius: 8, border: "1px dashed #cbd5e1" }}>
+              No BOQ sections configured for this area.
+            </div>
+          )}
         </div>
       </section>
 

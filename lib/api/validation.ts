@@ -352,7 +352,7 @@ export const projectTemplatePatchSchema = z.object({
   visibility: templateVisibility.optional(),
   imageUrl: z.string().url().max(2048).nullable().optional(),
   tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
-  status: z.enum(["draft", "needs_review"]).optional(),
+  status: z.enum(["draft", "active", "needs_review", "archived"]).optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, "At least one field is required.");
 
 export const projectTemplateSectionSchema = z.object({ data: templateJson }).strict();

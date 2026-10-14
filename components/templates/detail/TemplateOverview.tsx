@@ -83,8 +83,8 @@ export default function TemplateOverview({
     areas.length > 0
       ? areas.slice(0, 3).map((a) => ({
           name: a.name,
-          sections: a.sections?.length || 6,
-          items: a.sections?.reduce((sum, s) => sum + (s.items?.length || 0), 0) || 24,
+          sections: a.sections?.length || 0,
+          items: a.sections?.reduce((sum, s) => sum + (s.items?.length || 0), 0) || 0,
         }))
       : [];
 
@@ -251,7 +251,7 @@ export default function TemplateOverview({
 
         {/* Card 2: Status & Governance */}
         <div className="td-card td-bottom-card">
-          <h3 className="td-card-heading">STAUS & GOVERNANCE</h3>
+          <h3 className="td-card-heading">STATUS & GOVERNANCE</h3>
 
           <div className="td-governance-list">
             <div className="td-gov-row">
@@ -265,27 +265,29 @@ export default function TemplateOverview({
             <div className="td-gov-row">
               <span className="td-gov-label">Published On</span>
               <span className="td-gov-val">
-                {formatDate(template.publishedAt || "2026-07-06T00:00:00Z")}
+                {formatDate(template.publishedAt || template.createdAt)}
               </span>
             </div>
             <div className="td-gov-row">
               <span className="td-gov-label">Published by</span>
-              <span className="td-gov-val">{template.updatedBy || "Pradhyumn D"}</span>
+              <span className="td-gov-val">{template.updatedBy || "Admin"}</span>
             </div>
             <div className="td-gov-row">
               <span className="td-gov-label">Next Review</span>
-              <span className="td-gov-val">06 Nov 2026</span>
+              <span className="td-gov-val">
+                {formatDate(template.updatedAt ? new Date(new Date(template.updatedAt).getTime() + 90 * 86400000).toISOString() : null)}
+              </span>
             </div>
             <div className="td-gov-row">
               <span className="td-gov-label">Last Updated</span>
               <span className="td-gov-val">
-                {formatDate(template.updatedAt || "2026-08-06T00:00:00Z")}
+                {formatDate(template.updatedAt)}
               </span>
             </div>
             <div className="td-gov-row">
               <span className="td-gov-label">Last Viewed</span>
               <span className="td-gov-val">
-                {formatDate(template.lastUsedAt || template.updatedAt || "2026-08-06T00:00:00Z")}
+                {formatDate(template.lastUsedAt || template.updatedAt)}
               </span>
             </div>
           </div>
@@ -298,7 +300,7 @@ export default function TemplateOverview({
 
         {/* Card 3: Usage Summary */}
         <div className="td-card td-bottom-card">
-          <h3 className="td-card-heading">USEAGE SUMMARY</h3>
+          <h3 className="td-card-heading">USAGE SUMMARY</h3>
 
           <div className="td-usage-preview-list">
             <div className="td-usage-p-row">
@@ -312,7 +314,7 @@ export default function TemplateOverview({
             <div className="td-usage-p-row">
               <span className="label">Last Used</span>
               <span className="val">
-                {formatDate(template.lastUsedAt || "2026-08-18T00:00:00Z")}
+                {formatDate(template.lastUsedAt)}
               </span>
             </div>
           </div>

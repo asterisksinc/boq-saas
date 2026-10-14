@@ -134,31 +134,44 @@ export default function WorkflowMilestonesView({
     setOpenCardMenuId(null);
   };
 
+  const totalMilestones = milestones.length;
+  const linkedTasks = milestones.reduce(
+    (sum, m) => sum + (m.tasksCount || m.linkedTasks || 0),
+    0
+  );
+  const totalDeliverables = milestones.reduce(
+    (sum, m) => sum + (m.deliverablesCount || m.linkedDeliverables || 0),
+    0
+  );
+  const approvalGates = milestones.filter(
+    (m) => m.approvalType && m.approvalType !== "No Approval" && m.approvalType !== "None"
+  ).length;
+
   return (
     <div className="td-wf-milestones-container">
       {/* ── 4 KPI Summary Cards (Reference 3) ─────────────────────── */}
       <div className="td-wf-kpi-grid">
         <div className="td-wf-kpi-card">
           <span className="label">Milestones</span>
-          <span className="val">08</span>
+          <span className="val">{String(totalMilestones).padStart(2, "0")}</span>
           <span className="sub">All Configured</span>
         </div>
 
         <div className="td-wf-kpi-card">
           <span className="label">Linked Tasks</span>
-          <span className="val">64</span>
+          <span className="val">{String(linkedTasks).padStart(2, "0")}</span>
           <span className="sub">Across Milestones</span>
         </div>
 
         <div className="td-wf-kpi-card">
           <span className="label">Deliverables</span>
-          <span className="val">11</span>
+          <span className="val">{String(totalDeliverables).padStart(2, "0")}</span>
           <span className="sub">Requires Output</span>
         </div>
 
         <div className="td-wf-kpi-card">
           <span className="label">Approval Gates</span>
-          <span className="val">04</span>
+          <span className="val">{String(approvalGates).padStart(2, "0")}</span>
           <span className="sub">At Milestones</span>
         </div>
       </div>

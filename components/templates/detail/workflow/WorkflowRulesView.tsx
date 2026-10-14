@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   WorkflowRule,
   RuleCategory,
+  RulePriority,
   DEFAULT_WORKFLOW_RULES,
   normalizeRule,
 } from "@/lib/templates/rules-domain";
@@ -189,6 +190,13 @@ export default function WorkflowRulesView({
     onCloseAddModal?.();
   };
 
+  const handleUpdatePriority = (ruleId: string, priority: RulePriority) => {
+    const updated = rules.map((r) =>
+      r.id === ruleId ? { ...r, priority } : r
+    );
+    commitRulesChange(updated);
+  };
+
   return (
     <div className="td-wf-rules-container">
       {/* ── 1. KPI Summary Cards (Real dynamic metrics) ─────────────── */}
@@ -212,6 +220,7 @@ export default function WorkflowRulesView({
             onDuplicateRule={handleDuplicateRule}
             onDeleteRule={handleDeleteRule}
             onToggleStatus={handleToggleStatus}
+            onUpdatePriority={handleUpdatePriority}
             onCreateRuleClick={handleOpenCreateRule}
           />
         </div>

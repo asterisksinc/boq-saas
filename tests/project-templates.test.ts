@@ -21,6 +21,11 @@ describe("project template user contracts", () => {
     expect(parsed.visibility).toBe("workspace");
     expect(() => projectTemplateCreateSchema.parse({ ...parsed, workspaceId: crypto.randomUUID() })).toThrow();
     expect(() => projectTemplatePatchSchema.parse({})).toThrow();
+    expect(projectTemplatePatchSchema.parse({ status: "needs_review", imageUrl: "https://example.com/img.png" })).toEqual({
+      status: "needs_review",
+      imageUrl: "https://example.com/img.png",
+    });
+    expect(() => projectTemplatePatchSchema.parse({ status: "invalid_status" })).toThrow();
     expect(projectTemplateSectionSchema.parse({ data: { stages: [] } })).toBeTruthy();
   });
 

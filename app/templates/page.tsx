@@ -242,6 +242,7 @@ function TemplatesContent() {
     businessType: "",
     status: "",
     region: "",
+    visibility: "",
   });
 
   // Data States
@@ -271,6 +272,33 @@ function TemplatesContent() {
   const [archivedTemplates, setArchivedTemplates] = useState<ArchivedTemplate[]>([]);
   const [archivedTotal, setArchivedTotal] = useState(0);
 
+  const appliedFiltersCount = useMemo(() => {
+    let count = 0;
+    if (filters.businessType) count += 1;
+    if (filters.status) count += 1;
+    if (filters.region) count += 1;
+    if (filters.visibility) count += 1;
+    return count;
+  }, [filters]);
+
+  const filteredRecentlyUsed = useMemo(() => {
+    if (!overview?.recentlyUsed) return [];
+    return overview.recentlyUsed.filter((t) => {
+      if (query) {
+        const q = query.toLowerCase();
+        const matchName = t.name?.toLowerCase().includes(q);
+        const matchCode = t.templateCode?.toLowerCase().includes(q);
+        const matchDesc = t.description?.toLowerCase().includes(q);
+        if (!matchName && !matchCode && !matchDesc) return false;
+      }
+      if (filters.status && t.status !== filters.status) return false;
+      if (filters.businessType && t.businessType !== filters.businessType) return false;
+      if (filters.region && t.region !== filters.region) return false;
+      if (filters.visibility && t.visibility !== filters.visibility) return false;
+      return true;
+    });
+  }, [overview?.recentlyUsed, query, filters]);
+
   const appliedBoqFiltersCount = useMemo(() => {
     let count = 0;
     count += boqFilters.status.length;
@@ -298,6 +326,8 @@ function TemplatesContent() {
         search: query || undefined,
         status: filters.status || undefined,
         type: filters.businessType || undefined,
+        region: filters.region || undefined,
+        visibility: filters.visibility || undefined,
         page,
         pageSize,
       });
@@ -539,113 +569,30 @@ function TemplatesContent() {
   };
 
   const renderCardMeta = (t: ProjectTemplate) => {
-    let rooms = t.composition?.rooms ?? t.roomCount;
-    let sections = t.composition?.boqSections ?? t.sectionCount;
-
-    if (rooms === undefined || rooms === null || rooms === 0) {
-      const n = (t.name || "").toLowerCase();
-      if (n.includes("3bhk") || n.includes("3 bhk")) rooms = 8;
-      else if (n.includes("2bhk") || n.includes("2 bhk")) rooms = 6;
-      else if (n.includes("1bhk") || n.includes("1 bhk")) rooms = 4;
-      else if (n.includes("villa")) rooms = 12;
-      else if (n.includes("office")) rooms = 8;
-      else if (n.includes("retail")) rooms = 6;
-      else if (n.includes("restaurant")) rooms = 6;
-      else if (n.includes("hotel")) rooms = 12;
-      else rooms = 0;
-    }
-
-    if (sections === undefined || sections === null || sections === 0) {
-      const n = (t.name || "").toLowerCase();
-      if (n.includes("3bhk") || n.includes("3 bhk")) sections = 18;
-      else if (n.includes("2bhk") || n.includes("2 bhk")) sections = 14;
-      else if (n.includes("1bhk") || n.includes("1 bhk")) sections = 10;
-      else if (n.includes("villa")) sections = 24;
-      else if (n.includes("office")) sections = 18;
-      else if (n.includes("retail")) sections = 14;
-      else if (n.includes("restaurant")) sections = 14;
-      else if (n.includes("hotel")) sections = 24;
-      else sections = 0;
-    }
-
+    const rooms = t.composition?.rooms ?? t.roomCount ?? 0;
+    const sections = t.composition?.boqSections ?? t.sectionCount ?? 0;
     return `${rooms} Rooms · ${sections} BOQ Sections`;
   };
 
   const renderUsageCount = (t: ProjectTemplate) => {
-    let count = t.useCount ?? t.usageCount ?? 0;
-    if (count === 0) {
-      const n = (t.name || "").toLowerCase();
-      if (n.includes("3bhk") || n.includes("3 bhk")) count = 42;
-      else if (n.includes("2bhk") || n.includes("2 bhk")) count = 38;
-      else if (n.includes("1bhk") || n.includes("1 bhk")) count = 21;
-      else if (n.includes("villa")) count = 31;
-      else if (n.includes("office")) count = 42;
-      else if (n.includes("retail")) count = 18;
-      else if (n.includes("restaurant")) count = 22;
-      else if (n.includes("hotel")) count = 16;
-    }
+    const count = t.useCount ?? t.usageCount ?? 0;
     return `Used ${count} Times`;
   };
 
   const getProjectTypeLabel = (t: ProjectTemplate): string => {
-    if (t.projectType && t.projectType.trim() !== "" && t.projectType.toLowerCase() !== t.businessType?.toLowerCase()) {
-      return t.projectType;
-    }
-    const n = (t.name || "").toLowerCase();
-    if (n.includes("3bhk") || n.includes("3 bhk")) return "3BHK";
-    if (n.includes("2bhk") || n.includes("2 bhk")) return "2BHK";
-    if (n.includes("1bhk") || n.includes("1 bhk")) return "1BHK";
-    if (n.includes("villa")) return "Villa";
-    if (n.includes("office")) return "Office";
-    if (n.includes("retail") || n.includes("store")) return "Store";
-    if (n.includes("restaurant")) return "Restaurant";
-    if (n.includes("hotel")) return "Hotel";
     return t.projectType || t.businessType || "Standard";
   };
 
   const getTemplateRooms = (t: ProjectTemplate): number => {
-    const count = t.composition?.rooms ?? t.roomCount;
-    if (count !== undefined && count !== null && count > 0) return count;
-    const n = (t.name || "").toLowerCase();
-    if (n.includes("3bhk") || n.includes("3 bhk")) return 8;
-    if (n.includes("2bhk") || n.includes("2 bhk")) return 6;
-    if (n.includes("1bhk") || n.includes("1 bhk")) return 4;
-    if (n.includes("villa")) return 12;
-    if (n.includes("office")) return 10;
-    if (n.includes("retail") || n.includes("store")) return 6;
-    if (n.includes("restaurant")) return 7;
-    if (n.includes("hotel")) return 6;
-    return count ?? 0;
+    return t.composition?.rooms ?? t.roomCount ?? 0;
   };
 
   const getTemplateSections = (t: ProjectTemplate): number => {
-    const count = t.composition?.boqSections ?? t.sectionCount;
-    if (count !== undefined && count !== null && count > 0) return count;
-    const n = (t.name || "").toLowerCase();
-    if (n.includes("3bhk") || n.includes("3 bhk")) return 18;
-    if (n.includes("2bhk") || n.includes("2 bhk")) return 14;
-    if (n.includes("1bhk") || n.includes("1 bhk")) return 10;
-    if (n.includes("villa")) return 24;
-    if (n.includes("office")) return 20;
-    if (n.includes("retail") || n.includes("store")) return 16;
-    if (n.includes("restaurant")) return 18;
-    if (n.includes("hotel")) return 12;
-    return count ?? 0;
+    return t.composition?.boqSections ?? t.sectionCount ?? 0;
   };
 
   const getTemplateItems = (t: ProjectTemplate): number => {
-    const count = t.composition?.items ?? t.itemCount;
-    if (count !== undefined && count !== null && count > 0) return count;
-    const n = (t.name || "").toLowerCase();
-    if (n.includes("3bhk") || n.includes("3 bhk")) return 186;
-    if (n.includes("2bhk") || n.includes("2 bhk")) return 142;
-    if (n.includes("1bhk") || n.includes("1 bhk")) return 96;
-    if (n.includes("villa")) return 248;
-    if (n.includes("office")) return 220;
-    if (n.includes("retail") || n.includes("store")) return 165;
-    if (n.includes("restaurant")) return 190;
-    if (n.includes("hotel")) return 128;
-    return count ?? 0;
+    return t.composition?.items ?? t.itemCount ?? 0;
   };
 
   const renderStatusPill = (t: ProjectTemplate) => {
@@ -878,14 +825,14 @@ function TemplatesContent() {
                 <div style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
                   <button
                     type="button"
-                    className={`template-filter-btn ${isFilterOpen || filters.businessType || filters.status || filters.region ? "active" : ""}`}
+                    className={`template-filter-btn ${isFilterOpen || appliedFiltersCount > 0 ? "active" : ""}`}
                     onClick={() => setIsFilterOpen(!isFilterOpen)}
                     title="Filter templates"
                     aria-label="Filter templates"
                   >
                     <SlidersHorizontal size={15} />
                     <span>Filter</span>
-                    {(filters.businessType || filters.status || filters.region) && (
+                    {appliedFiltersCount > 0 && (
                       <span className="template-filter-indicator" />
                     )}
                   </button>
@@ -894,7 +841,7 @@ function TemplatesContent() {
                     onClose={() => setIsFilterOpen(false)}
                     filters={filters}
                     onChange={setFilters}
-                    onReset={() => setFilters({ businessType: "", status: "", region: "" })}
+                    onReset={() => setFilters({ businessType: "", status: "", region: "", visibility: "" })}
                   />
                 </div>
               )}
@@ -944,9 +891,9 @@ function TemplatesContent() {
                     <div key={i} className="template-card-skeleton skeleton-shimmer" />
                   ))}
                 </div>
-              ) : (overview?.recentlyUsed && overview.recentlyUsed.length > 0) ? (
+              ) : (filteredRecentlyUsed && filteredRecentlyUsed.length > 0) ? (
                 <div className="template-cards-grid">
-                  {overview.recentlyUsed.slice(0, 4).map((t) => (
+                  {filteredRecentlyUsed.slice(0, 4).map((t) => (
                     <div
                       key={t.id}
                       className="target-template-card"
@@ -1046,7 +993,11 @@ function TemplatesContent() {
                       Start projects with pre-defined structure.
                     </div>
                     <div className="target-kpi-note">
-                      Most Used: <b>{overview?.mostUsedProject || "None"}</b>
+                      {overview?.mostUsedProject ? (
+                        <>Most Used: <b>{overview.mostUsedProject}</b></>
+                      ) : (
+                        <span>No usage recorded</span>
+                      )}
                     </div>
                   </div>
 
@@ -1059,13 +1010,17 @@ function TemplatesContent() {
                   >
                     <div className="target-kpi-label">BOQ Templates</div>
                     <div className="target-kpi-value">
-                      {overview?.boqTemplatesCount ?? boqTotal ?? 7}
+                      {overview?.boqTemplatesCount ?? boqTotal ?? 0}
                     </div>
                     <div className="target-kpi-desc">
                       Reusable BOQ Sections and item structures.
                     </div>
                     <div className="target-kpi-note">
-                      Most Used: <b>{overview?.mostUsedBoq || "Kitchen BOQ Template"}</b>
+                      {overview?.mostUsedBoq ? (
+                        <>Most Used: <b>{overview.mostUsedBoq}</b></>
+                      ) : (
+                        <span>No usage recorded</span>
+                      )}
                     </div>
                   </div>
 
@@ -1078,13 +1033,17 @@ function TemplatesContent() {
                   >
                     <div className="target-kpi-label">Document Templates</div>
                     <div className="target-kpi-value">
-                      {overview?.documentTemplatesCount ?? docTemplates.length ?? 1}
+                      {overview?.documentTemplatesCount ?? docTemplates.length ?? 0}
                     </div>
                     <div className="target-kpi-desc">
                       Branded BOQ, proposals, and invoice layouts.
                     </div>
                     <div className="target-kpi-note">
-                      Most Used: <b>{overview?.mostUsedDoc || "BOQ (Detailed)"}</b>
+                      {overview?.mostUsedDoc ? (
+                        <>Most Used: <b>{overview.mostUsedDoc}</b></>
+                      ) : (
+                        <span>No usage recorded</span>
+                      )}
                     </div>
                   </div>
 
@@ -1096,7 +1055,11 @@ function TemplatesContent() {
                     </div>
                     <div className="target-kpi-subdesc">in last 7 Days</div>
                     <div className="target-kpi-note">
-                      Updated: <b>{overview?.lastUpdatedName || "Invoice Standard"}</b>
+                      {overview?.lastUpdatedName ? (
+                        <>Updated: <b>{overview.lastUpdatedName}</b></>
+                      ) : (
+                        <span>No recent updates</span>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -39013,6 +39013,49 @@ input {
 }
 
 /* Template Cards Grid */
+
+
+/* Template Section Header & View All */
+.template-section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.template-section-heading {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #0f172a;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin: 0;
+}
+
+.template-view-all-link,
+.template-view-all-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    line-height: 1.2;
+}
+
+.template-view-all-link:hover,
+.template-view-all-btn:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #0f172a;
+}
+
 .template-cards-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -40288,10 +40331,9 @@ input {
    ========================================================================== */
 
 .td-page-shell {
-    padding: 0 40px 48px 40px;
-    max-width: 1480px;
-    margin: 0 auto;
+    padding: 0 28px 40px 28px;
     width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
 }
 

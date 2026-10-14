@@ -18,7 +18,7 @@ import TemplateUsage from "@/components/templates/detail/TemplateUsage";
 import TemplateVersions from "@/components/templates/detail/TemplateVersions";
 import TemplateActivity from "@/components/templates/detail/TemplateActivity";
 import UseTemplateModal from "@/components/templates/detail/UseTemplateModal";
-import { getTemplate, duplicateProjectTemplate } from "@/lib/api/templates";
+import { getTemplate, duplicateProjectTemplate, updateProjectTemplate } from "@/lib/api/templates";
 
 export default function TemplateDetailPage() {
   const params = useParams();
@@ -98,6 +98,11 @@ export default function TemplateDetailPage() {
   const handleUseTemplate = () => {
     setIsUseModalOpen(true);
   };
+
+  const validSubtabs = ["Stages", "Tasks", "Milestones", "Approvals", "Rules"] as const;
+  const matchedSubtab = validSubtabs.find(
+    (s) => s.toLowerCase() === subtabParam?.toLowerCase()
+  );
 
   return (
     <main className="fig-dashboard boq-dashboard">
@@ -189,8 +194,11 @@ export default function TemplateDetailPage() {
                 onDuplicate={handleDuplicate}
                 onEdit={handleEdit}
                 onUseTemplate={handleUseTemplate}
-                onImageUploaded={(url) => {
+                onImageUploaded={async (url) => {
                   setTemplate((prev: any) => ({ ...prev, imageUrl: url }));
+                  try {
+                    await updateProjectTemplate(template.id, { imageUrl: url });
+                  } catch {}
                 }}
               />
 
@@ -222,7 +230,8 @@ export default function TemplateDetailPage() {
               {activeTab === "Costing & BOQ" && (
                 <TemplateCostingBoq
                   templateId={template.id}
-                  initialItems={template.costingBoq?.items || []}
+                  initialCosting={template.costingBoq}
+                  initialStructure={template.structure}
                   onUpdate={fetchTemplateData}
                 />
               )}
@@ -232,7 +241,7 @@ export default function TemplateDetailPage() {
                   templateId={template.id}
                   templateName={template.name}
                   initialWorkflow={template.workflow}
-                  initialSubTab={subtabParam?.toLowerCase() === "rules" ? "Rules" : "Rules"}
+                  initialSubTab={matchedSubtab || "Stages"}
                   onUpdate={fetchTemplateData}
                 />
               )}

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import {
   WorkflowRule,
+  RulePriority,
   formatActionSummary,
 } from "@/lib/templates/rules-domain";
 
@@ -27,6 +28,7 @@ interface RulesDataTableProps {
   onDuplicateRule: (rule: WorkflowRule) => void;
   onDeleteRule: (ruleId: string) => void;
   onToggleStatus: (ruleId: string) => void;
+  onUpdatePriority?: (ruleId: string, priority: RulePriority) => void;
   onCreateRuleClick: () => void;
 }
 
@@ -38,11 +40,13 @@ export default function RulesDataTable({
   onDuplicateRule,
   onDeleteRule,
   onToggleStatus,
+  onUpdatePriority,
   onCreateRuleClick,
 }: RulesDataTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [openKebabId, setOpenKebabId] = useState<string | null>(null);
+  const [openPriorityId, setOpenPriorityId] = useState<string | null>(null);
 
   const totalCount = rules.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
@@ -82,6 +86,21 @@ export default function RulesDataTable({
     return <span className="td-status-dash">—</span>;
   };
 
+  const formatDate = (isoOrStr?: string | null) => {
+    if (!isoOrStr) return "12 Aug 2026";
+    try {
+      const d = new Date(isoOrStr);
+      if (isNaN(d.getTime())) return String(isoOrStr);
+      return new Intl.DateTimeFormat("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }).format(d);
+    } catch {
+      return String(isoOrStr);
+    }
+  };
+
   return (
     <div className="td-wf-table-card">
       <div className="td-wf-table-responsive">
@@ -89,17 +108,20 @@ export default function RulesDataTable({
           <thead>
             <tr>
               <th style={{ width: "4%" }} className="center">#</th>
-              <th style={{ width: "26%" }}>RULE NAME</th>
-              <th style={{ width: "20%" }}>TRIGGER</th>
-              <th style={{ width: "24%" }}>ACTION</th>
-              <th style={{ width: "16%" }}>STATUS</th>
+              <th style={{ width: "22%" }}>RULE NAME</th>
+              <th style={{ width: "17%" }}>TRIGGER</th>
+              <th style={{ width: "17%" }}>ACTION</th>
+              <th style={{ width: "14%" }}>STATUS</th>
               <th style={{ width: "10%" }}>PRIORITY</th>
+              <th style={{ width: "7%" }}>EXECUTED</th>
+              <th style={{ width: "11%" }}>LAST UPDATED</th>
+              <th style={{ width: "4%" }} className="center"></th>
             </tr>
           </thead>
           <tbody>
             {paginatedRules.length === 0 ? (
               <tr>
-                <td colSpan={6} className="td-table-empty-row">
+                <td colSpan={9} className="td-table-empty-row">
                   <div className="td-empty-rules-state">
                     <p className="empty-title">No workflow rules configured</p>
                     <p className="empty-desc">
@@ -121,6 +143,7 @@ export default function RulesDataTable({
                 const rowNumber = startIdx + idx + 1;
                 const isSelected = selectedRuleId === rule.id;
                 const isKebabOpen = openKebabId === rule.id;
+                const isPriorityOpen = openPriorityId === rule.id;
                 const actionInfo = formatActionSummary(rule.actions);
                 const triggerTiming = rule.trigger.timing || rule.trigger.evaluate || "Immediately";
 
@@ -171,85 +194,150 @@ export default function RulesDataTable({
                     {/* Column 5: Status */}
                     <td>{getStatusPill(rule)}</td>
 
-                    {/* Column 6: Priority + Kebab / Chevron */}
-                    <td>
-                      <div className="td-priority-cell-wrap">
-                        <span className={`td-pri-badge ${getPriorityBadgeClass(rule.priority)}`}>
-                          {(rule.priority || "MEDIUM").toUpperCase()}
-                        </span>
+                    {/* Column 6: Interactive Priority Dropdown (Screenshot 5) */}
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <div className="td-relative-inline">
+                        <button
+                          type="button"
+                          className={`td-pri-badge ${getPriorityBadgeClass(rule.priority)}`}
+                          style={{
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 5,
+                            border: "none",
+                            padding: "3px 8px",
+                            borderRadius: 6,
+                          }}
+                          onClick={() => setOpenPriorityId(isPriorityOpen ? null : rule.id)}
+                          title="Change priority"
+                        >
+                          <span>{(rule.priority || "MEDIUM").toUpperCase()}</span>
+                          <ChevronDown size={11} />
+                        </button>
 
-                        <div className="td-relative-inline" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            type="button"
-                            className="td-kebab-btn"
-                            title="Rule Actions"
-                            onClick={() => setOpenKebabId(isKebabOpen ? null : rule.id)}
+                        {isPriorityOpen && (
+                          <div
+                            className="td-wf-action-menu"
+                            style={{
+                              position: "absolute",
+                              top: 28,
+                              left: 0,
+                              zIndex: 40,
+                              minWidth: 110,
+                              boxShadow: "0 4px 14px rgba(0,0,0,0.12)",
+                            }}
                           >
-                            <ChevronDown size={14} className="chevron-icon" />
-                          </button>
-
-                          {isKebabOpen && (
-                            <div className="td-wf-action-menu">
+                            {(["Critical", "High", "Medium", "Low"] as RulePriority[]).map((pri) => (
                               <button
+                                key={pri}
                                 type="button"
                                 className="item"
                                 onClick={() => {
-                                  onSelectRule(rule);
-                                  setOpenKebabId(null);
+                                  onUpdatePriority?.(rule.id, pri);
+                                  setOpenPriorityId(null);
                                 }}
                               >
-                                <Eye size={13} />
-                                <span>View Details</span>
-                              </button>
-                              <button
-                                type="button"
-                                className="item"
-                                onClick={() => {
-                                  onEditRule(rule);
-                                  setOpenKebabId(null);
-                                }}
-                              >
-                                <Edit3 size={13} />
-                                <span>Edit Rule</span>
-                              </button>
-                              <button
-                                type="button"
-                                className="item"
-                                onClick={() => {
-                                  onDuplicateRule(rule);
-                                  setOpenKebabId(null);
-                                }}
-                              >
-                                <Copy size={13} />
-                                <span>Duplicate</span>
-                              </button>
-                              <button
-                                type="button"
-                                className="item"
-                                onClick={() => {
-                                  onToggleStatus(rule.id);
-                                  setOpenKebabId(null);
-                                }}
-                              >
-                                <CheckCircle size={13} />
-                                <span>
-                                  {rule.status === "ACTIVE" ? "Deactivate" : "Activate"}
+                                <span
+                                  className={`td-pri-badge ${getPriorityBadgeClass(pri)}`}
+                                  style={{ padding: "2px 6px", fontSize: 11 }}
+                                >
+                                  {pri.toUpperCase()}
                                 </span>
                               </button>
-                              <button
-                                type="button"
-                                className="item danger"
-                                onClick={() => {
-                                  onDeleteRule(rule.id);
-                                  setOpenKebabId(null);
-                                }}
-                              >
-                                <Trash2 size={13} />
-                                <span>Delete Rule</span>
-                              </button>
-                            </div>
-                          )}
-                        </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Column 7: Executed Count (Screenshot 5) */}
+                    <td>
+                      <span className="td-num-txt font-medium" style={{ fontSize: 13, color: "#334155" }}>
+                        {rule.executedCount ?? 0}
+                      </span>
+                    </td>
+
+                    {/* Column 8: Last Updated (Screenshot 5) */}
+                    <td>
+                      <span className="cell-muted text-xs" style={{ fontSize: 12, color: "#64748b" }}>
+                        {formatDate(rule.lastUpdated || rule.updatedAt)}
+                      </span>
+                    </td>
+
+                    {/* Column 9: Kebab Action Menu */}
+                    <td className="center" onClick={(e) => e.stopPropagation()}>
+                      <div className="td-relative-inline">
+                        <button
+                          type="button"
+                          className="td-kebab-btn"
+                          title="Rule Actions"
+                          onClick={() => setOpenKebabId(isKebabOpen ? null : rule.id)}
+                        >
+                          <MoreHorizontal size={15} />
+                        </button>
+
+                        {isKebabOpen && (
+                          <div className="td-wf-action-menu" style={{ right: 0, left: "auto" }}>
+                            <button
+                              type="button"
+                              className="item"
+                              onClick={() => {
+                                onSelectRule(rule);
+                                setOpenKebabId(null);
+                              }}
+                            >
+                              <Eye size={13} />
+                              <span>View Details</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="item"
+                              onClick={() => {
+                                onEditRule(rule);
+                                setOpenKebabId(null);
+                              }}
+                            >
+                              <Edit3 size={13} />
+                              <span>Edit Rule</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="item"
+                              onClick={() => {
+                                onDuplicateRule(rule);
+                                setOpenKebabId(null);
+                              }}
+                            >
+                              <Copy size={13} />
+                              <span>Duplicate</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="item"
+                              onClick={() => {
+                                onToggleStatus(rule.id);
+                                setOpenKebabId(null);
+                              }}
+                            >
+                              <CheckCircle size={13} />
+                              <span>
+                                {rule.status === "ACTIVE" ? "Deactivate" : "Activate"}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              className="item danger"
+                              onClick={() => {
+                                onDeleteRule(rule.id);
+                                setOpenKebabId(null);
+                              }}
+                            >
+                              <Trash2 size={13} />
+                              <span>Delete Rule</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>

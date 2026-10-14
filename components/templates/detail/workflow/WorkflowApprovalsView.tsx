@@ -57,11 +57,12 @@ export default function WorkflowApprovalsView({
     const q = searchQuery.toLowerCase();
     return approvals.filter(
       (a) =>
-        a.name.toLowerCase().includes(q) ||
-        a.code.toLowerCase().includes(q) ||
-        a.triggerTitle.toLowerCase().includes(q) ||
-        a.triggerDescription.toLowerCase().includes(q) ||
-        a.status.toLowerCase().includes(q)
+        a.name?.toLowerCase().includes(q) ||
+        a.code?.toLowerCase().includes(q) ||
+        (a.triggerTitle && a.triggerTitle.toLowerCase().includes(q)) ||
+        (a.triggerDescription && a.triggerDescription.toLowerCase().includes(q)) ||
+        (typeof (a as any).trigger === "string" && (a as any).trigger.toLowerCase().includes(q)) ||
+        a.status?.toLowerCase().includes(q)
     );
   }, [approvals, searchQuery]);
 
@@ -73,6 +74,11 @@ export default function WorkflowApprovalsView({
 
   const selectedFlow =
     approvals.find((a) => a.id === selectedFlowId) || approvals[0];
+
+  const totalFlows = approvals.length;
+  const activeFlows = approvals.filter((a) => (a.status || "").toUpperCase() === "ACTIVE").length;
+  const draftFlows = approvals.filter((a) => (a.status || "").toUpperCase() === "DRAFT").length;
+  const needsAttention = approvals.filter((a) => (a.status || "").toUpperCase().includes("ATTENTION") || (a.status || "").toUpperCase().includes("REVIEW")).length;
 
   const handleRowClick = (flow: MockApprovalFlow) => {
     setSelectedFlowId(flow.id);
@@ -104,14 +110,17 @@ export default function WorkflowApprovalsView({
     setOpenActionMenuId(null);
   };
 
-  const renderApproverBubble = (approver: MockApprover, key: string | number) => {
+  const renderApproverBubble = (approver: any, key: string | number) => {
+    const label = typeof approver === "string" ? approver.slice(0, 2).toUpperCase() : (approver.label || approver.name || "AP");
+    const role = typeof approver === "string" ? approver : (approver.role || "Approver");
+    const color = (typeof approver === "object" && approver.color) ? approver.color : "blue";
     return (
       <span
         key={key}
-        className={`td-approver-bubble ${approver.color}`}
-        title={`${approver.label} (${approver.role})`}
+        className={`td-approver-bubble ${color}`}
+        title={`${label} (${role})`}
       >
-        {approver.label}
+        {label}
       </span>
     );
   };
@@ -122,25 +131,25 @@ export default function WorkflowApprovalsView({
       <div className="td-wf-kpi-grid">
         <div className="td-wf-kpi-card">
           <span className="label">Approval Flows</span>
-          <span className="val">06</span>
+          <span className="val">{String(totalFlows).padStart(2, "0")}</span>
           <span className="sub">All Configured</span>
         </div>
 
         <div className="td-wf-kpi-card">
           <span className="label">Active</span>
-          <span className="val">04</span>
+          <span className="val">{String(activeFlows).padStart(2, "0")}</span>
           <span className="sub">Ready to Use</span>
         </div>
 
         <div className="td-wf-kpi-card">
           <span className="label">Draft</span>
-          <span className="val">01</span>
+          <span className="val">{String(draftFlows).padStart(2, "0")}</span>
           <span className="sub">In-Progress</span>
         </div>
 
         <div className="td-wf-kpi-card">
           <span className="label">Needs Attention</span>
-          <span className="val">01</span>
+          <span className="val">{String(needsAttention).padStart(2, "0")}</span>
           <span className="sub">Config Issues</span>
         </div>
       </div>
@@ -202,23 +211,23 @@ export default function WorkflowApprovalsView({
                         {/* Column 3: Trigger + Subtitle */}
                         <td>
                           <div className="td-flow-trigger-cell">
-                            <span className="primary-trigger">{flow.triggerTitle}</span>
-                            <span className="sub-trigger">{flow.triggerDescription}</span>
+                            <span className="primary-trigger">{flow.triggerTitle || (typeof (flow as any).trigger === "string" ? (flow as any).trigger : "Manual Trigger")}</span>
+                            <span className="sub-trigger">{flow.triggerDescription || "Standard condition"}</span>
                           </div>
                         </td>
 
                         {/* Column 4: Stages Count + Mode */}
                         <td>
                           <div className="td-flow-stages-cell">
-                            <span className="stages-count">{flow.stagesCount}</span>
-                            <span className="stages-mode">{flow.mode}</span>
+                            <span className="stages-count">{flow.stagesCount ?? (Array.isArray((flow as any).stages) ? (flow as any).stages.length : 1)}</span>
+                            <span className="stages-mode">{flow.mode || "Sequential"}</span>
                           </div>
                         </td>
 
                         {/* Column 5: Approvers Avatar Stack */}
                         <td>
                           <div className="td-approvers-stack">
-                            {flow.approvers.map((appr, aIdx) =>
+                            {(Array.isArray(flow.approvers) ? flow.approvers : []).map((appr, aIdx) =>
                               renderApproverBubble(appr, aIdx)
                             )}
                             <span className="td-approver-bubble add-bubble">+</span>
@@ -360,9 +369,9 @@ export default function WorkflowApprovalsView({
           <aside className="td-approval-inspector">
             <div className="insp-head">
               <div className="title-block">
-                <h4 className="flow-title">{selectedFlow.name.toUpperCase()}</h4>
+                <h4 className="flow-title">{(selectedFlow.name || "Approval Flow").toUpperCase()}</h4>
                 <span className="flow-meta">
-                  {selectedFlow.code} · {selectedFlow.category} · {selectedFlow.version}
+                  {selectedFlow.code || "APR"} · {selectedFlow.category || "General"} · {selectedFlow.version || "v1.0"}
                 </span>
               </div>
               <button
@@ -375,7 +384,7 @@ export default function WorkflowApprovalsView({
               </button>
             </div>
 
-            <p className="insp-description">{selectedFlow.description}</p>
+            <p className="insp-description">{selectedFlow.description || "No description provided."}</p>
 
             <div className="insp-rows-list">
               <div className="insp-row">
@@ -387,46 +396,46 @@ export default function WorkflowApprovalsView({
                       : "status-pill-draft"
                   }`}
                 >
-                  {selectedFlow.status}
+                  {selectedFlow.status || "DRAFT"}
                 </span>
               </div>
 
               <div className="insp-row">
                 <span className="lbl">Trigger</span>
                 <div className="val-col">
-                  <span className="val-main">{selectedFlow.triggerTitle}</span>
-                  <span className="val-sub">{selectedFlow.triggerDescription}</span>
+                  <span className="val-main">{selectedFlow.triggerTitle || (typeof (selectedFlow as any).trigger === "string" ? (selectedFlow as any).trigger : "Manual Trigger")}</span>
+                  <span className="val-sub">{selectedFlow.triggerDescription || "Standard condition"}</span>
                 </div>
               </div>
 
               <div className="insp-row">
                 <span className="lbl">Approval Mode</span>
-                <span className="val-main">{selectedFlow.mode}</span>
+                <span className="val-main">{selectedFlow.mode || "Sequential"}</span>
               </div>
 
               <div className="insp-row">
                 <span className="lbl">Stages</span>
-                <span className="val-main">{selectedFlow.stagesCount}</span>
+                <span className="val-main">{selectedFlow.stagesCount ?? (Array.isArray((selectedFlow as any).stages) ? (selectedFlow as any).stages.length : 1)}</span>
               </div>
 
               <div className="insp-row">
                 <span className="lbl">SLA</span>
-                <span className="val-main">{selectedFlow.sla}</span>
+                <span className="val-main">{selectedFlow.sla || "48 Hours"}</span>
               </div>
 
               <div className="insp-row">
                 <span className="lbl">Created By</span>
                 <div className="val-col">
-                  <span className="val-main">{selectedFlow.createdBy}</span>
-                  <span className="val-sub">{selectedFlow.createdAt}</span>
+                  <span className="val-main">{selectedFlow.createdBy || "Admin"}</span>
+                  <span className="val-sub">{selectedFlow.createdAt || "Recently"}</span>
                 </div>
               </div>
 
               <div className="insp-row">
                 <span className="lbl">Last Updated</span>
                 <div className="val-col">
-                  <span className="val-main">by {selectedFlow.lastUpdatedBy}</span>
-                  <span className="val-sub">{selectedFlow.lastUpdated}</span>
+                  <span className="val-main">by {selectedFlow.lastUpdatedBy || "Admin"}</span>
+                  <span className="val-sub">{selectedFlow.lastUpdated || "Recently"}</span>
                 </div>
               </div>
             </div>
@@ -441,20 +450,26 @@ export default function WorkflowApprovalsView({
       </div>
 
       {/* ── Bottom Section: Approval Flow Preview (Reference 4 & 5) ─ */}
-      <div className="td-approval-preview-section">
-        <h4 className="preview-heading">Approval Flow Preview</h4>
+      {selectedFlow && (
+        <div className="td-approval-preview-section">
+          <h4 className="preview-heading">Approval Flow Preview</h4>
 
-        <div className="preview-steps-grid">
-          {selectedFlow.previewSteps.map((step, sIdx) => (
-            <div key={sIdx} className="preview-step-card">
-              {step.header && <span className="step-tag-header">{step.header}</span>}
-              {step.badge && <span className="step-tag-badge">{step.badge}</span>}
-              <h5 className="step-title">{step.title}</h5>
-              <p className="step-subtitle">{step.subtitle}</p>
-            </div>
-          ))}
+          <div className="preview-steps-grid">
+            {(selectedFlow.previewSteps || [
+              { header: "Step 01", title: "Submission", subtitle: "Initiator requests approval" },
+              { header: "Step 02", title: "Review", subtitle: "Project manager verifies criteria" },
+              { header: "Step 03", title: "Approval", subtitle: "Authorized approver signs off" },
+            ]).map((step, sIdx) => (
+              <div key={sIdx} className="preview-step-card">
+                {step.header && <span className="step-tag-header">{step.header}</span>}
+                {step.badge && <span className="step-tag-badge">{step.badge}</span>}
+                <h5 className="step-title">{step.title}</h5>
+                <p className="step-subtitle">{step.subtitle}</p>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
