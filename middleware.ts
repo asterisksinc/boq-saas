@@ -42,6 +42,10 @@ function isClientUser(user: { app_metadata?: Record<string, unknown>; user_metad
     return user.app_metadata?.role === "client" || user.user_metadata?.role === "client";
 }
 
+function isPublicClientPath(pathname: string) {
+    return pathname.startsWith("/client/invitation") || pathname.startsWith("/client/create-account");
+}
+
 export async function middleware(request: NextRequest) {
     let response = NextResponse.next({ request });
     const supabase = createServerClient(
@@ -63,8 +67,18 @@ export async function middleware(request: NextRequest) {
     if (!user && !isPublicPath(request.nextUrl.pathname)) {
         const loginUrl = request.nextUrl.clone();
         loginUrl.pathname = "/login";
-        loginUrl.searchParams.set("next", request.nextUrl.pathname);
+        loginUrl.searchParams.set("next", `${request.nextUrl.pathname}${request.nextUrl.search}`);
         return NextResponse.redirect(loginUrl);
+    }
+
+    if (user && request.nextUrl.pathname.startsWith("/client/") && !isPublicClientPath(request.nextUrl.pathname)) {
+        if (!isClientUser(user)) {
+            return NextResponse.redirect(new URL("/dashboard", request.url));
+        }
+    }
+
+    if (user && (request.nextUrl.pathname === "/dashboard" || request.nextUrl.pathname.startsWith("/dashboard/")) && isClientUser(user)) {
+        return NextResponse.redirect(new URL("/client/dashboard", request.url));
     }
 
     if (user && (request.nextUrl.pathname === "/admin" || request.nextUrl.pathname.startsWith("/admin/"))) {

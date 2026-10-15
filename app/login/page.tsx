@@ -25,12 +25,18 @@ export default function LoginPage() {
             if (!response.otpRequired) {
                 const userPref = await getUserPreferences().catch(() => null);
                 const landing = userPref?.landingPage || userPref?.landing_page || "dashboard";
-                const target = landing.startsWith("/") ? landing : `/${landing.toLowerCase()}`;
+                const requestedNext = new URLSearchParams(window.location.search).get("next");
+                const nextPath = requestedNext && requestedNext.startsWith("/") ? requestedNext : null;
+                const target = response.user?.role === "client"
+                    ? (nextPath?.startsWith("/client/") ? nextPath : "/client/dashboard")
+                    : (nextPath || (landing.startsWith("/") ? landing : `/${landing.toLowerCase()}`));
                 router.push(target);
                 return;
             }
 
             const params = new URLSearchParams({ flow: "login", email: email.trim() });
+            const next = new URLSearchParams(window.location.search).get("next");
+            if (next) params.set("next", next);
             router.push(`/verify-email?${params.toString()}`);
         } catch (requestError) {
             const message = getApiErrorMessage(requestError);

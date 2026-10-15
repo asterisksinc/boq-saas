@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { AuthLayout } from "@/components/auth/AuthLayout";
-import { getApiErrorMessage, resendVerification, verifyEmail, verifyEmailCode } from "@/lib/api/auth";
+import { getApiErrorMessage, getCurrentUser, resendVerification, verifyEmail, verifyEmailCode } from "@/lib/api/auth";
 
 export default function VerifyEmailPage() {
     return (
@@ -21,6 +21,7 @@ function VerifyEmailContent() {
     const type = useMemo(() => searchParams.get("type") ?? "email", [searchParams]);
     const flow = useMemo(() => searchParams.get("flow") ?? "link", [searchParams]);
     const emailParam = useMemo(() => searchParams.get("email") ?? "", [searchParams]);
+    const next = useMemo(() => searchParams.get("next"), [searchParams]);
 
     const [status, setStatus] = useState<"idle" | "verifying" | "success" | "error">("idle");
     const [message, setMessage] = useState("");
@@ -92,11 +93,14 @@ function VerifyEmailContent() {
             setMessage("Your email has been verified.");
 
             // Redirect based on flow
-            setTimeout(() => {
+            setTimeout(async () => {
                 if (flow === "signup") {
                     router.push("/onboarding");
                 } else if (flow === "login") {
-                    router.push("/dashboard");
+                    const currentUser = await getCurrentUser().catch(() => null);
+                    const requestedNext = next && next.startsWith("/") ? next : null;
+                    const isClient = currentUser?.user?.role === "client";
+                    router.push(isClient ? (requestedNext?.startsWith("/client/") ? requestedNext : "/client/dashboard") : (requestedNext || "/dashboard"));
                 } else {
                     router.push("/login");
                 }

@@ -12,6 +12,7 @@ export type ApiEnvelope<T> = {
 export type AuthUser = {
     id: string;
     email?: string | null;
+    role?: string | null;
 };
 
 export type AuthContext = {

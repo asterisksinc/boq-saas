@@ -154,7 +154,7 @@ export default function ClientInvoicesPage() {
         return start + i;
     });
 
-    const activeProjectName = projects[0]?.name || "Mehta Residences";
+    const activeProjectName = projects[0]?.name || "your projects";
 
     return (
         <main className="fig-dashboard" style={{ background: "#edf2f9" }}>

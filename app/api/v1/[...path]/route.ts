@@ -223,7 +223,13 @@ async function login(request: Request, supabase: SupabaseClient, id: string) {
   }
   const ctx = await context(supabase, id); if ("response" in ctx) return ctx.response;
   await audit(supabase, "auth.login.succeeded", id);
-  return ok({ otpRequired: false, user: { id: data.user.id, email: data.user.email }, context: ctx.data }, 200, id);
+  const appRole = typeof data.user.app_metadata?.role === "string" ? data.user.app_metadata.role : null;
+  const userRole = typeof data.user.user_metadata?.role === "string" ? data.user.user_metadata.role : null;
+  return ok({
+    otpRequired: false,
+    user: { id: data.user.id, email: data.user.email, role: appRole || userRole },
+    context: ctx.data,
+  }, 200, id);
 }
 
 async function refresh(supabase: SupabaseClient, id: string) {
