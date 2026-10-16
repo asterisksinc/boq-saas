@@ -5745,10 +5745,23 @@ async function listBoqs(request: NextRequest, supabase: SupabaseClient, id: stri
   }, 200, id);
 }
 
-async function nextBoqIdentity(supabase: SupabaseClient, workspaceId: string, offset = 1) {
+async function nextBoqIdentity(supabase: SupabaseClient, workspaceId: string, offset = 1, projectId?: string) {
   const result = await supabase.from("boqs").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId);
   const sequence = String((result.count ?? 0) + offset).padStart(4, "0");
-  return { boqNumber: `BOQ-${sequence}`, version: "v1" };
+  let version = "v1";
+  if (projectId) {
+    const existing = await supabase.from("boqs").select("version").eq("workspace_id", workspaceId).eq("project_id", projectId).is("archived_at", null);
+    let maxMajor = 0;
+    for (const row of existing.data ?? []) {
+      const match = String(row.version).match(/^v(\d+)/i);
+      if (match) {
+        const v = parseInt(match[1], 10);
+        if (!isNaN(v) && v > maxMajor) maxMajor = v;
+      }
+    }
+    version = `v${maxMajor + 1}`;
+  }
+  return { boqNumber: `BOQ-${sequence}`, version };
 }
 
 async function cleanupCreatedBoq(supabase: SupabaseClient, workspaceId: string, boqId: string, requestId: string) {
@@ -5772,7 +5785,7 @@ async function createBoq(request: Request, supabase: SupabaseClient, id: string)
 
   let inserted;
   for (let attempt = 1; attempt <= 5; attempt++) {
-    const identity = await nextBoqIdentity(supabase, scoped.access.workspaceId, attempt);
+    const identity = await nextBoqIdentity(supabase, scoped.access.workspaceId, attempt, input.data.projectId);
     inserted = await supabase.from("boqs").insert({ workspace_id: scoped.access.workspaceId, project_id: input.data.projectId,
       boq_number: identity.boqNumber, version: identity.version, assigned_to: assignedTo,
       source_method: input.data.method, source_template_id: input.data.templateId, markup_percent: input.data.markupPercent,
@@ -5958,8 +5971,13 @@ async function getBoq(supabase: SupabaseClient, id: string, boqId: string) {
 async function updateBoq(request: Request, supabase: SupabaseClient, id: string, boqId: string) {
   const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
   const input = await parsed(request, boqPatchSchema, id); if (input.response) return input.response;
+
+  if (input.data.createRevision) {
+    return createBoqRevision(request, supabase, id, boqId);
+  }
+
   const map: Record<string,string> = { projectId: "project_id", assignedTo: "assigned_to", markupPercent: "markup_percent", taxPercent: "tax_percent" };
-  const values = Object.fromEntries(Object.entries(input.data).map(([k,v]) => [map[k],v])); values.updated_by = scoped.access.userId;
+  const values = Object.fromEntries(Object.entries(input.data).filter(([k]) => map[k]).map(([k,v]) => [map[k],v])); values.updated_by = scoped.access.userId;
   const result = await supabase.from("boqs").update(values).eq("workspace_id", scoped.access.workspaceId).eq("id", boqId).is("archived_at", null).select(boqSelect).maybeSingle();
   if (result.error) return fail("VALIDATION_ERROR", "BOQ could not be updated.", 400, id);
   if (!result.data) return fail("NOT_FOUND", "BOQ was not found.", 404, id);
@@ -6005,6 +6023,146 @@ async function duplicateBoq(supabase: SupabaseClient, id: string, boqId: string)
     }
   }
   return ok(boqDto(created.data as Record<string, unknown>, (source.rooms as unknown[])?.length ?? 0, num(source.itemCount), num(source.subtotal), String(source.projectName ?? ""), String(source.assignedToName ?? "")), 201, id);
+}
+
+async function nextMinorVersion(supabase: SupabaseClient, workspaceId: string, boqNumber: string, currentVersion: string): Promise<string> {
+  const match = currentVersion.match(/^v(\d+)/i);
+  const major = match ? parseInt(match[1], 10) : 1;
+  const existing = await supabase.from("boqs").select("version").eq("workspace_id", workspaceId).eq("boq_number", boqNumber);
+  let maxMinor = 0;
+  const minorRegex = new RegExp(`^v${major}\\.(\\d+)`, "i");
+  for (const row of existing.data ?? []) {
+    const m = String(row.version).match(minorRegex);
+    if (m) {
+      const num = parseInt(m[1], 10);
+      if (!isNaN(num) && num > maxMinor) maxMinor = num;
+    }
+  }
+  return `v${major}.${maxMinor + 1}`;
+}
+
+async function createBoqRevision(request: Request, supabase: SupabaseClient, id: string, boqId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const detailResponse = await getBoq(supabase, id, boqId); const payload = await detailResponse.json();
+  if (!detailResponse.ok) return detailResponse; const source = payload.data as Record<string, unknown>;
+
+  let body: any = {};
+  try {
+    body = await request.json();
+  } catch {
+    body = {};
+  }
+
+  const newVersion = await nextMinorVersion(supabase, scoped.access.workspaceId, String(source.boqNumber), String(source.version));
+  const assignedTo = body.assignedTo || source.assignedTo || scoped.access.userId;
+  const markupPercent = body.markupPercent !== undefined ? num(body.markupPercent) : num(source.markupPercent);
+  const taxPercent = body.taxPercent !== undefined ? num(body.taxPercent) : num(source.taxPercent);
+
+  const created = await supabase.from("boqs").insert({
+    workspace_id: scoped.access.workspaceId,
+    project_id: source.projectId,
+    boq_number: source.boqNumber,
+    version: newVersion,
+    assigned_to: assignedTo,
+    source_method: source.method || "blank",
+    markup_percent: markupPercent,
+    tax_percent: taxPercent,
+    status: "draft",
+    created_by: scoped.access.userId,
+    updated_by: scoped.access.userId,
+  }).select(boqSelect).single();
+
+  if (created.error) return fail("VALIDATION_ERROR", created.error.message || "BOQ revision could not be created.", 400, id);
+
+  for (const sourceRoom of (source.rooms as Array<Record<string, unknown>>) || []) {
+    const room = await supabase.from("boq_rooms").insert({
+      workspace_id: scoped.access.workspaceId,
+      boq_id: created.data.id,
+      name: sourceRoom.name,
+      description: sourceRoom.description,
+      sort_order: sourceRoom.sort_order,
+    }).select("id").single();
+    if (room.data) {
+      for (const sourceCategory of (sourceRoom.categories as Array<Record<string, unknown>>) || []) {
+        const category = await supabase.from("boq_categories").insert({
+          workspace_id: scoped.access.workspaceId,
+          boq_id: created.data.id,
+          room_id: room.data.id,
+          name: sourceCategory.name,
+          description: sourceCategory.description,
+          sort_order: sourceCategory.sort_order,
+        }).select("id").single();
+        if (category.data) {
+          const copiedItems = ((sourceCategory.items as Array<Record<string, unknown>>) || []).map((item) => ({
+            workspace_id: scoped.access.workspaceId,
+            boq_id: created.data.id,
+            room_id: room.data.id,
+            category_id: category.data.id,
+            name: item.name,
+            description: item.description,
+            unit: item.unit,
+            quantity: item.quantity,
+            rate: item.rate,
+            waste_percent: item.waste_percent,
+            tax_percent: item.tax_percent,
+            sort_order: item.sort_order,
+          }));
+          if (copiedItems.length) await supabase.from("boq_items").insert(copiedItems);
+        }
+      }
+    }
+  }
+
+  await audit(supabase, "boq.revision_created", id);
+
+  const [projectRes, profileRes] = await Promise.all([
+    created.data.project_id ? supabase.from("projects").select("name").eq("id", created.data.project_id).maybeSingle() : Promise.resolve({ data: null }),
+    created.data.assigned_to ? supabase.from("user_profiles").select("display_name").eq("user_id", created.data.assigned_to).maybeSingle() : Promise.resolve({ data: null }),
+  ]);
+
+  return ok(boqDto(
+    created.data as Record<string, unknown>,
+    (source.rooms as unknown[])?.length ?? 0,
+    num(source.itemCount),
+    num(source.subtotal),
+    projectRes.data?.name ?? null,
+    profileRes.data?.display_name ?? null
+  ), 201, id);
+}
+
+async function getBoqRevisions(supabase: SupabaseClient, id: string, boqId: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const target = await supabase.from("boqs").select("boq_number, workspace_id, project_id").eq("workspace_id", scoped.access.workspaceId).eq("id", boqId).maybeSingle();
+  if (!target.data) return fail("NOT_FOUND", "BOQ was not found.", 404, id);
+
+  const revisions = await supabase.from("boqs").select(boqSelect)
+    .eq("workspace_id", scoped.access.workspaceId)
+    .eq("boq_number", target.data.boq_number)
+    .is("archived_at", null)
+    .order("created_at", { ascending: false });
+
+  if (revisions.error) return fail("INTERNAL_ERROR", "Could not load BOQ revisions.", 500, id);
+  const rows = (revisions.data ?? []) as Record<string, unknown>[];
+  const boqIds = rows.map((r) => String(r.id));
+  const stats = await boqStats(supabase, scoped.access.workspaceId, boqIds);
+
+  const [projectRes, profiles] = await Promise.all([
+    target.data.project_id ? supabase.from("projects").select("name").eq("id", target.data.project_id).maybeSingle() : Promise.resolve({ data: null }),
+    supabase.from("user_profiles").select("user_id, display_name").in("user_id", rows.map((r) => String(r.assigned_to)).filter(Boolean)),
+  ]);
+
+  const profileMap = new Map<string, string>();
+  for (const prof of profiles.data ?? []) profileMap.set(prof.user_id, prof.display_name);
+
+  const items = rows.map((r) => {
+    const s = stats.get(String(r.id)) ?? { rooms: 0, items: 0, subtotal: 0 };
+    return {
+      ...boqDto(r, s.rooms, s.items, s.subtotal, projectRes.data?.name ?? null, profileMap.get(String(r.assigned_to)) ?? null),
+      isCurrent: r.id === boqId,
+    };
+  });
+
+  return ok({ items, boqNumber: target.data.boq_number, total: items.length }, 200, id);
 }
 
 async function duplicateBoqRoom(supabase: SupabaseClient, id: string, boqId: string, roomId: string) {
@@ -12216,6 +12374,9 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (boqTemplateSectionMatch && request.method === "POST") return addBoqTemplateSection(request, supabase, id, boqTemplateSectionMatch[1]);
   const boqTemplateItemMatch = route.match(/^boq-templates\/([0-9a-f-]{36})\/items$/i);
   if (boqTemplateItemMatch && request.method === "POST") return addBoqTemplateItem(request, supabase, id, boqTemplateItemMatch[1]);
+  const boqRevisionsMatch = route.match(/^boqs\/([0-9a-f-]{36})\/revisions$/i);
+  if (boqRevisionsMatch && request.method === "GET") return getBoqRevisions(supabase, id, boqRevisionsMatch[1]);
+  if (boqRevisionsMatch && request.method === "POST") return createBoqRevision(request, supabase, id, boqRevisionsMatch[1]);
   const boqMatch = route.match(/^boqs\/([0-9a-f-]{36})$/i);
   if (boqMatch && request.method === "GET") return getBoq(supabase, id, boqMatch[1]);
   if (boqMatch && request.method === "PATCH") return updateBoq(request, supabase, id, boqMatch[1]);

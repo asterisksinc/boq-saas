@@ -283,6 +283,8 @@ export const boqPatchSchema = z.object({
   projectId: z.string().uuid().optional(),
   assignedTo: z.string().uuid().nullable().optional(),
   markupPercent: percent.optional(), taxPercent: percent.optional(),
+  createRevision: z.boolean().optional(),
+  revisionReason: z.string().trim().max(500).optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, "At least one field is required.");
 
 export const boqStatusSchema = z.object({ status: z.enum(["draft", "in_review", "approved", "archived"]) }).strict();

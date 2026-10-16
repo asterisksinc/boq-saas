@@ -59,6 +59,14 @@ export async function duplicateBoq(boqId: string): Promise<Boq> {
     return fetchApi<Boq>(`/api/v1/boqs/${boqId}/duplicate`, { method: "POST" });
 }
 
+export async function getBoqRevisions(boqId: string): Promise<{ items: Boq[]; boqNumber: string; total: number }> {
+    return fetchApi(`/api/v1/boqs/${boqId}/revisions`);
+}
+
+export async function createBoqRevision(boqId: string, payload?: Record<string, unknown>): Promise<Boq> {
+    return fetchApi<Boq>(`/api/v1/boqs/${boqId}/revisions`, { method: "POST", body: JSON.stringify(payload || {}) });
+}
+
 // Room CRUD
 export async function addBoqRoom(boqId: string, input: { name: string; description?: string; sort_order?: number }): Promise<Record<string, unknown>> {
     return fetchApi(`/api/v1/boqs/${boqId}/rooms`, { method: "POST", body: JSON.stringify(input) });
