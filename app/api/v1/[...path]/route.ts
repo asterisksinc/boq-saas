@@ -3282,10 +3282,15 @@ async function clientApprovalComment(request: Request, supabase: SupabaseClient,
 
 async function dashboardOverview(request: NextRequest, supabase: SupabaseClient, id: string) {
   const auth = await requireUser(supabase, id); if (auth.response) return auth.response;
-  const [{ data, error }, profileResult, projectsResult] = await Promise.all([
+  const requestedPeriod = request.nextUrl.searchParams.get("period");
+  const period = ["week", "month", "quarter"].includes(requestedPeriod ?? "") ? requestedPeriod! : null;
+
+  const [{ data, error }, profileResult, projectsResult, boqsResult, invoicesResult] = await Promise.all([
     supabase.rpc("get_dashboard_overview"),
     supabase.from("user_profiles").select("display_name,avatar_url").eq("user_id", auth.user.id).maybeSingle(),
-    supabase.from("projects").select("status").is("archived_at", null),
+    supabase.from("projects").select("id,status,created_at,project_value,approved_budget,progress").is("archived_at", null),
+    supabase.from("boqs").select("id,status,grand_total,created_at").is("archived_at", null),
+    supabase.from("invoices").select("id,status,subtotal,total_amount,total_paid,created_at").is("archived_at", null).neq("status", "void"),
   ]);
   if (error) {
     console.error(JSON.stringify({ requestId: id, event: "dashboard_overview_failed", code: error.code }));
@@ -3293,21 +3298,178 @@ async function dashboardOverview(request: NextRequest, supabase: SupabaseClient,
   }
 
   const base = (data ?? {}) as Record<string, unknown>;
+  const baseKpis = (base.kpis ?? {}) as Record<string, unknown>;
+  const allProjects = (projectsResult.data ?? []) as Array<{ id?: string; status?: string | null; created_at?: string | null; project_value?: number | null; approved_budget?: number | null; progress?: number | null }>;
+  const allBoqs = (boqsResult.data ?? []) as Array<{ id?: string; status?: string | null; grand_total?: number | null; created_at?: string | null }>;
+  const allInvoices = (invoicesResult.data ?? []) as Array<{ id?: string; status?: string | null; total_paid?: number | null; subtotal?: number | null; created_at?: string | null }>;
+
+  const now = new Date();
+  let periodStart: Date | null = null;
+  let prevPeriodStart: Date | null = null;
+  let prevPeriodEnd: Date | null = null;
+
+  if (period === "week") {
+    periodStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    prevPeriodStart = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+    prevPeriodEnd = periodStart;
+  } else if (period === "month") {
+    periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    prevPeriodStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    prevPeriodEnd = periodStart;
+  } else if (period === "quarter") {
+    const qMonth = Math.floor(now.getMonth() / 3) * 3;
+    periodStart = new Date(now.getFullYear(), qMonth, 1);
+    prevPeriodStart = new Date(now.getFullYear(), qMonth - 3, 1);
+    prevPeriodEnd = periodStart;
+  }
+
+  const filteredProjects = periodStart
+    ? allProjects.filter((p) => p.created_at && new Date(p.created_at) >= periodStart!)
+    : allProjects;
+
+  const prevProjects = (prevPeriodStart && prevPeriodEnd)
+    ? allProjects.filter((p) => p.created_at && new Date(p.created_at) >= prevPeriodStart! && new Date(p.created_at) < prevPeriodEnd!)
+    : [];
+
   const counts = { active: 0, planning: 0, onHold: 0, completed: 0 };
-  for (const row of projectsResult.data ?? []) {
+  let calculatedEstValue = 0;
+  for (const row of filteredProjects) {
     if (row.status === "active" || row.status === "in_progress") counts.active += 1;
     else if (row.status === "planning") counts.planning += 1;
     else if (row.status === "on_hold") counts.onHold += 1;
     else if (row.status === "completed") counts.completed += 1;
+    calculatedEstValue += Number(row.project_value) || Number(row.approved_budget) || 0;
   }
+
+  const totalBoqValue = allBoqs.reduce((acc, b) => acc + (Number(b.grand_total) || 0), 0);
+  const totalActualCost = allInvoices.reduce((acc, inv) => acc + (Number(inv.total_paid) || Number(inv.subtotal) || 0), 0);
+
+  const rawEst = Number(baseKpis.totalEstimatedValue) || 0;
+  const totalEstimated = rawEst > 0 ? rawEst : (calculatedEstValue > 0 ? calculatedEstValue : (totalBoqValue > 0 ? totalBoqValue : (allProjects.length > 0 ? 0 : null)));
+  const actualCost = totalActualCost > 0 ? totalActualCost : (Number(baseKpis.actualCost) || (totalEstimated && totalEstimated > 0 ? 0 : null));
+  const grossMargin = (totalEstimated && totalEstimated > 0 && actualCost !== null && actualCost > 0)
+    ? Math.round(((totalEstimated - actualCost) / totalEstimated) * 100)
+    : (Number(baseKpis.grossMargin) || null);
+
+  function calcTrend(curr: number, prev: number) {
+    if (prev > 0) {
+      const diff = curr - prev;
+      const pct = Math.round((Math.abs(diff) / prev) * 100);
+      return { value: pct, direction: diff >= 0 ? ("up" as const) : ("down" as const) };
+    }
+    return { value: 0, direction: "neutral" as const };
+  }
+
+  const prevActive = prevProjects.filter((p) => p.status === "active" || p.status === "in_progress").length;
+  const trends = {
+    totalProjects: calcTrend(filteredProjects.length, prevProjects.length),
+    activeProjects: calcTrend(counts.active, prevActive),
+    estimatedValue: calcTrend(calculatedEstValue, prevProjects.reduce((s, p) => s + (Number(p.project_value) || 0), 0)),
+    grossMargin: { value: 0, direction: "neutral" as const },
+  };
+
+  let chartSeries: Array<{ label: string; estimated: number; actual: number }> = [];
+  const hasRecordsWithDates = filteredProjects.length > 0 || allBoqs.length > 0 || allInvoices.length > 0;
+  if (hasRecordsWithDates) {
+    if (period === "week") {
+      const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      chartSeries = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(now.getTime() - (6 - i) * 24 * 60 * 60 * 1000);
+        const dayStr = d.toISOString().slice(0, 10);
+        const est = filteredProjects.filter(p => p.created_at && String(p.created_at).startsWith(dayStr)).reduce((s, p) => s + (Number(p.project_value) || Number(p.approved_budget) || 0), 0);
+        const act = allInvoices.filter(inv => inv.created_at && String(inv.created_at).startsWith(dayStr)).reduce((s, inv) => s + (Number(inv.total_paid) || Number(inv.subtotal) || 0), 0);
+        return { label: dayNames[d.getDay()], estimated: est, actual: act };
+      });
+    } else if (period === "month") {
+      chartSeries = [
+        { label: "Week 1", estimated: 0, actual: 0 },
+        { label: "Week 2", estimated: 0, actual: 0 },
+        { label: "Week 3", estimated: 0, actual: 0 },
+        { label: "Week 4", estimated: 0, actual: 0 },
+      ];
+      for (const p of filteredProjects) {
+        if (!p.created_at) continue;
+        const day = new Date(p.created_at).getDate();
+        const wIdx = Math.min(3, Math.floor((day - 1) / 7));
+        chartSeries[wIdx].estimated += Number(p.project_value) || Number(p.approved_budget) || 0;
+      }
+      for (const inv of allInvoices) {
+        if (!inv.created_at) continue;
+        const day = new Date(inv.created_at).getDate();
+        const wIdx = Math.min(3, Math.floor((day - 1) / 7));
+        chartSeries[wIdx].actual += Number(inv.total_paid) || Number(inv.subtotal) || 0;
+      }
+    } else if (period === "quarter") {
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const qMonth = Math.floor(now.getMonth() / 3) * 3;
+      chartSeries = [
+        { label: monthNames[qMonth], estimated: 0, actual: 0 },
+        { label: monthNames[qMonth + 1], estimated: 0, actual: 0 },
+        { label: monthNames[qMonth + 2], estimated: 0, actual: 0 },
+      ];
+      for (const p of filteredProjects) {
+        if (!p.created_at) continue;
+        const m = new Date(p.created_at).getMonth();
+        const idx = m - qMonth;
+        if (idx >= 0 && idx < 3) {
+          chartSeries[idx].estimated += Number(p.project_value) || Number(p.approved_budget) || 0;
+        }
+      }
+      for (const inv of allInvoices) {
+        if (!inv.created_at) continue;
+        const m = new Date(inv.created_at).getMonth();
+        const idx = m - qMonth;
+        if (idx >= 0 && idx < 3) {
+          chartSeries[idx].actual += Number(inv.total_paid) || Number(inv.subtotal) || 0;
+        }
+      }
+    } else {
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      chartSeries = Array.from({ length: 6 }, (_, i) => {
+        const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+        const yMonth = d.toISOString().slice(0, 7);
+        const est = allProjects.filter(p => p.created_at && String(p.created_at).startsWith(yMonth)).reduce((s, p) => s + (Number(p.project_value) || Number(p.approved_budget) || 0), 0);
+        const act = allInvoices.filter(inv => inv.created_at && String(inv.created_at).startsWith(yMonth)).reduce((s, inv) => s + (Number(inv.total_paid) || Number(inv.subtotal) || 0), 0);
+        return { label: monthNames[d.getMonth()], estimated: est, actual: act };
+      });
+    }
+  }
+
+  const hasNonZeroSeries = chartSeries.some(pt => pt.estimated > 0 || pt.actual > 0);
+  const costOverview = hasNonZeroSeries ? {
+    currency: ((base.scope as Record<string, unknown>)?.currency as string) || "INR",
+    series: chartSeries,
+  } : null;
+
+  const kpis = {
+    ...baseKpis,
+    totalProjects: filteredProjects.length,
+    activeProjects: counts.active,
+    totalEstimatedValue: totalEstimated,
+    actualCost: actualCost,
+    grossMargin: grossMargin,
+  };
+
+  const scope = {
+    ...((base.scope ?? {}) as Record<string, unknown>),
+    period: period ?? "month",
+  };
+
   return ok({
     ...base,
+    scope,
+    kpis,
+    trends,
+    costOverview,
     profile: {
       displayName: profileResult.data?.display_name ?? auth.user.user_metadata?.display_name ?? null,
       avatarUrl: profileResult.data?.avatar_url ?? null,
       email: auth.user.email ?? null,
     },
-    projectStatusBreakdown: counts,
+    projectStatusBreakdown: {
+      ...counts,
+      totalBoqValue,
+    },
   }, 200, id);
 }
 
@@ -4788,12 +4950,20 @@ async function dashboardList(request: NextRequest, supabase: SupabaseClient, id:
   const { page, pageSize, from, to } = pagination(request.nextUrl.searchParams);
 
   if (name === "recent-projects") {
-    const countQ = supabase.from("projects").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("archived_at", null);
-    const itemsQ = supabase.from("projects").select(projectSelect).eq("workspace_id", workspaceId).is("archived_at", null).order("updated_at", { ascending: false }).range(from, to);
-    const [count, items] = await Promise.all([countQ, itemsQ]);
-    if (count.error || items.error) return fail("INTERNAL_ERROR", "Recent projects could not be loaded.", 500, id);
-    const total = count.count ?? 0;
-    return ok({ items: (items.data ?? []).map((r: Record<string, unknown>) => projectDto(r)), page, pageSize, total, hasMore: to + 1 < total }, 200, id);
+    let result: any = await supabase.from("projects").select(projectSelect, { count: "exact" })
+      .eq("workspace_id", workspaceId).is("archived_at", null)
+      .order("updated_at", { ascending: false }).range(from, to);
+    if (result.error && (result.error.message?.includes("column") || result.error.code === "42703")) {
+      result = await supabase.from("projects").select(projectBaseSelect, { count: "exact" })
+        .eq("workspace_id", workspaceId).is("archived_at", null)
+        .order("updated_at", { ascending: false }).range(from, to);
+    }
+    if (result.error) {
+      console.error(JSON.stringify({ requestId: id, event: "recent_projects_failed", code: result.error.code }));
+      return fail("INTERNAL_ERROR", "Recent projects could not be loaded.", 500, id);
+    }
+    const total = result.count ?? 0;
+    return ok({ items: (result.data ?? []).map((r: Record<string, unknown>) => projectDto(r)), page, pageSize, total, hasMore: to + 1 < total }, 200, id);
   }
 
   if (name === "recent-boqs") {

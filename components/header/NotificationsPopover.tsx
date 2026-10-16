@@ -121,7 +121,7 @@ export default function NotificationsPopover({
             aria-label="Notifications"
             onClick={(e) => e.stopPropagation()}
         >
-            {/* Header */}
+            {/* Header: Frame 2147225549 */}
             <div className="fig-notif-header">
                 <div className="fig-notif-header-left">
                     <span className="fig-notif-title">Notifications</span>
@@ -131,20 +131,20 @@ export default function NotificationsPopover({
                         <span className="fig-notif-badge fig-notif-badge-subtle">0 NEW</span>
                     )}
                 </div>
-                {unreadCount > 0 && (
-                    <button
-                        type="button"
-                        className="fig-notif-mark-all-btn"
-                        onClick={onMarkAllRead}
-                    >
-                        <CheckCheck size={14} className="fig-notif-check-icon" />
-                        <span>Mark all as read</span>
-                    </button>
-                )}
+                <button
+                    type="button"
+                    className="fig-notif-mark-all-btn"
+                    onClick={onMarkAllRead}
+                    disabled={unreadCount === 0}
+                    aria-label="Mark all notifications as read"
+                >
+                    <Check size={14} className="fig-notif-check-icon" />
+                    <span>Mark all as read</span>
+                </button>
             </div>
 
-            {/* Category Filter Tabs */}
-            <div className="fig-notif-tabs" role="tablist">
+            {/* Category Filter Tabs: Buttons (Frame 2147225067, 2147225075, etc.) */}
+            <div className="fig-notif-tabs" role="tablist" aria-label="Notification categories">
                 {TABS.map((tab) => (
                     <button
                         key={tab}
@@ -159,7 +159,7 @@ export default function NotificationsPopover({
                 ))}
             </div>
 
-            {/* Notifications List */}
+            {/* Notifications List Card Container: Frame 2147225027 */}
             <div className="fig-notif-body">
                 {loading && notifications.length === 0 ? (
                     <div className="fig-notif-empty">Loading notifications...</div>
@@ -193,13 +193,22 @@ export default function NotificationsPopover({
                                 item.priority === "urgent" ||
                                 item.priority === "high";
 
+                            const displayCategory =
+                                category === "PAYMENTS"
+                                    ? "Payments"
+                                    : category === "PROJECTS"
+                                    ? "Projects"
+                                    : category === "SYSTEM"
+                                    ? "System"
+                                    : "BOQ";
+
                             return (
                                 <li
                                     key={item.id}
                                     className={`fig-notif-item ${isUnread ? "is-unread" : ""}`}
                                     onClick={() => handleItemClick(item)}
                                 >
-                                    {/* Icon Circle */}
+                                    {/* Icon Circle: Frame 2147225550 */}
                                     <div
                                         className={`fig-notif-avatar ${
                                             isAlert
@@ -214,19 +223,19 @@ export default function NotificationsPopover({
                                         }`}
                                     >
                                         {isAlert ? (
-                                            <AlertCircle size={16} />
+                                            <AlertCircle size={18} />
                                         ) : isApproved ? (
-                                            <Check size={16} />
+                                            <Check size={18} />
                                         ) : category === "BOQ" ? (
-                                            <FileText size={16} />
+                                            <FileText size={18} />
                                         ) : category === "PROJECTS" ? (
-                                            <Folder size={16} />
+                                            <Folder size={18} />
                                         ) : (
-                                            <Sparkles size={16} />
+                                            <Sparkles size={18} />
                                         )}
                                     </div>
 
-                                    {/* Details */}
+                                    {/* Details: Frame 2147225545 */}
                                     <div className="fig-notif-content">
                                         <div className="fig-notif-top-row">
                                             <span className="fig-notif-item-title">{title}</span>
@@ -241,7 +250,7 @@ export default function NotificationsPopover({
                                         <p className="fig-notif-description">{description}</p>
 
                                         <span className={`fig-notif-category-tag tag-${category.toLowerCase()}`}>
-                                            {category === "PAYMENTS" ? "Payments" : category}
+                                            {displayCategory}
                                         </span>
                                     </div>
                                 </li>

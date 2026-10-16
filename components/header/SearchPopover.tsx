@@ -134,16 +134,18 @@ export default function SearchPopover({
             } else if (e.key === "ArrowUp") {
                 e.preventDefault();
                 setSelectedIndex((prev) => (prev <= 0 ? itemsLength - 1 : prev - 1));
-            } else if (e.key === "Enter" && selectedIndex >= 0) {
-                e.preventDefault();
+            } else if (e.key === "Enter") {
                 if (query.trim()) {
-                    const selected = results[selectedIndex];
+                    const targetIndex = selectedIndex >= 0 ? selectedIndex : 0;
+                    const selected = results[targetIndex];
                     if (selected) {
+                        e.preventDefault();
                         saveRecent(selected.title);
                         onNavigate(selected.url);
                         onClose();
                     }
-                } else {
+                } else if (selectedIndex >= 0) {
+                    e.preventDefault();
                     const term = recents[selectedIndex];
                     if (term) {
                         onSelectQuery(term);
@@ -168,22 +170,31 @@ export default function SearchPopover({
             aria-label="Search results"
             onClick={(e) => e.stopPropagation()}
         >
-            {!isSearching ? (
-                // Recents View
-                <div>
-                    <div className="fig-search-popover-header">
-                        <span className="fig-search-heading">RECENT</span>
-                        {recents.length > 0 && (
-                            <button
-                                type="button"
-                                className="fig-search-clear-btn"
-                                onClick={handleClearRecents}
-                            >
-                                CLEAR
-                            </button>
-                        )}
-                    </div>
-                    {recents.length === 0 ? (
+            {/* Header: Frame 2147225549 */}
+            <div className="fig-search-popover-header">
+                <span className="fig-search-heading">
+                    {!isSearching ? "RECENT" : loading ? "SEARCHING..." : `RESULTS (${results.length})`}
+                </span>
+                {!isSearching ? (
+                    recents.length > 0 && (
+                        <button
+                            type="button"
+                            className="fig-search-clear-btn"
+                            onClick={handleClearRecents}
+                        >
+                            CLEAR
+                        </button>
+                    )
+                ) : (
+                    loading && <Loader2 size={13} className="fig-search-spinner" />
+                )}
+            </div>
+
+            {/* Inner White Card: Frame 2147225027 */}
+            <div className="fig-search-card">
+                {!isSearching ? (
+                    // Recents View
+                    recents.length === 0 ? (
                         <div className="fig-search-empty">No recent searches yet.</div>
                     ) : (
                         <ul className="fig-search-list">
@@ -196,25 +207,18 @@ export default function SearchPopover({
                                     }}
                                     onMouseEnter={() => setSelectedIndex(idx)}
                                 >
-                                    <Search size={15} className="fig-search-item-icon" />
-                                    <span className="fig-search-item-text">{item}</span>
-                                    <ArrowUpRight size={15} className="fig-search-item-arrow" />
+                                    <div className="fig-search-item-left">
+                                        <Search size={16} className="fig-search-item-icon" />
+                                        <span className="fig-search-item-text">{item}</span>
+                                    </div>
+                                    <ArrowUpRight size={16} className="fig-search-item-arrow" />
                                 </li>
                             ))}
                         </ul>
-                    )}
-                </div>
-            ) : (
-                // Live Results View
-                <div>
-                    <div className="fig-search-popover-header">
-                        <span className="fig-search-heading">
-                            {loading ? "SEARCHING..." : `RESULTS (${results.length})`}
-                        </span>
-                        {loading && <Loader2 size={13} className="fig-search-spinner" />}
-                    </div>
-
-                    {searchError ? (
+                    )
+                ) : (
+                    // Live Results View
+                    searchError ? (
                         <div className="fig-search-empty" role="alert">
                             {searchError}
                         </div>
@@ -240,29 +244,33 @@ export default function SearchPopover({
                                     }}
                                     onMouseEnter={() => setSelectedIndex(idx)}
                                 >
-                                    <span className="fig-search-type-icon">
-                                        {item.type === "project" && <Folder size={15} />}
-                                        {item.type === "boq" && <FileText size={15} />}
-                                        {item.type === "invoice" && <Receipt size={15} />}
-                                    </span>
-                                    <div className="fig-search-item-content">
-                                        <div className="fig-search-item-title">{item.title}</div>
-                                        {item.subtitle && (
-                                            <div className="fig-search-item-subtitle">{item.subtitle}</div>
-                                        )}
-                                    </div>
-                                    {item.status && (
-                                        <span className={`fig-search-badge fig-search-badge-${item.status.toLowerCase()}`}>
-                                            {item.status}
+                                    <div className="fig-search-item-left">
+                                        <span className="fig-search-type-icon">
+                                            {item.type === "project" && <Folder size={15} />}
+                                            {item.type === "boq" && <FileText size={15} />}
+                                            {item.type === "invoice" && <Receipt size={15} />}
                                         </span>
-                                    )}
-                                    <ArrowUpRight size={15} className="fig-search-item-arrow" />
+                                        <div className="fig-search-item-content">
+                                            <div className="fig-search-item-title">{item.title}</div>
+                                            {item.subtitle && (
+                                                <div className="fig-search-item-subtitle">{item.subtitle}</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="fig-search-item-right">
+                                        {item.status && (
+                                            <span className={`fig-search-badge fig-search-badge-${item.status.toLowerCase()}`}>
+                                                {item.status}
+                                            </span>
+                                        )}
+                                        <ArrowUpRight size={16} className="fig-search-item-arrow" />
+                                    </div>
                                 </li>
                             ))}
                         </ul>
-                    )}
-                </div>
-            )}
+                    )
+                )}
+            </div>
         </div>
     );
 }

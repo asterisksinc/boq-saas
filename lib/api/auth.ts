@@ -57,7 +57,13 @@ export type DashboardOverview = {
     };
     organization: { id: string; name: string; status: string; country: string | null };
     profile?: { displayName: string | null; avatarUrl: string | null; email: string | null };
-    projectStatusBreakdown?: { active: number; planning: number; onHold: number; completed: number };
+    projectStatusBreakdown?: { active: number; planning: number; onHold: number; completed: number; totalBoqValue?: number };
+    trends?: {
+        totalProjects: { value: number; direction: "up" | "down" | "neutral" };
+        activeProjects: { value: number; direction: "up" | "down" | "neutral" };
+        estimatedValue: { value: number; direction: "up" | "down" | "neutral" };
+        grossMargin: { value: number; direction: "up" | "down" | "neutral" };
+    };
     recentProjects: unknown[];
     recentBoqs: unknown[];
     pendingActions: unknown[];
@@ -136,8 +142,9 @@ export async function getCurrentUser() {
     return request<{ user: AuthUser; context?: AuthContext }>("/api/v1/auth/me");
 }
 
-export async function getDashboardOverview() {
-    return request<DashboardOverview>("/api/v1/dashboard/overview");
+export async function getDashboardOverview(period?: string) {
+    const query = period ? `?period=${encodeURIComponent(period)}` : "";
+    return request<DashboardOverview>(`/api/v1/dashboard/overview${query}`);
 }
 
 export async function getDashboardNotifications(params?: { page?: number; pageSize?: number }) {

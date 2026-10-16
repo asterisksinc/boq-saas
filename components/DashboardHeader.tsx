@@ -269,7 +269,7 @@ export default function DashboardHeader({
                             <button
                                 type="button"
                                 onClick={handleNewButtonClick}
-                                className="flex items-center gap-2"
+                                className="fig-dashboard-new-main"
                             >
                                 <Plus size={20} />
                                 <span>New</span>
@@ -277,6 +277,7 @@ export default function DashboardHeader({
                             <i />
                             <button
                                 type="button"
+                                className="fig-dashboard-new-chevron"
                                 aria-label="Open new menu"
                                 aria-expanded={activeOverlay === "new"}
                                 onClick={handleNewChevronClick}
