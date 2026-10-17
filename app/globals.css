@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Urbanist:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Urbanist:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&display=swap');
 @import "./workflow-rules.css";
 @import "./project-overview.css";
 
@@ -9575,6 +9575,575 @@ textarea {
   .project-create-modal {
     width: calc(100vw - 24px);
     padding: 12px;
+  }
+}
+
+/* ==========================================================================
+   Edit Project Modal Redesign (Figma Frame 2147225092 / Frame 2147225027)
+   ========================================================================== */
+
+.project-modal.project-edit-modal {
+  width: min(590px, calc(100vw - 32px));
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(226, 232, 240, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 16px;
+  gap: 16px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+  box-sizing: border-box;
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
+}
+
+.project-edit-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0;
+  gap: 24px;
+  width: 100%;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.project-edit-header-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.project-edit-title {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 120%;
+  color: #0F172A;
+  margin: 0;
+}
+
+.project-edit-code {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 120%;
+  color: #64748B;
+  margin: 0;
+}
+
+.project-edit-close-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #0F172A;
+  padding: 0;
+  border-radius: 4px;
+  transition: opacity 0.15s ease;
+  flex-shrink: 0;
+}
+
+.project-edit-close-btn:hover {
+  opacity: 0.7;
+}
+
+.project-edit-panel {
+  background: #FFFFFF;
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-self: stretch;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-y: auto;
+  max-height: calc(85vh - 140px);
+}
+
+.project-edit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.project-edit-field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.project-edit-field.full-width {
+  grid-column: 1 / -1;
+}
+
+.project-edit-label {
+  font-family: 'Inter', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 20px;
+  color: #0F172A;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.project-edit-required {
+  font-family: 'Inter', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 16px;
+  color: #DC2626;
+}
+
+.project-edit-input-wrap {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.project-edit-input,
+.project-edit-select,
+.project-edit-textarea {
+  box-sizing: border-box;
+  width: 100%;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  font-family: 'Inter', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: #0F172A;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.project-edit-input,
+.project-edit-select {
+  height: 48px;
+  padding: 14px 16px;
+}
+
+.project-edit-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 40px;
+  cursor: pointer;
+}
+
+.project-edit-select-icon {
+  position: absolute;
+  right: 14px;
+  pointer-events: none;
+  color: #0F172A;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.project-edit-textarea {
+  padding: 12px 16px;
+  resize: vertical;
+  min-height: 80px;
+}
+
+.project-edit-input:hover,
+.project-edit-select:hover,
+.project-edit-textarea:hover {
+  border-color: #CBD5E1;
+}
+
+.project-edit-input:focus,
+.project-edit-select:focus,
+.project-edit-textarea:focus {
+  outline: none;
+  border-color: #2563EB;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.project-edit-input:disabled,
+.project-edit-select:disabled,
+.project-edit-textarea:disabled {
+  background: #F8FAFC;
+  color: #94A3B8;
+  cursor: not-allowed;
+}
+
+.project-edit-status-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.project-edit-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 20px;
+  border: 1px solid #E2E8F0;
+  background: #FFFFFF;
+  font-family: 'Urbanist', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748B;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.project-edit-status-pill:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+.project-edit-status-pill.active {
+  border-color: #2563EB;
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563EB;
+  font-weight: 600;
+}
+
+.project-edit-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #94A3B8;
+}
+
+.project-edit-status-pill.active .project-edit-status-dot {
+  background: #2563EB;
+}
+
+.project-edit-error-banner {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 10px 14px;
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 6px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: #DC2626;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.project-edit-footer {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0;
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.project-edit-cancel-btn {
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 14px 20px;
+  height: 46px;
+  min-width: 71px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.project-edit-cancel-btn:hover:not(:disabled) {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+.project-edit-cancel-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.project-edit-rooms-btn {
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 14px 18px;
+  height: 46px;
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  border-radius: 6px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #2563EB;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.project-edit-rooms-btn:hover:not(:disabled) {
+  background: #DBEAFE;
+  border-color: #93C5FD;
+}
+
+.project-edit-rooms-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.project-edit-save-btn {
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 14px 24px;
+  height: 46px;
+  min-width: 119px;
+  background: #2563EB;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #FFFFFF;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.project-edit-save-btn:hover:not(:disabled) {
+  background: #1D4ED8;
+}
+
+.project-edit-save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ==========================================================================
+   Delete Project Confirmation Modal Redesign (Figma Frame 2147225092 / Frame 2147225027)
+   ========================================================================== */
+
+.project-modal.project-delete-modal {
+  width: min(384px, calc(100vw - 32px));
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(226, 232, 240, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 16px;
+  gap: 16px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+  overflow: visible;
+  box-sizing: border-box;
+}
+
+.project-delete-panel {
+  box-sizing: border-box;
+  width: 100%;
+  background: #FFFFFF;
+  border-radius: 14px;
+  padding: 24px 16px;
+  gap: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.project-delete-icon-badge {
+  box-sizing: border-box;
+  width: 68px;
+  height: 68px;
+  background: #FEF2F2;
+  border-radius: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.project-delete-icon {
+  width: 28px;
+  height: 28px;
+  color: #EF4444;
+}
+
+.project-delete-text-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  max-width: 320px;
+}
+
+.project-delete-title {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 120%;
+  color: #0F172A;
+  margin: 0;
+}
+
+.project-delete-desc {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 140%;
+  text-align: center;
+  color: #64748B;
+  margin: 0;
+  word-break: break-word;
+}
+
+.project-delete-error {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px 12px;
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 6px;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: #DC2626;
+  text-align: center;
+}
+
+.project-delete-footer {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.project-delete-cancel-btn {
+  flex: 1;
+  height: 46px;
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 14px;
+  gap: 6px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.project-delete-cancel-btn:hover:not(:disabled) {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+.project-delete-cancel-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.project-delete-confirm-btn {
+  flex: 1;
+  height: 46px;
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 14px;
+  gap: 6px;
+  background: #EF4444;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #FFFFFF;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.project-delete-confirm-btn:hover:not(:disabled) {
+  background: #DC2626;
+}
+
+.project-delete-confirm-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+  .project-edit-grid {
+    grid-template-columns: 1fr;
+  }
+  .project-edit-footer {
+    flex-direction: column-reverse;
+  }
+  .project-edit-footer > div,
+  .project-edit-cancel-btn,
+  .project-edit-rooms-btn,
+  .project-edit-save-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 400px) {
+  .project-delete-footer {
+    flex-direction: column-reverse;
+  }
+  .project-delete-cancel-btn,
+  .project-delete-confirm-btn {
+    width: 100%;
   }
 }
 
@@ -51238,3 +51807,2900 @@ textarea {
         grid-template-columns: 1fr;
     }
 }
+
+/* ==========================================================================
+   WORKSPACE DOCUMENTS REDESIGN (Figma Specs 1 & 2)
+   ========================================================================== */
+
+.workspace-doc-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Header & Toolbar */
+.workspace-doc-toolbar {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    min-height: 46px;
+}
+
+.workspace-doc-title {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 120%;
+    color: #0F172A;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.workspace-doc-actions {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+/* Search Box matching Figma frame 76 */
+.workspace-doc-search {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 5px 12px 5px 5px;
+    gap: 8px;
+    width: 260px;
+    height: 46px;
+    background: rgba(255, 255, 255, 0.75);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    backdrop-filter: blur(20.4px);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.workspace-doc-search:focus-within {
+    background: #FFFFFF;
+    border-color: #2563EB;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.workspace-doc-search-icon-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: #FFFFFF;
+    border-radius: 6px;
+    flex-shrink: 0;
+    color: #475569;
+}
+
+.workspace-doc-search input {
+    border: none;
+    outline: none;
+    background: transparent;
+    font-family: 'Urbanist', sans-serif;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    width: 100%;
+}
+
+.workspace-doc-search input::placeholder {
+    color: #64748B;
+}
+
+/* View Toggle (List / Grid) matching Figma 86x46 */
+.workspace-doc-view-toggle {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    height: 46px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    overflow: hidden;
+    padding: 3px;
+    gap: 2px;
+}
+
+.workspace-doc-view-toggle button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: #64748B;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.workspace-doc-view-toggle button:hover {
+    color: #0F172A;
+    background: #F1F5F9;
+}
+
+.workspace-doc-view-toggle button.active {
+    background: #E4ECFB;
+    color: #2563EB;
+}
+
+/* Buttons */
+.workspace-doc-btn-upload {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 46px;
+    padding: 0 16px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    font-family: 'Urbanist', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.workspace-doc-btn-upload:hover {
+    background: #F8FAFC;
+    border-color: #CBD5E1;
+}
+
+.workspace-doc-btn-new {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 46px;
+    padding: 0 18px;
+    background: #2563EB;
+    border: none;
+    border-radius: 6px;
+    font-family: 'Urbanist', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #FFFFFF;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2);
+}
+
+.workspace-doc-btn-new:hover {
+    background: #1D4ED8;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+/* Breadcrumbs (Figma Reference 2) */
+.workspace-doc-breadcrumbs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Urbanist', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: #64748B;
+}
+
+.workspace-doc-breadcrumb-link {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: transparent;
+    border: none;
+    padding: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: #2563EB;
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+
+.workspace-doc-breadcrumb-link:hover {
+    color: #1D4ED8;
+    text-decoration: underline;
+}
+
+.workspace-doc-breadcrumb-sep {
+    color: #94A3B8;
+    user-select: none;
+}
+
+.workspace-doc-breadcrumb-current {
+    color: #0F172A;
+}
+
+/* Selected Folder Summary Card (Figma Reference 2) */
+.workspace-doc-summary-card {
+    min-height: 82px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    gap: 16px;
+    background: #FFFFFF;
+    border: 1px solid #2563EB;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+}
+
+.workspace-doc-summary-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.workspace-doc-summary-badge {
+    width: 40px;
+    height: 40px;
+    background: #2563EB;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #FFFFFF;
+    flex-shrink: 0;
+}
+
+.workspace-doc-summary-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.workspace-doc-summary-name {
+    font-family: 'Urbanist', sans-serif;
+    font-weight: 600;
+    font-size: 16px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.workspace-doc-summary-meta {
+    font-family: 'Urbanist', sans-serif;
+    font-size: 13px;
+    color: #64748B;
+}
+
+.workspace-doc-summary-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.workspace-doc-summary-date {
+    font-family: 'Urbanist', sans-serif;
+    font-size: 13px;
+    color: #64748B;
+}
+
+/* Table Card & Headers */
+.workspace-doc-table-card {
+    width: 100%;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    overflow: visible;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.workspace-doc-table-head {
+    display: grid;
+    grid-template-columns: minmax(260px, 3fr) 180px 180px 160px 56px;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: transparent;
+    border-bottom: 1px solid #EBEBEB;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    user-select: none;
+}
+
+.workspace-doc-table-head.doc-mode {
+    grid-template-columns: minmax(260px, 3fr) 200px 140px 160px 56px;
+}
+
+.workspace-doc-table-head > div {
+    background: #E4ECFB;
+    height: 36px;
+    padding: 8px 12px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    font-family: 'Urbanist', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: #64748B;
+    text-transform: uppercase;
+    box-sizing: border-box;
+}
+
+.workspace-doc-table-head > div:empty {
+    background: transparent;
+    padding: 0;
+}
+
+.workspace-doc-table-body {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Rows matching 56px Figma frames with #EBEBEB dividers */
+.workspace-doc-table-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(260px, 3fr) 180px 180px 160px 56px;
+    align-items: center;
+    gap: 8px;
+    height: 56px;
+    padding: 0 20px;
+    border-bottom: 1px solid #EBEBEB;
+    background: #FFFFFF;
+    transition: background 0.15s ease;
+    cursor: pointer;
+}
+
+.workspace-doc-table-row.doc-mode {
+    grid-template-columns: minmax(260px, 3fr) 200px 140px 160px 56px;
+}
+
+.workspace-doc-table-row:last-child {
+    border-bottom: none;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+}
+
+.workspace-doc-table-row:hover {
+    background: #F8FAFC;
+}
+
+/* Cell content */
+.workspace-doc-col-name {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.workspace-doc-icon-folder {
+    width: 40px;
+    height: 40px;
+    border-radius: 9999px;
+    background: #E4ECFB;
+    color: #2563EB;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.workspace-doc-icon-file {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: #F2F3F2;
+    color: #64748B;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.workspace-doc-name-text {
+    font-family: 'Urbanist', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.workspace-doc-cell-muted {
+    font-family: 'Urbanist', sans-serif;
+    font-size: 14px;
+    color: #475569;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.workspace-doc-approved-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    background: #DCFCE7;
+    color: #15803D;
+    font-size: 11.5px;
+    font-weight: 600;
+    border-radius: 9999px;
+    margin-left: 8px;
+    flex-shrink: 0;
+}
+
+.workspace-doc-col-action {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    position: relative;
+}
+
+.workspace-doc-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: #64748B;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.workspace-doc-action-btn:hover {
+    background: #F1F5F9;
+    color: #0F172A;
+}
+
+/* Floating Dropdown Menu (156-220px, 16px radius, #FFFFFF, shadow) */
+.workspace-doc-dropdown {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    min-width: 156px;
+    background: #FFFFFF;
+    border: 1px solid #EBEBEB;
+    border-radius: 16px;
+    box-shadow: 0px 16px 32px -12px rgba(14, 18, 27, 0.1);
+    z-index: 60;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.workspace-doc-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 9px 12px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    font-family: 'Urbanist', sans-serif;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: #64748B;
+    text-align: left;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s ease, color 0.15s ease;
+    white-space: nowrap;
+}
+
+.workspace-doc-dropdown-item:hover {
+    background: #F8FAFC;
+    color: #2563EB;
+}
+
+.workspace-doc-dropdown-item.danger {
+    color: #EF4444;
+}
+
+.workspace-doc-dropdown-item.danger:hover {
+    background: #FEF2F2;
+    color: #DC2626;
+}
+
+.workspace-doc-dropdown-sep {
+    height: 1px;
+    background: #EBEBEB;
+    margin: 4px 0;
+}
+
+/* Grid View */
+.workspace-doc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    width: 100%;
+}
+
+.workspace-doc-grid-card {
+    position: relative;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.workspace-doc-grid-card:hover {
+    border-color: #93C5FD;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.08);
+    transform: translateY(-1px);
+}
+
+.workspace-doc-grid-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.workspace-doc-grid-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.workspace-doc-grid-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 10px;
+    border-top: 1px solid #F1F5F9;
+    font-size: 12px;
+    color: #64748B;
+}
+
+/* Empty State */
+.workspace-doc-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 64px 20px;
+    background: #FFFFFF;
+    border: 1px dashed #CBD5E1;
+    border-radius: 12px;
+    text-align: center;
+    gap: 12px;
+    color: #64748B;
+    font-size: 14px;
+}
+
+.workspace-doc-empty-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #F1F5F9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94A3B8;
+}
+
+/* Responsive adjustments */
+@media (max-width: 900px) {
+    .workspace-doc-table-head,
+    .workspace-doc-table-row {
+        grid-template-columns: minmax(180px, 1fr) 120px 100px 44px;
+    }
+    .workspace-doc-table-head > *:nth-child(4),
+    .workspace-doc-table-row > *:nth-child(4) {
+        display: none;
+    }
+    .workspace-doc-search {
+        width: 100%;
+    }
+}
+
+/* Figma Documents Workspace Modals (New Folder, Upload Files, Delete Confirmation) */
+.workspace-doc-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.workspace-doc-modal-card {
+    position: relative;
+    width: 400px;
+    max-width: 100%;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0px 20px 40px rgba(15, 23, 42, 0.15);
+    box-sizing: border-box;
+    animation: workspaceModalIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes workspaceModalIn {
+    from {
+        opacity: 0;
+        transform: scale(0.96) translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.workspace-doc-modal-header {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.workspace-doc-modal-title {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 120%;
+    color: #0F172A;
+    margin: 0;
+}
+
+.workspace-doc-modal-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    color: #64748B;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.workspace-doc-modal-close:hover {
+    background: rgba(15, 23, 42, 0.06);
+    color: #0F172A;
+}
+
+.workspace-doc-modal-panel {
+    width: 100%;
+    background: #FFFFFF;
+    border-radius: 14px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    box-sizing: border-box;
+}
+
+.workspace-doc-modal-label {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.workspace-doc-modal-label span.required {
+    color: #DC2626;
+}
+
+.workspace-doc-modal-input {
+    width: 100%;
+    height: 48px;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    padding: 0 14px;
+    font-family: 'Urbanist', sans-serif;
+    font-size: 14px;
+    color: #0F172A;
+    background: #FFFFFF;
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.workspace-doc-modal-input:focus {
+    border-color: #2563EB;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.workspace-doc-modal-select {
+    width: 100%;
+    height: 48px;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    padding: 0 14px;
+    font-family: 'Urbanist', sans-serif;
+    font-size: 14px;
+    color: #0F172A;
+    background: #FFFFFF;
+    outline: none;
+    box-sizing: border-box;
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+}
+
+.workspace-doc-modal-select:focus {
+    border-color: #2563EB;
+}
+
+.workspace-doc-dropzone {
+    width: 100%;
+    min-height: 140px;
+    background: #F2F3F2;
+    border: 1px dashed #E2E8F0;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px;
+    cursor: pointer;
+    box-sizing: border-box;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.workspace-doc-dropzone:hover,
+.workspace-doc-dropzone.dragover {
+    border-color: #2563EB;
+    background: #EEF2F6;
+}
+
+.workspace-doc-dropzone-badge {
+    width: 42px;
+    height: 42px;
+    background: #E2E4E2;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #64748B;
+}
+
+.workspace-doc-dropzone-text {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.workspace-doc-dropzone-subtext {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.workspace-doc-modal-footer {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+.workspace-doc-btn-cancel {
+    height: 46px;
+    min-width: 71px;
+    padding: 0 16px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.workspace-doc-btn-cancel:hover {
+    background: #F8FAFC;
+    border-color: #CBD5E1;
+}
+
+.workspace-doc-btn-submit {
+    height: 46px;
+    min-width: 113px;
+    padding: 0 16px;
+    background: #2563EB;
+    border: none;
+    border-radius: 6px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #FFFFFF;
+    cursor: pointer;
+    transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.workspace-doc-btn-submit:hover:not(:disabled) {
+    background: #1D4ED8;
+}
+
+.workspace-doc-btn-submit:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.workspace-doc-delete-badge {
+    width: 68px;
+    height: 68px;
+    background: #FEF2F2;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #EF4444;
+}
+
+.workspace-doc-delete-file-card {
+    width: 100%;
+    height: 70px;
+    background: #FFFFFF;
+    border: 1px solid #EBEBEB;
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    box-sizing: border-box;
+    text-align: left;
+}
+
+.workspace-doc-delete-file-badge {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #F2F3F2;
+    color: #64748B;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.workspace-doc-checkbox-wrap {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+    cursor: pointer;
+    user-select: none;
+}
+
+.workspace-doc-btn-danger {
+    flex: 1;
+    height: 46px;
+    background: #EF4444;
+    border: none;
+    border-radius: 6px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #FFFFFF;
+    cursor: pointer;
+    transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.workspace-doc-btn-danger:hover:not(:disabled) {
+    background: #DC2626;
+}
+
+.workspace-doc-btn-danger:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* =========================================================================
+   PROJECT WORKSPACE: PAYMENTS TAB (FIGMA REDESIGN)
+   ========================================================================= */
+
+/* Workspace Tabs */
+.workspace-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  padding: 0;
+  margin-bottom: 24px;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+.workspace-tabs .po-tab-btn {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.workspace-tabs .po-tab-btn:hover {
+  color: #0F172A;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.workspace-tabs .po-tab-btn.is-active,
+.workspace-tabs .po-tab-btn.active {
+  background: #EFF6FF !important;
+  color: #2563EB !important;
+  font-weight: 600 !important;
+}
+
+/* Payments Container */
+.workspace-payment-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+}
+
+/* Summary Metrics Row (Frame 2147225071) */
+.workspace-payment-metrics-container {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  backdrop-filter: blur(20.4px);
+  border-radius: 6px;
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .workspace-payment-metrics-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 540px) {
+  .workspace-payment-metrics-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+.workspace-payment-metric-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 16px;
+  background: #FFFFFF;
+  box-shadow: 0px 0px 6px rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  min-height: 100px;
+  gap: 8px;
+}
+
+.workspace-payment-metric-label {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+.workspace-payment-metric-value {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 20px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.workspace-payment-metric-value.paid {
+  color: #16A34A;
+}
+
+.workspace-payment-metric-value.outstanding {
+  color: #D90606;
+}
+
+.workspace-payment-metric-sub {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+.workspace-payment-metric-sub.overdue {
+  color: #D90606;
+  font-weight: 600;
+}
+
+/* Schedule Card (Frame 2147225072 / 2147225065) */
+.workspace-payment-schedule-container {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  backdrop-filter: blur(20.4px);
+  border-radius: 6px;
+  width: 100%;
+}
+
+.workspace-payment-schedule-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.workspace-payment-schedule-title {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #64748B;
+}
+
+.workspace-payment-schedule-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+.workspace-payment-btn-simulate {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  height: 46px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.workspace-payment-btn-simulate:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+.workspace-payment-btn-record {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 16px;
+  height: 46px;
+  background: #2563EB;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #FFFFFF;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.workspace-payment-btn-record:hover {
+  background: #1D4ED8;
+}
+
+/* Inner Table Panel (Frame 93) */
+.workspace-payment-table-panel {
+  box-sizing: border-box;
+  background: #FFFFFF;
+  box-shadow: 0px 0px 6px rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  padding: 20px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.workspace-payment-table-wrapper {
+  overflow-x: auto;
+  width: 100%;
+}
+
+/* Table Head (Frame 57) - Redesigned with neutral #F8FAFC, border-bottom #E2E8F0, Urbanist 12px 600, readable #475569 text */
+.workspace-payment-table-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 42px;
+  min-height: 42px;
+  min-width: 960px;
+  padding: 0 16px;
+  background: #F8FAFC;
+  border-bottom: 1px solid #E2E8F0;
+  border-radius: 8px 8px 0 0;
+  box-sizing: border-box;
+}
+
+.workspace-payment-table-head .workspace-payment-col {
+  background: transparent;
+  color: #475569;
+  font-family: 'Urbanist', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 120%;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.workspace-payment-head-pill {
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 120%;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #475569;
+  white-space: nowrap;
+}
+
+/* Table Rows (Frame 59) */
+.workspace-payment-table-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+  min-height: 56px;
+  min-width: 960px;
+  padding: 0 16px;
+  border-bottom: 1px solid #EBEBEB;
+  transition: background-color 0.15s ease;
+  box-sizing: border-box;
+  background: #FFFFFF;
+}
+
+.workspace-payment-table-row:hover {
+  background: #F8FAFC;
+}
+
+/* Column Dimensions & Flex */
+.workspace-payment-col {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.workspace-payment-col-stage {
+  flex: 2.2;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+}
+
+.workspace-payment-stage-name {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.workspace-payment-stage-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+.workspace-payment-stage-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2563EB;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.workspace-payment-col-date {
+  flex: 1.3;
+  min-width: 140px;
+}
+
+.workspace-payment-col-due {
+  flex: 1.3;
+  min-width: 140px;
+}
+
+.workspace-payment-col-amount {
+  flex: 1;
+  min-width: 110px;
+}
+
+.workspace-payment-col-invoiced {
+  flex: 1.1;
+  min-width: 120px;
+}
+
+.workspace-payment-col-paid {
+  flex: 1;
+  min-width: 110px;
+}
+
+.workspace-payment-col-status {
+  flex: 1;
+  min-width: 100px;
+}
+
+.workspace-payment-col-action {
+  width: 48px;
+  min-width: 48px;
+  flex: 0 0 48px;
+  justify-content: center;
+  position: relative;
+}
+
+/* Row Cell Typography */
+.workspace-payment-cell-text {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  white-space: nowrap;
+}
+
+.workspace-payment-cell-text.overdue {
+  color: #D90606;
+  font-weight: 600;
+}
+
+.workspace-payment-cell-amount {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  white-space: nowrap;
+}
+
+.workspace-payment-cell-paid {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  white-space: nowrap;
+}
+
+.workspace-payment-invoice-link {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #2563EB;
+  text-decoration: underline;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.workspace-payment-invoice-link:hover {
+  color: #1D4ED8;
+}
+
+.workspace-payment-invoice-no {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #D90606;
+  white-space: nowrap;
+}
+
+/* Status Badges */
+.workspace-payment-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 11px;
+  line-height: 120%;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.workspace-payment-badge.paid {
+  background: rgba(22, 163, 74, 0.12);
+  color: #16A34A;
+}
+
+.workspace-payment-badge.overdue {
+  background: rgba(217, 6, 6, 0.12);
+  color: #D90606;
+}
+
+.workspace-payment-badge.partial {
+  background: rgba(217, 119, 6, 0.12);
+  color: #D97706;
+}
+
+.workspace-payment-badge.upcoming {
+  background: rgba(100, 116, 139, 0.12);
+  color: #64748B;
+}
+
+.workspace-payment-badge.active {
+  background: rgba(22, 163, 74, 0.12);
+  color: #16A34A;
+}
+
+/* Action Dropdown Menu */
+.workspace-payment-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #64748B;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.workspace-payment-action-btn:hover {
+  background: #F1F5F9;
+  color: #0F172A;
+}
+
+.workspace-payment-menu-container {
+  position: relative;
+}
+
+.workspace-payment-menu-dropdown {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  min-width: 210px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  box-shadow: 0px 4px 16px rgba(0, 0, 0, 0.1);
+  padding: 6px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.workspace-payment-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 120%;
+  color: #0F172A;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.workspace-payment-menu-item:hover {
+  background: #F1F5F9;
+  color: #2563EB;
+}
+
+.workspace-payment-empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: #64748B;
+  font-family: 'Urbanist', sans-serif;
+  font-size: 14px;
+}
+
+/* =========================================================================
+   WORKSPACE PAYMENTS: REDESIGNED DRAWER (TRANSACTION RECORD / PAYMENT DETAILS)
+   Figma Frame 2147225092, 2147225093, 2147225027
+   ========================================================================= */
+
+.workspace-payment-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  display: flex;
+  justify-content: flex-end;
+  animation: workspaceFadeIn 0.2s ease-out;
+}
+
+.workspace-payment-drawer-container {
+  box-sizing: border-box;
+  width: min(590px, 100vw);
+  height: 100vh;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(20.4px);
+  -webkit-backdrop-filter: blur(20.4px);
+  border-left: 1px solid rgba(255, 255, 255, 0.32);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: hidden;
+  animation: workspaceSlideInRight 0.25s ease-out;
+}
+
+@keyframes workspaceSlideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes workspaceFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.workspace-payment-drawer-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 4px;
+}
+
+.workspace-payment-drawer-title-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.workspace-payment-drawer-subtitle {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #64748B;
+  margin: 0;
+}
+
+.workspace-payment-drawer-title {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 120%;
+  color: #0F172A;
+  margin: 0;
+}
+
+.workspace-payment-drawer-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  color: #0F172A;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.workspace-payment-drawer-close:hover {
+  background: #F1F5F9;
+  border-color: #CBD5E1;
+}
+
+.workspace-payment-drawer-card {
+  box-sizing: border-box;
+  background: #FFFFFF;
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  overflow-y: auto;
+  box-shadow: 0px 0px 6px rgba(0, 0, 0, 0.06);
+}
+
+.workspace-payment-drawer-badges {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.workspace-payment-drawer-source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  background: rgba(37, 99, 235, 0.12);
+  border-radius: 9999px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 11px;
+  line-height: 120%;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #2563EB;
+}
+
+.workspace-payment-drawer-amount-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+}
+
+.workspace-payment-drawer-amount-val {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 32px;
+  line-height: 120%;
+  color: #0F172A;
+  margin: 0;
+}
+
+.workspace-payment-drawer-amount-lbl {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+.workspace-payment-drawer-divider {
+  width: 100%;
+  height: 1px;
+  background: #EBEBEB;
+  border: none;
+  margin: 0;
+}
+
+.workspace-payment-drawer-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  width: 100%;
+}
+
+.workspace-payment-drawer-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.workspace-payment-drawer-field-label {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+.workspace-payment-drawer-field-val {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.workspace-payment-drawer-field-val.link {
+  color: #2563EB;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.workspace-payment-drawer-section-title {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 120%;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #64748B;
+  margin: 0 0 8px 0;
+}
+
+/* Timeline */
+.workspace-payment-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+}
+
+.workspace-payment-timeline-item {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 14px;
+  position: relative;
+  padding-bottom: 20px;
+}
+
+.workspace-payment-timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+.workspace-payment-timeline-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  width: 20px;
+  flex-shrink: 0;
+}
+
+.workspace-payment-timeline-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid #64748B;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #FFFFFF;
+  box-sizing: border-box;
+}
+
+.workspace-payment-timeline-dot-inner {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #64748B;
+}
+
+.workspace-payment-timeline-dot.success {
+  border-color: #16A34A;
+}
+
+.workspace-payment-timeline-dot.success .workspace-payment-timeline-dot-inner {
+  background: #16A34A;
+}
+
+.workspace-payment-timeline-line {
+  position: absolute;
+  top: 18px;
+  bottom: -2px;
+  left: 9px;
+  width: 1px;
+  border-left: 1px dashed #B2BAC5;
+}
+
+.workspace-payment-timeline-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.workspace-payment-timeline-title {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.workspace-payment-timeline-time {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+.workspace-payment-receipt-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #2563EB;
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  background: #EFF6FF;
+  padding: 8px 14px;
+  border-radius: 6px;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.workspace-payment-receipt-link:hover {
+  background: #DBEAFE;
+}
+
+.workspace-payment-notes-box {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-family: 'Urbanist', sans-serif;
+  font-size: 13px;
+  line-height: 140%;
+  color: #475569;
+  margin: 0;
+}
+
+.workspace-payment-drawer-footer {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-top: auto;
+  padding-top: 12px;
+}
+
+.workspace-payment-drawer-btn-secondary {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 46px;
+  padding: 0 20px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  color: #0F172A;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.workspace-payment-drawer-btn-secondary:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+.workspace-payment-drawer-btn-primary {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 46px;
+  padding: 0 24px;
+  background: #2563EB;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  color: #FFFFFF;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.workspace-payment-drawer-btn-primary:hover {
+  background: #1D4ED8;
+}
+
+/* =========================================================================
+   WORKSPACE PAYMENTS: REDESIGNED RECORD PAYMENT MODAL
+   Figma Frame 2147225093, 2147225027
+   ========================================================================= */
+
+.workspace-record-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: workspaceFadeIn 0.2s ease-out;
+}
+
+.workspace-record-modal-container {
+  box-sizing: border-box;
+  width: min(590px, 100%);
+  max-height: calc(100vh - 32px);
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(20.4px);
+  -webkit-backdrop-filter: blur(20.4px);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: hidden;
+  box-shadow: 0px 20px 40px rgba(0, 0, 0, 0.15);
+  animation: workspaceScaleUp 0.2s ease-out;
+}
+
+@keyframes workspaceScaleUp {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.workspace-record-modal-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 4px;
+}
+
+.workspace-record-modal-title-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.workspace-record-modal-title {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 120%;
+  color: #0F172A;
+  margin: 0;
+}
+
+.workspace-record-modal-subtitle {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  margin: 0;
+}
+
+.workspace-record-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  color: #0F172A;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.workspace-record-modal-close:hover {
+  background: #F1F5F9;
+  border-color: #CBD5E1;
+}
+
+.workspace-record-modal-card {
+  box-sizing: border-box;
+  background: #FFFFFF;
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  overflow-y: auto;
+  box-shadow: 0px 0px 6px rgba(0, 0, 0, 0.06);
+}
+
+.workspace-record-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  width: 100%;
+}
+
+@media (max-width: 520px) {
+  .workspace-record-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.workspace-record-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.workspace-record-field.full-width {
+  grid-column: 1 / -1;
+}
+
+.workspace-record-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 20px;
+  color: #0F172A;
+}
+
+.workspace-record-req {
+  color: #DC2626;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.workspace-record-input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 48px;
+  padding: 12px 16px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: #0F172A;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.workspace-record-input:focus {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.workspace-record-input::placeholder {
+  color: #64748B;
+}
+
+.workspace-record-file-box {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  padding: 7px 12px;
+  gap: 12px;
+  height: 48px;
+  background: rgba(226, 232, 240, 0.2);
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.workspace-record-file-btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  height: 34px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 120%;
+  color: #0F172A;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.workspace-record-file-btn:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+.workspace-record-file-name {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 120%;
+  color: #64748B;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-record-textarea {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100px;
+  min-height: 80px;
+  padding: 14px 16px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: #0F172A;
+  resize: vertical;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.workspace-record-textarea:focus {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.workspace-record-textarea::placeholder {
+  color: #64748B;
+}
+
+.workspace-record-error {
+  color: #DC2626;
+  background: #FEF2F2;
+  border: 1px solid #FCA5A5;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-family: 'Urbanist', sans-serif;
+  font-size: 13px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.workspace-record-modal-footer {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  min-height: 46px;
+  margin-top: 4px;
+}
+
+.workspace-record-btn-cancel {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 46px;
+  padding: 0 20px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.workspace-record-btn-cancel:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+.workspace-record-btn-submit {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 46px;
+  padding: 0 24px;
+  background: #2563EB;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #FFFFFF;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.workspace-record-btn-submit:hover:not(:disabled) {
+  background: #1D4ED8;
+}
+
+.workspace-record-btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* =========================================================================
+   Figma Redesign: Projects → Activity Log (Frame 2147225071 / 2147225028)
+   ========================================================================= */
+
+.workspace-activity-container {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 16px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 6px;
+}
+
+.workspace-activity-header {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.workspace-activity-title {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 120%;
+  color: #0F172A;
+  margin: 0;
+}
+
+.workspace-activity-filters {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  background: #F1F5F9;
+  padding: 4px;
+  border-radius: 8px;
+}
+
+.workspace-activity-filter-btn {
+  border: none;
+  background: transparent;
+  color: #64748B;
+  font-family: 'Urbanist', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-transform: capitalize;
+}
+
+.workspace-activity-filter-btn:hover {
+  color: #0F172A;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.workspace-activity-filter-btn.active {
+  background: #FFFFFF;
+  color: #2563EB;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.workspace-activity-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 16px;
+  gap: 12px;
+  width: 100%;
+  background: #FFFFFF;
+  box-shadow: 0px 0px 6px rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+}
+
+.workspace-activity-row {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 6px 0;
+  gap: 16px;
+  width: 100%;
+  transition: background-color 0.15s ease;
+}
+
+.workspace-activity-avatar {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 50%;
+  background: #D9D9D9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 600;
+  font-size: 12px;
+  color: #334155;
+  user-select: none;
+  overflow: hidden;
+}
+
+.workspace-activity-avatar.avatar-system {
+  background: #E2E8F0;
+  color: #475569;
+}
+
+.workspace-activity-avatar.avatar-user {
+  background: #DBEAFE;
+  color: #1D4ED8;
+}
+
+.workspace-activity-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.workspace-activity-line1 {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.workspace-activity-author {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.workspace-activity-verb {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+.workspace-activity-target {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.workspace-activity-line2 {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+.workspace-activity-time {
+  color: #64748B;
+}
+
+.workspace-activity-dot {
+  color: #94A3B8;
+  font-size: 10px;
+}
+
+.workspace-activity-category {
+  color: #64748B;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.workspace-activity-divider {
+  width: 100%;
+  height: 1px;
+  background: #EBEBEB;
+  border: none;
+  margin: 0;
+}
+
+.workspace-activity-empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: #64748B;
+  font-family: 'Urbanist', sans-serif;
+  font-size: 14px;
+  width: 100%;
+}
+
+/* =========================================================================
+   Figma Redesign: Invite Client & Manage Client Access Modals
+   Frame 2147225093 / 2147225027 / 2147225569
+   ========================================================================= */
+
+.workspace-client-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.workspace-client-modal-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 16px;
+  gap: 16px;
+  width: 590px;
+  max-width: 100%;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  animation: workspaceClientModalIn 0.2s ease-out;
+}
+
+@keyframes workspaceClientModalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.workspace-client-modal-header {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0px;
+  gap: 24px;
+  width: 100%;
+  min-height: 48px;
+}
+
+.workspace-client-modal-titles {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  flex-grow: 1;
+}
+
+.workspace-client-modal-title {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 120%;
+  color: #0F172A;
+  margin: 0;
+}
+
+.workspace-client-modal-subtitle {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  margin: 0;
+}
+
+.workspace-client-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #0F172A;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.workspace-client-modal-close:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.workspace-client-inner-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 16px;
+  gap: 16px;
+  width: 100%;
+  background: #FFFFFF;
+  border-radius: 14px;
+}
+
+.workspace-client-meta-banner {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  gap: 16px;
+  width: 100%;
+  min-height: 53px;
+  background: rgba(226, 232, 240, 0.2);
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+}
+
+.workspace-client-meta-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  flex: 1;
+}
+
+.workspace-client-meta-label {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.workspace-client-meta-value {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.workspace-client-section-heading {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 120%;
+  color: #0F172A;
+  margin: 0;
+}
+
+.workspace-client-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  width: 100%;
+}
+
+@media (max-width: 580px) {
+  .workspace-client-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.workspace-client-field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+}
+
+.workspace-client-label {
+  font-family: 'Inter', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 20px;
+  color: #0F172A;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.workspace-client-label .required-star {
+  color: #DC2626;
+  font-size: 12px;
+}
+
+.workspace-client-input {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 14px 16px;
+  width: 100%;
+  height: 48px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  font-family: 'Inter', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: #0F172A;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.workspace-client-input:focus {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.workspace-client-input::placeholder {
+  color: #94A3B8;
+}
+
+.workspace-client-textarea {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  padding: 14px 16px;
+  width: 100%;
+  min-height: 116px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  font-family: 'Inter', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: #0F172A;
+  resize: vertical;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.workspace-client-textarea:focus {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.workspace-client-textarea::placeholder {
+  color: #64748B;
+}
+
+.workspace-client-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #FEF3C7;
+  color: #B45309;
+  border-radius: 6px;
+  font-family: 'Urbanist', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.workspace-client-status-chip.chip-active {
+  background: #ECFDF5;
+  color: #047857;
+}
+
+.workspace-client-error {
+  color: #DC2626;
+  background: #FEF2F2;
+  border: 1px solid #FCA5A5;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-family: 'Urbanist', sans-serif;
+  font-size: 13px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.workspace-client-modal-footer {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0px;
+  gap: 16px;
+  width: 100%;
+  min-height: 46px;
+}
+
+.workspace-client-btn-revoke {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 0;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  color: #D90606;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.workspace-client-btn-revoke:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+.workspace-client-btn-revoke:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.workspace-client-footer-actions {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 16px;
+  margin-left: auto;
+}
+
+.workspace-client-btn-cancel {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 46px;
+  padding: 0 20px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.workspace-client-btn-cancel:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+.workspace-client-btn-primary {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 46px;
+  padding: 0 24px;
+  background: #2563EB;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #FFFFFF;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.workspace-client-btn-primary:hover:not(:disabled) {
+  background: #1D4ED8;
+}
+
+.workspace-client-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+

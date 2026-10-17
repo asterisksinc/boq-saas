@@ -4411,6 +4411,76 @@ async function resendProjectClientInvite(request: Request, supabase: SupabaseCli
   }, 200, id);
 }
 
+async function revokeProjectClientInvite(request: Request, supabase: SupabaseClient, id: string, projectId: string) {
+  const scoped = await workspaceAccess(supabase, id, true);
+  if ("response" in scoped) return scoped.response;
+  const wid = scoped.access.workspaceId;
+
+  const projectRes = await supabase
+    .from("projects")
+    .select("id, name, client_name, client_email")
+    .eq("workspace_id", wid)
+    .eq("id", projectId)
+    .is("archived_at", null)
+    .maybeSingle();
+
+  if (!projectRes.data) return fail("NOT_FOUND", "Project was not found.", 404, id);
+
+  const nowIso = new Date().toISOString();
+
+  try {
+    await supabase
+      .from("project_client_invitations")
+      .update({ status: "revoked", updated_at: nowIso })
+      .eq("workspace_id", wid)
+      .eq("project_id", projectId)
+      .in("status", ["pending", "accepted"]);
+  } catch {}
+
+  try {
+    const { data: wsSettings } = await supabase
+      .from("workspace_settings")
+      .select("security")
+      .eq("workspace_id", wid)
+      .maybeSingle();
+    if (wsSettings) {
+      const sec = (wsSettings.security as any) || {};
+      const invs = Array.isArray(sec.client_invitations) ? sec.client_invitations : [];
+      const updatedInvs = invs.map((x: any) =>
+        x.projectId === projectId && (x.status === "pending" || x.status === "accepted")
+          ? { ...x, status: "revoked", updatedAt: nowIso }
+          : x
+      );
+      await supabase.from("workspace_settings").update({
+        security: { ...sec, client_invitations: updatedInvs },
+        updated_at: nowIso,
+        updated_by: scoped.access.userId,
+      }).eq("workspace_id", wid);
+    }
+  } catch {}
+
+  try {
+    await supabase.from("audit_logs").insert({
+      workspace_id: wid,
+      actor_user_id: scoped.access.userId,
+      action: "project.client_access_revoked",
+      entity_type: "project",
+      entity_id: projectId,
+      metadata: {
+        client_name: projectRes.data.client_name,
+        client_email: projectRes.data.client_email,
+        revoked_at: nowIso,
+      },
+      request_id: id,
+    });
+  } catch {}
+
+  return ok({
+    revoked: true,
+    message: "Client access has been revoked successfully.",
+  }, 200, id);
+}
+
 async function getProjectActivities(request: NextRequest, supabase: SupabaseClient, id: string, projectId: string) {
   const scoped = await workspaceAccess(supabase, id);
   if ("response" in scoped) return scoped.response;
@@ -5341,10 +5411,12 @@ function folderDto(row: Record<string, unknown>, itemCount = 0, sizeBytes = 0) {
   return { id: row.id, parentId: row.parent_id, name: row.name, itemCount, sizeBytes, createdAt: row.created_at, updatedAt: row.updated_at };
 }
 
-function documentDto(row: Record<string, unknown>) {
+function documentDto(row: Record<string, unknown>, isApproved?: boolean) {
+  const approved = isApproved !== undefined ? isApproved : (row.isApproved === true || row.approvalStatus === "approved");
   return {
     id: row.id, folderId: row.folder_id, proposalId: row.proposal_id, projectId: row.project_id, projectName: row.project_name,
-    name: row.name, mimeType: row.mime_type, sizeBytes: Number(row.size_bytes), createdAt: row.created_at, updatedAt: row.updated_at
+    name: row.name, mimeType: row.mime_type, sizeBytes: Number(row.size_bytes), createdAt: row.created_at, updatedAt: row.updated_at,
+    isApproved: approved, approvalStatus: approved ? "approved" : "pending"
   };
 }
 
@@ -5478,10 +5550,50 @@ async function listDocuments(request: NextRequest, supabase: SupabaseClient, id:
   const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
   const folderId = request.nextUrl.searchParams.get("folderId");
   const projectId = request.nextUrl.searchParams.get("projectId");
+  const approvedOnly = request.nextUrl.searchParams.get("approvedOnly") === "true";
   if (!folderId) return fail("VALIDATION_ERROR", "folderId is required.", 400, id);
   const { page, pageSize, from, to } = pagination(request.nextUrl.searchParams);
   const search = request.nextUrl.searchParams.get("search")?.trim().slice(0, 120);
   const admin = createSupabaseAdminClient();
+
+  if (approvedOnly) {
+    const { data: folder } = await admin
+      .from("document_folders")
+      .select("id, name, parent_id")
+      .eq("workspace_id", scoped.access.workspaceId)
+      .eq("id", folderId)
+      .maybeSingle();
+    if (!folder) return fail("NOT_FOUND", "Folder was not found.", 404, id);
+
+    let project: { id: string; name: string } | null = null;
+    if (projectId) {
+      if (scoped.access.role === "client") {
+        const userEmail = (scoped.access.email ?? "").toLowerCase();
+        const accessibleProjectIds = await getClientAccessibleProjectIds(admin, userEmail, scoped.access.userId);
+        if (!accessibleProjectIds.includes(projectId)) {
+          return fail("FORBIDDEN", "You do not have access to this project.", 403, id);
+        }
+      }
+      const { data: p } = await admin
+        .from("projects")
+        .select("id, name")
+        .eq("workspace_id", scoped.access.workspaceId)
+        .eq("id", projectId)
+        .maybeSingle();
+      project = p;
+    }
+
+    const approvedData = await resolveApprovedFolderData(admin, scoped.access.workspaceId, folder, project);
+    let items = approvedData.items;
+    if (search) {
+      const q = search.toLowerCase();
+      items = items.filter((it) => it.name.toLowerCase().includes(q));
+    }
+    const total = items.length;
+    const paginated = items.slice(from, to + 1);
+    return ok({ items: paginated, page, pageSize, total, hasMore: to + 1 < total }, 200, id);
+  }
+
   let query = admin.from("documents").select("id,folder_id,proposal_id,project_id,project_name,name,mime_type,size_bytes,created_at,updated_at", { count: "exact" })
     .eq("workspace_id", scoped.access.workspaceId).eq("folder_id", folderId).order("updated_at", { ascending: false }).range(from, to);
 
@@ -5632,6 +5744,471 @@ async function deleteDocument(supabase: SupabaseClient, id: string, documentId: 
   if (deleted.error) return fail("INTERNAL_ERROR", "Document metadata could not be deleted.", 500, id);
   await audit(supabase, "document.deleted", id);
   return ok({ deleted: true }, 200, id);
+}
+
+async function approveDocument(supabase: SupabaseClient, id: string, documentId: string) {
+  const scoped = await workspaceAccess(supabase, id, true);
+  if ("response" in scoped) return scoped.response;
+  if (!["owner", "admin", "member"].includes(scoped.access.role)) {
+    return fail("FORBIDDEN", "Your workspace role cannot approve documents.", 403, id);
+  }
+  const admin = createSupabaseAdminClient();
+  const { data: doc } = await admin
+    .from("documents")
+    .select("id, name, project_id, folder_id")
+    .eq("workspace_id", scoped.access.workspaceId)
+    .eq("id", documentId)
+    .maybeSingle();
+  if (!doc) return fail("NOT_FOUND", "Document was not found.", 404, id);
+
+  await audit(supabase, "document.approved", id);
+  await admin.from("audit_logs").insert({
+    workspace_id: scoped.access.workspaceId,
+    actor_user_id: scoped.access.userId,
+    action: "document.approved",
+    entity_type: "document",
+    entity_id: doc.id,
+    metadata: {
+      documentId: doc.id,
+      name: doc.name,
+      projectId: doc.project_id,
+      approvedBy: scoped.access.userId,
+      approvedAt: new Date().toISOString(),
+    },
+  });
+  return ok({ id: doc.id, isApproved: true, approvalStatus: "approved" }, 200, id);
+}
+
+function basicDocumentListPdf(lines: string[]) {
+  const commands = lines.slice(0, 32).map((line, index) =>
+    `BT /F1 ${index === 0 ? 16 : index === 1 ? 11 : 9} Tf 40 ${770 - index * 20} Td (${pdfEscape(line).slice(0, 110)}) Tj ET`
+  ).join("\n");
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    `<< /Length ${Buffer.byteLength(commands, "ascii")} >>\nstream\n${commands}\nendstream`,
+  ];
+  let output = "%PDF-1.4\n";
+  const offsets = [0];
+  objects.forEach((object, index) => {
+    offsets.push(Buffer.byteLength(output, "ascii"));
+    output += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xref = Buffer.byteLength(output, "ascii");
+  output += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.slice(1).map((offset) => `${String(offset).padStart(10, "0")} 00000 n `).join("\n")}\n`;
+  output += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return new Uint8Array(Buffer.from(output, "ascii"));
+}
+
+async function resolveApprovedFolderData(
+  admin: SupabaseClient,
+  workspaceId: string,
+  folder: { id: string; name: string },
+  project: { id: string; name: string } | null,
+  boqId?: string | null
+) {
+  const fName = (folder.name || "").toLowerCase();
+
+  let docQuery = admin
+    .from("documents")
+    .select("id, folder_id, proposal_id, project_id, project_name, name, mime_type, size_bytes, created_at, updated_at")
+    .eq("workspace_id", workspaceId)
+    .eq("folder_id", folder.id);
+
+  if (project?.id) {
+    docQuery = docQuery.eq("project_id", project.id);
+  }
+  const { data: rawDocs } = await docQuery.order("updated_at", { ascending: false });
+  const docsList = (rawDocs || []) as Array<Record<string, any>>;
+
+  let propQuery = admin.from("proposals").select("id, proposal_code, status, project_id").eq("workspace_id", workspaceId);
+  if (project?.id) propQuery = propQuery.eq("project_id", project.id);
+  const { data: propData } = await propQuery;
+  const approvedPropIds = new Set(
+    ((propData || []) as Array<Record<string, any>>)
+      .filter((p) => p.status === "approved" || p.status === "won")
+      .map((p) => p.id)
+  );
+  const approvedPropCodes = new Set(
+    ((propData || []) as Array<Record<string, any>>)
+      .filter((p) => p.status === "approved" || p.status === "won")
+      .map((p) => String(p.proposal_code || "").toLowerCase())
+  );
+
+  let boqQuery = admin.from("boqs").select("id, boq_number, version, status, grand_total, subtotal, markup_amount, markup_percent, tax_amount, tax_percent, project_id, updated_at").eq("workspace_id", workspaceId);
+  if (project?.id) boqQuery = boqQuery.eq("project_id", project.id);
+  if (boqId) boqQuery = boqQuery.eq("id", boqId);
+  const { data: boqData } = await boqQuery;
+  const boqList = (boqData || []) as Array<Record<string, any>>;
+  const approvedBoqIds = new Set(boqList.filter((b) => b.status === "approved").map((b) => b.id));
+  const approvedBoqNumbers = new Set(boqList.filter((b) => b.status === "approved").map((b) => String(b.boq_number || "").toLowerCase()));
+
+  let invQuery = admin.from("invoices").select("id, invoice_number, status, project_id").eq("workspace_id", workspaceId);
+  if (project?.id) invQuery = invQuery.eq("project_id", project.id);
+  const { data: invData } = await invQuery;
+  const approvedInvNumbers = new Set(
+    ((invData || []) as Array<Record<string, any>>)
+      .filter((inv) => ["paid", "issued", "approved"].includes(inv.status))
+      .map((inv) => String(inv.invoice_number || "").toLowerCase())
+  );
+
+  let sigQuery = admin.from("client_document_signatures").select("document_id, document_title, status").eq("workspace_id", workspaceId).eq("status", "signed");
+  if (project?.id) sigQuery = sigQuery.eq("project_id", project.id);
+  const { data: sigData } = await sigQuery;
+  const sigList = (sigData || []) as Array<Record<string, any>>;
+  const signedDocIds = new Set(sigList.map((s) => s.document_id));
+  const signedDocTitles = new Set(sigList.map((s) => String(s.document_title || "").toLowerCase()));
+
+  let appQuery = admin.from("activity_approvals").select("id, name, attachments, status").eq("workspace_id", workspaceId).eq("status", "approved");
+  if (project?.id) appQuery = appQuery.eq("project_id", project.id);
+  const { data: appData } = await appQuery;
+  const approvedAttachmentNames = new Set<string>();
+  const approvedAttachmentIds = new Set<string>();
+  for (const row of ((appData || []) as Array<Record<string, any>>)) {
+    if (Array.isArray(row.attachments)) {
+      for (const att of row.attachments) {
+        if (att?.documentId) approvedAttachmentIds.add(att.documentId);
+        if (att?.name) approvedAttachmentNames.add(String(att.name).toLowerCase());
+      }
+    }
+  }
+
+  const { data: auditData } = await admin
+    .from("audit_logs")
+    .select("entity_id")
+    .eq("workspace_id", workspaceId)
+    .eq("entity_type", "document")
+    .eq("action", "document.approved");
+  const approvedAuditDocIds = new Set(((auditData || []) as Array<Record<string, any>>).map((a) => a.entity_id));
+
+  const { data: boqAuditData } = await admin
+    .from("audit_logs")
+    .select("entity_id")
+    .eq("workspace_id", workspaceId)
+    .eq("entity_type", "boq")
+    .eq("action", "client.boq.approved");
+  ((boqAuditData || []) as Array<Record<string, any>>).forEach((row) => {
+    if (row.entity_id) approvedBoqIds.add(row.entity_id);
+  });
+
+  const approvedDocs = docsList.filter((doc) => {
+    const docNameLower = (doc.name || "").toLowerCase();
+
+    if (approvedAuditDocIds.has(doc.id)) return true;
+    if (signedDocIds.has(doc.id) || signedDocTitles.has(docNameLower)) return true;
+    if (approvedAttachmentIds.has(doc.id) || approvedAttachmentNames.has(docNameLower)) return true;
+
+    if (doc.proposal_id && approvedPropIds.has(doc.proposal_id)) return true;
+    if (fName.includes("proposal")) {
+      for (const code of approvedPropCodes) {
+        if (code && docNameLower.includes(code)) return true;
+      }
+      return false;
+    }
+
+    if (fName.includes("boq")) {
+      for (const num of approvedBoqNumbers) {
+        if (num && docNameLower.includes(num)) return true;
+      }
+      if (/approved|final/i.test(docNameLower)) {
+        if (approvedBoqIds.size > 0) return true;
+      }
+      return false;
+    }
+
+    if (fName.includes("invoice")) {
+      for (const invNum of approvedInvNumbers) {
+        if (invNum && docNameLower.includes(invNum)) return true;
+      }
+      return false;
+    }
+
+    if (/approved|final|\.signed\./i.test(docNameLower)) {
+      return true;
+    }
+
+    return false;
+  }).map((doc) => ({
+    id: doc.id,
+    folderId: doc.folder_id,
+    proposalId: doc.proposal_id,
+    projectId: doc.project_id,
+    projectName: doc.project_name || project?.name || null,
+    name: doc.name,
+    mimeType: doc.mime_type,
+    sizeBytes: Number(doc.size_bytes),
+    createdAt: doc.created_at,
+    updatedAt: doc.updated_at,
+    isApproved: true,
+    approvalStatus: "approved",
+  }));
+
+  if (fName.includes("boq") && approvedBoqIds.size > 0) {
+    const targetBoqId = boqId || Array.from(approvedBoqIds)[0];
+    const targetBoq = boqList.find((b) => b.id === targetBoqId);
+    if (targetBoq) {
+      const { data: boqDetail } = await admin
+        .from("boqs")
+        .select(`
+          id, boq_number, version, status, markup_percent, tax_percent, subtotal, markup_amount, tax_amount, grand_total,
+          boq_rooms (
+            id, name, sort_order,
+            boq_categories (
+              id, name, sort_order,
+              boq_items (
+                id, name, description, unit, quantity, rate, amount, sort_order
+              )
+            )
+          )
+        `)
+        .eq("id", targetBoq.id)
+        .single();
+
+      if (boqDetail) {
+        const transformedBoq = {
+          id: boqDetail.id,
+          boqNumber: boqDetail.boq_number,
+          version: boqDetail.version,
+          status: boqDetail.status,
+          projectName: project?.name || "Project",
+          subtotal: boqDetail.subtotal,
+          markupPercent: boqDetail.markup_percent,
+          markupAmount: boqDetail.markup_amount,
+          taxPercent: boqDetail.tax_percent,
+          taxAmount: boqDetail.tax_amount,
+          grandTotal: boqDetail.grand_total,
+          rooms: (((boqDetail as any).boq_rooms as Array<Record<string, any>>) || []).map((r) => ({
+            name: r.name,
+            categories: ((r.boq_categories as Array<Record<string, any>>) || []).map((c) => ({
+              name: c.name,
+              items: ((c.boq_items as Array<Record<string, any>>) || []).map((it) => ({
+                name: it.name,
+                description: it.description,
+                unit: it.unit,
+                quantity: it.quantity,
+                rate: it.rate,
+                amount: it.amount,
+              })),
+            })),
+          })),
+        };
+
+        return {
+          type: "boq" as const,
+          folderName: folder.name,
+          items: approvedDocs.length > 0 ? approvedDocs : [{
+            id: targetBoq.id,
+            folderId: folder.id,
+            proposalId: null,
+            projectId: project?.id || null,
+            projectName: project?.name || null,
+            name: `${targetBoq.boq_number || "BOQ"} - Approved.pdf`,
+            mimeType: "application/pdf",
+            sizeBytes: 4200000,
+            createdAt: targetBoq.updated_at,
+            updatedAt: targetBoq.updated_at,
+            isApproved: true,
+            approvalStatus: "approved",
+          }],
+          boqDetail: transformedBoq,
+        };
+      }
+    }
+  }
+
+  return {
+    type: "documents" as const,
+    folderName: folder.name,
+    items: approvedDocs,
+  };
+}
+
+async function exportFolderExcel(request: NextRequest, supabase: SupabaseClient, id: string, folderId: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const admin = createSupabaseAdminClient();
+  const wid = scoped.access.workspaceId;
+  const projectId = request.nextUrl.searchParams.get("projectId");
+  const boqId = request.nextUrl.searchParams.get("boqId");
+
+  const { data: folder, error: folderErr } = await admin
+    .from("document_folders")
+    .select("id, name, parent_id")
+    .eq("workspace_id", wid)
+    .eq("id", folderId)
+    .single();
+  if (folderErr || !folder) return fail("NOT_FOUND", "Folder was not found.", 404, id);
+
+  let project: { id: string; name: string } | null = null;
+  if (projectId) {
+    if (scoped.access.role === "client") {
+      const userEmail = (scoped.access.email ?? "").toLowerCase();
+      const accessibleProjectIds = await getClientAccessibleProjectIds(admin, userEmail, scoped.access.userId);
+      if (!accessibleProjectIds.includes(projectId)) {
+        return fail("FORBIDDEN", "You do not have access to this project.", 403, id);
+      }
+    }
+    const { data: p } = await admin.from("projects").select("id, name").eq("workspace_id", wid).eq("id", projectId).single();
+    if (!p) return fail("NOT_FOUND", "Project was not found.", 404, id);
+    project = p;
+  }
+
+  const approvedData = await resolveApprovedFolderData(admin, wid, folder, project, boqId);
+
+  if (approvedData.items.length === 0) {
+    return fail("NOT_FOUND", "No approved files available in this folder to export.", 404, id);
+  }
+
+  const projectName = project?.name || "Project";
+  const sanitizedProjectName = projectName.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const sanitizedFolderName = folder.name.replace(/[^a-zA-Z0-9_-]/g, "_");
+
+  let buffer: Buffer;
+  let filename: string;
+
+  if (approvedData.type === "boq" && approvedData.boqDetail) {
+    const boq = approvedData.boqDetail;
+    const rows: Array<Record<string, unknown>> = [];
+    let idx = 1;
+    for (const r of (boq.rooms as Array<Record<string, any>>) || []) {
+      for (const c of (r.categories as Array<Record<string, any>>) || []) {
+        for (const it of (c.items as Array<Record<string, any>>) || []) {
+          rows.push({
+            "#": idx++,
+            "Room": r.name,
+            "Category": c.name,
+            "Item": it.name,
+            "Description": it.description || "",
+            "Unit": it.unit,
+            "Quantity": it.quantity,
+            "Rate (INR)": it.rate,
+            "Amount (INR)": it.amount,
+          });
+        }
+      }
+    }
+    if (rows.length === 0) {
+      rows.push({
+        "#": 1,
+        "Room": "General",
+        "Category": "General",
+        "Item": boq.boqNumber || "BOQ",
+        "Description": "Approved BOQ",
+        "Unit": "-",
+        "Quantity": 1,
+        "Rate (INR)": boq.grandTotal || 0,
+        "Amount (INR)": boq.grandTotal || 0,
+      });
+    }
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Approved BOQ");
+    buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }) as Buffer;
+    filename = `${sanitizedProjectName}_${(boq.boqNumber || "BOQ").replace(/[^a-zA-Z0-9_-]/g, "_")}_Approved.xlsx`;
+  } else {
+    const rows = approvedData.items.map((doc, idx) => ({
+      "#": idx + 1,
+      "Document Name": doc.name,
+      "Category / Folder": folder.name,
+      "Project": project?.name || doc.projectName || "General",
+      "File Size": doc.sizeBytes ? (doc.sizeBytes > 1048576 ? `${(doc.sizeBytes / 1048576).toFixed(1)} MB` : `${Math.ceil(doc.sizeBytes / 1024)} KB`) : "—",
+      "Status": "APPROVED",
+      "Last Modified": doc.updatedAt ? new Date(doc.updatedAt).toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" }) : "—",
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Approved Documents");
+    buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }) as Buffer;
+    filename = `${sanitizedProjectName}_${sanitizedFolderName}_ApprovedDocuments.xlsx`;
+  }
+
+  return new Response(new Uint8Array(buffer), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Cache-Control": "private, no-store",
+      "X-Request-Id": id,
+    },
+  });
+}
+
+async function exportFolderPdf(request: NextRequest, supabase: SupabaseClient, id: string, folderId: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const admin = createSupabaseAdminClient();
+  const wid = scoped.access.workspaceId;
+  const projectId = request.nextUrl.searchParams.get("projectId");
+  const boqId = request.nextUrl.searchParams.get("boqId");
+
+  const { data: folder, error: folderErr } = await admin
+    .from("document_folders")
+    .select("id, name, parent_id")
+    .eq("workspace_id", wid)
+    .eq("id", folderId)
+    .single();
+  if (folderErr || !folder) return fail("NOT_FOUND", "Folder was not found.", 404, id);
+
+  let project: { id: string; name: string } | null = null;
+  if (projectId) {
+    if (scoped.access.role === "client") {
+      const userEmail = (scoped.access.email ?? "").toLowerCase();
+      const accessibleProjectIds = await getClientAccessibleProjectIds(admin, userEmail, scoped.access.userId);
+      if (!accessibleProjectIds.includes(projectId)) {
+        return fail("FORBIDDEN", "You do not have access to this project.", 403, id);
+      }
+    }
+    const { data: p } = await admin.from("projects").select("id, name").eq("workspace_id", wid).eq("id", projectId).single();
+    if (!p) return fail("NOT_FOUND", "Project was not found.", 404, id);
+    project = p;
+  }
+
+  const approvedData = await resolveApprovedFolderData(admin, wid, folder, project, boqId);
+
+  if (approvedData.items.length === 0) {
+    return fail("NOT_FOUND", "No approved files available in this folder to export.", 404, id);
+  }
+
+  const projectName = project?.name || "Project";
+  const sanitizedProjectName = projectName.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const sanitizedFolderName = folder.name.replace(/[^a-zA-Z0-9_-]/g, "_");
+
+  let pdfBytes: Uint8Array;
+  let filename: string;
+
+  if (approvedData.type === "boq" && approvedData.boqDetail) {
+    const boq = approvedData.boqDetail;
+    pdfBytes = basicBoqPdf(boq);
+    filename = `${sanitizedProjectName}_${(boq.boqNumber || "BOQ").replace(/[^a-zA-Z0-9_-]/g, "_")}_Approved.pdf`;
+  } else {
+    const lines: string[] = [
+      `${projectName} — Approved Documents`,
+      `Folder: ${folder.name} | Status: APPROVED`,
+      `Generated: ${new Date().toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" })} | Total Files: ${approvedData.items.length}`,
+      "",
+      "APPROVED FILES LIST",
+      "--------------------------------------------------------------------------------",
+    ];
+    for (const [i, doc] of approvedData.items.entries()) {
+      const sizeStr = doc.sizeBytes ? (doc.sizeBytes > 1048576 ? `${(doc.sizeBytes / 1048576).toFixed(1)} MB` : `${Math.ceil(doc.sizeBytes / 1024)} KB`) : "—";
+      const modStr = doc.updatedAt ? new Date(doc.updatedAt).toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+      lines.push(`${i + 1}. ${doc.name} (${sizeStr}) - ${modStr} [APPROVED]`);
+    }
+    lines.push("--------------------------------------------------------------------------------");
+    lines.push("This document contains only authoritative approved project assets.");
+    pdfBytes = basicDocumentListPdf(lines);
+    filename = `${sanitizedProjectName}_${sanitizedFolderName}_ApprovedDocuments.pdf`;
+  }
+
+  return new Response(Buffer.from(pdfBytes), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Cache-Control": "private, no-store",
+      "X-Request-Id": id,
+    },
+  });
 }
 
 // BOQ, Costing, and Reports & Analytics APIs. Calculated money fields are read
@@ -12331,6 +12908,7 @@ async function dispatch(request: NextRequest, path: string[]) {
   const projectClientInviteMatch = route.match(/^projects\/([0-9a-f-]{36})\/client-invite$/i);
   if (projectClientInviteMatch && request.method === "GET") return getProjectClientInvite(supabase, id, projectClientInviteMatch[1]);
   if (projectClientInviteMatch && request.method === "POST") return createProjectClientInvite(request, supabase, id, projectClientInviteMatch[1]);
+  if (projectClientInviteMatch && request.method === "DELETE") return revokeProjectClientInvite(request, supabase, id, projectClientInviteMatch[1]);
   const projectClientInviteResendMatch = route.match(/^projects\/([0-9a-f-]{36})\/client-invite\/resend$/i);
   if (projectClientInviteResendMatch && request.method === "POST") return resendProjectClientInvite(request, supabase, id, projectClientInviteResendMatch[1]);
   const projectStatusMatch = route.match(/^projects\/([0-9a-f-]{36})\/status$/i);
@@ -12451,11 +13029,17 @@ async function dispatch(request: NextRequest, path: string[]) {
   const folderMatch = route.match(/^document-folders\/([0-9a-f-]{36})$/i);
   if (folderMatch && request.method === "PATCH") return updateFolder(request, supabase, id, folderMatch[1]);
   if (folderMatch && request.method === "DELETE") return deleteFolder(request, supabase, id, folderMatch[1]);
+  const folderExportExcelMatch = route.match(/^document-folders\/([0-9a-f-]{36})\/export\/excel$/i);
+  if (folderExportExcelMatch && request.method === "GET") return exportFolderExcel(request, supabase, id, folderExportExcelMatch[1]);
+  const folderExportPdfMatch = route.match(/^document-folders\/([0-9a-f-]{36})\/export\/pdf$/i);
+  if (folderExportPdfMatch && request.method === "GET") return exportFolderPdf(request, supabase, id, folderExportPdfMatch[1]);
   if (request.method === "GET" && route === "documents") return listDocuments(request, supabase, id);
   if (request.method === "POST" && route === "documents/upload") return uploadDocument(request, supabase, id);
   const documentMatch = route.match(/^documents\/([0-9a-f-]{36})$/i);
   if (documentMatch && request.method === "PATCH") return updateDocument(request, supabase, id, documentMatch[1]);
   if (documentMatch && request.method === "DELETE") return deleteDocument(supabase, id, documentMatch[1]);
+  const documentApproveMatch = route.match(/^documents\/([0-9a-f-]{36})\/approve$/i);
+  if (documentApproveMatch && request.method === "POST") return approveDocument(supabase, id, documentApproveMatch[1]);
   const downloadMatch = route.match(/^documents\/([0-9a-f-]{36})\/download$/i);
   if (downloadMatch && request.method === "GET") return downloadDocument(supabase, id, downloadMatch[1]);
   if (request.method === "GET" && route === "invoices") return listInvoices(request, supabase, id);

@@ -85,6 +85,7 @@ type Form = {
   projectValue: string;
   startDate: string;
   targetCompletionDate: string;
+  leadDesigner?: string;
 };
 
 const blankForm: Form = {
@@ -99,6 +100,7 @@ const blankForm: Form = {
   projectValue: "",
   startDate: "",
   targetCompletionDate: "",
+  leadDesigner: "",
 };
 
 const message = (x: unknown, fallback: string) =>
@@ -170,6 +172,8 @@ export default function ProjectsPage() {
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [wizardProject, setWizardProject] = useState<Project | null>(null);
   const [remove, setRemove] = useState<Project | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [summary, setSummary] = useState<{ totalProjects: number; totalEstimatedValue: number } | null>(null);
 
@@ -354,20 +358,29 @@ export default function ProjectsPage() {
 
   const del = async () => {
     if (!remove) return;
+    setDeleting(true);
+    setDeleteError("");
     try {
       const r = await fetch(`/api/v1/projects/${remove.id}`, {
         method: "DELETE",
         credentials: "include",
       });
       if (!r.ok) {
-        setNotice(message(await r.json(), "Project could not be deleted."));
+        const errData = await r.json().catch(() => ({}));
+        const errMsg = message(errData, "Project could not be deleted.");
+        setDeleteError(errMsg);
+        setNotice(errMsg);
       } else {
         setRemove(null);
         setNotice("Project deleted.");
         load();
       }
     } catch {
-      setNotice("Failed to delete project.");
+      const errMsg = "Failed to delete project.";
+      setDeleteError(errMsg);
+      setNotice(errMsg);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -758,20 +771,16 @@ export default function ProjectsPage() {
       )}
 
       {remove && (
-        <Modal title="Delete Project?" subtitle="This action cannot be undone." onClose={() => setRemove(null)}>
-          <div className="delete-copy">
-            <img src="/assets/projects/menu-delete.svg" alt="" style={{ width: 20, height: 20 }} />
-            <p>
-              Delete <b>{remove.name}</b>? Dependent records may prevent deletion.
-            </p>
-          </div>
-          <footer>
-            <button onClick={() => setRemove(null)}>Cancel</button>
-            <button className="danger-button" onClick={del}>
-              Delete Project
-            </button>
-          </footer>
-        </Modal>
+        <DeleteProjectModal
+          project={remove}
+          onClose={() => {
+            setRemove(null);
+            setDeleteError("");
+          }}
+          onConfirm={del}
+          deleting={deleting}
+          error={deleteError}
+        />
       )}
 
       {notice && (
@@ -1122,14 +1131,51 @@ function EditProjectModal({
     projectValue: project.projectValue ? String(project.projectValue) : "",
     startDate: project.startDate ? project.startDate.split("T")[0] : "",
     targetCompletionDate: project.targetCompletionDate ? project.targetCompletionDate.split("T")[0] : "",
+    leadDesigner: project.leadDesigner || project.designer || "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    const origOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = origOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [onClose]);
+
   const change = (key: keyof Form, val: string) => setForm((f) => ({ ...f, [key]: val }));
+
+  const parseBudget = (val: string): number | null => {
+    if (!val || !val.trim()) return null;
+    const clean = val.trim().replace(/,/g, "").replace(/₹/g, "");
+    if (/^(\d+(\.\d+)?)\s*(cr|crore|crores)$/i.test(clean)) {
+      const m = clean.match(/^(\d+(\.\d+)?)/);
+      return m ? Math.round(Number(m[1]) * 10000000) : null;
+    }
+    if (/^(\d+(\.\d+)?)\s*(l|lac|lakh|lakhs)$/i.test(clean)) {
+      const m = clean.match(/^(\d+(\.\d+)?)/);
+      return m ? Math.round(Number(m[1]) * 100000) : null;
+    }
+    const n = Number(clean);
+    return isNaN(n) ? null : n;
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (!form.name.trim()) {
+      setError("Project Name is required.");
+      return;
+    }
+    if (!form.clientName.trim()) {
+      setError("Client Name is required.");
+      return;
+    }
     setSaving(true);
     setError("");
 
@@ -1142,9 +1188,13 @@ function EditProjectModal({
       location: form.location.trim() || null,
       description: form.description.trim() || null,
       areaSqft: form.areaSqft ? Number(form.areaSqft) : null,
-      projectValue: form.projectValue ? Number(form.projectValue) : null,
+      projectValue: parseBudget(form.projectValue),
       startDate: form.startDate || null,
       targetCompletionDate: form.targetCompletionDate || null,
+      leadDesigner: form.leadDesigner?.trim() || null,
+      metadata: {
+        leadDesigner: form.leadDesigner?.trim() || null,
+      },
     };
 
     try {
@@ -1164,35 +1214,218 @@ function EditProjectModal({
     }
   };
 
-  return (
-    <Modal title="Edit Project Details" subtitle="Update details or continue room configuration." onClose={onClose} wide>
-      <form onSubmit={handleSubmit} className="project-form">
-        <fieldset>
-          <legend>Project Details</legend>
-          <Label text="Project Name" required>
-            <input required value={form.name} onChange={(e) => change("name", e.target.value)} />
-          </Label>
-        </fieldset>
+  const projectCode = project.projectCode || (project.id ? `PRJ-${project.id.slice(-4).toUpperCase()}` : "PRJ-0001");
 
-        <fieldset>
-          <legend>Client Information</legend>
-          <div className="form-grid">
-            <Label text="Client Name" required>
-              <input required value={form.clientName} onChange={(e) => change("clientName", e.target.value)} />
-            </Label>
-            <Label text="Client Contact">
-              <input value={form.clientContact} onChange={(e) => change("clientContact", e.target.value)} />
-            </Label>
-            <Label text="Project Type" required>
-              <select required value={form.projectType} onChange={(e) => change("projectType", e.target.value)}>
-                <option>Residential</option>
-                <option>Commercial</option>
-                <option>Retail</option>
-                <option>Hospitality</option>
-              </select>
-            </Label>
-            <Label text="Project Status">
-              <div className="status-radios">
+  return (
+    <div className="project-modal-backdrop" onMouseDown={onClose}>
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="edit-project-title"
+        className="project-modal project-edit-modal"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        {/* Header - Frame 2147225093 */}
+        <header className="project-edit-header">
+          <div className="project-edit-header-text">
+            <h1 id="edit-project-title" className="project-edit-title">
+              Edit Project
+            </h1>
+            <p className="project-edit-code">{projectCode}</p>
+          </div>
+          <button
+            type="button"
+            className="project-edit-close-btn"
+            onClick={onClose}
+            aria-label="Close modal"
+          >
+            <X size={20} />
+          </button>
+        </header>
+
+        {/* Inner White Form Panel - Frame 2147225027 */}
+        <form id="edit-project-form" onSubmit={handleSubmit} className="project-edit-panel">
+          <div className="project-edit-grid">
+            {/* Project Name */}
+            <div className="project-edit-field">
+              <label htmlFor="edit-proj-name" className="project-edit-label">
+                Project Name <span className="project-edit-required">*</span>
+              </label>
+              <div className="project-edit-input-wrap">
+                <input
+                  id="edit-proj-name"
+                  required
+                  className="project-edit-input"
+                  value={form.name}
+                  onChange={(e) => change("name", e.target.value)}
+                  placeholder="e.g. Oberoi Residence"
+                />
+              </div>
+            </div>
+
+            {/* Client Name */}
+            <div className="project-edit-field">
+              <label htmlFor="edit-client-name" className="project-edit-label">
+                Client Name <span className="project-edit-required">*</span>
+              </label>
+              <div className="project-edit-input-wrap">
+                <input
+                  id="edit-client-name"
+                  required
+                  className="project-edit-input"
+                  value={form.clientName}
+                  onChange={(e) => change("clientName", e.target.value)}
+                  placeholder="e.g. Nikhil Oberoi"
+                />
+              </div>
+            </div>
+
+            {/* Project Type */}
+            <div className="project-edit-field">
+              <label htmlFor="edit-proj-type" className="project-edit-label">
+                Project Type
+              </label>
+              <div className="project-edit-input-wrap">
+                <select
+                  id="edit-proj-type"
+                  required
+                  className="project-edit-select"
+                  value={form.projectType}
+                  onChange={(e) => change("projectType", e.target.value)}
+                >
+                  <option value="Residential">Residential</option>
+                  <option value="Commercial">Commercial</option>
+                  <option value="Retail">Retail</option>
+                  <option value="Hospitality">Hospitality</option>
+                  <option value="Studio">Studio</option>
+                  <option value="Institutional">Institutional</option>
+                  <option value="Other">Other</option>
+                </select>
+                <div className="project-edit-select-icon">
+                  <ChevronDown size={18} />
+                </div>
+              </div>
+            </div>
+
+            {/* Assigned Designer */}
+            <div className="project-edit-field">
+              <label htmlFor="edit-designer" className="project-edit-label">
+                Assigned Designer
+              </label>
+              <div className="project-edit-input-wrap">
+                <input
+                  id="edit-designer"
+                  className="project-edit-input"
+                  value={form.leadDesigner || ""}
+                  onChange={(e) => change("leadDesigner", e.target.value)}
+                  placeholder="e.g. Jenny Wilson"
+                />
+              </div>
+            </div>
+
+            {/* Budget (₹) */}
+            <div className="project-edit-field">
+              <label htmlFor="edit-budget" className="project-edit-label">
+                Budget (₹)
+              </label>
+              <div className="project-edit-input-wrap">
+                <input
+                  id="edit-budget"
+                  className="project-edit-input"
+                  value={form.projectValue}
+                  onChange={(e) => change("projectValue", e.target.value)}
+                  placeholder="e.g. 42.5L or 4250000"
+                />
+              </div>
+            </div>
+
+            {/* Area (sqft) */}
+            <div className="project-edit-field">
+              <label htmlFor="edit-area" className="project-edit-label">
+                Area (sqft)
+              </label>
+              <div className="project-edit-input-wrap">
+                <input
+                  id="edit-area"
+                  type="number"
+                  min="1"
+                  className="project-edit-input"
+                  value={form.areaSqft}
+                  onChange={(e) => change("areaSqft", e.target.value)}
+                  placeholder="e.g. 3200"
+                />
+              </div>
+            </div>
+
+            {/* Location */}
+            <div className="project-edit-field">
+              <label htmlFor="edit-location" className="project-edit-label">
+                Location
+              </label>
+              <div className="project-edit-input-wrap">
+                <input
+                  id="edit-location"
+                  className="project-edit-input"
+                  value={form.location}
+                  onChange={(e) => change("location", e.target.value)}
+                  placeholder="e.g. Bandra West, Mumbai"
+                />
+              </div>
+            </div>
+
+            {/* Client Contact */}
+            <div className="project-edit-field">
+              <label htmlFor="edit-contact" className="project-edit-label">
+                Client Contact
+              </label>
+              <div className="project-edit-input-wrap">
+                <input
+                  id="edit-contact"
+                  className="project-edit-input"
+                  value={form.clientContact}
+                  onChange={(e) => change("clientContact", e.target.value)}
+                  placeholder="e.g. +91 98765 43210"
+                />
+              </div>
+            </div>
+
+            {/* Start Date */}
+            <div className="project-edit-field">
+              <label htmlFor="edit-start-date" className="project-edit-label">
+                Start Date
+              </label>
+              <div className="project-edit-input-wrap">
+                <input
+                  id="edit-start-date"
+                  type="date"
+                  className="project-edit-input"
+                  value={form.startDate}
+                  onChange={(e) => change("startDate", e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Target Completion */}
+            <div className="project-edit-field">
+              <label htmlFor="edit-target-date" className="project-edit-label">
+                Target Completion
+              </label>
+              <div className="project-edit-input-wrap">
+                <input
+                  id="edit-target-date"
+                  type="date"
+                  min={form.startDate || undefined}
+                  className="project-edit-input"
+                  value={form.targetCompletionDate}
+                  onChange={(e) => change("targetCompletionDate", e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Project Status */}
+            <div className="project-edit-field full-width">
+              <label className="project-edit-label">Project Status</label>
+              <div className="project-edit-status-pills" role="radiogroup">
                 {[
                   { val: "planning", text: "Planning" },
                   { val: "in_progress", text: "In Progress" },
@@ -1202,77 +1435,160 @@ function EditProjectModal({
                   <button
                     key={s.val}
                     type="button"
-                    className={form.status === s.val ? "active" : ""}
+                    role="radio"
+                    aria-checked={form.status === s.val}
+                    className={`project-edit-status-pill ${form.status === s.val ? "active" : ""}`}
                     onClick={() => change("status", s.val)}
                   >
-                    <i /> {s.text}
+                    <span className="project-edit-status-dot" />
+                    {s.text}
                   </button>
                 ))}
               </div>
-            </Label>
+            </div>
+
+            {/* Project Scope / Description */}
+            <div className="project-edit-field full-width">
+              <label htmlFor="edit-desc" className="project-edit-label">
+                Project Scope / Description
+              </label>
+              <div className="project-edit-input-wrap">
+                <textarea
+                  id="edit-desc"
+                  rows={3}
+                  className="project-edit-textarea"
+                  value={form.description}
+                  onChange={(e) => change("description", e.target.value)}
+                  placeholder="Brief description of the project scope and specifications..."
+                />
+              </div>
+            </div>
           </div>
-        </fieldset>
 
-        <fieldset>
-          <div className="form-grid">
-            <Label text="Location">
-              <input value={form.location} onChange={(e) => change("location", e.target.value)} />
-            </Label>
-            <Label text="Area (sqft)">
-              <input type="number" min="1" value={form.areaSqft} onChange={(e) => change("areaSqft", e.target.value)} />
-            </Label>
-          </div>
-          <Label text="Project Scope / Description">
-            <textarea rows={3} value={form.description} onChange={(e) => change("description", e.target.value)} />
-          </Label>
-        </fieldset>
+          {error && (
+            <div className="project-edit-error-banner" role="alert">
+              <Info size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+        </form>
 
-        <fieldset>
-          <legend>Timeline</legend>
-          <div className="form-grid">
-            <Label text="Start Date">
-              <input type="date" value={form.startDate} onChange={(e) => change("startDate", e.target.value)} />
-            </Label>
-            <Label text="Target Completion">
-              <input
-                type="date"
-                min={form.startDate || undefined}
-                value={form.targetCompletionDate}
-                onChange={(e) => change("targetCompletionDate", e.target.value)}
-              />
-            </Label>
-          </div>
-        </fieldset>
-
-        {error && <p className="form-error">{error}</p>}
-
-        <footer style={{ display: "flex", justifyContent: "space-between", marginTop: 16 }}>
-          <button
-            type="button"
-            onClick={() => onConfigureRooms(project)}
-            style={{
-              padding: "8px 14px",
-              background: "#eff6ff",
-              color: "#2563eb",
-              border: "1px solid #bfdbfe",
-              borderRadius: 6,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            Configure Rooms in Wizard →
-          </button>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button type="button" onClick={onClose} disabled={saving}>
+        {/* Footer - Frame 2147225069 */}
+        <footer className="project-edit-footer">
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <button
+              type="button"
+              className="project-edit-cancel-btn"
+              onClick={onClose}
+              disabled={saving}
+            >
               Cancel
             </button>
-            <button type="submit" className="primary" disabled={saving}>
-              {saving ? "Saving…" : "Save Changes"}
-            </button>
+            {onConfigureRooms && (
+              <button
+                type="button"
+                className="project-edit-rooms-btn"
+                onClick={() => onConfigureRooms(project)}
+                disabled={saving}
+              >
+                Configure Rooms in Wizard →
+              </button>
+            )}
           </div>
+          <button
+            type="submit"
+            form="edit-project-form"
+            className="project-edit-save-btn"
+            disabled={saving}
+          >
+            {saving ? "Saving…" : "Save Changes"}
+          </button>
         </footer>
-      </form>
-    </Modal>
+      </section>
+    </div>
+  );
+}
+
+function DeleteProjectModal({
+  project,
+  onClose,
+  onConfirm,
+  deleting,
+  error,
+}: {
+  project: Project;
+  onClose: () => void;
+  onConfirm: () => void;
+  deleting: boolean;
+  error?: string;
+}) {
+  useEffect(() => {
+    const origOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !deleting) onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = origOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [onClose, deleting]);
+
+  return (
+    <div className="project-modal-backdrop" onMouseDown={deleting ? undefined : onClose}>
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-project-title"
+        className="project-modal project-delete-modal"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        {/* Frame 2147225027 */}
+        <div className="project-delete-panel">
+          {/* Frame 2147225105 */}
+          <div className="project-delete-icon-badge">
+            <Trash2 size={28} className="project-delete-icon" />
+          </div>
+
+          {/* Frame 2147224969 */}
+          <div className="project-delete-text-wrap">
+            <h2 id="delete-project-title" className="project-delete-title">
+              Delete Project
+            </h2>
+            <p className="project-delete-desc">
+              &ldquo;{project.name}&rdquo; and all associated BOQs and data will be permanently removed. This cannot be undone.
+            </p>
+          </div>
+
+          {error && (
+            <div className="project-delete-error" role="alert">
+              {error}
+            </div>
+          )}
+        </div>
+
+        {/* Frame 2147225069 */}
+        <footer className="project-delete-footer">
+          <button
+            type="button"
+            className="project-delete-cancel-btn"
+            onClick={onClose}
+            disabled={deleting}
+          >
+            No, Keep It,
+          </button>
+          <button
+            type="button"
+            className="project-delete-confirm-btn"
+            onClick={onConfirm}
+            disabled={deleting}
+          >
+            {deleting ? "Deleting…" : "Yes, Delete!"}
+          </button>
+        </footer>
+      </section>
+    </div>
   );
 }
 

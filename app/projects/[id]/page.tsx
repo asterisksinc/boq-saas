@@ -36,6 +36,7 @@ import {
   History,
   GitBranch,
   FileDown,
+  Folder as FolderIcon,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState, useCallback } from "react";
@@ -144,6 +145,8 @@ export type Doc = {
   projectName?: string;
   sizeBytes: number;
   updatedAt: string;
+  isApproved?: boolean;
+  approvalStatus?: "approved" | "pending";
 };
 
 export type ClientInvitation = {
@@ -182,6 +185,16 @@ const formatCompactMoney = (value?: number, currency = "INR"): string => {
 const date = (x?: string) =>
   x ? new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(new Date(x)) : "—";
 const words = (x: string) => x.replace(/_/g, " ");
+const formatTime = (x?: string | null) => {
+  if (!x) return "12:00 PM";
+  try {
+    const d = new Date(x);
+    if (isNaN(d.getTime())) return "12:00 PM";
+    return new Intl.DateTimeFormat("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }).format(d);
+  } catch {
+    return "12:00 PM";
+  }
+};
 const formatTimeAgo = (x?: string | null) => {
   if (!x) return "2 hours ago";
   const diffSec = Math.floor((Date.now() - new Date(x).getTime()) / 1000);
@@ -207,6 +220,11 @@ export default function ProjectPage() {
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
+  const [uploadFolderId, setUploadFolderId] = useState<string>("");
+  const [stagedFile, setStagedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
 
   // Modals & Menu State
   const [menuOpen, setMenuOpen] = useState(false);
@@ -253,9 +271,9 @@ export default function ProjectPage() {
 
   const open = async (f: Folder) => {
     setFolder(f);
-    const r = await fetch(`/api/v1/documents?folderId=${f.id}&projectId=${encodeURIComponent(id)}&pageSize=100`, { credentials: "include" });
+    const r = await fetch(`/api/v1/documents?folderId=${f.id}&projectId=${encodeURIComponent(id)}&approvedOnly=true&pageSize=100`, { credentials: "include" });
     const b = await r.json();
-    setD((b.data?.items || []).filter((x: Doc) => x.projectId === id));
+    setD((b.data?.items || []).filter((x: Doc) => !x.projectId || x.projectId === id));
   };
 
   const stats = useMemo(
@@ -270,38 +288,68 @@ export default function ProjectPage() {
 
   const create = async () => {
     if (!name.trim()) return;
-    const r = await fetch("/api/v1/document-folders", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim(), parentId: folder?.id || null }),
-    });
-    if (!r.ok) return setError("Folder could not be created.");
-    setNewFolder(false);
-    setName("");
-    void load();
+    setIsCreatingFolder(true);
+    try {
+      const r = await fetch("/api/v1/document-folders", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), parentId: folder?.id || null }),
+      });
+      if (!r.ok) {
+        showToast("Folder could not be created.");
+        setIsCreatingFolder(false);
+        return;
+      }
+      showToast("Folder created successfully.");
+      setNewFolder(false);
+      setName("");
+      setIsCreatingFolder(false);
+      void load();
+    } catch {
+      showToast("Folder could not be created.");
+      setIsCreatingFolder(false);
+    }
+  };
+
+  const handleUploadStaged = async () => {
+    if (!stagedFile || !p) return;
+    const targetFolderId = uploadFolderId || folder?.id || (folders.length > 0 ? folders[0].id : null);
+    setIsUploading(true);
+    const d = new FormData();
+    d.append("file", stagedFile);
+    if (targetFolderId) d.append("folderId", targetFolderId);
+    d.append("projectId", p.id);
+    d.append("projectName", p.name);
+    try {
+      const r = await fetch("/api/v1/documents/upload", { method: "POST", credentials: "include", body: d });
+      if (!r.ok) {
+        showToast("File could not be uploaded.");
+        setIsUploading(false);
+        return;
+      }
+      showToast("File uploaded successfully.");
+      setUpload(false);
+      setStagedFile(null);
+      setIsUploading(false);
+      if (folder) {
+        void open(folder);
+      } else if (targetFolderId) {
+        const targetFolder = folders.find((x) => x.id === targetFolderId);
+        if (targetFolder) void open(targetFolder);
+      } else {
+        void load();
+      }
+    } catch {
+      showToast("File could not be uploaded.");
+      setIsUploading(false);
+    }
   };
 
   const send = async (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f || !p) return;
-    const targetFolderId = folder?.id || (folders.length > 0 ? folders[0].id : null);
-    const d = new FormData();
-    d.append("file", f);
-    if (targetFolderId) d.append("folderId", targetFolderId);
-    d.append("projectId", p.id);
-    d.append("projectName", p.name);
-    const r = await fetch("/api/v1/documents/upload", { method: "POST", credentials: "include", body: d });
-    if (!r.ok) return setError("File could not be uploaded.");
-    setUpload(false);
-    if (folder) {
-      void open(folder);
-    } else if (targetFolderId) {
-      const targetFolder = folders.find((x) => x.id === targetFolderId);
-      if (targetFolder) void open(targetFolder);
-    } else {
-      void load();
-    }
+    setStagedFile(f);
   };
 
   if (!p) return <div className="workspace-loading">{error || "Loading project workspace…"}</div>;
@@ -379,38 +427,176 @@ export default function ProjectPage() {
               back={() => setFolder(null)}
               upload={() => setUpload(true)}
               add={() => setNewFolder(true)}
+              project={p}
+              onReload={load}
+              showToast={showToast}
             />
           )}
-          {tab === "Payments" && <Payments p={p} b={boqs} rows={invoices} s={stats} load={load} />}
+          {tab === "Payments" && <Payments p={p} b={boqs} rows={invoices} s={stats} load={load} showToast={showToast} />}
           {tab === "Activity Log" && <Activity pId={p.id} />}
         </section>
       </div>
 
-      {/* Modals */}
+      {/* Figma Frame 2147225094 Upload Files Modal */}
       {upload && (
-        <Modal title="Upload Files" close={() => setUpload(false)}>
-          <label className="upload-drop">
-            <Upload />
-            <b>Drop files here</b>
-            <span>or click to browse your computer</span>
-            <input type="file" onChange={send} />
-          </label>
-        </Modal>
+        <div className="workspace-doc-modal-backdrop" onClick={() => { setUpload(false); setStagedFile(null); }}>
+          <div className="workspace-doc-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="workspace-doc-modal-header">
+              <h3 className="workspace-doc-modal-title">Upload Files</h3>
+              <button
+                className="workspace-doc-modal-close"
+                onClick={() => {
+                  setUpload(false);
+                  setStagedFile(null);
+                }}
+                aria-label="Close modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="workspace-doc-modal-panel">
+              <label className="workspace-doc-modal-label">
+                <span>Upload to <span className="required" style={{ color: "#DC2626" }}>*</span></span>
+                <select
+                  className="workspace-doc-modal-select"
+                  value={uploadFolderId || folder?.id || (folders[0]?.id ?? "")}
+                  onChange={(e) => setUploadFolderId(e.target.value)}
+                >
+                  {folders.length === 0 ? (
+                    <option value="">General (Root)</option>
+                  ) : (
+                    folders.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </label>
+
+              <label
+                className={`workspace-doc-dropzone ${dragOver ? "dragover" : ""}`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOver(true);
+                }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOver(false);
+                  if (e.dataTransfer.files?.[0]) setStagedFile(e.dataTransfer.files[0]);
+                }}
+              >
+                <input
+                  type="file"
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    if (e.target.files?.[0]) setStagedFile(e.target.files[0]);
+                  }}
+                />
+                <div className="workspace-doc-dropzone-badge">
+                  <Upload size={20} />
+                </div>
+                {stagedFile ? (
+                  <div style={{ textAlign: "center" }}>
+                    <div className="workspace-doc-dropzone-text">{stagedFile.name}</div>
+                    <div className="workspace-doc-dropzone-subtext">
+                      {stagedFile.size > 1048576
+                        ? `${(stagedFile.size / 1048576).toFixed(1)} MB`
+                        : `${Math.max(1, Math.ceil(stagedFile.size / 1024))} KB`}{" "}
+                      • Click to replace
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <span className="workspace-doc-dropzone-text">Drop files here</span>
+                    <span className="workspace-doc-dropzone-subtext">or click to browse your computer</span>
+                  </>
+                )}
+              </label>
+            </div>
+
+            <div className="workspace-doc-modal-footer">
+              <button
+                type="button"
+                className="workspace-doc-btn-cancel"
+                onClick={() => {
+                  setUpload(false);
+                  setStagedFile(null);
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="workspace-doc-btn-submit"
+                disabled={!stagedFile || isUploading}
+                onClick={handleUploadStaged}
+              >
+                {isUploading ? "Uploading..." : "Save & Upload"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
+      {/* Figma Frame 2147225093 New Folder Modal */}
       {newFolder && (
-        <Modal title="New Folder" close={() => setNewFolder(false)}>
-          <label className="modal-label">
-            Folder Name *
-            <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="ex. Projects" />
-          </label>
-          <footer>
-            <button onClick={() => setNewFolder(false)}>Cancel</button>
-            <button className="primary" onClick={create}>
-              Create Folder
-            </button>
-          </footer>
-        </Modal>
+        <div className="workspace-doc-modal-backdrop" onClick={() => { setNewFolder(false); setName(""); }}>
+          <div className="workspace-doc-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="workspace-doc-modal-header">
+              <h3 className="workspace-doc-modal-title">New Folder</h3>
+              <button
+                className="workspace-doc-modal-close"
+                onClick={() => {
+                  setNewFolder(false);
+                  setName("");
+                }}
+                aria-label="Close modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="workspace-doc-modal-panel">
+              <label className="workspace-doc-modal-label">
+                <span>Folder Name <span className="required" style={{ color: "#DC2626" }}>*</span></span>
+                <input
+                  autoFocus
+                  className="workspace-doc-modal-input"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="ex. Projects"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && name.trim()) void create();
+                  }}
+                />
+              </label>
+            </div>
+
+            <div className="workspace-doc-modal-footer">
+              <button
+                type="button"
+                className="workspace-doc-btn-cancel"
+                onClick={() => {
+                  setNewFolder(false);
+                  setName("");
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="workspace-doc-btn-submit"
+                disabled={!name.trim() || isCreatingFolder}
+                onClick={create}
+              >
+                {isCreatingFolder ? "Creating..." : "Create Folder"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {inviteOpen && (
@@ -3285,6 +3471,9 @@ function Docs({
   back,
   upload,
   add,
+  project,
+  onReload,
+  showToast,
 }: {
   folders: Folder[];
   folder: Folder | null;
@@ -3295,73 +3484,727 @@ function Docs({
   back: () => void;
   upload: () => void;
   add: () => void;
+  project?: Project | null;
+  onReload?: () => void;
+  showToast?: (msg: string) => void;
 }) {
+  const [search, setSearch] = useState("");
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleDocClick = () => setActiveMenuId(null);
+    window.addEventListener("click", handleDocClick);
+    return () => window.removeEventListener("click", handleDocClick);
+  }, []);
+
   const size = (x: number) => (x > 1048576 ? `${(x / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.ceil(x / 1024))} KB`);
+
+  const handleExport = async (folderId: string, format: "excel" | "pdf", e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setActiveMenuId(null);
+    try {
+      const projectId = project?.id || "";
+      const res = await fetch(`/api/v1/document-folders/${folderId}/export/${format}?projectId=${encodeURIComponent(projectId)}`, {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        showToast?.(data?.error?.message || "No approved files available in this folder to export.");
+        return;
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get("content-disposition");
+      let filename = format === "excel" ? "ApprovedDocuments.xlsx" : "ApprovedDocuments.pdf";
+      if (disposition && disposition.includes("filename=")) {
+        const match = disposition.match(/filename="?([^"]+)"?/);
+        if (match && match[1]) filename = match[1];
+      }
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      showToast?.(`${format.toUpperCase()} export downloaded successfully.`);
+    } catch {
+      showToast?.(`Failed to download ${format.toUpperCase()} export.`);
+    }
+  };
+
+  const [fileToDelete, setFileToDelete] = useState<Doc | null>(null);
+  const [deleteFileConfirmed, setDeleteFileConfirmed] = useState(false);
+  const [isDeletingFile, setIsDeletingFile] = useState(false);
+
+  const [folderToDelete, setFolderToDelete] = useState<Folder | null>(null);
+  const [deleteFolderConfirmed, setDeleteFolderConfirmed] = useState(false);
+  const [isDeletingFolder, setIsDeletingFolder] = useState(false);
+
+  const handleDeleteFolder = (f: Folder, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setActiveMenuId(null);
+    setFolderToDelete(f);
+    setDeleteFolderConfirmed(false);
+  };
+
+  const confirmDeleteFolder = async () => {
+    if (!folderToDelete) return;
+    setIsDeletingFolder(true);
+    try {
+      const res = await fetch(`/api/v1/document-folders/${folderToDelete.id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ confirmation: folderToDelete.name }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => null);
+        showToast?.(d?.error?.message || "Could not delete folder.");
+        setIsDeletingFolder(false);
+        return;
+      }
+      showToast?.("Folder deleted successfully.");
+      setFolderToDelete(null);
+      setIsDeletingFolder(false);
+      onReload?.();
+    } catch {
+      showToast?.("Failed to delete folder.");
+      setIsDeletingFolder(false);
+    }
+  };
+
+  const handleDeleteDoc = (d: Doc, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setActiveMenuId(null);
+    setFileToDelete(d);
+    setDeleteFileConfirmed(false);
+  };
+
+  const confirmDeleteDoc = async () => {
+    if (!fileToDelete) return;
+    setIsDeletingFile(true);
+    try {
+      const res = await fetch(`/api/v1/documents/${fileToDelete.id}`, { method: "DELETE", credentials: "include" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        showToast?.(data?.error?.message || "Could not delete file.");
+        setIsDeletingFile(false);
+        return;
+      }
+      showToast?.("File deleted successfully.");
+      const currentFolder = folder;
+      setFileToDelete(null);
+      setIsDeletingFile(false);
+      if (currentFolder) open(currentFolder);
+      else onReload?.();
+    } catch {
+      showToast?.("Failed to delete file.");
+      setIsDeletingFile(false);
+    }
+  };
+
+  const filteredFolders = folders.filter((f) => f.name.toLowerCase().includes(search.toLowerCase()));
+  const filteredDocs = docs.filter((d) => d.name.toLowerCase().includes(search.toLowerCase()));
+
   return (
     <section className="documents">
-      <header>
-        <h3>{folder ? `Documents › ${folder.name}` : "Documents"}</h3>
-        <div className="doc-actions">
-          <button className="primary" onClick={add}>
-            <Plus />
-            New Folder
-          </button>
-          <button onClick={upload} style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-            <Upload />
-            Upload
-          </button>
-          <button className={!grid ? "active" : ""} onClick={() => setGrid(false)} title="List View">
-            <LayoutList />
-          </button>
-          <button className={grid ? "active" : ""} onClick={() => setGrid(true)} title="Grid View">
-            <Grid2X2 />
-          </button>
-        </div>
-      </header>
-      {folder && (
-        <button className="folder-banner" onClick={back}>
-          <img src="/assets/projects/folder-icon.svg" alt="" />
-          <span>
-            <b>{folder.name}</b>
-            <small>
-              {folder.itemCount} items | {size(folder.sizeBytes)}
-            </small>
-          </span>
-        </button>
-      )}
+      <div className="workspace-doc-container">
+      {/* Figma Reference 1 Header & Toolbar (Root View) */}
       {!folder ? (
-        <div className={grid ? "folder-grid" : "folder-list"}>
-          {folders.map((f) => (
-            <button key={f.id} onClick={() => open(f)}>
-              <img src="/assets/projects/folder-icon.svg" alt="" />
-              <span>
-                <b>{f.name}</b>
-                <small>
-                  {f.itemCount} items | {size(f.sizeBytes)}
-                </small>
-              </span>
-              <small>{date(f.updatedAt)}</small>
-              <MoreHorizontal />
+        <div className="workspace-doc-toolbar">
+          <h3 className="workspace-doc-title">Documents</h3>
+          <div className="workspace-doc-actions">
+            <div className="workspace-doc-search">
+              <div className="workspace-doc-search-icon-box">
+                <Search size={16} />
+              </div>
+              <input
+                type="text"
+                placeholder="Search..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <button className="workspace-doc-btn-new" onClick={add} style={{ order: 3 }}>
+              <Plus size={16} />
+              New Folder
             </button>
-          ))}
-          {!folders.length && <div className="blank">No folders yet. Click New Folder to organise project files.</div>}
+            <button className="workspace-doc-btn-upload" onClick={upload} style={{ order: 2 }}>
+              <Upload size={16} />
+              Upload
+            </button>
+            <div className="workspace-doc-view-toggle" style={{ order: 1 }}>
+              <button
+                className={!grid ? "active" : ""}
+                onClick={() => setGrid(false)}
+                title="List View"
+                aria-label="List View"
+              >
+                <LayoutList size={18} />
+              </button>
+              <button
+                className={grid ? "active" : ""}
+                onClick={() => setGrid(true)}
+                title="Grid View"
+                aria-label="Grid View"
+              >
+                <Grid2X2 size={18} />
+              </button>
+            </div>
+          </div>
         </div>
       ) : (
-        <div className="file-list">
-          {docs.map((x) => (
-            <div key={x.id}>
-              <FileText />
-              <b>{x.name}</b>
-              <small>{x.projectName || "Project document"}</small>
-              <span>
-                {date(x.updatedAt)} | {size(x.sizeBytes)}
-              </span>
-              <a href={`/api/v1/documents/${x.id}/download`}>
-                <Eye />
-              </a>
+        /* Figma Reference 2 Header & Toolbar (Folder View) */
+        <div className="workspace-doc-toolbar">
+          <div className="workspace-doc-breadcrumbs">
+            <button className="workspace-doc-breadcrumb-link" onClick={back}>
+              <ArrowLeft size={16} /> Documents
+            </button>
+            <span className="workspace-doc-breadcrumb-sep">›</span>
+            <span className="workspace-doc-breadcrumb-current">{folder.name}</span>
+          </div>
+          <div className="workspace-doc-actions">
+            <div className="workspace-doc-search">
+              <div className="workspace-doc-search-icon-box">
+                <Search size={16} />
+              </div>
+              <input
+                type="text"
+                placeholder="Search files..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
             </div>
-          ))}
-          {!docs.length && <div className="blank">No project documents in this folder yet. Click Upload to add files.</div>}
+            <div className="workspace-doc-view-toggle">
+              <button
+                className={!grid ? "active" : ""}
+                onClick={() => setGrid(false)}
+                title="List View"
+                aria-label="List View"
+              >
+                <LayoutList size={18} />
+              </button>
+              <button
+                className={grid ? "active" : ""}
+                onClick={() => setGrid(true)}
+                title="Grid View"
+                aria-label="Grid View"
+              >
+                <Grid2X2 size={18} />
+              </button>
+            </div>
+            <button className="workspace-doc-btn-upload" onClick={upload}>
+              <Upload size={16} />
+              Upload
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Figma Reference 2 Selected Folder Summary Card */}
+      {folder && (
+        <div className="workspace-doc-summary-card">
+          <div className="workspace-doc-summary-left">
+            <div className="workspace-doc-summary-badge">
+              <FolderIcon size={20} />
+            </div>
+            <div className="workspace-doc-summary-info">
+              <div className="workspace-doc-summary-name">{folder.name}</div>
+              <div className="workspace-doc-summary-meta">
+                {folder.itemCount} items | {size(folder.sizeBytes)}
+              </div>
+            </div>
+          </div>
+          <div className="workspace-doc-summary-right">
+            <span className="workspace-doc-summary-date">Last modified: {date(folder.updatedAt)}</span>
+            <button
+              className="workspace-doc-btn-upload"
+              style={{ height: "36px", padding: "0 12px", fontSize: "13px" }}
+              onClick={(e) => handleExport(folder.id, "excel", e)}
+              title="Download Approved Files as Excel"
+            >
+              <FileSpreadsheet size={15} />
+              Export Excel
+            </button>
+            <button
+              className="workspace-doc-btn-upload"
+              style={{ height: "36px", padding: "0 12px", fontSize: "13px" }}
+              onClick={(e) => handleExport(folder.id, "pdf", e)}
+              title="Download Approved Files as PDF"
+            >
+              <FileDown size={15} />
+              Export PDF
+            </button>
+            <div className="workspace-doc-col-action" onClick={(e) => e.stopPropagation()}>
+              <button
+                className="workspace-doc-action-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveMenuId(activeMenuId === `summary-${folder.id}` ? null : `summary-${folder.id}`);
+                }}
+                title="Folder options"
+                aria-label="More options"
+              >
+                <MoreHorizontal size={18} />
+              </button>
+              {activeMenuId === `summary-${folder.id}` && (
+                <div className="workspace-doc-dropdown" onClick={(e) => e.stopPropagation()}>
+                  <button className="workspace-doc-dropdown-item" onClick={(e) => handleExport(folder.id, "excel", e)}>
+                    <FileSpreadsheet size={15} /> Download Approved Files — Excel (.xlsx)
+                  </button>
+                  <button className="workspace-doc-dropdown-item" onClick={(e) => handleExport(folder.id, "pdf", e)}>
+                    <FileDown size={15} /> Download Approved Files — PDF (.pdf)
+                  </button>
+                  <div className="workspace-doc-dropdown-sep" />
+                  <button className="workspace-doc-dropdown-item danger" onClick={(e) => handleDeleteFolder(folder, e)}>
+                    <Trash2 size={15} /> Delete Folder
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Root View Content: Folders List / Grid */}
+      {!folder ? (
+        !filteredFolders.length ? (
+          <div className="workspace-doc-empty">
+            <div className="workspace-doc-empty-icon">
+              <FolderIcon size={24} />
+            </div>
+            <div>No folders yet. Click New Folder to organise project files.</div>
+          </div>
+        ) : !grid ? (
+          <div className="workspace-doc-table-card">
+            <div className="workspace-doc-table-head">
+              <div>NAME</div>
+              <div>ITEMS</div>
+              <div>SIZE</div>
+              <div>LAST MODIFIED</div>
+              <div />
+            </div>
+            <div className="workspace-doc-table-body">
+              {filteredFolders.map((f) => (
+                <div key={f.id} className="workspace-doc-table-row" onClick={() => open(f)}>
+                  <div className="workspace-doc-col-name">
+                    <div className="workspace-doc-icon-folder">
+                      <FolderIcon size={18} />
+                    </div>
+                    <span className="workspace-doc-name-text">{f.name}</span>
+                  </div>
+                  <span className="workspace-doc-cell-muted">{f.itemCount} items</span>
+                  <span className="workspace-doc-cell-muted">{size(f.sizeBytes)}</span>
+                  <span className="workspace-doc-cell-muted">{date(f.updatedAt)}</span>
+                  <div className="workspace-doc-col-action" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      className="workspace-doc-action-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveMenuId(activeMenuId === f.id ? null : f.id);
+                      }}
+                      title="More options"
+                      aria-label="More options"
+                    >
+                      <MoreHorizontal size={18} />
+                    </button>
+                    {activeMenuId === f.id && (
+                      <div className="workspace-doc-dropdown" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          className="workspace-doc-dropdown-item"
+                          onClick={() => {
+                            setActiveMenuId(null);
+                            open(f);
+                          }}
+                        >
+                          <FolderIcon size={15} /> Open Folder
+                        </button>
+                        <button
+                          className="workspace-doc-dropdown-item"
+                          onClick={(e) => handleExport(f.id, "excel", e)}
+                        >
+                          <FileSpreadsheet size={15} /> Download Approved Files — Excel (.xlsx)
+                        </button>
+                        <button
+                          className="workspace-doc-dropdown-item"
+                          onClick={(e) => handleExport(f.id, "pdf", e)}
+                        >
+                          <FileDown size={15} /> Download Approved Files — PDF (.pdf)
+                        </button>
+                        <div className="workspace-doc-dropdown-sep" />
+                        <button
+                          className="workspace-doc-dropdown-item danger"
+                          onClick={(e) => handleDeleteFolder(f, e)}
+                        >
+                          <Trash2 size={15} /> Delete Folder
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="workspace-doc-grid">
+            {filteredFolders.map((f) => (
+              <div key={f.id} className="workspace-doc-grid-card" onClick={() => open(f)}>
+                <div className="workspace-doc-grid-top">
+                  <div className="workspace-doc-icon-folder">
+                    <FolderIcon size={20} />
+                  </div>
+                  <div className="workspace-doc-col-action" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      className="workspace-doc-action-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveMenuId(activeMenuId === f.id ? null : f.id);
+                      }}
+                      title="More options"
+                      aria-label="More options"
+                    >
+                      <MoreHorizontal size={18} />
+                    </button>
+                    {activeMenuId === f.id && (
+                      <div className="workspace-doc-dropdown" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          className="workspace-doc-dropdown-item"
+                          onClick={() => {
+                            setActiveMenuId(null);
+                            open(f);
+                          }}
+                        >
+                          <FolderIcon size={15} /> Open Folder
+                        </button>
+                        <button
+                          className="workspace-doc-dropdown-item"
+                          onClick={(e) => handleExport(f.id, "excel", e)}
+                        >
+                          <FileSpreadsheet size={15} /> Download Approved Files — Excel (.xlsx)
+                        </button>
+                        <button
+                          className="workspace-doc-dropdown-item"
+                          onClick={(e) => handleExport(f.id, "pdf", e)}
+                        >
+                          <FileDown size={15} /> Download Approved Files — PDF (.pdf)
+                        </button>
+                        <div className="workspace-doc-dropdown-sep" />
+                        <button
+                          className="workspace-doc-dropdown-item danger"
+                          onClick={(e) => handleDeleteFolder(f, e)}
+                        >
+                          <Trash2 size={15} /> Delete Folder
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="workspace-doc-grid-info">
+                  <span className="workspace-doc-name-text">{f.name}</span>
+                  <span className="workspace-doc-cell-muted">
+                    {f.itemCount} items | {size(f.sizeBytes)}
+                  </span>
+                </div>
+                <div className="workspace-doc-grid-bottom">
+                  <span>Modified: {date(f.updatedAt)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      ) : (
+        /* Folder View Content: Approved Documents List / Grid */
+        !filteredDocs.length ? (
+          <div className="workspace-doc-empty">
+            <div className="workspace-doc-empty-icon">
+              <FileText size={24} />
+            </div>
+            <div>No approved files in this folder yet.</div>
+          </div>
+        ) : !grid ? (
+          <div className="workspace-doc-table-card">
+            <div className="workspace-doc-table-head doc-mode">
+              <div>NAME</div>
+              <div>PROJECT</div>
+              <div>SIZE</div>
+              <div>MODIFIED</div>
+              <div />
+            </div>
+            <div className="workspace-doc-table-body">
+              {filteredDocs.map((x) => (
+                <div key={x.id} className="workspace-doc-table-row doc-mode">
+                  <div className="workspace-doc-col-name">
+                    <div className="workspace-doc-icon-file">
+                      <FileText size={18} />
+                    </div>
+                    <span className="workspace-doc-name-text">{x.name}</span>
+                    {(x.isApproved || x.approvalStatus === "approved") && (
+                      <span className="workspace-doc-approved-badge">
+                        <Check size={11} /> Approved
+                      </span>
+                    )}
+                  </div>
+                  <span className="workspace-doc-cell-muted">{x.projectName || project?.name || "General"}</span>
+                  <span className="workspace-doc-cell-muted">{size(x.sizeBytes)}</span>
+                  <span className="workspace-doc-cell-muted">{date(x.updatedAt)}</span>
+                  <div className="workspace-doc-col-action" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      className="workspace-doc-action-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveMenuId(activeMenuId === x.id ? null : x.id);
+                      }}
+                      title="File options"
+                      aria-label="More options"
+                    >
+                      <MoreHorizontal size={18} />
+                    </button>
+                    {activeMenuId === x.id && (
+                      <div className="workspace-doc-dropdown" onClick={(e) => e.stopPropagation()}>
+                        <a
+                          className="workspace-doc-dropdown-item"
+                          href={`/api/v1/documents/${x.id}/download`}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={() => setActiveMenuId(null)}
+                        >
+                          <Eye size={15} /> View
+                        </a>
+                        <a
+                          className="workspace-doc-dropdown-item"
+                          href={`/api/v1/documents/${x.id}/download`}
+                          download={x.name}
+                          onClick={() => setActiveMenuId(null)}
+                        >
+                          <Download size={15} /> Download
+                        </a>
+                        <div className="workspace-doc-dropdown-sep" />
+                        <button
+                          className="workspace-doc-dropdown-item danger"
+                          onClick={(e) => handleDeleteDoc(x, e)}
+                        >
+                          <Trash2 size={15} /> Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="workspace-doc-grid">
+            {filteredDocs.map((x) => (
+              <div key={x.id} className="workspace-doc-grid-card">
+                <div className="workspace-doc-grid-top">
+                  <div className="workspace-doc-icon-file">
+                    <FileText size={20} />
+                  </div>
+                  <div className="workspace-doc-col-action" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      className="workspace-doc-action-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveMenuId(activeMenuId === x.id ? null : x.id);
+                      }}
+                      title="File options"
+                      aria-label="More options"
+                    >
+                      <MoreHorizontal size={18} />
+                    </button>
+                    {activeMenuId === x.id && (
+                      <div className="workspace-doc-dropdown" onClick={(e) => e.stopPropagation()}>
+                        <a
+                          className="workspace-doc-dropdown-item"
+                          href={`/api/v1/documents/${x.id}/download`}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={() => setActiveMenuId(null)}
+                        >
+                          <Eye size={15} /> View
+                        </a>
+                        <a
+                          className="workspace-doc-dropdown-item"
+                          href={`/api/v1/documents/${x.id}/download`}
+                          download={x.name}
+                          onClick={() => setActiveMenuId(null)}
+                        >
+                          <Download size={15} /> Download
+                        </a>
+                        <div className="workspace-doc-dropdown-sep" />
+                        <button
+                          className="workspace-doc-dropdown-item danger"
+                          onClick={(e) => handleDeleteDoc(x, e)}
+                        >
+                          <Trash2 size={15} /> Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="workspace-doc-grid-info">
+                  <span className="workspace-doc-name-text">{x.name}</span>
+                  <span className="workspace-doc-cell-muted">{x.projectName || project?.name || "General"}</span>
+                </div>
+                <div className="workspace-doc-grid-bottom">
+                  <span>{size(x.sizeBytes)}</span>
+                  <span>{date(x.updatedAt)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+      </div>
+
+      {/* Figma Frame 2147225094 / Frame 2147225027 Delete File Confirmation Modal */}
+      {fileToDelete && (
+        <div className="workspace-doc-modal-backdrop" onClick={() => setFileToDelete(null)}>
+          <div className="workspace-doc-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="workspace-doc-modal-header">
+              <h3 className="workspace-doc-modal-title">Delete File?</h3>
+              <button
+                className="workspace-doc-modal-close"
+                onClick={() => setFileToDelete(null)}
+                aria-label="Close modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="workspace-doc-modal-panel" style={{ alignItems: "center", textAlign: "center", padding: "24px 16px", gap: "14px" }}>
+              <div className="workspace-doc-delete-badge">
+                <Trash2 size={28} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <h4 style={{ margin: 0, fontFamily: "Urbanist, sans-serif", fontSize: "18px", fontWeight: 600, color: "#0F172A" }}>
+                  Delete File?
+                </h4>
+                <p style={{ margin: 0, fontFamily: "Urbanist, sans-serif", fontSize: "14px", fontWeight: 500, color: "#64748B", lineHeight: "140%" }}>
+                  This file will be permanently deleted from &quot;{fileToDelete.name}&quot;. This action cannot be undone.
+                </p>
+              </div>
+
+              <div className="workspace-doc-delete-file-card">
+                <div className="workspace-doc-delete-file-badge">
+                  <FileText size={20} />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}>
+                  <span style={{ fontFamily: "Urbanist, sans-serif", fontWeight: 600, fontSize: "14px", color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {fileToDelete.name}
+                  </span>
+                  <span style={{ fontFamily: "Urbanist, sans-serif", fontSize: "12px", color: "#64748B" }}>
+                    {size(fileToDelete.sizeBytes)}
+                  </span>
+                </div>
+              </div>
+
+              <label className="workspace-doc-checkbox-wrap">
+                <input
+                  type="checkbox"
+                  checked={deleteFileConfirmed}
+                  onChange={(e) => setDeleteFileConfirmed(e.target.checked)}
+                  style={{ width: "18px", height: "18px", accentColor: "#EF4444", cursor: "pointer" }}
+                />
+                <span>I understand this action cannot be undone</span>
+              </label>
+            </div>
+
+            <div className="workspace-doc-modal-footer" style={{ justifyContent: "space-between", gap: "12px" }}>
+              <button
+                type="button"
+                className="workspace-doc-btn-cancel"
+                style={{ flex: 1 }}
+                onClick={() => setFileToDelete(null)}
+              >
+                No, Keep It,
+              </button>
+              <button
+                type="button"
+                className="workspace-doc-btn-danger"
+                disabled={!deleteFileConfirmed || isDeletingFile}
+                onClick={confirmDeleteDoc}
+              >
+                {isDeletingFile ? "Deleting..." : "Yes, Delete!"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Folder Confirmation Modal (Matching Figma Design) */}
+      {folderToDelete && (
+        <div className="workspace-doc-modal-backdrop" onClick={() => setFolderToDelete(null)}>
+          <div className="workspace-doc-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="workspace-doc-modal-header">
+              <h3 className="workspace-doc-modal-title">Delete Folder?</h3>
+              <button
+                className="workspace-doc-modal-close"
+                onClick={() => setFolderToDelete(null)}
+                aria-label="Close modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="workspace-doc-modal-panel" style={{ alignItems: "center", textAlign: "center", padding: "24px 16px", gap: "14px" }}>
+              <div className="workspace-doc-delete-badge">
+                <Trash2 size={28} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <h4 style={{ margin: 0, fontFamily: "Urbanist, sans-serif", fontSize: "18px", fontWeight: 600, color: "#0F172A" }}>
+                  Delete Folder?
+                </h4>
+                <p style={{ margin: 0, fontFamily: "Urbanist, sans-serif", fontSize: "14px", fontWeight: 500, color: "#64748B", lineHeight: "140%" }}>
+                  This folder and its contents will be permanently deleted from &quot;{folderToDelete.name}&quot;. This action cannot be undone.
+                </p>
+              </div>
+
+              <div className="workspace-doc-delete-file-card">
+                <div className="workspace-doc-delete-file-badge" style={{ background: "#E4ECFB", color: "#2563EB" }}>
+                  <FolderIcon size={20} />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}>
+                  <span style={{ fontFamily: "Urbanist, sans-serif", fontWeight: 600, fontSize: "14px", color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {folderToDelete.name}
+                  </span>
+                  <span style={{ fontFamily: "Urbanist, sans-serif", fontSize: "12px", color: "#64748B" }}>
+                    {folderToDelete.itemCount} items • {size(folderToDelete.sizeBytes)}
+                  </span>
+                </div>
+              </div>
+
+              <label className="workspace-doc-checkbox-wrap">
+                <input
+                  type="checkbox"
+                  checked={deleteFolderConfirmed}
+                  onChange={(e) => setDeleteFolderConfirmed(e.target.checked)}
+                  style={{ width: "18px", height: "18px", accentColor: "#EF4444", cursor: "pointer" }}
+                />
+                <span>I understand this action cannot be undone</span>
+              </label>
+            </div>
+
+            <div className="workspace-doc-modal-footer" style={{ justifyContent: "space-between", gap: "12px" }}>
+              <button
+                type="button"
+                className="workspace-doc-btn-cancel"
+                style={{ flex: 1 }}
+                onClick={() => setFolderToDelete(null)}
+              >
+                No, Keep It,
+              </button>
+              <button
+                type="button"
+                className="workspace-doc-btn-danger"
+                disabled={!deleteFolderConfirmed || isDeletingFolder}
+                onClick={confirmDeleteFolder}
+              >
+                {isDeletingFolder ? "Deleting..." : "Yes, Delete!"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </section>
@@ -3374,68 +4217,301 @@ function Payments({
   rows,
   s,
   load,
+  showToast,
 }: {
   p: Project;
   b: Boq[];
   rows: Invoice[];
   s: { budget: number; paid: number; due: number };
   load: () => void;
+  showToast?: (msg: string) => void;
 }) {
   const [modal, setModal] = useState(false);
+  const [simulateModal, setSimulateModal] = useState(false);
   const [drawerInvoice, setDrawerInvoice] = useState<Invoice | null>(null);
   const [recordModalInvoice, setRecordModalInvoice] = useState<Invoice | null>(null);
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(".workspace-payment-menu-container")) {
+        setActiveMenuId(null);
+      }
+    };
+    if (activeMenuId) {
+      document.addEventListener("click", handleOutsideClick);
+      return () => document.removeEventListener("click", handleOutsideClick);
+    }
+  }, [activeMenuId]);
 
   const handleOpenRecord = (inv?: Invoice) => {
+    setActiveMenuId(null);
     setRecordModalInvoice(inv || null);
     setModal(true);
   };
 
+  const handleDownloadPdf = async (inv: Invoice) => {
+    setActiveMenuId(null);
+    try {
+      const res = await fetch(`/api/v1/invoices/${inv.id}/pdf`, { credentials: "include" });
+      if (!res.ok) throw new Error("Invoice PDF not generated yet");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${inv.invoiceNumber || "Invoice"}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast?.("Invoice PDF downloaded successfully.");
+    } catch {
+      showToast?.("Invoice PDF could not be downloaded.");
+    }
+  };
+
+  // Metrics calculations
+  const totalContract = s.budget || 0;
+  const totalInvoiced = rows.reduce((acc, x) => acc + (x.totalAmount || 0), 0);
+  const totalPaid = s.paid || 0;
+  const totalOutstanding = s.due || 0;
+
+  const invoicedPct = totalContract > 0 ? ((totalInvoiced / totalContract) * 100).toFixed(1) : "0.0";
+  const paidPct = totalContract > 0 ? ((totalPaid / totalContract) * 100).toFixed(1) : "0.0";
+
+  const isOverdueDate = (dueDate?: string) => {
+    if (!dueDate) return false;
+    const t = new Date(dueDate).getTime();
+    return !isNaN(t) && t < Date.now();
+  };
+
+  const overdueRows = rows.filter(
+    (x) => x.status === "overdue" || (isOverdueDate(x.dueDate) && (x.outstanding || 0) > 0)
+  );
+  const totalOverdue = overdueRows.reduce((acc, x) => acc + (x.outstanding || 0), 0);
+
   return (
-    <>
-      <Metrics
-        data={[
-          ["Contract Value", money(s.budget)],
-          ["Invoiced", money(rows.reduce((a, x) => a + x.totalAmount, 0))],
-          ["Paid", money(s.paid)],
-          ["Outstanding", money(s.due)],
-        ]}
-      />
-      <section className="tab-panel">
-        <header>
-          <h4>Payment Schedule & Invoices</h4>
-          <button className="primary" onClick={() => handleOpenRecord()}>
-            <Plus />
-            Record Payment
-          </button>
+    <div className="workspace-payment-container">
+      {/* Figma Frame 2147225071: 4 Metric Cards */}
+      <div className="workspace-payment-metrics-container">
+        {/* Card 1: Contract Value */}
+        <div className="workspace-payment-metric-card">
+          <span className="workspace-payment-metric-label">Contract Value</span>
+          <span className="workspace-payment-metric-value">{money(totalContract)}</span>
+          <span className="workspace-payment-metric-sub">Total Project Budget</span>
+        </div>
+
+        {/* Card 2: Invoiced */}
+        <div className="workspace-payment-metric-card">
+          <span className="workspace-payment-metric-label">Invoiced</span>
+          <span className="workspace-payment-metric-value">{formatCompactMoney(totalInvoiced)}</span>
+          <span className="workspace-payment-metric-sub">{invoicedPct}% of contract</span>
+        </div>
+
+        {/* Card 3: Paid */}
+        <div className="workspace-payment-metric-card">
+          <span className="workspace-payment-metric-label">Paid</span>
+          <span className="workspace-payment-metric-value paid">{formatCompactMoney(totalPaid)}</span>
+          <span className="workspace-payment-metric-sub">{paidPct}% of contract</span>
+        </div>
+
+        {/* Card 4: Outstanding */}
+        <div className="workspace-payment-metric-card">
+          <span className="workspace-payment-metric-label">Outstanding</span>
+          <span className="workspace-payment-metric-value outstanding">{formatCompactMoney(totalOutstanding)}</span>
+          <span className={`workspace-payment-metric-sub ${totalOverdue > 0 ? "overdue" : ""}`}>
+            {totalOverdue > 0 ? "Overdue" : "All current"}
+          </span>
+        </div>
+      </div>
+
+      {/* Figma Frame 2147225072 / 2147225065: Schedule Container */}
+      <div className="workspace-payment-schedule-container">
+        <header className="workspace-payment-schedule-header">
+          <h4 className="workspace-payment-schedule-title">PAYMENT SCHEDULE</h4>
+          <div className="workspace-payment-schedule-actions">
+            <button
+              type="button"
+              className="workspace-payment-btn-simulate"
+              onClick={() => setSimulateModal(true)}
+            >
+              Simulate Client Payment
+            </button>
+            <button
+              type="button"
+              className="workspace-payment-btn-record"
+              onClick={() => handleOpenRecord()}
+            >
+              <Plus size={16} />
+              Record Payment
+            </button>
+          </div>
         </header>
-        <Table heads={["STAGE / MILESTONE", "INVOICE #", "TRANSACTION DATE", "DUE DATE", "AMOUNT", "PAID", "STATUS", ""]}>
-          {rows.map((x) => (
-            <tr key={x.id} onClick={() => setDrawerInvoice(x)}>
-              <td><b>{x.milestone || "General Milestone"}</b></td>
-              <td>{x.invoiceNumber}</td>
-              <td>{date(x.issueDate)}</td>
-              <td>{date(x.dueDate)}</td>
-              <td>{money(x.totalAmount)}</td>
-              <td>{money(x.totalPaid)}</td>
-              <td>
-                <span
-                  className="tag"
-                  style={{
-                    background: x.status === "paid" ? "#dcfce7" : x.status === "overdue" ? "#fee2e2" : "#fef3c7",
-                    color: x.status === "paid" ? "#15803d" : x.status === "overdue" ? "#b91c1c" : "#d97706",
-                  }}
-                >
-                  {words(x.status)}
-                </span>
-              </td>
-              <td>
-                <MoreHorizontal />
-              </td>
-            </tr>
-          ))}
-        </Table>
-        {!rows.length && <div className="blank">No invoices or payment records are linked to this project. Click Record Payment to add a transaction.</div>}
-      </section>
+
+        <div className="workspace-payment-table-panel">
+          <div className="workspace-payment-table-wrapper">
+            {/* Table Header (Frame 57 with E4ECFB pills) */}
+            <div className="workspace-payment-table-head">
+              <div className="workspace-payment-col workspace-payment-col-stage">
+                <span className="workspace-payment-head-pill">STAGE</span>
+              </div>
+              <div className="workspace-payment-col workspace-payment-col-date">
+                <span className="workspace-payment-head-pill">TRANSACTION DATE</span>
+              </div>
+              <div className="workspace-payment-col workspace-payment-col-due">
+                <span className="workspace-payment-head-pill">DUE DATE</span>
+              </div>
+              <div className="workspace-payment-col workspace-payment-col-amount">
+                <span className="workspace-payment-head-pill">AMOUNT</span>
+              </div>
+              <div className="workspace-payment-col workspace-payment-col-invoiced">
+                <span className="workspace-payment-head-pill">INVOICED</span>
+              </div>
+              <div className="workspace-payment-col workspace-payment-col-paid">
+                <span className="workspace-payment-head-pill">PAID</span>
+              </div>
+              <div className="workspace-payment-col workspace-payment-col-status">
+                <span className="workspace-payment-head-pill">STATUS</span>
+              </div>
+              <div className="workspace-payment-col workspace-payment-col-action"></div>
+            </div>
+
+            {/* Table Rows (Frame 59) */}
+            {rows.map((x) => {
+              const isOverdue =
+                x.status === "overdue" || (isOverdueDate(x.dueDate) && (x.outstanding || 0) > 0);
+              const statusKey =
+                x.status === "paid" ? "paid" : isOverdue ? "overdue" : x.status === "partially_paid" ? "partial" : "upcoming";
+              const statusLabel =
+                x.status === "paid"
+                  ? "PAID"
+                  : isOverdue
+                  ? "OVERDUE"
+                  : x.status === "partially_paid"
+                  ? "PARTIAL"
+                  : x.status
+                  ? x.status.toUpperCase()
+                  : "UPCOMING";
+
+              return (
+                <div key={x.id} className="workspace-payment-table-row">
+                  {/* STAGE */}
+                  <div className="workspace-payment-col workspace-payment-col-stage">
+                    <div className="workspace-payment-stage-name" title={x.milestone || "General Milestone"}>
+                      {x.milestone || "General Milestone"}
+                    </div>
+                    <div className="workspace-payment-stage-sub">
+                      <span className="workspace-payment-stage-dot" />
+                      <span>{x.transactionReference?.startsWith("SIM-") || x.paymentMethod === "upi" ? "Client Dashboard" : "Manual Entry"}</span>
+                    </div>
+                  </div>
+
+                  {/* TRANSACTION DATE */}
+                  <div className="workspace-payment-col workspace-payment-col-date">
+                    <span className="workspace-payment-cell-text">{date(x.issueDate)}</span>
+                  </div>
+
+                  {/* DUE DATE */}
+                  <div className="workspace-payment-col workspace-payment-col-due">
+                    <span className={`workspace-payment-cell-text ${isOverdue ? "overdue" : ""}`}>
+                      {x.dueDate ? date(x.dueDate) : "Upcoming"}
+                    </span>
+                  </div>
+
+                  {/* AMOUNT */}
+                  <div className="workspace-payment-col workspace-payment-col-amount">
+                    <span className="workspace-payment-cell-amount">{formatCompactMoney(x.totalAmount)}</span>
+                  </div>
+
+                  {/* INVOICED */}
+                  <div className="workspace-payment-col workspace-payment-col-invoiced">
+                    {x.invoiceNumber ? (
+                      <button
+                        type="button"
+                        className="workspace-payment-invoice-link"
+                        onClick={() => setDrawerInvoice(x)}
+                        title="View invoice details"
+                      >
+                        {x.invoiceNumber}
+                      </button>
+                    ) : (
+                      <span className="workspace-payment-invoice-no">No</span>
+                    )}
+                  </div>
+
+                  {/* PAID */}
+                  <div className="workspace-payment-col workspace-payment-col-paid">
+                    <span className="workspace-payment-cell-paid">
+                      {x.totalPaid && x.totalPaid > 0 ? formatCompactMoney(x.totalPaid) : "—"}
+                    </span>
+                  </div>
+
+                  {/* STATUS */}
+                  <div className="workspace-payment-col workspace-payment-col-status">
+                    <span className={`workspace-payment-badge ${statusKey}`}>
+                      {statusLabel}
+                    </span>
+                  </div>
+
+                  {/* Action Menu (3-dots) */}
+                  <div className="workspace-payment-col workspace-payment-col-action workspace-payment-menu-container">
+                    <button
+                      type="button"
+                      className="workspace-payment-action-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveMenuId(activeMenuId === x.id ? null : x.id);
+                      }}
+                      aria-label="Payment row actions"
+                    >
+                      <MoreHorizontal size={18} />
+                    </button>
+
+                    {activeMenuId === x.id && (
+                      <div className="workspace-payment-menu-dropdown">
+                        <button
+                          type="button"
+                          className="workspace-payment-menu-item"
+                          onClick={() => {
+                            setActiveMenuId(null);
+                            setDrawerInvoice(x);
+                          }}
+                        >
+                          <Eye size={14} />
+                          View Transaction Details
+                        </button>
+                        <button
+                          type="button"
+                          className="workspace-payment-menu-item"
+                          onClick={() => handleOpenRecord(x)}
+                        >
+                          <Plus size={14} />
+                          Record Payment
+                        </button>
+                        <button
+                          type="button"
+                          className="workspace-payment-menu-item"
+                          onClick={() => handleDownloadPdf(x)}
+                        >
+                          <Download size={14} />
+                          Download Invoice PDF
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            {!rows.length && (
+              <div className="workspace-payment-empty">
+                No invoices or payment records are linked to this project. Click Record Payment to add a transaction.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Payment Details Slide Drawer */}
       {drawerInvoice && (
@@ -3464,7 +4540,17 @@ function Payments({
           load={load}
         />
       )}
-    </>
+
+      {/* Simulate Client Payment Modal */}
+      {simulateModal && (
+        <SimulatePaymentModal
+          invoices={rows}
+          close={() => setSimulateModal(false)}
+          load={load}
+          showToast={showToast}
+        />
+      )}
+    </div>
   );
 }
 
@@ -3482,197 +4568,239 @@ function PaymentDetailsDrawer({
   onRecordPayment: () => void;
 }) {
   const isPaid = invoice.status === "paid";
-  const boqRef = boqs[0]?.boqNumber || project.projectCode || "BOQ-001";
+  const isOverdue =
+    invoice.status === "overdue" ||
+    (invoice.dueDate && new Date(invoice.dueDate).getTime() < Date.now() && (invoice.outstanding || 0) > 0);
+  const boqRef = boqs[0]?.boqNumber || project.projectCode || "BOQ-2024-004";
+  const txnId = invoice.transactionReference || `TXN-${(invoice.id || "8F72A91C").slice(0, 8).toUpperCase()}`;
+  const isClientDashboard = invoice.transactionReference?.startsWith("SIM-") || invoice.paymentMethod === "upi";
+
+  const statusLabel = isPaid
+    ? "PAID"
+    : isOverdue
+    ? "OVERDUE"
+    : invoice.status === "partially_paid"
+    ? "PARTIALLY PAID"
+    : "ACTIVE";
+  const statusClass = isPaid
+    ? "paid"
+    : isOverdue
+    ? "overdue"
+    : invoice.status === "partially_paid"
+    ? "partial"
+    : "active";
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 110,
-        background: "rgba(15, 23, 42, 0.4)",
-        backdropFilter: "blur(4px)",
-        display: "flex",
-        justifyContent: "flex-end",
-      }}
-      onClick={onClose}
-    >
+    <div className="workspace-payment-drawer-backdrop" onClick={onClose}>
       <div
-        className="payment-panel"
-        style={{
-          width: "min(440px, 100vw)",
-          background: "#fff",
-          height: "100vh",
-          overflowY: "auto",
-          padding: "24px",
-          boxShadow: "-10px 0 30px rgba(0,0,0,0.1)",
-        }}
+        className="workspace-payment-drawer-container"
         onClick={(e) => e.stopPropagation()}
       >
-        <button onClick={onClose} aria-label="Close drawer" style={{ float: "right", border: 0, background: "#f1f5f9", borderRadius: "50%", padding: "6px", cursor: "pointer" }}>
-          <X size={16} />
-        </button>
-        <small style={{ color: "#64748b", textTransform: "uppercase", fontSize: "10px", fontWeight: 700, letterSpacing: "0.05em" }}>
-          TRANSACTION RECORD
-        </small>
-        <h2 style={{ fontSize: "18px", margin: "6px 0 16px", color: "#0f172a" }}>
-          {invoice.milestone || invoice.invoiceNumber}
-        </h2>
+        {/* Header (Figma Frame 2147225093) */}
+        <div className="workspace-payment-drawer-header">
+          <div className="workspace-payment-drawer-title-group">
+            <span className="workspace-payment-drawer-subtitle">TRANSACTION RECORD</span>
+            <h3 className="workspace-payment-drawer-title">Payment Details</h3>
+          </div>
+          <button
+            type="button"
+            className="workspace-payment-drawer-close"
+            onClick={onClose}
+            aria-label="Close drawer"
+          >
+            <X size={18} />
+          </button>
+        </div>
 
-        {/* Big Amount Card */}
-        <section style={{ background: "#f8fafc", borderRadius: "10px", padding: "16px", marginBottom: "20px", border: "1px solid #e2e8f0" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: "11px", color: "#64748b" }}>Payment Amount</span>
-            <span
-              className="tag"
-              style={{
-                background: isPaid ? "#dcfce7" : invoice.status === "overdue" ? "#fee2e2" : "#fef3c7",
-                color: isPaid ? "#15803d" : invoice.status === "overdue" ? "#b91c1c" : "#d97706",
-                fontSize: "10px",
-                fontWeight: 700,
-              }}
-            >
-              {invoice.status.toUpperCase()}
+        {/* Content Card (Figma Frame 2147225027) */}
+        <div className="workspace-payment-drawer-card">
+          {/* Status Badges Row (Frame 2147225412) */}
+          <div className="workspace-payment-drawer-badges">
+            <span className={`workspace-payment-badge ${statusClass}`}>
+              {statusLabel}
+            </span>
+            <span className="workspace-payment-drawer-source-badge">
+              <span className="workspace-payment-stage-dot" />
+              {isClientDashboard ? "CLIENT DASHBOARD" : "MANUAL ENTRY"}
             </span>
           </div>
-          <b style={{ display: "block", fontSize: "26px", color: "#0f172a", margin: "10px 0 4px" }}>
-            {money(invoice.totalAmount)}
-          </b>
-          <span style={{ fontSize: "11px", color: "#64748b" }}>
-            {invoice.outstanding > 0 ? `${money(invoice.outstanding)} outstanding balance` : "Fully paid & reconciled"}
-          </span>
-        </section>
 
-        {/* Key Details Grid */}
-        <div style={{ marginBottom: "20px" }}>
-          <h4 style={{ fontSize: "11px", textTransform: "uppercase", color: "#64748b", margin: "0 0 10px" }}>Transaction Metadata</h4>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", background: "#f8fafc", padding: "14px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
-            <div>
-              <small style={{ color: "#8492a5", fontSize: "10px", display: "block" }}>Invoice #</small>
-              <b style={{ fontSize: "12px", color: "#1e293b", display: "block", marginTop: "2px" }}>{invoice.invoiceNumber}</b>
+          {/* Amount Frame (Frame 2147225413) */}
+          <div className="workspace-payment-drawer-amount-block">
+            <div className="workspace-payment-drawer-amount-val">
+              {formatCompactMoney(invoice.totalPaid && invoice.totalPaid > 0 ? invoice.totalPaid : invoice.totalAmount)}
             </div>
-            <div>
-              <small style={{ color: "#8492a5", fontSize: "10px", display: "block" }}>BOQ Reference</small>
-              <b style={{ fontSize: "12px", color: "#1e293b", display: "block", marginTop: "2px" }}>{boqRef}</b>
-            </div>
-            <div>
-              <small style={{ color: "#8492a5", fontSize: "10px", display: "block" }}>Payment Method</small>
-              <b style={{ fontSize: "12px", color: "#1e293b", display: "block", marginTop: "2px" }}>{words(invoice.paymentMethod || "bank_transfer")}</b>
-            </div>
-            <div>
-              <small style={{ color: "#8492a5", fontSize: "10px", display: "block" }}>Ref / Cheque ID</small>
-              <b style={{ fontSize: "12px", color: "#1e293b", display: "block", marginTop: "2px" }}>{invoice.transactionReference || "—"}</b>
-            </div>
-            <div>
-              <small style={{ color: "#8492a5", fontSize: "10px", display: "block" }}>Issue Date</small>
-              <b style={{ fontSize: "12px", color: "#1e293b", display: "block", marginTop: "2px" }}>{date(invoice.issueDate)}</b>
-            </div>
-            <div>
-              <small style={{ color: "#8492a5", fontSize: "10px", display: "block" }}>Due Date</small>
-              <b style={{ fontSize: "12px", color: "#1e293b", display: "block", marginTop: "2px" }}>{date(invoice.dueDate)}</b>
+            <div className="workspace-payment-drawer-amount-lbl">
+              {invoice.totalPaid && invoice.totalPaid > 0 ? "Amount Received" : "Payment Amount"}
+              {invoice.outstanding > 0 ? ` · ${money(invoice.outstanding)} outstanding` : " · Fully reconciled & settled"}
             </div>
           </div>
-        </div>
 
-        {/* Timeline Stepper */}
-        <div style={{ marginBottom: "20px" }}>
-          <h4 style={{ fontSize: "11px", textTransform: "uppercase", color: "#64748b", margin: "0 0 10px" }}>Payment Timeline</h4>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px", padding: "14px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
-              <span style={{ color: "#16a34a", marginTop: "2px" }}><CheckCircle2 size={16} /></span>
-              <div>
-                <b style={{ display: "block", fontSize: "12px", color: "#1e293b" }}>Invoice Created & Sent</b>
-                <small style={{ color: "#64748b", fontSize: "10px" }}>{date(invoice.issueDate)}</small>
+          <div className="workspace-payment-drawer-divider" />
+
+          {/* Transaction Metadata Grid (Frame 2147225081) */}
+          <div>
+            <h4 className="workspace-payment-drawer-section-title">Transaction Metadata</h4>
+            <div className="workspace-payment-drawer-grid">
+              <div className="workspace-payment-drawer-field">
+                <span className="workspace-payment-drawer-field-label">Transaction Type</span>
+                <span className="workspace-payment-drawer-field-val">
+                  {invoice.milestone || "Milestone Payment"}
+                </span>
               </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
-              <span style={{ color: invoice.totalPaid > 0 ? "#16a34a" : "#f59e0b", marginTop: "2px" }}>
-                {invoice.totalPaid > 0 ? <CheckCircle2 size={16} /> : <Clock size={16} />}
-              </span>
-              <div>
-                <b style={{ display: "block", fontSize: "12px", color: "#1e293b" }}>
-                  {invoice.totalPaid > 0 ? "Payment Initiated" : "Payment Due"}
-                </b>
-                <small style={{ color: "#64748b", fontSize: "10px" }}>Due {date(invoice.dueDate)}</small>
+              <div className="workspace-payment-drawer-field">
+                <span className="workspace-payment-drawer-field-label">Payment Method</span>
+                <span className="workspace-payment-drawer-field-val">
+                  {words(invoice.paymentMethod || "bank_transfer").toUpperCase()}
+                </span>
               </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
-              <span style={{ color: isPaid ? "#16a34a" : "#cbd5e1", marginTop: "2px" }}>
-                <CheckCircle2 size={16} />
-              </span>
-              <div>
-                <b style={{ display: "block", fontSize: "12px", color: isPaid ? "#1e293b" : "#94a3b8" }}>
-                  Reconciled & Cleared
-                </b>
-                <small style={{ color: "#64748b", fontSize: "10px" }}>
-                  {isPaid ? (invoice.paidAt ? date(invoice.paidAt) : "Payment cleared") : "Pending full settlement"}
-                </small>
+              <div className="workspace-payment-drawer-field">
+                <span className="workspace-payment-drawer-field-label">Transaction ID</span>
+                <span className="workspace-payment-drawer-field-val">{txnId}</span>
+              </div>
+              <div className="workspace-payment-drawer-field">
+                <span className="workspace-payment-drawer-field-label">Transaction Date</span>
+                <span className="workspace-payment-drawer-field-val">
+                  {date(invoice.paidAt || invoice.issueDate)}
+                </span>
+              </div>
+              <div className="workspace-payment-drawer-field">
+                <span className="workspace-payment-drawer-field-label">Transaction Time</span>
+                <span className="workspace-payment-drawer-field-val">
+                  {invoice.paidAt ? formatTime(invoice.paidAt) : "03:42 PM"}
+                </span>
+              </div>
+              <div className="workspace-payment-drawer-field">
+                <span className="workspace-payment-drawer-field-label">Linked Invoice</span>
+                <span className="workspace-payment-drawer-field-val link">
+                  {invoice.invoiceNumber}
+                </span>
+              </div>
+              <div className="workspace-payment-drawer-field">
+                <span className="workspace-payment-drawer-field-label">Linked BOQ</span>
+                <span className="workspace-payment-drawer-field-val link">{boqRef}</span>
+              </div>
+              <div className="workspace-payment-drawer-field">
+                <span className="workspace-payment-drawer-field-label">Due Date</span>
+                <span className="workspace-payment-drawer-field-val">{date(invoice.dueDate)}</span>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Receipt Attachment */}
-        <div style={{ marginBottom: "20px" }}>
-          <h4 style={{ fontSize: "11px", textTransform: "uppercase", color: "#64748b", margin: "0 0 8px" }}>Payment Receipt</h4>
-          {invoice.receiptUrl ? (
-            <a
-              href={invoice.receiptUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                color: "#2563eb",
-                fontWeight: 600,
-                fontSize: "12px",
-                background: "#eff6ff",
-                padding: "8px 12px",
-                borderRadius: "6px",
-                textDecoration: "none",
-              }}
-            >
-              <Paperclip size={14} /> View / Download Receipt
-            </a>
-          ) : (
-            <span style={{ fontSize: "11px", color: "#94a3b8" }}>No receipt document attached to this invoice.</span>
-          )}
-        </div>
+          <div className="workspace-payment-drawer-divider" />
 
-        {/* Notes */}
-        <div style={{ marginBottom: "24px" }}>
-          <h4 style={{ fontSize: "11px", textTransform: "uppercase", color: "#64748b", margin: "0 0 8px" }}>Notes</h4>
-          <p style={{ margin: 0, fontSize: "12px", color: "#475569", background: "#f8fafc", padding: "10px 12px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
-            {invoice.notes || "No additional transaction notes recorded."}
-          </p>
-        </div>
+          {/* Payment History / Timeline (Frame 2147225417) */}
+          <div>
+            <h4 className="workspace-payment-drawer-section-title">Payment Timeline</h4>
+            <div className="workspace-payment-timeline">
+              <div className="workspace-payment-timeline-item">
+                <div className="workspace-payment-timeline-node">
+                  <div className="workspace-payment-timeline-dot success">
+                    <div className="workspace-payment-timeline-dot-inner" />
+                  </div>
+                  <div className="workspace-payment-timeline-line" />
+                </div>
+                <div className="workspace-payment-timeline-content">
+                  <span className="workspace-payment-timeline-title">Payment Initiated</span>
+                  <span className="workspace-payment-timeline-time">
+                    {date(invoice.issueDate)} · 10:00 AM
+                  </span>
+                </div>
+              </div>
 
-        {/* Actions Footer */}
-        <div style={{ display: "flex", gap: "10px", marginTop: "auto" }}>
-          {invoice.outstanding > 0 && (
+              <div className="workspace-payment-timeline-item">
+                <div className="workspace-payment-timeline-node">
+                  <div className={`workspace-payment-timeline-dot ${invoice.totalPaid > 0 ? "success" : ""}`}>
+                    <div className="workspace-payment-timeline-dot-inner" />
+                  </div>
+                  <div className="workspace-payment-timeline-line" />
+                </div>
+                <div className="workspace-payment-timeline-content">
+                  <span className="workspace-payment-timeline-title">
+                    {invoice.totalPaid > 0
+                      ? `${words(invoice.paymentMethod || "bank_transfer").toUpperCase()} payment processing`
+                      : "Awaiting Client Payment"}
+                  </span>
+                  <span className="workspace-payment-timeline-time">
+                    {invoice.paidAt
+                      ? `${date(invoice.paidAt)} · ${formatTime(invoice.paidAt)}`
+                      : `Due by ${date(invoice.dueDate)}`}
+                  </span>
+                </div>
+              </div>
+
+              <div className="workspace-payment-timeline-item">
+                <div className="workspace-payment-timeline-node">
+                  <div className={`workspace-payment-timeline-dot ${isPaid ? "success" : ""}`}>
+                    <div className="workspace-payment-timeline-dot-inner" />
+                  </div>
+                </div>
+                <div className="workspace-payment-timeline-content">
+                  <span className="workspace-payment-timeline-title">
+                    {isPaid
+                      ? `Payment linked to Invoice ${invoice.invoiceNumber}`
+                      : "Pending full reconciliation"}
+                  </span>
+                  <span className="workspace-payment-timeline-time">
+                    {isPaid
+                      ? invoice.paidAt
+                        ? date(invoice.paidAt)
+                        : "Payment cleared & settled"
+                      : `${money(invoice.outstanding)} balance pending`}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="workspace-payment-drawer-divider" />
+
+          {/* Payment Receipt */}
+          <div>
+            <h4 className="workspace-payment-drawer-section-title">Payment Receipt</h4>
+            {invoice.receiptUrl ? (
+              <a
+                href={invoice.receiptUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="workspace-payment-receipt-link"
+              >
+                <Paperclip size={14} /> View / Download Receipt
+              </a>
+            ) : (
+              <span style={{ fontSize: "12px", color: "#64748B", fontFamily: "'Urbanist', sans-serif" }}>
+                No receipt document attached to this invoice.
+              </span>
+            )}
+          </div>
+
+          {/* Notes */}
+          <div>
+            <h4 className="workspace-payment-drawer-section-title">Notes</h4>
+            <p className="workspace-payment-notes-box">
+              {invoice.notes || "No additional transaction notes recorded."}
+            </p>
+          </div>
+
+          {/* Actions Footer */}
+          <div className="workspace-payment-drawer-footer">
+            {invoice.outstanding > 0 && (
+              <button
+                type="button"
+                className="workspace-payment-drawer-btn-primary"
+                onClick={onRecordPayment}
+              >
+                Record Payment
+              </button>
+            )}
             <button
-              className="primary"
-              onClick={onRecordPayment}
-              style={{ flex: 1, padding: "10px", fontSize: "12px", fontWeight: 600, borderRadius: "6px", cursor: "pointer" }}
+              type="button"
+              className="workspace-payment-drawer-btn-secondary"
+              onClick={onClose}
             >
-              Record Payment
+              Close
             </button>
-          )}
-          <button
-            onClick={onClose}
-            style={{
-              padding: "10px 16px",
-              fontSize: "12px",
-              fontWeight: 600,
-              borderRadius: "6px",
-              border: "1px solid #dce4ef",
-              background: "#fff",
-              cursor: "pointer",
-            }}
-          >
-            Close
-          </button>
+          </div>
         </div>
       </div>
     </div>
@@ -3693,10 +4821,14 @@ function RecordPaymentModal({
   const [invoiceId, setInvoiceId] = useState(initialInvoice?.id || (invoices[0]?.id || ""));
   const [milestone, setMilestone] = useState(initialInvoice?.milestone || "");
   const [amount, setAmount] = useState(
-    initialInvoice ? String(initialInvoice.outstanding || initialInvoice.totalAmount) : (invoices[0] ? String(invoices[0].outstanding || invoices[0].totalAmount) : "")
+    initialInvoice
+      ? String(initialInvoice.outstanding || initialInvoice.totalAmount)
+      : invoices[0]
+      ? String(invoices[0].outstanding || invoices[0].totalAmount)
+      : ""
   );
   const [method, setMethod] = useState("bank_transfer");
-  const [paidDate, setPaidDate] = useState(new Date().toISOString().split("T")[0]);
+  const [paidDate, setPaidDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [paidTime, setPaidTime] = useState("12:00");
   const [reference, setReference] = useState("");
   const [receiptUrl, setReceiptUrl] = useState("");
@@ -3705,6 +4837,7 @@ function RecordPaymentModal({
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleInvoiceChange = (id: string) => {
     setInvoiceId(id);
@@ -3741,12 +4874,14 @@ function RecordPaymentModal({
 
   const submit = async () => {
     if (!invoiceId || !amount) return setError("Invoice and amount are required.");
+    const numAmount = Number(amount);
+    if (isNaN(numAmount) || numAmount <= 0) return setError("Please enter a valid positive payment amount.");
     setLoading(true);
     setError("");
     try {
       const combinedDateTime = paidDate ? `${paidDate}T${paidTime || "00:00"}:00.000Z` : undefined;
       await recordPayment(invoiceId, {
-        amount: Number(amount),
+        amount: numAmount,
         method,
         paidAt: combinedDateTime,
         reference,
@@ -3763,49 +4898,61 @@ function RecordPaymentModal({
   };
 
   return (
-    <div className="workspace-modal-bg" onMouseDown={close}>
-      <section
-        className="workspace-modal"
-        style={{ width: "min(680px, calc(100vw - 32px))", padding: "20px" }}
+    <div className="workspace-record-modal-backdrop" onMouseDown={close}>
+      <div
+        className="workspace-record-modal-container"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <header style={{ borderBottom: "1px solid #e2e8f0", paddingBottom: "12px", marginBottom: "16px" }}>
-          <div>
-            <h3 style={{ fontSize: "16px", fontWeight: 700, margin: 0, color: "#0f172a" }}>Record Payment</h3>
-            <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: "12px" }}>
-              Record a new payment transaction against a project milestone or invoice.
+        {/* Header (Figma Frame 2147225093) */}
+        <div className="workspace-record-modal-header">
+          <div className="workspace-record-modal-title-group">
+            <h3 className="workspace-record-modal-title">Record Payment</h3>
+            <p className="workspace-record-modal-subtitle">
+              Add a payment received from the client manually.
             </p>
           </div>
-          <button onClick={close} aria-label="Close modal">
+          <button
+            type="button"
+            className="workspace-record-modal-close"
+            onClick={close}
+            aria-label="Close modal"
+          >
             <X size={18} />
           </button>
-        </header>
+        </div>
 
-        {error && (
-          <div style={{ color: "#dc2626", background: "#fef2f2", padding: "8px 12px", borderRadius: "6px", fontSize: "12px", marginBottom: "14px" }}>
-            {error}
-          </div>
-        )}
+        {/* Inner Card (Figma Frame 2147225027) */}
+        <div className="workspace-record-modal-card">
+          {error && (
+            <div className="workspace-record-error">
+              {error}
+            </div>
+          )}
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", maxHeight: "450px", overflowY: "auto", paddingRight: "4px" }}>
-          {/* Column 1 */}
-          <div>
-            <label className="modal-label" style={{ marginTop: 0 }}>
-              Payment For (Milestone)
+          <div className="workspace-record-grid">
+            {/* Field 1: Payment For (Milestone) */}
+            <div className="workspace-record-field">
+              <label className="workspace-record-label">
+                Payment For (Milestone)
+              </label>
               <input
                 type="text"
+                className="workspace-record-input"
                 value={milestone}
                 onChange={(e) => setMilestone(e.target.value)}
-                placeholder="e.g. Advance Deposit (20%)"
+                placeholder="e.g. Milestone 2 — BOQ Approval"
               />
-            </label>
+            </div>
 
-            <label className="modal-label">
-              Linked Invoice *
+            {/* Field 2: Linked Invoice * */}
+            <div className="workspace-record-field">
+              <label className="workspace-record-label">
+                Linked Invoice <span className="workspace-record-req">*</span>
+              </label>
               <select
+                className="workspace-record-input"
                 value={invoiceId}
                 onChange={(e) => handleInvoiceChange(e.target.value)}
-                style={{ width: "100%", marginTop: "6px", padding: "10px", border: "1px solid #dce4ef", borderRadius: "6px", background: "#fff" }}
               >
                 <option value="">Select Invoice</option>
                 {invoices.map((x) => (
@@ -3814,152 +4961,410 @@ function RecordPaymentModal({
                   </option>
                 ))}
               </select>
-            </label>
+            </div>
 
-            <label className="modal-label">
-              Amount Received (₹) *
+            {/* Field 3: Amount Received (₹) * */}
+            <div className="workspace-record-field">
+              <label className="workspace-record-label">
+                Amount Received (₹) <span className="workspace-record-req">*</span>
+              </label>
               <input
                 type="number"
+                className="workspace-record-input"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                placeholder="0"
+                placeholder="Enter payment amount"
                 min="1"
                 required
               />
-            </label>
+            </div>
 
-            <label className="modal-label">
-              Payment Method *
+            {/* Field 4: Payment Method * */}
+            <div className="workspace-record-field">
+              <label className="workspace-record-label">
+                Payment Method <span className="workspace-record-req">*</span>
+              </label>
               <select
+                className="workspace-record-input"
                 value={method}
                 onChange={(e) => setMethod(e.target.value)}
-                style={{ width: "100%", marginTop: "6px", padding: "10px", border: "1px solid #dce4ef", borderRadius: "6px", background: "#fff" }}
               >
-                <option value="bank_transfer">Bank Transfer / NEFT / RTGS</option>
-                <option value="upi">UPI / QR Code</option>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="upi">UPI</option>
                 <option value="cheque">Cheque</option>
                 <option value="cash">Cash</option>
                 <option value="card">Credit / Debit Card</option>
                 <option value="other">Other</option>
               </select>
-            </label>
-          </div>
-
-          {/* Column 2 */}
-          <div>
-            <label className="modal-label" style={{ marginTop: 0 }}>
-              Reference / Cheque / UTR ID
-              <input
-                type="text"
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
-                placeholder="e.g. UTR-98234823"
-              />
-            </label>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "15px" }}>
-              <label className="modal-label" style={{ marginTop: 0 }}>
-                Payment Date *
-                <input
-                  type="date"
-                  value={paidDate}
-                  onChange={(e) => setPaidDate(e.target.value)}
-                  required
-                />
-              </label>
-
-              <label className="modal-label" style={{ marginTop: 0 }}>
-                Payment Time
-                <input
-                  type="time"
-                  value={paidTime}
-                  onChange={(e) => setPaidTime(e.target.value)}
-                />
-              </label>
             </div>
 
-            <div className="modal-label" style={{ marginTop: "15px" }}>
-              Receipt / Proof of Payment
-              <div
-                style={{
-                  marginTop: "6px",
-                  border: "1px dashed #cbd5e1",
-                  borderRadius: "6px",
-                  padding: "12px",
-                  background: "#f8fafc",
-                  textAlign: "center",
-                }}
-              >
-                {receiptUrl ? (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "11px" }}>
-                    <span style={{ color: "#16a34a", fontWeight: 600 }}>📄 {receiptFileName || "Receipt Attached"}</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setReceiptUrl("");
-                        setReceiptFileName("");
-                      }}
-                      style={{ border: 0, background: "transparent", color: "#dc2626", cursor: "pointer" }}
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ) : (
-                  <label style={{ cursor: "pointer", display: "block" }}>
-                    <input
-                      type="file"
-                      accept="image/*,application/pdf"
-                      onChange={handleReceiptUpload}
-                      style={{ display: "none" }}
-                    />
-                    <span style={{ color: "#2563eb", fontSize: "11px", fontWeight: 600 }}>
-                      {uploadingReceipt ? "Uploading…" : "Browse or Drop Receipt"}
-                    </span>
-                    <small style={{ display: "block", color: "#94a3b8", fontSize: "10px", marginTop: "2px" }}>
-                      PNG, JPG, or PDF up to 10MB
-                    </small>
-                  </label>
+            {/* Field 5: Reference / Cheque / UTR ID */}
+            <div className="workspace-record-field">
+              <label className="workspace-record-label">
+                Reference / Cheque / UTR ID
+              </label>
+              <input
+                type="text"
+                className="workspace-record-input"
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+                placeholder="Enter transaction/reference ID"
+              />
+            </div>
+
+            {/* Field 6: Payment Date * */}
+            <div className="workspace-record-field">
+              <label className="workspace-record-label">
+                Payment Date <span className="workspace-record-req">*</span>
+              </label>
+              <input
+                type="date"
+                className="workspace-record-input"
+                value={paidDate}
+                onChange={(e) => setPaidDate(e.target.value)}
+                required
+              />
+            </div>
+
+            {/* Field 7: Payment Time */}
+            <div className="workspace-record-field">
+              <label className="workspace-record-label">
+                Payment Time
+              </label>
+              <input
+                type="time"
+                className="workspace-record-input"
+                value={paidTime}
+                onChange={(e) => setPaidTime(e.target.value)}
+              />
+            </div>
+
+            {/* Field 8: Receipt / Proof of Payment */}
+            <div className="workspace-record-field">
+              <label className="workspace-record-label">
+                Receipt / Proof of Payment
+              </label>
+              <div className="workspace-record-file-box">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={handleReceiptUpload}
+                  style={{ display: "none" }}
+                />
+                <button
+                  type="button"
+                  className="workspace-record-file-btn"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingReceipt}
+                >
+                  Choose File
+                </button>
+                <span className="workspace-record-file-name">
+                  {uploadingReceipt
+                    ? "Uploading…"
+                    : receiptFileName
+                    ? receiptFileName
+                    : "No file chosen"}
+                </span>
+                {receiptUrl && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReceiptUrl("");
+                      setReceiptFileName("");
+                    }}
+                    style={{
+                      border: 0,
+                      background: "transparent",
+                      color: "#DC2626",
+                      cursor: "pointer",
+                      marginLeft: "auto",
+                      display: "flex",
+                      alignItems: "center",
+                    }}
+                    title="Remove attachment"
+                  >
+                    <X size={16} />
+                  </button>
                 )}
               </div>
             </div>
-          </div>
 
-          {/* Full-width Notes */}
-          <div style={{ gridColumn: "span 2" }}>
-            <label className="modal-label" style={{ marginTop: "10px" }}>
-              Notes / Remarks
+            {/* Field 9: Notes / Remarks (Full Width) */}
+            <div className="workspace-record-field full-width">
+              <label className="workspace-record-label">
+                Notes / Remarks
+              </label>
               <textarea
+                className="workspace-record-textarea"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="e.g. Payment verified via HDFC account statement"
-                rows={2}
-                style={{
-                  boxSizing: "border-box",
-                  width: "100%",
-                  marginTop: "6px",
-                  padding: "8px 10px",
-                  border: "1px solid #dbe4ef",
-                  borderRadius: "6px",
-                  font: "inherit",
-                  fontSize: "12px",
-                  outline: "none",
-                }}
+                placeholder="Add notes about this payment..."
+                rows={3}
               />
-            </label>
+            </div>
           </div>
         </div>
 
-        <footer style={{ marginTop: "16px", paddingTop: "12px", borderTop: "1px solid #e2e8f0" }}>
-          <button onClick={close} disabled={loading}>
+        {/* Modal Footer (Frame 2147225069) */}
+        <div className="workspace-record-modal-footer">
+          <button
+            type="button"
+            className="workspace-record-btn-cancel"
+            onClick={close}
+            disabled={loading}
+          >
             Cancel
           </button>
-          <button className="primary" onClick={submit} disabled={loading || uploadingReceipt}>
+          <button
+            type="button"
+            className="workspace-record-btn-submit"
+            onClick={submit}
+            disabled={loading || uploadingReceipt}
+          >
             {loading ? "Recording…" : "Record Payment"}
           </button>
-        </footer>
-      </section>
+        </div>
+      </div>
     </div>
   );
+}
+
+function SimulatePaymentModal({
+  invoices,
+  close,
+  load,
+  showToast,
+}: {
+  invoices: Invoice[];
+  close: () => void;
+  load: () => void;
+  showToast?: (msg: string) => void;
+}) {
+  const [invoiceId, setInvoiceId] = useState(invoices[0]?.id || "");
+  const selectedInvoice = invoices.find((x) => x.id === invoiceId) || invoices[0];
+  const [amount, setAmount] = useState(
+    selectedInvoice ? String(selectedInvoice.outstanding || selectedInvoice.totalAmount) : ""
+  );
+  const [method, setMethod] = useState("upi");
+  const [reference, setReference] = useState(() => `SIM-TXN-${Math.floor(100000 + Math.random() * 900000)}`);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleInvoiceChange = (id: string) => {
+    setInvoiceId(id);
+    const sel = invoices.find((x) => x.id === id);
+    if (sel) {
+      setAmount(String(sel.outstanding || sel.totalAmount));
+    }
+  };
+
+  const handleSimulate = async () => {
+    if (!invoiceId) {
+      setError("Please select an invoice to simulate payment for.");
+      return;
+    }
+    const numAmount = Number(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      setError("Please enter a valid payment amount.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError("");
+    try {
+      await recordPayment(invoiceId, {
+        amount: numAmount,
+        method,
+        reference: reference.trim() || `SIM-${Date.now()}`,
+        paidAt: new Date().toISOString(),
+        notes: "Simulated online client payment from project dashboard",
+        milestone: selectedInvoice?.milestone || undefined,
+      });
+      load();
+      showToast?.(`Client payment of ₹${numAmount.toLocaleString("en-IN")} simulated successfully!`);
+      close();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to simulate payment.");
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="workspace-doc-modal-backdrop" onClick={close}>
+      <div className="workspace-doc-modal-card" style={{ maxWidth: "520px" }} onClick={(e) => e.stopPropagation()}>
+        <div className="workspace-doc-modal-header">
+          <div>
+            <h3 className="workspace-doc-modal-title">Simulate Client Payment</h3>
+            <p style={{ margin: "4px 0 0", color: "#64748B", fontSize: "13px", fontFamily: "'Urbanist', sans-serif" }}>
+              Simulate an incoming online payment transaction as if made by the client.
+            </p>
+          </div>
+          <button className="workspace-doc-modal-close" onClick={close} aria-label="Close modal">
+            <X size={18} />
+          </button>
+        </div>
+
+        {error && (
+          <div style={{ color: "#DC2626", background: "#FEF2F2", padding: "8px 12px", borderRadius: "6px", fontSize: "13px", marginBottom: "14px" }}>
+            {error}
+          </div>
+        )}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px", margin: "16px 0" }}>
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#0F172A", marginBottom: "6px", fontFamily: "'Urbanist', sans-serif" }}>
+              Select Invoice / Milestone *
+            </label>
+            {invoices.length > 0 ? (
+              <select
+                value={invoiceId}
+                onChange={(e) => handleInvoiceChange(e.target.value)}
+                style={{ width: "100%", padding: "10px 12px", border: "1px solid #CBD5E1", borderRadius: "6px", fontSize: "14px", fontFamily: "'Urbanist', sans-serif", background: "#FFFFFF", color: "#0F172A" }}
+              >
+                {invoices.map((inv) => (
+                  <option key={inv.id} value={inv.id}>
+                    {inv.invoiceNumber || "Invoice"} — {inv.milestone || "Milestone"} (Due: {money(inv.outstanding)})
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div style={{ fontSize: "13px", color: "#94A3B8" }}>No invoices available to simulate.</div>
+            )}
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <div>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#0F172A", marginBottom: "6px", fontFamily: "'Urbanist', sans-serif" }}>
+                Amount to Pay (₹) *
+              </label>
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                min="1"
+                placeholder="0"
+                style={{ width: "100%", padding: "10px 12px", border: "1px solid #CBD5E1", borderRadius: "6px", fontSize: "14px", fontFamily: "'Urbanist', sans-serif", boxSizing: "border-box" }}
+              />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#0F172A", marginBottom: "6px", fontFamily: "'Urbanist', sans-serif" }}>
+                Payment Method
+              </label>
+              <select
+                value={method}
+                onChange={(e) => setMethod(e.target.value)}
+                style={{ width: "100%", padding: "10px 12px", border: "1px solid #CBD5E1", borderRadius: "6px", fontSize: "14px", fontFamily: "'Urbanist', sans-serif", background: "#FFFFFF", color: "#0F172A" }}
+              >
+                <option value="upi">UPI / Instant Pay</option>
+                <option value="bank_transfer">Bank Transfer (NEFT/RTGS)</option>
+                <option value="card">Credit / Debit Card</option>
+                <option value="net_banking">Net Banking</option>
+                <option value="cheque">Cheque</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#0F172A", marginBottom: "6px", fontFamily: "'Urbanist', sans-serif" }}>
+              Simulated Reference ID
+            </label>
+            <input
+              type="text"
+              value={reference}
+              onChange={(e) => setReference(e.target.value)}
+              placeholder="e.g. SIM-TXN-123456"
+              style={{ width: "100%", padding: "10px 12px", border: "1px solid #CBD5E1", borderRadius: "6px", fontSize: "14px", fontFamily: "'Urbanist', sans-serif", boxSizing: "border-box" }}
+            />
+          </div>
+
+          <div style={{ background: "#F1F5F9", borderRadius: "6px", padding: "10px 14px", fontSize: "12px", color: "#64748B", lineHeight: 1.4 }}>
+            💡 <strong>Notice:</strong> This simulates an instantaneous customer payment event, updates the invoice status, ledger, and payment schedule in real time.
+          </div>
+        </div>
+
+        <div className="workspace-doc-modal-actions" style={{ justifyContent: "flex-end" }}>
+          <button
+            type="button"
+            className="workspace-doc-btn-cancel"
+            onClick={close}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="workspace-doc-btn-primary"
+            onClick={handleSimulate}
+            disabled={isSubmitting || !invoices.length}
+          >
+            {isSubmitting ? "Processing..." : "Simulate Payment"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function parseActivityLogItem(x: any) {
+  const author = x.user || x.actor || x.userName || (x.userId ? `User ${String(x.userId).slice(0, 4)}` : "System");
+  const isSystem = author.toLowerCase().includes("system");
+  const initials = author
+    .split(/\s+/)
+    .map((p: string) => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase() || "SY";
+
+  const rawCat = (x.category || x.type || "ACTIVITY").toUpperCase();
+  const category = rawCat === "INVITE" ? "INVITATION" : rawCat;
+
+  let verb = "updated";
+  let target = x.title || x.action || "Project";
+
+  if (x.type === "boq") {
+    verb = x.status === "approved" ? "approved" : x.status === "ready" ? "finalized" : "updated";
+    target = x.title || "BOQ Revision";
+  } else if (x.type === "task") {
+    verb = x.status === "completed" ? "completed" : "updated";
+    target = (x.title || "Task").replace(/^Task:\s*/i, "");
+  } else if (x.type === "approval") {
+    verb = x.status === "approved" ? "approved" : x.status === "rejected" ? "rejected" : "submitted";
+    target = (x.title || "Approval").replace(/^Approval:\s*/i, "");
+  } else if (x.type === "invoice") {
+    verb = x.status === "paid" ? "recorded payment for" : "issued";
+    target = x.title || "Invoice";
+  } else if (x.type === "invite") {
+    verb = "sent invitation to";
+    target = x.description?.replace(/^Invitation sent to\s*/i, "").replace(/\s*\(.*\)$/, "") || "Client";
+  } else if (x.type === "project") {
+    verb = "initiated";
+    target = x.title?.replace(/^Project\s*/i, "") || "Project";
+  } else {
+    target = x.title || x.name || "Project Update";
+  }
+
+  const timeAgo = formatActivityTimeAgo(x.createdAt || x.timestamp);
+
+  return { author, verb, target, timeAgo, category, initials, isSystem };
+}
+
+function formatActivityTimeAgo(dateStr: string) {
+  if (!dateStr) return "Recently";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  if (isNaN(diff) || diff < 0) return "Just now";
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins} min${mins > 1 ? "s" : ""} ago`;
+  const hours = Math.floor(mins / 3600000);
+  if (hours < 24) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} day${days > 1 ? "s" : ""} ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 4) return `${weeks} week${weeks > 1 ? "s" : ""} ago`;
+  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 function Activity({ pId }: { pId: string }) {
@@ -3986,78 +5391,55 @@ function Activity({ pId }: { pId: string }) {
 
   return (
     <section className="tab-panel activity">
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
-        <h4 style={{ margin: 0 }}>Project Activity Log ({acts.length})</h4>
-        <div style={{ display: "flex", gap: "6px", background: "#f1f5f9", padding: "3px", borderRadius: "6px" }}>
-          {["all", "boq", "invoice", "task", "approval"].map((cat) => (
-            <button
-              key={cat}
-              type="button"
-              onClick={() => setFilter(cat)}
-              style={{
-                border: 0,
-                background: filter === cat ? "#fff" : "transparent",
-                color: filter === cat ? "#2563eb" : "#64748b",
-                fontSize: "11px",
-                fontWeight: 600,
-                padding: "3px 8px",
-                borderRadius: "4px",
-                cursor: "pointer",
-                textTransform: "capitalize",
-              }}
-            >
-              {cat === "all" ? "All Activity" : cat}
-            </button>
-          ))}
-        </div>
-      </header>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-        {filteredActs.map((x, i) => {
-          const cat = (x.category || x.type || "ACTIVITY").toUpperCase();
-          const catColor = cat === "BOQ" ? "#2563eb" : cat === "INVOICE" ? "#16a34a" : cat === "TASK" ? "#8b5cf6" : cat === "APPROVAL" ? "#d97706" : "#64748b";
-          const catBg = cat === "BOQ" ? "#eff6ff" : cat === "INVOICE" ? "#f0fdf4" : cat === "TASK" ? "#f5f3ff" : cat === "APPROVAL" ? "#fffbeb" : "#f8fafc";
-          return (
-            <div
-              key={x.id || i}
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: "12px",
-                padding: "12px 14px",
-                borderRadius: "8px",
-                background: "#fff",
-                border: "1px solid #e2e8f0",
-              }}
-            >
-              <span
-                style={{
-                  background: catBg,
-                  color: catColor,
-                  borderRadius: "6px",
-                  padding: "4px 8px",
-                  fontSize: "9px",
-                  fontWeight: 700,
-                  marginTop: "2px",
-                }}
+      <div className="workspace-activity-container">
+        <header className="workspace-activity-header">
+          <h4 className="workspace-activity-title">Project Activity Log ({acts.length})</h4>
+          <div className="workspace-activity-filters">
+            {["all", "boq", "invoice", "task", "approval"].map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setFilter(cat)}
+                className={`workspace-activity-filter-btn ${filter === cat ? "active" : ""}`}
               >
-                {cat}
-              </span>
-              <div style={{ flex: 1 }}>
-                <b style={{ display: "block", fontSize: "12px", color: "#1e293b" }}>{x.title || x.action || x.name || "Project Update"}</b>
-                {x.description && (
-                  <p style={{ margin: "3px 0 0", fontSize: "11px", color: "#64748b" }}>{x.description}</p>
-                )}
-                <small style={{ display: "block", marginTop: "4px", fontSize: "10px", color: "#94a3b8" }}>
-                  {date(x.createdAt || x.timestamp)} · By {x.actor || x.userName || x.userId || "System"}
-                </small>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+                {cat === "all" ? "All Activity" : cat}
+              </button>
+            ))}
+          </div>
+        </header>
 
-      {!filteredActs.length && <div className="blank">No activity recorded for this filter.</div>}
+        <div className="workspace-activity-card">
+          {filteredActs.map((x, i) => {
+            const parsed = parseActivityLogItem(x);
+            return (
+              <div key={x.id || i} style={{ width: "100%" }}>
+                <div className="workspace-activity-row">
+                  <div className={`workspace-activity-avatar ${parsed.isSystem ? "avatar-system" : "avatar-user"}`}>
+                    {parsed.initials}
+                  </div>
+                  <div className="workspace-activity-info">
+                    <div className="workspace-activity-line1">
+                      <span className="workspace-activity-author">{parsed.author}</span>
+                      <span className="workspace-activity-verb">{parsed.verb}</span>
+                      <span className="workspace-activity-target">{parsed.target}</span>
+                    </div>
+                    <div className="workspace-activity-line2">
+                      <span className="workspace-activity-time">{parsed.timeAgo}</span>
+                      <span className="workspace-activity-dot">•</span>
+                      <span className="workspace-activity-category">{parsed.category}</span>
+                    </div>
+                  </div>
+                </div>
+                {i < filteredActs.length - 1 && <hr className="workspace-activity-divider" />}
+              </div>
+            );
+          })}
+
+          {!filteredActs.length && (
+            <div className="workspace-activity-empty">No activity recorded for this filter.</div>
+          )}
+        </div>
+      </div>
     </section>
   );
 }
@@ -4079,7 +5461,7 @@ function Modal({ title, close, children }: { title: string; close: () => void; c
 }
 
 /* =========================================================================
-   Client Invite Modal
+   Client Invite & Manage Access Modal (Figma Frames 2147225093 / 2147225027 / 2147225569)
    ========================================================================= */
 function ClientInviteModal({
   project,
@@ -4088,22 +5470,25 @@ function ClientInviteModal({
   onReload,
   showToast,
   openEditProject,
+  initialMode,
 }: {
   project: Project;
   invitation: ClientInvitation | null;
   onClose: () => void;
   onReload: () => void;
   showToast: (msg: string) => void;
-  openEditProject: () => void;
+  openEditProject?: () => void;
+  initialMode?: "invite" | "manage";
 }) {
-  const [email, setEmail] = useState(project.clientEmail || "");
-  const [clientName, setClientName] = useState(project.clientName || "");
-  const [message, setMessage] = useState("");
+  const [currentInv, setCurrentInv] = useState<ClientInvitation | null>(invitation);
+  const isManaging = initialMode === "manage" || (initialMode !== "invite" && !!currentInv && (currentInv.status === "pending" || currentInv.status === "accepted"));
+  const [email, setEmail] = useState(currentInv?.email || project.clientEmail || "");
+  const [clientName, setClientName] = useState(currentInv?.clientName || project.clientName || "");
+  const [message, setMessage] = useState(currentInv?.message || "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [currentInv, setCurrentInv] = useState<ClientInvitation | null>(invitation);
 
-  const isPending = currentInv && currentInv.status === "pending";
+  const projectCodeDisplay = project.projectCode || (project.id ? "PRJ-" + project.id.slice(0, 4).toUpperCase() : "PRJ-0048");
 
   const handleSend = async (e: FormEvent) => {
     e.preventDefault();
@@ -4147,159 +5532,257 @@ function ClientInviteModal({
     }
   };
 
-  const handleResend = async () => {
+  const handleSaveAndSendUpdates = async (e?: FormEvent) => {
+    if (e) e.preventDefault();
+    if (!email.trim()) {
+      setError("Client email is required.");
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await fetch(`/api/v1/projects/${project.id}/client-invite`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim(),
+          clientName: clientName.trim() || project.clientName,
+          message: message.trim() || undefined,
+        }),
+      });
+
+      const payload = await res.json();
+      if (!res.ok) {
+        if (res.status === 409) {
+          const resendRes = await fetch(`/api/v1/projects/${project.id}/client-invite/resend`, {
+            method: "POST",
+            credentials: "include",
+          });
+          const resendPayload = await resendRes.json();
+          if (!resendRes.ok) {
+            throw new Error(resendPayload.error?.message || "Failed to send updates.");
+          }
+          showToast(resendPayload.data?.message || "Client invitation updated and resent successfully.");
+          onReload();
+          onClose();
+          return;
+        }
+        throw new Error(payload.error?.message || "Failed to save client access updates.");
+      }
+
+      showToast(payload.data?.message || "Client access saved and invitation sent successfully.");
+      onReload();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save client access.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRevoke = async () => {
+    if (!confirm("Are you sure you want to revoke client access for this project? The client will no longer be able to access the shared project dashboard.")) {
+      return;
+    }
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`/api/v1/projects/${project.id}/client-invite/resend`, {
-        method: "POST",
+      const res = await fetch(`/api/v1/projects/${project.id}/client-invite`, {
+        method: "DELETE",
         credentials: "include",
       });
       const payload = await res.json();
       if (!res.ok) {
-        throw new Error(payload.error?.message || "Unable to resend invitation. Please try again.");
+        throw new Error(payload.error?.message || "Failed to revoke client access.");
       }
-      showToast(payload.data?.message || "Client invitation resent successfully.");
-      if (payload.data?.invitation) {
-        setCurrentInv(payload.data.invitation);
-      }
+      showToast(payload.data?.message || "Client access has been revoked successfully.");
       onReload();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to resend invitation.");
+      setError(err instanceof Error ? err.message : "Failed to revoke client access.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Modal title={isPending ? "Client Invitation Pending" : "Send Invite to Client"} close={onClose}>
-      {isPending ? (
-        <div>
-          <div style={{ marginTop: "10px", padding: "14px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#f59e0b", marginBottom: "8px" }}>
-              <Clock size={16} />
-              <strong style={{ fontSize: "13px", color: "#1e293b" }}>An invitation has already been sent</strong>
-            </div>
-            <p style={{ margin: "0 0 10px", fontSize: "12px", color: "#475569" }}>
-              An invitation has already been sent to: <strong>{currentInv.email}</strong>
+    <div className="workspace-client-modal-backdrop" onClick={onClose}>
+      <div className="workspace-client-modal-card" onClick={(e) => e.stopPropagation()}>
+        {/* Header (Frame 2147225093) */}
+        <div className="workspace-client-modal-header">
+          <div className="workspace-client-modal-titles">
+            <h3 className="workspace-client-modal-title">
+              {isManaging ? "Manage Client Access" : "Invite Client"}
+            </h3>
+            <p className="workspace-client-modal-subtitle">
+              {isManaging
+                ? "Configure client viewing privileges for this shared project dashboard."
+                : "Invite your client to access the shared project dashboard"}
             </p>
-            <div style={{ fontSize: "11px", color: "#64748b", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
-              <div>Client: <strong>{currentInv.clientName || project.clientName}</strong></div>
-              <div>Status: <span className="tag" style={{ background: "#fef3c7", color: "#b45309" }}>Pending</span></div>
-              <div>Sent on: <strong>{date(currentInv.createdAt)}</strong></div>
-              <div>Expires: <strong>{date(currentInv.expiresAt)}</strong></div>
+          </div>
+          <button
+            type="button"
+            className="workspace-client-modal-close"
+            onClick={onClose}
+            aria-label="Close modal"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Content Card (Frame 2147225027) */}
+        <div className="workspace-client-inner-card">
+          {/* Metadata Banner (Frame 2147225360) */}
+          <div className="workspace-client-meta-banner">
+            <div className="workspace-client-meta-col">
+              <span className="workspace-client-meta-label">ID</span>
+              <span className="workspace-client-meta-value">{projectCodeDisplay}</span>
+            </div>
+            <div className="workspace-client-meta-col">
+              <span className="workspace-client-meta-label">PROJECT</span>
+              <span className="workspace-client-meta-value">{project.name}</span>
             </div>
           </div>
 
-          {error && <div style={{ color: "#dc2626", fontSize: "12px", marginTop: "10px" }}>{error}</div>}
-
-          <footer>
-            <button onClick={onClose} disabled={loading}>
-              Cancel
-            </button>
-            <button className="primary" onClick={handleResend} disabled={loading}>
-              {loading ? "Resending..." : "Resend Invitation"}
-            </button>
-          </footer>
-        </div>
-      ) : (
-        <form onSubmit={handleSend}>
-          <p style={{ margin: "6px 0 14px", fontSize: "12px", color: "#64748b" }}>
-            Invite the client associated with this project to access their project workspace.
-          </p>
-
-          {!project.clientEmail && !email && (
-            <div
-              style={{
-                padding: "10px 12px",
-                background: "#fef2f2",
-                border: "1px solid #fecaca",
-                borderRadius: "6px",
-                color: "#b91c1c",
-                fontSize: "12px",
-                marginBottom: "12px",
-                display: "flex",
-                flexDirection: "column",
-                gap: "4px",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: 600 }}>
-                <AlertCircle size={15} />
-                No client email is available for this project.
-              </div>
-              <span>Please add the client's email below before sending an invitation.</span>
+          {/* If managing an existing invite/access, show status badge */}
+          {isManaging && currentInv && (
+            <div className={`workspace-client-status-chip ${currentInv.status === "accepted" ? "chip-active" : ""}`}>
+              {currentInv.status === "accepted" ? (
+                <>
+                  <CheckCircle2 size={14} /> Active Client Access
+                </>
+              ) : (
+                <>
+                  <Clock size={14} /> Pending Invitation (sent to {currentInv.email})
+                </>
+              )}
             </div>
           )}
 
-          {error && (
-            <div style={{ padding: "8px 12px", background: "#fef2f2", color: "#dc2626", borderRadius: "6px", fontSize: "12px", marginBottom: "12px" }}>
-              {error}
-            </div>
-          )}
+          {error && <div className="workspace-client-error">{error}</div>}
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            <label className="modal-label" style={{ marginTop: 0 }}>
-              Client Name
+          {/* Section Heading */}
+          <h4 className="workspace-client-section-heading">Client Information</h4>
+
+          {/* 2-Column Form Fields (Frame 2147225425) */}
+          <div className="workspace-client-form-grid">
+            <div className="workspace-client-field">
+              <label className="workspace-client-label">
+                Client Name <span className="required-star">*</span>
+              </label>
               <input
                 type="text"
+                className="workspace-client-input"
                 value={clientName}
                 onChange={(e) => setClientName(e.target.value)}
                 placeholder="Client Name"
+                disabled={loading}
               />
-            </label>
-
-            <label className="modal-label" style={{ marginTop: 0 }}>
-              Email *
+            </div>
+            <div className="workspace-client-field">
+              <label className="workspace-client-label">
+                Client Email <span className="required-star">*</span>
+              </label>
               <input
                 type="email"
+                className="workspace-client-input"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="client@email.com"
                 required
+                disabled={loading}
                 autoFocus={!project.clientEmail}
               />
-            </label>
-
-            <label className="modal-label" style={{ marginTop: 0 }}>
-              Project
-              <input type="text" value={project.name} disabled style={{ background: "#f1f5f9", cursor: "not-allowed" }} />
-            </label>
-
-            <label className="modal-label" style={{ marginTop: 0 }}>
-              Message
-              <textarea
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Optional message for the client..."
-                rows={3}
-                style={{
-                  boxSizing: "border-box",
-                  width: "100%",
-                  marginTop: "6px",
-                  padding: "10px",
-                  border: "1px solid #dbe4ef",
-                  borderRadius: "6px",
-                  outline: "none",
-                  font: "inherit",
-                  fontSize: "12px",
-                }}
-              />
-            </label>
+            </div>
           </div>
 
-          <footer>
-            <button type="button" onClick={onClose} disabled={loading}>
+          {/* Full-width Personal Message Field */}
+          <div className="workspace-client-field" style={{ width: "100%" }}>
+            <label className="workspace-client-label">Personal Message</label>
+            <textarea
+              className="workspace-client-textarea"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Add notes for your client..."
+              rows={3}
+              disabled={loading}
+            />
+          </div>
+        </div>
+
+        {/* Footer (Frame 2147225069 / Frame 2147225569) */}
+        {isManaging ? (
+          <div className="workspace-client-modal-footer">
+            <button
+              type="button"
+              className="workspace-client-btn-revoke"
+              onClick={handleRevoke}
+              disabled={loading}
+            >
+              <Trash2 size={16} />
+              <span>Revoke Access</span>
+            </button>
+            <div className="workspace-client-footer-actions">
+              <button
+                type="button"
+                className="workspace-client-btn-cancel"
+                onClick={onClose}
+                disabled={loading}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="workspace-client-btn-primary"
+                onClick={handleSaveAndSendUpdates}
+                disabled={loading || !email.trim()}
+              >
+                {loading ? "Saving..." : "Save & Send Updates"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="workspace-client-modal-footer">
+            <button
+              type="button"
+              className="workspace-client-btn-cancel"
+              onClick={onClose}
+              disabled={loading}
+            >
               Cancel
             </button>
-            <button type="submit" className="primary" disabled={loading || !email.trim()}>
-              {loading ? "Sending Invite..." : "Send Invite"}
+            <button
+              type="button"
+              className="workspace-client-btn-primary"
+              onClick={handleSend}
+              disabled={loading || !email.trim()}
+            >
+              {loading ? "Sending..." : "Send Invitation"}
             </button>
-          </footer>
-        </form>
-      )}
-    </Modal>
+          </div>
+        )}
+      </div>
+    </div>
   );
+}
+
+function ManageClientAccessModal(props: {
+  project: Project;
+  invitation: ClientInvitation | null;
+  onClose: () => void;
+  onReload: () => void;
+  showToast: (msg: string) => void;
+  openEditProject?: () => void;
+}) {
+  return <ClientInviteModal {...props} initialMode="manage" />;
 }
 
 /* =========================================================================
