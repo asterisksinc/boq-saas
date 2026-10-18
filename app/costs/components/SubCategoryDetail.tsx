@@ -115,29 +115,16 @@ export default function SubCategoryDetail({
     const tabs: SubCatTab[] = ["Overview", "Items", "Pricing Defaults", "Activity"];
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+        <div className="costing-category-detail-shell">
             {/* Back navigation button */}
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <button
-                    type="button"
-                    onClick={onBack}
-                    style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        background: "none",
-                        border: "none",
-                        color: "#2563eb",
-                        fontSize: "14px",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        padding: 0
-                    }}
-                    className="hover:underline"
-                >
-                    <ArrowLeft size={16} /> Back to {parentCategory.name}
-                </button>
-            </div>
+            <button
+                type="button"
+                className="costing-back-link"
+                onClick={onBack}
+            >
+                <ArrowLeft size={16} />
+                <span>Back to {parentCategory.name}</span>
+            </button>
 
             {/* Header info */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>

@@ -16,10 +16,11 @@ interface CostingFilterPopoverProps {
   onApply?: (filters: { status: string; category?: string }) => void;
   statusOptions?: FilterOption[];
   categoryFilter?: string;
-  onCategoryChange?: (categoryId: string) => void;
   categoryOptions?: FilterOption[];
+  onCategoryChange?: (categoryId: string) => void;
   onReset?: () => void;
   title?: string;
+  showLabel?: boolean;
 }
 
 const DEFAULT_STATUS_OPTIONS: FilterOption[] = [
@@ -40,6 +41,7 @@ export default function CostingFilterPopover({
   categoryOptions = [],
   onReset,
   title = "Filter Records",
+  showLabel = false,
 }: CostingFilterPopoverProps) {
   const effectiveStatus = (currentStatus ?? statusFilter ?? "all").toLowerCase();
   const [isOpen, setIsOpen] = useState(false);
@@ -121,33 +123,44 @@ export default function CostingFilterPopover({
         ref={buttonRef}
         type="button"
         onClick={handleToggle}
+        className={showLabel ? "costing-filter-btn" : "costing-filter-icon-btn"}
         style={{
+          boxSizing: "border-box",
           display: "inline-flex",
           alignItems: "center",
+          justifyContent: "center",
           gap: "8px",
-          background: activeCount > 0 ? "#eff6ff" : "#ffffff",
-          border: `1px solid ${activeCount > 0 ? "#93c5fd" : "#e5e7eb"}`,
-          color: activeCount > 0 ? "#2563eb" : "#4b5563",
-          padding: "8px 16px",
-          borderRadius: "8px",
-          fontSize: "14px",
-          fontWeight: 500,
+          width: showLabel ? "auto" : "46px",
+          padding: showLabel ? "13px 20px" : "0",
+          height: "46px",
+          background: activeCount > 0 ? "#EFF6FF" : "#FFFFFF",
+          border: `1px solid ${activeCount > 0 ? "#2563EB" : "#E2E8F0"}`,
+          borderRadius: "6px",
           cursor: "pointer",
-          transition: "all 0.15s ease",
+          position: "relative",
           outline: "none",
+          transition: "all 0.15s ease",
+          fontFamily: "'Inter', sans-serif",
+          fontWeight: 500,
+          fontSize: "14px",
+          color: activeCount > 0 ? "#2563EB" : "#0F172A",
         }}
         title="Filter"
+        aria-label="Filter"
       >
-        <SlidersHorizontal size={15} color={activeCount > 0 ? "#2563eb" : "#6b7280"} />
-        <span>Filter</span>
+        <SlidersHorizontal size={18} color={activeCount > 0 ? "#2563EB" : "#0F172A"} />
+        {showLabel && <span>Filter</span>}
         {activeCount > 0 && (
           <span
             style={{
-              background: "#2563eb",
+              position: "absolute",
+              top: "-4px",
+              right: "-4px",
+              background: "#2563EB",
               color: "#ffffff",
-              fontSize: "11px",
+              fontSize: "10px",
               fontWeight: 700,
-              padding: "1px 6px",
+              padding: "1px 5px",
               borderRadius: "10px",
               lineHeight: 1.2,
             }}
@@ -289,7 +302,7 @@ export default function CostingFilterPopover({
                   }}
                 >
                   <option value="all">All Categories</option>
-                  {categoryOptions.map((c) => (
+                  {categoryOptions.map((c: FilterOption) => (
                     <option key={c.value} value={c.value}>
                       {c.label}
                     </option>

@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Plus, RefreshCw, Search, SlidersHorizontal, Tag } from "lucide-react";
-import { getCostingItems, deleteCostingItem, duplicateCostingItem } from "@/lib/api/costing";
-import type { CostingItemBackend } from "@/lib/types";
+import { Plus, RefreshCw, Search } from "lucide-react";
+import { getCostingItems, deleteCostingItem, duplicateCostingItem, getCostingCategories } from "@/lib/api/costing";
+import type { CostingItemBackend, CostingCategoryBackend } from "@/lib/types";
 import AddItemModal from "./AddItemModal";
 import RateStatusDropdown from "@/components/costing/RateStatusDropdown";
 import CostingMoreMenu from "@/components/costing/CostingMoreMenu";
@@ -23,12 +23,18 @@ export default function LibraryTab({ isAddOpen, setIsAddOpen }: LibraryTabProps)
 
     const [isImportOpen, setIsImportOpen] = useState(false);
     const [items, setItems] = useState<CostingItemBackend[]>([]);
+    const [categories, setCategories] = useState<CostingCategoryBackend[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+
+    // Edit Item state
+    const [editingItem, setEditingItem] = useState<CostingItemBackend | null>(null);
+    const [isEditOpen, setIsEditOpen] = useState(false);
 
     // Filter & Pagination states
     const [searchQuery, setSearchQuery] = useState("");
     const [rateStatusFilter, setRateStatusFilter] = useState("all");
+    const [categoryFilter, setCategoryFilter] = useState("all");
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
 
@@ -36,15 +42,18 @@ export default function LibraryTab({ isAddOpen, setIsAddOpen }: LibraryTabProps)
         setLoading(true);
         setError("");
         try {
-            const res = await getCostingItems({
-                page: 1,
-                pageSize: 200,
-                search: searchQuery.trim() || undefined,
-                rateStatus: rateStatusFilter !== "all" ? rateStatusFilter : undefined
-            });
-            setItems(res.items || []);
+            const [itemsRes, catsRes] = await Promise.all([
+                getCostingItems({
+                    page: 1,
+                    pageSize: 500,
+                    rateStatus: rateStatusFilter !== "all" ? rateStatusFilter : undefined,
+                }),
+                getCostingCategories({ pageSize: 100 }).catch(() => ({ items: [] })),
+            ]);
+            setItems(itemsRes.items || []);
+            setCategories(catsRes.items || []);
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to load items");
+            setError(err instanceof Error ? err.message : "Failed to load costing items");
         } finally {
             setLoading(false);
         }
@@ -54,22 +63,33 @@ export default function LibraryTab({ isAddOpen, setIsAddOpen }: LibraryTabProps)
         void loadData();
     }, [rateStatusFilter]);
 
-    // Client-side search & status filtering for responsive responsiveness
+    // Fast client-side search & status & category filtering
     const filteredItems = useMemo(() => {
         return items.filter((item) => {
+            const query = searchQuery.trim().toLowerCase();
             const matchesSearch =
-                !searchQuery ||
-                item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                (item.code && item.code.toLowerCase().includes(searchQuery.toLowerCase())) ||
-                (item.category && item.category.toLowerCase().includes(searchQuery.toLowerCase())) ||
-                (item.preferred_vendor && item.preferred_vendor.toLowerCase().includes(searchQuery.toLowerCase()));
+                !query ||
+                item.name.toLowerCase().includes(query) ||
+                (item.code && item.code.toLowerCase().includes(query)) ||
+                (item.category && item.category.toLowerCase().includes(query)) ||
+                (item.preferred_vendor && item.preferred_vendor.toLowerCase().includes(query)) ||
+                (item.preferredVendor && item.preferredVendor.toLowerCase().includes(query)) ||
+                (item.vendor && item.vendor.toLowerCase().includes(query));
 
             const currentStatus = (item.rate_status || item.rateStatus || "active").toLowerCase();
-            const matchesStatus = rateStatusFilter === "all" || currentStatus === rateStatusFilter.toLowerCase();
+            const matchesStatus =
+                rateStatusFilter === "all" ||
+                currentStatus === rateStatusFilter.toLowerCase() ||
+                (rateStatusFilter === "active" && currentStatus === "approved");
 
-            return matchesSearch && matchesStatus;
+            const matchesCategory =
+                categoryFilter === "all" ||
+                item.category_id === categoryFilter ||
+                (item.category && item.category.toLowerCase().includes(categoryFilter.toLowerCase()));
+
+            return matchesSearch && matchesStatus && matchesCategory;
         });
-    }, [items, searchQuery, rateStatusFilter]);
+    }, [items, searchQuery, rateStatusFilter, categoryFilter]);
 
     // Paginate
     const paginatedItems = useMemo(() => {
@@ -87,14 +107,51 @@ export default function LibraryTab({ isAddOpen, setIsAddOpen }: LibraryTabProps)
         try {
             const d = new Date(dateStr);
             if (isNaN(d.getTime())) return "-";
-            return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+            return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
         } catch {
             return "-";
         }
     };
 
+    // Category hierarchy parser for two-line Figma cell
+    const parseCategory = (item: CostingItemBackend) => {
+        const catStr = item.category || item.categoryName;
+        if (catStr && catStr.includes(" > ")) {
+            const [parent, sub] = catStr.split(" > ");
+            return { primary: parent.trim(), sub: `> ${sub.trim()}` };
+        }
+        if (catStr) {
+            return { primary: catStr, sub: null };
+        }
+        if (item.category_id) {
+            const found = categories.find((c) => c.id === item.category_id);
+            if (found) {
+                if (found.parent_id) {
+                    const parent = categories.find((c) => c.id === found.parent_id);
+                    return { primary: parent?.name || found.name, sub: `> ${found.name}` };
+                }
+                return { primary: found.name, sub: null };
+            }
+        }
+        return { primary: "-", sub: null };
+    };
+
+    // Real Item Type badge text
+    const getItemType = (item: CostingItemBackend) => {
+        const rawType = (item as unknown as Record<string, unknown>).type;
+        if (rawType && typeof rawType === "string") return rawType.toUpperCase();
+        const code = (item.code || "").toUpperCase();
+        if (code.startsWith("LAB")) return "LABOUR";
+        if (code.startsWith("TRP")) return "TRANSPORT";
+        if (code.startsWith("ELE")) return "ELECTRICAL";
+        if (code.startsWith("FUR")) return "FURNITURE";
+        if (code.startsWith("MAT")) return "MATERIAL";
+        const status = (item.rate_status || item.rateStatus || "active").toUpperCase();
+        return status === "ACTIVE" ? "APPROVED" : status;
+    };
+
     const handleDeleteItem = async (itemId: string) => {
-        if (!confirm("Are you sure you want to delete this item?")) return;
+        if (!confirm("Are you sure you want to delete this costing item?")) return;
         try {
             await deleteCostingItem(itemId);
             setItems((prev) => prev.filter((i) => i.id !== itemId));
@@ -112,6 +169,11 @@ export default function LibraryTab({ isAddOpen, setIsAddOpen }: LibraryTabProps)
         }
     };
 
+    const handleEditItem = (item: CostingItemBackend) => {
+        setEditingItem(item);
+        setIsEditOpen(true);
+    };
+
     const existingVendors = Array.from(
         new Set(
             items
@@ -120,146 +182,131 @@ export default function LibraryTab({ isAddOpen, setIsAddOpen }: LibraryTabProps)
         )
     );
 
+    const categoryFilterOptions = categories.map((c) => ({
+        label: c.name,
+        value: c.id,
+    }));
+
     return (
-        <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: "16px" }}>
-            {/* Toolbar: Search, Filter, Import Excel, + New Item */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <label
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            background: "#fff",
-                            border: "1px solid #e5e7eb",
-                            borderRadius: "8px",
-                            padding: "0 12px"
-                        }}
-                    >
-                        <Search size={16} color="#6b7280" />
+        <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: "16px", width: "100%" }}>
+            {/* Toolbar: Search, Filter, + New Item (Frame 110) */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", width: "100%" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: 1, minWidth: "280px", maxWidth: "600px" }}>
+                    {/* Glassmorphic Search Box matching Figma Frame 76 */}
+                    <div className="costing-search-box">
+                        <div className="costing-search-icon-tile">
+                            <Search size={16} color="#475569" />
+                        </div>
                         <input
-                            placeholder="Search item, code, vendor..."
+                            placeholder="Search category by name…"
                             value={searchQuery}
                             onChange={(e) => {
                                 setSearchQuery(e.target.value);
                                 setCurrentPage(1);
                             }}
-                            style={{ border: "none", outline: "none", padding: "8px", fontSize: "14px", width: "240px" }}
+                            className="costing-search-input"
+                            aria-label="Search costing items"
                         />
-                    </label>
+                    </div>
+
+                    {/* Filter Button matching Figma */}
                     <CostingFilterPopover
                         currentStatus={rateStatusFilter}
-                        onApply={({ status }) => {
+                        categoryFilter={categoryFilter}
+                        categoryOptions={categoryFilterOptions}
+                        onApply={({ status, category }) => {
                             setRateStatusFilter(status);
+                            if (category) setCategoryFilter(category);
                             setCurrentPage(1);
                         }}
                         onReset={() => {
                             setRateStatusFilter("all");
+                            setCategoryFilter("all");
                             setCurrentPage(1);
                         }}
                     />
                 </div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <button
-                        type="button"
-                        onClick={() => setIsImportOpen(true)}
-                        style={{
-                            background: "#fff",
-                            border: "1px solid #e5e7eb",
-                            padding: "8px 16px",
-                            borderRadius: "8px",
-                            fontWeight: 500,
-                            fontSize: "13px",
-                            cursor: "pointer",
-                            color: "#374151"
-                        }}
-                    >
-                        Import Excel
-                    </button>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                     <button
                         type="button"
                         onClick={() => setShowAddModal(true)}
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            background: "#2563eb",
-                            color: "#fff",
-                            border: "none",
-                            padding: "8px 18px",
-                            borderRadius: "8px",
-                            fontWeight: 600,
-                            fontSize: "13px",
-                            cursor: "pointer",
-                            boxShadow: "0 1px 2px rgba(37,99,235,0.2)"
-                        }}
+                        className="costing-new-item-btn"
                     >
-                        <Plus size={16} /> New Item
+                        <Plus size={18} /> New Item
                     </button>
                 </div>
             </div>
 
             {error && (
-                <div style={{ padding: "16px", background: "#fef2f2", color: "#b91c1c", borderRadius: "10px", display: "flex", justifyContent: "space-between", alignItems: "center", border: "1px solid #fecaca" }}>
+                <div style={{ padding: "14px 18px", background: "#FEF2F2", color: "#B91C1C", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", border: "1px solid #FECACA", fontSize: "14px", fontFamily: "'Urbanist', sans-serif" }}>
                     <span>{error}</span>
-                    <button onClick={loadData} style={{ background: "none", border: "none", color: "#b91c1c", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px", fontWeight: 600 }}>
-                        <RefreshCw size={16} /> Retry
+                    <button onClick={loadData} style={{ background: "none", border: "none", color: "#B91C1C", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", fontWeight: 600 }}>
+                        <RefreshCw size={14} /> Retry
                     </button>
                 </div>
             )}
 
-            {/* Table Container */}
-            <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-                <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "14px", minWidth: "980px" }}>
+            {/* Table Container (Frame 2147225069) */}
+            <div className="costing-table-card">
+                <div className="costing-table-wrap">
+                    <table className="costing-table">
                         <thead>
-                            <tr style={{ background: "#f8fafc", color: "#64748b", borderBottom: "1px solid #e2e8f0" }}>
-                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>ITEM</th>
-                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>CATEGORY</th>
-                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>UNIT</th>
-                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>BASE COST (₹)</th>
-                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>SELLING RATE (₹)</th>
-                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>MARGIN</th>
-                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>PREFERRED VENDOR</th>
-                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>RATE STATUS</th>
-                                <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>UPDATED</th>
-                                <th style={{ padding: "14px 16px", width: "48px" }}></th>
+                            <tr>
+                                <th className="costing-th" style={{ width: "216px" }}>ITEM</th>
+                                <th className="costing-th" style={{ width: "100px" }}>TYPE</th>
+                                <th className="costing-th" style={{ width: "114px" }}>CATEGORY</th>
+                                <th className="costing-th" style={{ width: "75px" }}>UNIT</th>
+                                <th className="costing-th align-center" style={{ width: "129px" }}>BASE COST (₹)</th>
+                                <th className="costing-th align-center" style={{ width: "141px" }}>SELLING RATE (₹)</th>
+                                <th className="costing-th" style={{ width: "84px" }}>MARGIN</th>
+                                <th className="costing-th" style={{ width: "153px" }}>PREFERRED VENDOR</th>
+                                <th className="costing-th" style={{ width: "115px" }}>RATE STATUS</th>
+                                <th className="costing-th" style={{ width: "100px" }}>UPDATED</th>
+                                <th className="costing-th align-center" style={{ width: "64px" }}></th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={10} style={{ textAlign: "center", padding: "48px", color: "#64748b" }}>
-                                        <RefreshCw size={24} className="animate-spin" style={{ margin: "0 auto 8px", display: "block", color: "#3b82f6" }} />
-                                        Loading items...
+                                    <td colSpan={11} style={{ textAlign: "center", padding: "48px", color: "#64748B", fontFamily: "'Urbanist', sans-serif" }}>
+                                        <RefreshCw size={24} className="animate-spin" style={{ margin: "0 auto 10px", display: "block", color: "#2563EB" }} />
+                                        Loading costing library...
                                     </td>
                                 </tr>
                             ) : filteredItems.length === 0 ? (
                                 <tr>
-                                    <td colSpan={10} style={{ textAlign: "center", padding: "48px 24px", color: "#64748b" }}>
-                                        <div style={{ fontSize: "16px", fontWeight: 600, color: "#1e293b", marginBottom: "6px" }}>No items found</div>
-                                        <p style={{ margin: "0 0 16px 0", fontSize: "13.5px", color: "#94a3b8" }}>
-                                            {searchQuery || rateStatusFilter !== "all" ? "No items match your filters." : "Get started by adding items or importing from Excel."}
+                                    <td colSpan={11} style={{ textAlign: "center", padding: "48px 24px", color: "#64748B", fontFamily: "'Urbanist', sans-serif" }}>
+                                        <div style={{ fontSize: "16px", fontWeight: 600, color: "#0F172A", marginBottom: "6px" }}>No items found</div>
+                                        <p style={{ margin: "0 0 16px 0", fontSize: "14px", color: "#64748B" }}>
+                                            {searchQuery || rateStatusFilter !== "all" || categoryFilter !== "all"
+                                                ? "No items match your active search or filters."
+                                                : "Get started by adding items or importing from Excel."}
                                         </p>
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowAddModal(true)}
-                                            style={{
-                                                background: "#2563eb",
-                                                color: "#ffffff",
-                                                border: "none",
-                                                padding: "9px 20px",
-                                                borderRadius: "8px",
-                                                fontWeight: 600,
-                                                fontSize: "13.5px",
-                                                cursor: "pointer",
-                                                display: "inline-flex",
-                                                alignItems: "center",
-                                                gap: "6px"
-                                            }}
-                                        >
-                                            <Plus size={16} /> Add Your First Item
-                                        </button>
+                                        {searchQuery || rateStatusFilter !== "all" || categoryFilter !== "all" ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setSearchQuery("");
+                                                    setRateStatusFilter("all");
+                                                    setCategoryFilter("all");
+                                                    setCurrentPage(1);
+                                                }}
+                                                className="costing-import-excel-btn"
+                                                style={{ display: "inline-flex", margin: "0 auto" }}
+                                            >
+                                                Clear Filters
+                                            </button>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowAddModal(true)}
+                                                className="costing-new-item-btn"
+                                                style={{ display: "inline-flex", margin: "0 auto" }}
+                                            >
+                                                <Plus size={16} /> Add Your First Item
+                                            </button>
+                                        )}
                                     </td>
                                 </tr>
                             ) : (
@@ -267,85 +314,125 @@ export default function LibraryTab({ isAddOpen, setIsAddOpen }: LibraryTabProps)
                                     const base = Number(item.baseCost ?? item.base_cost ?? 0);
                                     const selling = Number(item.sellingRate ?? item.selling_rate ?? 0);
                                     const marginVal = selling > 0 ? ((selling - base) / selling) * 100 : 0;
-                                    const vendorName = item.preferredVendor || item.vendor || item.preferred_vendor || "-";
+                                    const vendorName = item.preferredVendor || item.vendor || item.preferred_vendor;
                                     const itemImage = item.imageUrl || item.image_url;
+                                    const catInfo = parseCategory(item);
+                                    const typeName = getItemType(item);
 
                                     return (
-                                        <tr key={item.id} style={{ borderBottom: "1px solid #f1f5f9", transition: "background 0.15s" }} className="hover:bg-gray-50">
-                                            {/* Item */}
-                                            <td style={{ padding: "14px 16px" }}>
-                                                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                                        <tr key={item.id} className="costing-tr">
+                                            {/* Column 1: Item */}
+                                            <td className="costing-td">
+                                                <div className="costing-item-cell">
                                                     {itemImage ? (
                                                         <img
                                                             src={itemImage}
                                                             alt=""
-                                                            style={{ width: "36px", height: "36px", borderRadius: "8px", objectFit: "cover", border: "1px solid #e2e8f0" }}
+                                                            className="costing-item-thumb"
                                                         />
                                                     ) : (
-                                                        <div style={{ width: "36px", height: "36px", background: "#eff6ff", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", color: "#3b82f6", fontWeight: 700, fontSize: "13px" }}>
-                                                            {item.name.slice(0, 2).toUpperCase()}
+                                                        <div className="costing-item-thumb">
+                                                            {item.name ? item.name.slice(0, 2).toUpperCase() : "IT"}
                                                         </div>
                                                     )}
-                                                    <div>
-                                                        <div style={{ fontWeight: 600, color: "#0f172a", fontSize: "14px" }}>{item.name}</div>
-                                                        <div style={{ color: "#94a3b8", fontSize: "12px" }}>{item.code || "-"}</div>
+                                                    <div className="costing-item-text-stack">
+                                                        <div className="costing-item-name">{item.name}</div>
+                                                        <div className="costing-item-code">{item.code || "-"}</div>
                                                     </div>
                                                 </div>
                                             </td>
 
-                                            {/* Category */}
-                                            <td style={{ padding: "14px 16px", color: "#334155" }}>
-                                                {item.category || item.category_id || "-"}
+                                            {/* Column 2: Type */}
+                                            <td className="costing-td">
+                                                <span
+                                                    className="costing-type-pill"
+                                                    style={
+                                                        typeName === "DRAFT" || typeName === "PENDING"
+                                                            ? { background: "rgba(100, 116, 139, 0.12)", color: "#64748B" }
+                                                            : typeName === "EXPIRED"
+                                                            ? { background: "rgba(220, 38, 38, 0.12)", color: "#DC2626" }
+                                                            : undefined
+                                                    }
+                                                >
+                                                    {typeName}
+                                                </span>
                                             </td>
 
-                                            {/* Unit */}
-                                            <td style={{ padding: "14px 16px", color: "#475569" }}>{item.unit || "Nos"}</td>
-
-                                            {/* Base Cost */}
-                                            <td style={{ padding: "14px 16px", color: "#0f172a", fontWeight: 500 }}>{formatMoney(base)}</td>
-
-                                            {/* Selling Rate */}
-                                            <td style={{ padding: "14px 16px", color: "#0f172a", fontWeight: 500 }}>{formatMoney(selling)}</td>
-
-                                            {/* Margin */}
-                                            <td style={{ padding: "14px 16px", color: marginVal >= 0 ? "#10b981" : "#ef4444", fontWeight: 600 }}>
-                                                {marginVal.toFixed(1)}%
-                                            </td>
-
-                                            {/* Vendor */}
-                                            <td style={{ padding: "14px 16px" }}>
-                                                <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#334155" }}>
-                                                    {vendorName !== "-" && (
-                                                        <div style={{ width: "22px", height: "22px", background: "#e2e8f0", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 700, color: "#475569" }}>
-                                                            {vendorName.slice(0, 1).toUpperCase()}
-                                                        </div>
+                                            {/* Column 3: Category */}
+                                            <td className="costing-td">
+                                                <div className="costing-category-stack">
+                                                    <div className="costing-category-primary">{catInfo.primary}</div>
+                                                    {catInfo.sub && (
+                                                        <div className="costing-category-sub">{catInfo.sub}</div>
                                                     )}
-                                                    <span>{vendorName}</span>
                                                 </div>
                                             </td>
 
-                                            {/* Rate Status Dropdown */}
-                                            <td style={{ padding: "14px 16px" }}>
+                                            {/* Column 4: Unit */}
+                                            <td className="costing-td">
+                                                <span className="costing-unit-text">{item.unit || "Nos"}</span>
+                                            </td>
+
+                                            {/* Column 5: Base Cost (₹) */}
+                                            <td className="costing-td align-center">
+                                                <span className="costing-price-text">{formatMoney(base)}</span>
+                                            </td>
+
+                                            {/* Column 6: Selling Rate (₹) */}
+                                            <td className="costing-td align-center">
+                                                <span className="costing-price-text">{formatMoney(selling)}</span>
+                                            </td>
+
+                                            {/* Column 7: Margin */}
+                                            <td className="costing-td">
+                                                <span className={`costing-margin-text ${marginVal < 0 ? "is-negative" : ""}`}>
+                                                    {marginVal.toFixed(2)}%
+                                                </span>
+                                            </td>
+
+                                            {/* Column 8: Preferred Vendor */}
+                                            <td className="costing-td">
+                                                {vendorName ? (
+                                                    <div className="costing-vendor-cell">
+                                                        <div className="costing-vendor-avatar">
+                                                            {vendorName.slice(0, 1).toUpperCase()}
+                                                        </div>
+                                                        <span className="costing-vendor-name">{vendorName}</span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="costing-vendor-name">-</span>
+                                                )}
+                                            </td>
+
+                                            {/* Column 9: Rate Status */}
+                                            <td className="costing-td">
                                                 <RateStatusDropdown
                                                     itemId={item.id}
                                                     currentStatus={item.rate_status || item.rateStatus || "active"}
                                                     onStatusChange={(newStatus) => {
                                                         setItems((prev) =>
-                                                            prev.map((i) => (i.id === item.id ? { ...i, rate_status: newStatus, rateStatus: newStatus } : i))
+                                                            prev.map((i) =>
+                                                                i.id === item.id
+                                                                    ? { ...i, rate_status: newStatus, rateStatus: newStatus }
+                                                                    : i
+                                                            )
                                                         );
                                                     }}
                                                 />
                                             </td>
 
-                                            {/* Updated */}
-                                            <td style={{ padding: "14px 16px", color: "#64748b", fontSize: "13px" }}>
-                                                {formatDate(item.updated_at || item.updatedAt)}
+                                            {/* Column 10: Updated */}
+                                            <td className="costing-td">
+                                                <span className="costing-updated-text">
+                                                    {formatDate(item.updated_at || item.updatedAt)}
+                                                </span>
                                             </td>
 
-                                            {/* Action More Menu */}
-                                            <td style={{ padding: "14px 16px" }}>
+                                            {/* Column 11: Actions */}
+                                            <td className="costing-td align-center">
                                                 <CostingMoreMenu
                                                     entityName="Item"
+                                                    onEdit={() => handleEditItem(item)}
                                                     onDuplicate={() => handleDuplicateItem(item.id)}
                                                     onDelete={() => handleDeleteItem(item.id)}
                                                 />
@@ -358,27 +445,43 @@ export default function LibraryTab({ isAddOpen, setIsAddOpen }: LibraryTabProps)
                     </table>
                 </div>
 
-                {/* Pagination */}
-                {filteredItems.length > 0 && (
-                    <CostingPagination
-                        currentPage={currentPage}
-                        totalPages={Math.max(1, Math.ceil(filteredItems.length / pageSize))}
-                        totalItems={filteredItems.length}
-                        pageSize={pageSize}
-                        onPageChange={setCurrentPage}
-                        onPageSizeChange={(newSize) => {
-                            setPageSize(newSize);
-                            setCurrentPage(1);
-                        }}
-                    />
-                )}
+                {/* Pagination (Frame 2147225166) */}
+                <CostingPagination
+                    currentPage={currentPage}
+                    totalPages={Math.max(1, Math.ceil(filteredItems.length / pageSize))}
+                    totalItems={filteredItems.length}
+                    pageSize={pageSize}
+                    onPageChange={setCurrentPage}
+                    onPageSizeChange={(newSize) => {
+                        setPageSize(newSize);
+                        setCurrentPage(1);
+                    }}
+                />
             </div>
 
             {/* Add Item Modal */}
             <AddItemModal
                 isOpen={showAddModal}
+                itemToEdit={null}
                 onClose={() => setShowAddModal(false)}
                 onSuccess={() => {
+                    setShowAddModal(false);
+                    void loadData();
+                }}
+                existingVendors={existingVendors}
+            />
+
+            {/* Edit Item Modal */}
+            <AddItemModal
+                isOpen={isEditOpen}
+                itemToEdit={editingItem}
+                onClose={() => {
+                    setIsEditOpen(false);
+                    setEditingItem(null);
+                }}
+                onSuccess={() => {
+                    setIsEditOpen(false);
+                    setEditingItem(null);
                     void loadData();
                 }}
                 existingVendors={existingVendors}

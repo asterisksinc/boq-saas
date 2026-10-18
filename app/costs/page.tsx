@@ -3,7 +3,6 @@
 import {
     Plus,
     Search,
-    SlidersHorizontal,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import LibraryTab from "./components/LibraryTab";
@@ -15,6 +14,7 @@ import SettingsTab from "./components/SettingsTab";
 import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
 import CostingExcelImportModal from "@/components/costing/CostingExcelImportModal";
+import "./costing-redesign.css";
 
 type MainTab = "Library" | "Categories" | "Analysis" | "Scenarios" | "Margins" | "Settings";
 
@@ -38,86 +38,85 @@ export default function CostsPage() {
 
     const tabs: MainTab[] = ["Library", "Categories", "Analysis", "Scenarios", "Margins", "Settings"];
 
+    const handleTabChange = (tab: MainTab) => {
+        setActiveTab(tab);
+        setIsCategoryDetailActive(false);
+    };
+
     return (
-        <main className="fig-dashboard boq-dashboard">
-            <div className="fig-dashboard-glow" />
+        <main className="fig-dashboard costing-dashboard">
+            <div className="fig-dashboard-glow costing-bg-gradient-overlay" />
 
             <DashboardRail />
 
-            <div className="fig-dashboard-main">
+            <div className="fig-dashboard-main" style={{ position: "relative" }}>
+                {/* Dashboard top header - preserves dashboard layout */}
                 <DashboardHeader title="Costing" />
 
-                <section className="costing-page-shell" style={{ padding: "32px", display: "flex", flexDirection: "column", gap: "24px" }}>
-                    {/* Page Header */}
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                        <div>
-                            <h2 style={{ fontSize: "24px", fontWeight: 600, color: "#1f2d3d", margin: "0 0 8px 0" }}>Costing Library</h2>
-                            <p style={{ fontSize: "14px", color: "#6b7280", margin: 0 }}>Budget control | Vendor comparison | Variance analysis</p>
-                        </div>
-                        <div style={{ display: "flex", gap: "12px" }}>
-                            <button
-                                type="button"
-                                onClick={() => setIsExcelImportOpen(true)}
-                                className="boq-ghost-button"
-                                style={{
-                                    background: "#fff",
-                                    border: "1px solid #e5e7eb",
-                                    padding: "8px 16px",
-                                    borderRadius: "8px",
-                                    fontWeight: 500,
-                                    cursor: "pointer"
-                                }}
-                            >
-                                Import Excel
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Tabs Row */}
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #e5e7eb", paddingBottom: "16px" }}>
-                        <div style={{ display: "flex", gap: "8px", background: "#fff", padding: "4px", borderRadius: "8px", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
-                            {tabs.map((tab) => (
-                                <button
-                                    key={tab}
-                                    onClick={() => setActiveTab(tab)}
-                                    style={{
-                                        padding: "8px 32px",
-                                        background: activeTab === tab ? "#eff6ff" : "transparent",
-                                        color: activeTab === tab ? "#2563eb" : "#6b7280",
-                                        fontWeight: activeTab === tab ? 600 : 500,
-                                        border: "none",
-                                        borderRadius: "6px",
-                                        cursor: "pointer",
-                                        fontSize: "14px"
-                                    }}
-                                >
-                                    {tab}
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* Right Actions depending on active tab */}
-                        {activeTab === "Categories" && !isCategoryDetailActive && (
-                            <div style={{ display: "flex", gap: "12px" }}>
-                                <label style={{ display: "flex", alignItems: "center", background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "0 12px" }}>
-                                    <Search size={16} color="#6b7280" />
-                                    <input
-                                        placeholder="Search category by name..."
-                                        value={categorySearch}
-                                        onChange={(e) => setCategorySearch(e.target.value)}
-                                        style={{ border: "none", outline: "none", padding: "8px", fontSize: "14px", width: "200px" }}
-                                    />
-                                </label>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsNewCategoryOpen(true)}
-                                    style={{ display: "flex", alignItems: "center", gap: "8px", background: "#2563eb", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "8px", fontWeight: 500, cursor: "pointer" }}
-                                >
-                                    <Plus size={16} /> New Category
-                                </button>
+                <section className="costing-page-shell" style={{ padding: "0 0 24px 0" }}>
+                    {/* Top-level Costing heading row and tabs: ONLY rendered when not inside Category Detail */}
+                    {!isCategoryDetailActive && (
+                        <>
+                            {/* Page Heading Row (Frame 2147225066) */}
+                            <div className="costing-heading-row">
+                                <div className="costing-title-group">
+                                    <h1 className="costing-main-heading">Costing Library</h1>
+                                    <p className="costing-subheading">Budget control | Vendor comparison | Variance analysis</p>
+                                </div>
+                                <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsExcelImportOpen(true)}
+                                        className="costing-import-excel-btn"
+                                    >
+                                        Import Excel
+                                    </button>
+                                </div>
                             </div>
-                        )}
-                    </div>
+
+                            {/* Navigation Tabs (Frame 2147225076) */}
+                            <div className="costing-tabs-toolbar-row">
+                                <div className="costing-tabs-container" role="tablist">
+                                    {tabs.map((tab) => (
+                                        <button
+                                            key={tab}
+                                            role="tab"
+                                            aria-selected={activeTab === tab}
+                                            onClick={() => handleTabChange(tab)}
+                                            className={`costing-tab-btn ${activeTab === tab ? "is-active" : ""}`}
+                                        >
+                                            {tab}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Right Actions for Categories tab */}
+                                {activeTab === "Categories" && (
+                                    <div className="costing-toolbar-group">
+                                        <div className="costing-search-box">
+                                            <div className="costing-search-icon-tile">
+                                                <Search size={16} color="#475569" />
+                                            </div>
+                                            <input
+                                                placeholder="Search category by name…"
+                                                value={categorySearch}
+                                                onChange={(e) => setCategorySearch(e.target.value)}
+                                                className="costing-search-input"
+                                                aria-label="Search categories"
+                                            />
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsNewCategoryOpen(true)}
+                                            className="costing-new-item-btn"
+                                        >
+                                            <Plus size={18} /> New Category
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    )}
 
                     {/* Main Content Area */}
                     <div className="costing-content-area" style={{ background: "transparent", minHeight: "500px" }}>

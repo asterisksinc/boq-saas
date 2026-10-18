@@ -23,7 +23,7 @@ export default function CostingPagination({
   onPageChange,
   onPageSizeChange,
   label = "Items",
-  pageSizeOptions = [10, 25, 50, 100],
+  pageSizeOptions = [10, 20, 50, 100],
   totalPages: propTotalPages,
 }: CostingPaginationProps) {
   const effectiveTotal = total ?? totalItems ?? 0;
@@ -46,47 +46,35 @@ export default function CostingPagination({
   };
 
   return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: "14px 20px",
-        borderTop: "1px solid #e2e8f0",
-        background: "#f8fafc",
-        flexWrap: "wrap",
-        gap: "12px",
-        fontSize: "13px",
-      }}
-    >
-      <div style={{ color: "#64748b", fontWeight: 500 }}>
-        Total {label}: <strong style={{ color: "#1e293b" }}>{total}</strong>
+    <div className="costing-pagination-bar" aria-label="Pagination">
+      <div className="costing-pagination-total">
+        Total {label}: <span>{effectiveTotal}</span>
       </div>
 
-      {totalPages > 1 && (
-        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+      {totalPages > 1 ? (
+        <div className="costing-pagination-pages">
           <button
             type="button"
             disabled={currentPage <= 1}
             onClick={() => onPageChange(currentPage - 1)}
-            style={{
-              padding: "5px 10px",
-              border: "1px solid #e2e8f0",
-              borderRadius: "6px",
-              background: "#ffffff",
-              color: currentPage <= 1 ? "#cbd5e1" : "#64748b",
-              cursor: currentPage <= 1 ? "not-allowed" : "pointer",
-              display: "flex",
-              alignItems: "center",
-            }}
+            className="costing-page-btn"
+            aria-label="Previous page"
           >
-            <ChevronLeft size={14} />
+            <ChevronLeft size={16} color={currentPage <= 1 ? "#94A3B8" : "#64748B"} />
           </button>
 
           {getPageNumbers().map((p, idx) => {
             if (p === "...") {
               return (
-                <span key={`dots-${idx}`} style={{ padding: "0 4px", color: "#94a3b8" }}>
+                <span
+                  key={`dots-${idx}`}
+                  style={{
+                    padding: "0 4px",
+                    color: "#94A3B8",
+                    fontFamily: "'Urbanist', sans-serif",
+                    fontWeight: 600,
+                  }}
+                >
                   ...
                 </span>
               );
@@ -97,17 +85,9 @@ export default function CostingPagination({
                 key={p}
                 type="button"
                 onClick={() => onPageChange(Number(p))}
-                style={{
-                  padding: "5px 11px",
-                  border: isCurrent ? "1px solid #2563eb" : "1px solid #e2e8f0",
-                  borderRadius: "6px",
-                  background: isCurrent ? "#eff6ff" : "#ffffff",
-                  color: isCurrent ? "#2563eb" : "#64748b",
-                  cursor: "pointer",
-                  fontWeight: isCurrent ? 700 : 500,
-                  fontSize: "13px",
-                  transition: "all 0.15s ease",
-                }}
+                className={`costing-page-btn ${isCurrent ? "is-active" : ""}`}
+                aria-label={`Page ${p}`}
+                aria-current={isCurrent ? "page" : undefined}
               >
                 {p}
               </button>
@@ -118,41 +98,25 @@ export default function CostingPagination({
             type="button"
             disabled={currentPage >= totalPages}
             onClick={() => onPageChange(currentPage + 1)}
-            style={{
-              padding: "5px 10px",
-              border: "1px solid #e2e8f0",
-              borderRadius: "6px",
-              background: "#ffffff",
-              color: currentPage >= totalPages ? "#cbd5e1" : "#64748b",
-              cursor: currentPage >= totalPages ? "not-allowed" : "pointer",
-              display: "flex",
-              alignItems: "center",
-            }}
+            className="costing-page-btn"
+            aria-label="Next page"
           >
-            <ChevronRight size={14} />
+            <ChevronRight size={16} color={currentPage >= totalPages ? "#94A3B8" : "#0F172A"} />
           </button>
         </div>
+      ) : (
+        <div style={{ flex: 1 }} />
       )}
 
       {onPageSizeChange && (
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#475569" }}>
-          <span>Show per Page:</span>
-          <div style={{ position: "relative" }}>
+        <div className="costing-page-size-wrap">
+          <span className="costing-page-size-label">Show per Page:</span>
+          <div className="costing-page-size-select-box">
             <select
               value={pageSize}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              style={{
-                appearance: "none",
-                background: "#ffffff",
-                border: "1px solid #e2e8f0",
-                borderRadius: "6px",
-                padding: "5px 28px 5px 10px",
-                fontSize: "13px",
-                color: "#1e293b",
-                fontWeight: 500,
-                cursor: "pointer",
-                outline: "none",
-              }}
+              className="costing-page-size-select"
+              aria-label="Items per page"
             >
               {pageSizeOptions.map((opt) => (
                 <option key={opt} value={opt}>
@@ -161,8 +125,8 @@ export default function CostingPagination({
               ))}
             </select>
             <ChevronDown
-              size={13}
-              color="#64748b"
+              size={14}
+              color="#64748B"
               style={{
                 position: "absolute",
                 right: "8px",

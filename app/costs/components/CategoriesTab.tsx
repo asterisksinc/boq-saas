@@ -7,10 +7,8 @@ import {
     Folder,
     GripVertical,
     Search,
-    SlidersHorizontal,
     Plus,
-    RefreshCw,
-    ChevronLeft
+    RefreshCw
 } from "lucide-react";
 import { getCostingCategories, deleteCostingCategory, duplicateCostingCategory } from "@/lib/api/costing";
 import type { CostingCategoryBackend } from "@/lib/types";
@@ -43,6 +41,7 @@ export default function CategoriesTab({
 
     // Parent ID to pre-populate when clicking '+' on a tree item
     const [modalParentId, setModalParentId] = useState<string | null>(null);
+    const [categoryToEdit, setCategoryToEdit] = useState<CostingCategoryBackend | null>(null);
 
     // Tree state
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -68,7 +67,7 @@ export default function CategoriesTab({
             setCategories(res.items || []);
             // Auto expand top categories initially
             const rootIds = (res.items || []).filter((c) => !c.parent_id).map((c) => c.id);
-            setExpandedIds(new Set(rootIds.slice(0, 3)));
+            setExpandedIds(new Set(rootIds.slice(0, 4)));
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to load categories");
         } finally {
@@ -146,6 +145,18 @@ export default function CategoriesTab({
         return list;
     }, [categories, selectedTreeId, rootCategories, childrenMap, effectiveSearch]);
 
+    // Filter tree root nodes by treeSearch
+    const filteredRoots = useMemo(() => {
+        if (!treeSearch.trim()) return rootCategories;
+        const q = treeSearch.trim().toLowerCase();
+        return rootCategories.filter((root) => {
+            if (root.name.toLowerCase().includes(q)) return true;
+            if (root.code && root.code.toLowerCase().includes(q)) return true;
+            const children = childrenMap.get(root.id) || [];
+            return children.some((c) => c.name.toLowerCase().includes(q) || (c.code && c.code.toLowerCase().includes(q)));
+        });
+    }, [rootCategories, childrenMap, treeSearch]);
+
     // Pagination
     const totalPages = Math.max(1, Math.ceil(filteredCategories.length / pageSize));
     const paginatedCategories = useMemo(() => {
@@ -172,21 +183,32 @@ export default function CategoriesTab({
     };
 
     const formatDate = (dateStr?: string) => {
-        if (!dateStr) return "05 Nov 2024";
+        if (!dateStr) return "-";
         try {
             const d = new Date(dateStr);
-            if (isNaN(d.getTime())) return "05 Nov 2024";
+            if (isNaN(d.getTime())) return "-";
             return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
         } catch {
-            return "05 Nov 2024";
+            return "-";
         }
     };
 
     const openCreateWithParent = (parentId: string | null, e: React.MouseEvent) => {
         e.stopPropagation();
+        setCategoryToEdit(null);
         setModalParentId(parentId);
         setShowModal(true);
     };
+
+    const handleEditCategory = (cat: CostingCategoryBackend) => {
+        setCategoryToEdit(cat);
+        setModalParentId(cat.parent_id || null);
+        setShowModal(true);
+    };
+
+    useEffect(() => {
+        onDetailViewChange?.(Boolean(activeDetailCategory));
+    }, [activeDetailCategory, onDetailViewChange]);
 
     // If active detail category is opened
     if (activeDetailCategory) {
@@ -203,14 +225,14 @@ export default function CategoriesTab({
     }
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px", width: "100%" }}>
             {error && (
                 <div
                     style={{
                         padding: "16px",
                         background: "#fef2f2",
                         color: "#b91c1c",
-                        borderRadius: "10px",
+                        borderRadius: "8px",
                         display: "flex",
                         justifyContent: "space-between",
                         alignItems: "center",
@@ -219,6 +241,7 @@ export default function CategoriesTab({
                 >
                     <span>{error}</span>
                     <button
+                        type="button"
                         onClick={loadData}
                         style={{
                             background: "none",
@@ -236,349 +259,172 @@ export default function CategoriesTab({
                 </div>
             )}
 
-            {/* Split Layout: Left Sidebar (Tree) + Right Main Panel (Table) */}
-            <div
-                style={{
-                    display: "grid",
-                    gridTemplateColumns: "300px 1fr",
-                    gap: "24px",
-                    alignItems: "flex-start"
-                }}
-            >
-                {/* ── Left Sidebar: Category Structure Tree ── */}
-                <div
-                    style={{
-                        background: "#ffffff",
-                        borderRadius: "12px",
-                        border: "1px solid #e5e7eb",
-                        boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-                        overflow: "hidden"
-                    }}
-                >
-                    {/* Tree Header */}
-                    <div
-                        style={{
-                            padding: "18px 20px 14px 20px",
-                            borderBottom: "1px solid #f1f5f9",
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "flex-start"
-                        }}
-                    >
-                        <div>
-                            <div
-                                style={{
-                                    fontSize: "12px",
-                                    fontWeight: 700,
-                                    letterSpacing: "0.05em",
-                                    color: "#6b7280",
-                                    textTransform: "uppercase"
-                                }}
-                            >
-                                CATEGORY STRUCTURE
-                            </div>
-                            <div
-                                style={{
-                                    fontSize: "12px",
-                                    color: "#9ca3af",
-                                    marginTop: "4px"
-                                }}
-                            >
-                                {totalSections} Sections · {totalItems} Items
-                            </div>
+            {/* Two-Panel Workspace: Left Category Structure Tree + Right Categories Table (Frame 2147225084) */}
+            <div className="costing-categories-workspace">
+                {/* ── Left Panel: Category Structure Card (Frame 2147225071) ── */}
+                <div className="costing-categories-tree-card">
+                    {/* Header: Title + Dynamic Counts + Search Button (Frame 2147225199) */}
+                    <div className="costing-categories-tree-header">
+                        <div className="costing-categories-tree-title-group">
+                            <h3 className="costing-categories-tree-title">CATEGORY STRUCTURE</h3>
+                            <span className="costing-categories-tree-subtitle">
+                                {totalSections} Sections • {totalItems} Items
+                            </span>
                         </div>
 
                         <button
                             type="button"
                             onClick={() => setShowTreeSearchInput(!showTreeSearchInput)}
-                            style={{
-                                background: showTreeSearchInput ? "#eff6ff" : "transparent",
-                                border: "1px solid",
-                                borderColor: showTreeSearchInput ? "#bfdbfe" : "#e5e7eb",
-                                borderRadius: "6px",
-                                padding: "6px",
-                                cursor: "pointer",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                color: showTreeSearchInput ? "#2563eb" : "#6b7280"
-                            }}
-                            title="Search Structure"
+                            className="costing-categories-tree-search-btn"
+                            title="Filter Category Structure"
+                            aria-label="Filter category structure"
                         >
-                            <Search size={15} />
+                            <div className="costing-categories-tree-search-inner">
+                                <Search size={16} color="#475569" />
+                            </div>
                         </button>
                     </div>
 
+                    {/* Expandable Tree Search Input */}
                     {showTreeSearchInput && (
-                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f1f5f9" }}>
+                        <div className="costing-categories-tree-search-input-box">
                             <input
                                 type="text"
                                 value={treeSearch}
                                 onChange={(e) => setTreeSearch(e.target.value)}
-                                placeholder="Filter sections..."
-                                style={{
-                                    width: "100%",
-                                    padding: "6px 10px",
-                                    borderRadius: "6px",
-                                    border: "1px solid #d1d5db",
-                                    fontSize: "12px",
-                                    outline: "none",
-                                    boxSizing: "border-box"
-                                }}
+                                placeholder="Search sections..."
+                                className="costing-categories-tree-search-input"
                                 autoFocus
                             />
                         </div>
                     )}
 
-                    {/* "All Categories" Reset Button */}
-                    <div style={{ padding: "10px 14px 4px 14px" }}>
-                        <div
-                            onClick={() => setSelectedTreeId(null)}
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                padding: "8px 10px",
-                                borderRadius: "8px",
-                                cursor: "pointer",
-                                fontSize: "13px",
-                                fontWeight: 600,
-                                background: selectedTreeId === null ? "#eff6ff" : "transparent",
-                                color: selectedTreeId === null ? "#2563eb" : "#4b5563",
-                                transition: "background 0.15s ease"
-                            }}
-                        >
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                <Folder size={15} color={selectedTreeId === null ? "#2563eb" : "#64748b"} />
-                                <span>All Categories</span>
-                            </div>
-                            <span
-                                style={{
-                                    fontSize: "11px",
-                                    fontWeight: 600,
-                                    background: selectedTreeId === null ? "#dbeafe" : "#f3f4f6",
-                                    color: selectedTreeId === null ? "#2563eb" : "#6b7280",
-                                    padding: "2px 7px",
-                                    borderRadius: "10px"
-                                }}
-                            >
-                                {categories.length}
-                            </span>
+                    {/* Divider (Rectangle 72) */}
+                    <hr className="costing-categories-tree-divider" />
+
+                    {/* "All Categories" Reset Row */}
+                    <div
+                        onClick={() => setSelectedTreeId(null)}
+                        className={`costing-categories-tree-row ${selectedTreeId === null ? "is-active" : ""}`}
+                        style={{ width: "100%", boxSizing: "border-box" }}
+                        role="button"
+                        tabIndex={0}
+                        aria-label="View all categories"
+                    >
+                        <div className="costing-categories-tree-row-left">
+                            <Folder size={18} color={selectedTreeId === null ? "#2563EB" : "#475569"} />
+                            <span className="costing-categories-tree-label">All Categories</span>
                         </div>
+                        <span className="costing-categories-tree-badge">{categories.length}</span>
                     </div>
 
-                    {/* Tree List */}
-                    <div style={{ padding: "4px 14px 16px 14px", maxHeight: "680px", overflowY: "auto" }}>
+                    {/* Tree List (Frame 2147225181) */}
+                    <div className="costing-categories-tree-list">
                         {loading ? (
-                            <div style={{ padding: "20px", textAlign: "center", color: "#9ca3af", fontSize: "13px" }}>
+                            <div style={{ padding: "20px", textAlign: "center", color: "#64748B", fontSize: "14px" }}>
                                 Loading structure...
                             </div>
-                        ) : rootCategories.length === 0 ? (
-                            <div style={{ padding: "20px", textAlign: "center", color: "#9ca3af", fontSize: "13px" }}>
+                        ) : filteredRoots.length === 0 ? (
+                            <div style={{ padding: "20px", textAlign: "center", color: "#64748B", fontSize: "14px" }}>
                                 No categories found
                             </div>
                         ) : (
-                            rootCategories
-                                .filter((root) => !treeSearch || root.name.toLowerCase().includes(treeSearch.toLowerCase()))
-                                .map((root) => {
-                                    const isExpanded = expandedIds.has(root.id);
-                                    const isSelected = selectedTreeId === root.id;
-                                    const children = childrenMap.get(root.id) || [];
-                                    const rootItemCount = (root.itemCount ?? root.items ?? 0) + children.reduce((s, c) => s + (c.itemCount ?? c.items ?? 0), 0);
+                            filteredRoots.map((root) => {
+                                const isExpanded = expandedIds.has(root.id);
+                                const isSelected = selectedTreeId === root.id;
+                                const children = childrenMap.get(root.id) || [];
+                                const rootItemCount = (root.itemCount ?? root.items ?? 0) + children.reduce((s, c) => s + (c.itemCount ?? c.items ?? 0), 0);
 
-                                    return (
-                                        <div key={root.id} style={{ marginBottom: "2px" }}>
-                                            {/* Root Category Row */}
-                                            <div
-                                                onClick={() => setSelectedTreeId(root.id)}
-                                                style={{
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    justifyContent: "space-between",
-                                                    padding: "8px 8px",
-                                                    borderRadius: "8px",
-                                                    cursor: "pointer",
-                                                    background: isSelected ? "#eff6ff" : "transparent",
-                                                    color: isSelected ? "#2563eb" : "#1f2937",
-                                                    transition: "background 0.15s ease"
-                                                }}
-                                                className="group hover:bg-slate-50"
-                                            >
-                                                <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
-                                                    <span
-                                                        onClick={(e) => toggleExpand(root.id, e)}
-                                                        style={{
-                                                            display: "inline-flex",
-                                                            alignItems: "center",
-                                                            justifyContent: "center",
-                                                            width: "18px",
-                                                            height: "18px",
-                                                            color: isSelected ? "#2563eb" : "#6b7280"
-                                                        }}
-                                                    >
-                                                        {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                                                    </span>
-                                                    <Folder
-                                                        size={15}
-                                                        color={isSelected ? "#2563eb" : "#64748b"}
-                                                        style={{ flexShrink: 0 }}
-                                                    />
-                                                    <span
-                                                        style={{
-                                                            fontSize: "13px",
-                                                            fontWeight: isSelected ? 600 : 500,
-                                                            whiteSpace: "nowrap",
-                                                            overflow: "hidden",
-                                                            textOverflow: "ellipsis"
-                                                        }}
-                                                    >
-                                                        {root.name}
-                                                    </span>
-                                                </div>
-
-                                                <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
-                                                    {isExpanded && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => openCreateWithParent(root.id, e)}
-                                                            title={`Add subcategory to ${root.name}`}
-                                                            style={{
-                                                                background: "none",
-                                                                border: "none",
-                                                                padding: "2px",
-                                                                cursor: "pointer",
-                                                                color: "#6b7280",
-                                                                display: "flex",
-                                                                alignItems: "center",
-                                                                borderRadius: "4px"
-                                                            }}
-                                                        >
-                                                            <Plus size={13} />
-                                                        </button>
-                                                    )}
-                                                    <span
-                                                        style={{
-                                                            fontSize: "11px",
-                                                            fontWeight: 600,
-                                                            background: isSelected ? "#dbeafe" : "#f3f4f6",
-                                                            color: isSelected ? "#2563eb" : "#6b7280",
-                                                            padding: "2px 7px",
-                                                            borderRadius: "10px",
-                                                            minWidth: "16px",
-                                                            textAlign: "center"
-                                                        }}
-                                                    >
-                                                        {rootItemCount}
-                                                    </span>
-                                                </div>
+                                return (
+                                    <div key={root.id} className="costing-categories-tree-node">
+                                        {/* Root Category Row (Frame 2147225184) */}
+                                        <div
+                                            onClick={() => setSelectedTreeId(root.id)}
+                                            className={`costing-categories-tree-row ${isSelected ? "is-active" : ""}`}
+                                            role="button"
+                                            tabIndex={0}
+                                        >
+                                            <div className="costing-categories-tree-row-left">
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => toggleExpand(root.id, e)}
+                                                    className="costing-categories-tree-arrow-btn"
+                                                    aria-label={isExpanded ? "Collapse" : "Expand"}
+                                                >
+                                                    {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                                                </button>
+                                                <Folder size={18} color={isSelected ? "#2563EB" : "#1C1B1F"} />
+                                                <span className="costing-categories-tree-label" title={root.name}>
+                                                    {root.name}
+                                                </span>
                                             </div>
 
-                                            {/* Subcategories (Expanded) */}
-                                            {isExpanded && children.length > 0 && (
-                                                <div style={{ paddingLeft: "24px", marginTop: "2px" }}>
-                                                    {children.map((child) => {
-                                                        const isChildSelected = selectedTreeId === child.id;
-                                                        const childCount = child.itemCount ?? child.items ?? 0;
+                                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => openCreateWithParent(root.id, e)}
+                                                    title={`Add subcategory to ${root.name}`}
+                                                    style={{
+                                                        background: "none",
+                                                        border: "none",
+                                                        padding: "2px",
+                                                        cursor: "pointer",
+                                                        color: isSelected ? "#2563EB" : "#64748B",
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        borderRadius: "4px"
+                                                    }}
+                                                    aria-label={`Add subcategory to ${root.name}`}
+                                                >
+                                                    <Plus size={14} />
+                                                </button>
+                                                <span className="costing-categories-tree-badge">{rootItemCount}</span>
+                                            </div>
+                                        </div>
 
-                                                        return (
-                                                            <div
-                                                                key={child.id}
-                                                                onClick={() => setSelectedTreeId(child.id)}
-                                                                style={{
-                                                                    display: "flex",
-                                                                    alignItems: "center",
-                                                                    justifyContent: "space-between",
-                                                                    padding: "6px 8px",
-                                                                    borderRadius: "6px",
-                                                                    cursor: "pointer",
-                                                                    background: isChildSelected ? "#eff6ff" : "transparent",
-                                                                    color: isChildSelected ? "#2563eb" : "#4b5563",
-                                                                    transition: "background 0.15s ease",
-                                                                    marginBottom: "2px"
-                                                                }}
-                                                                className="hover:bg-slate-50"
-                                                            >
-                                                                <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
-                                                                    <GripVertical
-                                                                        size={13}
-                                                                        color={isChildSelected ? "#3b82f6" : "#9ca3af"}
-                                                                        style={{ flexShrink: 0 }}
-                                                                    />
-                                                                    <Folder
-                                                                        size={14}
-                                                                        color={isChildSelected ? "#2563eb" : "#64748b"}
-                                                                        style={{ flexShrink: 0 }}
-                                                                    />
-                                                                    <span
-                                                                        style={{
-                                                                            fontSize: "12px",
-                                                                            fontWeight: isChildSelected ? 600 : 400,
-                                                                            whiteSpace: "nowrap",
-                                                                            overflow: "hidden",
-                                                                            textOverflow: "ellipsis"
-                                                                        }}
-                                                                    >
-                                                                        {child.name}
-                                                                    </span>
-                                                                </div>
+                                        {/* Subcategories (Frame 2147225180, Frame 2147225171) */}
+                                        {isExpanded && children.length > 0 && (
+                                            <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                                                {children.map((child) => {
+                                                    const isChildSelected = selectedTreeId === child.id;
+                                                    const childCount = child.itemCount ?? child.items ?? 0;
 
-                                                                <span
-                                                                    style={{
-                                                                        fontSize: "11px",
-                                                                        fontWeight: 600,
-                                                                        background: isChildSelected ? "#dbeafe" : "#f3f4f6",
-                                                                        color: isChildSelected ? "#2563eb" : "#6b7280",
-                                                                        padding: "1px 6px",
-                                                                        borderRadius: "8px",
-                                                                        flexShrink: 0
-                                                                    }}
-                                                                >
-                                                                    {childCount}
+                                                    return (
+                                                        <div
+                                                            key={child.id}
+                                                            onClick={() => setSelectedTreeId(child.id)}
+                                                            className={`costing-categories-tree-subrow ${isChildSelected ? "is-active" : ""}`}
+                                                            role="button"
+                                                            tabIndex={0}
+                                                        >
+                                                            <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
+                                                                <GripVertical size={14} color="#94A3B8" style={{ flexShrink: 0 }} />
+                                                                <Folder size={16} color={isChildSelected ? "#2563EB" : "#475569"} style={{ flexShrink: 0 }} />
+                                                                <span className="costing-categories-tree-label" title={child.name}>
+                                                                    {child.name}
                                                                 </span>
                                                             </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })
+                                                            <span className="costing-categories-tree-badge">{childCount}</span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })
                         )}
                     </div>
                 </div>
 
-                {/* ── Right Main Panel: Categories Data Table ── */}
-                <div
-                    style={{
-                        background: "#ffffff",
-                        borderRadius: "12px",
-                        border: "1px solid #e5e7eb",
-                        boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-                        overflow: "hidden",
-                        display: "flex",
-                        flexDirection: "column"
-                    }}
-                >
-                    {/* Table Container with Horizontal Scrolling */}
-                    <div style={{ overflowX: "auto" }}>
-                        <table
-                            style={{
-                                width: "100%",
-                                borderCollapse: "collapse",
-                                textAlign: "left",
-                                fontSize: "13px",
-                                minWidth: "980px"
-                            }}
-                        >
+                {/* ── Right Panel: Categories Table Card (Frame 2147225072) ── */}
+                <div className="costing-categories-table-card">
+                    {/* Responsive Horizontal Scroll Container */}
+                    <div className="costing-categories-table-scroll">
+                        <table className="costing-categories-table">
                             <thead>
-                                <tr
-                                    style={{
-                                        background: "#f8fafc",
-                                        color: "#64748b",
-                                        borderBottom: "1px solid #e2e8f0"
-                                    }}
-                                >
-                                    <th style={{ padding: "14px 16px", width: "36px" }}>
+                                <tr className="costing-categories-th-row">
+                                    <th className="costing-categories-th th-cb">
                                         <input
                                             type="checkbox"
                                             checked={
@@ -586,52 +432,37 @@ export default function CategoriesTab({
                                                 paginatedCategories.every((c) => selectedRowIds.has(c.id))
                                             }
                                             onChange={handleSelectAll}
-                                            style={{ cursor: "pointer", borderRadius: "4px" }}
+                                            style={{ width: "18px", height: "18px", cursor: "pointer", accentColor: "#2563EB" }}
+                                            aria-label="Select all categories"
                                         />
                                     </th>
-                                    <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>
+                                    <th className="costing-categories-th" style={{ width: "113px" }}>
                                         <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                                            <Folder size={14} color="#64748b" />
+                                            <Folder size={16} color="#64748B" />
                                             <span>CATEGORY</span>
                                         </div>
                                     </th>
-                                    <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>
-                                        CODE
-                                    </th>
-                                    <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>
-                                        PARENT CATEGORY
-                                    </th>
-                                    <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em", textAlign: "center" }}>
-                                        SUB-CATEGORIES
-                                    </th>
-                                    <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em", textAlign: "center" }}>
-                                        ITEMS
-                                    </th>
-                                    <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>
-                                        DEFAULT MARKUP
-                                    </th>
-                                    <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>
-                                        TAX
-                                    </th>
-                                    <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>
-                                        STATUS
-                                    </th>
-                                    <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>
-                                        UPDATED
-                                    </th>
-                                    <th style={{ padding: "14px 16px", width: "48px" }}></th>
+                                    <th className="costing-categories-th" style={{ width: "86px" }}>CODE</th>
+                                    <th className="costing-categories-th" style={{ width: "150px" }}>PARENT CATEGORY</th>
+                                    <th className="costing-categories-th" style={{ width: "141px" }}>SUB-CATEGORIES</th>
+                                    <th className="costing-categories-th" style={{ width: "88px" }}>ITEMS</th>
+                                    <th className="costing-categories-th" style={{ width: "140px" }}>DEFAULT MARKUP</th>
+                                    <th className="costing-categories-th" style={{ width: "94px" }}>TAX</th>
+                                    <th className="costing-categories-th" style={{ width: "90px" }}>STATUS</th>
+                                    <th className="costing-categories-th" style={{ width: "150px" }}>UPDATED</th>
+                                    <th className="costing-categories-th th-actions">ACTIONS</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={11} style={{ padding: "40px", textAlign: "center", color: "#9ca3af" }}>
+                                        <td colSpan={11} style={{ padding: "40px", textAlign: "center", color: "#64748B" }}>
                                             Loading categories...
                                         </td>
                                     </tr>
                                 ) : paginatedCategories.length === 0 ? (
                                     <tr>
-                                        <td colSpan={11} style={{ padding: "40px", textAlign: "center", color: "#9ca3af" }}>
+                                        <td colSpan={11} style={{ padding: "40px", textAlign: "center", color: "#64748B" }}>
                                             No categories match your criteria.
                                         </td>
                                     </tr>
@@ -643,29 +474,26 @@ export default function CategoriesTab({
                                         const itemCount = cat.itemCount ?? cat.items ?? 0;
                                         const markup = cat.default_markup_percent !== null && cat.default_markup_percent !== undefined ? `${cat.default_markup_percent}%` : "20%";
                                         const tax = cat.default_tax_percent !== null && cat.default_tax_percent !== undefined ? `GST ${cat.default_tax_percent}%` : "GST 18%";
+                                        const isInactive = cat.status === "INACTIVE";
 
                                         return (
                                             <tr
                                                 key={cat.id}
-                                                style={{
-                                                    borderBottom: "1px solid #f1f5f9",
-                                                    backgroundColor: isChecked ? "#f8fafc" : "transparent",
-                                                    transition: "background 0.15s ease"
-                                                }}
-                                                className="hover:bg-slate-50"
+                                                className={`costing-categories-tr ${isChecked ? "is-selected" : ""}`}
                                             >
                                                 {/* Checkbox */}
-                                                <td style={{ padding: "14px 16px" }}>
+                                                <td className="costing-categories-td td-cb">
                                                     <input
                                                         type="checkbox"
                                                         checked={isChecked}
                                                         onChange={() => handleSelectRow(cat.id)}
-                                                        style={{ cursor: "pointer", borderRadius: "4px" }}
+                                                        style={{ width: "18px", height: "18px", cursor: "pointer", accentColor: "#2563EB" }}
+                                                        aria-label={`Select category ${cat.name}`}
                                                     />
                                                 </td>
 
                                                 {/* Category Name with Folder Icon */}
-                                                <td style={{ padding: "14px 16px" }}>
+                                                <td className="costing-categories-td td-name">
                                                     <div
                                                         onClick={() => {
                                                             setActiveDetailCategory(cat);
@@ -674,84 +502,55 @@ export default function CategoriesTab({
                                                         style={{
                                                             display: "inline-flex",
                                                             alignItems: "center",
-                                                            gap: "10px",
+                                                            gap: "8px",
                                                             cursor: "pointer"
                                                         }}
+                                                        title="Click to view category details"
+                                                        role="button"
+                                                        tabIndex={0}
                                                     >
-                                                        <Folder size={17} color="#475569" style={{ flexShrink: 0 }} />
-                                                        <span
-                                                            style={{
-                                                                fontWeight: 600,
-                                                                color: "#1e293b",
-                                                                fontSize: "14px"
-                                                            }}
-                                                        >
-                                                            {cat.name}
-                                                        </span>
+                                                        <Folder size={18} color="#0F172A" style={{ flexShrink: 0 }} />
+                                                        <span style={{ fontWeight: 500, color: "#0F172A" }}>{cat.name}</span>
                                                     </div>
                                                 </td>
 
                                                 {/* Code */}
-                                                <td style={{ padding: "14px 16px", color: "#64748b", fontSize: "13px" }}>
-                                                    {cat.code || "-"}
-                                                </td>
+                                                <td className="costing-categories-td">{cat.code || "-"}</td>
 
                                                 {/* Parent Category */}
-                                                <td style={{ padding: "14px 16px", color: parentName ? "#475569" : "#9ca3af", fontSize: "13px" }}>
-                                                    {parentName || "-"}
-                                                </td>
+                                                <td className="costing-categories-td">{parentName || "-"}</td>
 
                                                 {/* Sub-Categories Count */}
-                                                <td style={{ padding: "14px 16px", textAlign: "center", color: "#64748b", fontSize: "13px" }}>
-                                                    {subCatCount > 0 ? subCatCount : "-"}
-                                                </td>
+                                                <td className="costing-categories-td">{subCatCount > 0 ? subCatCount : "-"}</td>
 
                                                 {/* Items Count */}
-                                                <td style={{ padding: "14px 16px", textAlign: "center", fontWeight: 600, color: "#1e293b", fontSize: "13px" }}>
-                                                    {itemCount}
-                                                </td>
+                                                <td className="costing-categories-td td-items">{itemCount}</td>
 
                                                 {/* Default Markup */}
-                                                <td style={{ padding: "14px 16px", color: "#475569", fontSize: "13px" }}>
-                                                    {markup}
-                                                </td>
+                                                <td className="costing-categories-td">{markup}</td>
 
                                                 {/* Tax */}
-                                                <td style={{ padding: "14px 16px", color: "#475569", fontSize: "13px" }}>
-                                                    {tax}
-                                                </td>
+                                                <td className="costing-categories-td">{tax}</td>
 
-                                                {/* Status Badge */}
-                                                <td style={{ padding: "14px 16px" }}>
-                                                    <span
-                                                        style={{
-                                                            background: "#ecfdf5",
-                                                            color: "#10b981",
-                                                            padding: "3px 8px",
-                                                            borderRadius: "12px",
-                                                            fontSize: "11px",
-                                                            fontWeight: 600,
-                                                            letterSpacing: "0.04em",
-                                                            textTransform: "uppercase"
-                                                        }}
-                                                    >
+                                                {/* Status Pill Badge */}
+                                                <td className="costing-categories-td">
+                                                    <span className={`costing-status-pill ${isInactive ? "inactive" : ""}`}>
                                                         {cat.status || "ACTIVE"}
                                                     </span>
                                                 </td>
 
                                                 {/* Updated */}
-                                                <td style={{ padding: "14px 16px", color: "#64748b", fontSize: "13px" }}>
-                                                    {formatDate(cat.updated_at)}
-                                                </td>
+                                                <td className="costing-categories-td">{formatDate(cat.updated_at)}</td>
 
                                                 {/* Action Menu */}
-                                                <td style={{ padding: "14px 16px" }}>
+                                                <td className="costing-categories-td" style={{ textAlign: "center" }}>
                                                     <CostingMoreMenu
                                                         entityName="Category"
                                                         onView={() => {
                                                             setActiveDetailCategory(cat);
                                                             onDetailViewChange?.(true);
                                                         }}
+                                                        onEdit={() => handleEditCategory(cat)}
                                                         onDuplicate={async () => {
                                                             try {
                                                                 await duplicateCostingCategory(cat.id);
@@ -779,35 +578,36 @@ export default function CategoriesTab({
                         </table>
                     </div>
 
-                    {/* Table Footer: Pagination */}
-                    {filteredCategories.length > 0 && (
-                        <CostingPagination
-                            currentPage={currentPage}
-                            totalPages={totalPages}
-                            totalItems={filteredCategories.length}
-                            pageSize={pageSize}
-                            onPageChange={setCurrentPage}
-                            onPageSizeChange={(newSize) => {
-                                setPageSize(newSize);
-                                setCurrentPage(1);
-                            }}
-                        />
-                    )}
+                    {/* Table Footer: CostingPagination (Frame 2147225166) */}
+                    <CostingPagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalItems={filteredCategories.length}
+                        pageSize={pageSize}
+                        onPageChange={setCurrentPage}
+                        onPageSizeChange={(newSize) => {
+                            setPageSize(newSize);
+                            setCurrentPage(1);
+                        }}
+                        label="Categories"
+                    />
                 </div>
             </div>
 
-            {/* New Category Modal Dialog */}
+            {/* New / Edit Category Modal Dialog */}
             <NewCategoryModal
                 isOpen={showModal}
                 onClose={() => {
                     setShowModal(false);
                     setModalParentId(null);
+                    setCategoryToEdit(null);
                 }}
                 onSuccess={() => {
                     void loadData();
                 }}
                 categories={categories}
                 initialParentId={modalParentId}
+                categoryToEdit={categoryToEdit}
             />
         </div>
     );

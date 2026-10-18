@@ -1,0 +1,1821 @@
+/* Costing Library Redesign Styles - Scoped to User Dashboard → Costing Library */
+/* Based on Figma Specifications (Frame 2147224971, Frame 2147225065, Frame 57, Frame 2147225166, Frame 90) */
+
+.fig-dashboard.costing-dashboard {
+  background: #F1F5F9 !important;
+  min-height: 100vh;
+  position: relative;
+}
+
+.costing-dashboard .fig-dashboard-glow {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 622px;
+  background: linear-gradient(180deg, #2563eb -371.16%, rgba(37, 99, 235, 0) 100%);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.costing-page-shell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  box-sizing: border-box;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  position: relative;
+  z-index: 1;
+}
+
+/* Atmospheric subtle blue gradient overlay matching Figma Rectangle 14 */
+.costing-bg-gradient-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 622px;
+  /* background: linear-gradient(180deg, rgba(37, 99, 235, 0.08) 0%, rgba(37, 99, 235, 0) 100%); */
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Page Heading Row (Frame 2147225066) */
+.costing-heading-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.costing-title-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.costing-main-heading {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.costing-subheading {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+/* Import Excel Button */
+.costing-import-excel-btn {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 14px 20px;
+  gap: 6px;
+  height: 46px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.costing-import-excel-btn:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+/* Tabs & Toolbar Row (Frame 2147225076) */
+.costing-tabs-toolbar-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+/* Tabs Container (Buttons) */
+.costing-tabs-container {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 6px;
+  gap: 6px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.costing-tab-btn {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 7px 16px;
+  min-width: 110px;
+  height: 34px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.costing-tab-btn:hover {
+  color: #0F172A;
+}
+
+.costing-tab-btn.is-active {
+  background: #EFF6FF;
+  color: #2563EB;
+}
+
+/* Toolbar Controls (Frame 110) */
+.costing-toolbar-group {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Search Box (Frame 76) */
+.costing-search-box {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 5px 12px 5px 5px;
+  gap: 8px;
+  width: 296px;
+  height: 46px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  backdrop-filter: blur(20.4px);
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.costing-search-box:focus-within {
+  background: #FFFFFF;
+  border-color: #2563EB;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.costing-search-icon-tile {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: #FFFFFF;
+  border-radius: 6px;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.costing-search-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  width: 100%;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.costing-search-input::placeholder {
+  color: #64748B;
+}
+
+/* Filter Square Button */
+.costing-filter-icon-btn {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  width: 46px;
+  height: 46px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #475569;
+  position: relative;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.costing-filter-icon-btn:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+  color: #0F172A;
+}
+
+/* Primary New Item Button */
+.costing-new-item-btn,
+.costing-new-btn {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 14px 18px;
+  gap: 6px;
+  height: 46px;
+  background: #2563EB;
+  border-radius: 6px;
+  border: none;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #FFFFFF;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25);
+  white-space: nowrap;
+}
+
+.costing-new-item-btn:hover,
+.costing-new-btn:hover {
+  background: #1D4ED8;
+}
+
+/* Content Area Surface (Frame 2147225069) */
+.costing-table-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 20px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+/* Table Horizontal Scroll Container */
+.costing-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 8px;
+}
+
+/* Semantic Table */
+.costing-table {
+  width: 100%;
+  min-width: 1100px;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+/* Table Header Row (Frame 57) */
+.costing-table thead tr {
+  height: 36px;
+  background: #E4ECFB;
+}
+
+.costing-th {
+  background: #E4ECFB;
+  padding: 8px 12px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  text-transform: uppercase;
+  color: #64748B;
+  white-space: nowrap;
+}
+
+.costing-th.align-center {
+  text-align: center;
+}
+
+.costing-th.align-right {
+  text-align: right;
+}
+
+.costing-table thead tr th:first-child {
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+}
+
+.costing-table thead tr th:last-child {
+  border-top-right-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+
+/* Table Data Rows */
+.costing-tr {
+  height: 56px;
+  border-bottom: 1px solid #EBEBEB;
+  transition: background 0.15s ease;
+}
+
+.costing-tr:hover {
+  background: rgba(248, 250, 252, 0.8);
+}
+
+.costing-td {
+  padding: 6px 12px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-size: 14px;
+  line-height: 120%;
+  vertical-align: middle;
+}
+
+.costing-td.align-center {
+  text-align: center;
+}
+
+/* Item Cell Layout */
+.costing-item-cell {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+}
+
+.costing-item-thumb {
+  width: 32px;
+  height: 32px;
+  background: #D9D9D9;
+  border-radius: 2px;
+  flex-shrink: 0;
+  object-fit: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.costing-item-text-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.costing-item-name {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.costing-item-code {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+/* Type Pill Badge (Frame 2147225014) */
+.costing-type-pill {
+  display: inline-flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 2px 8px;
+  height: 18px;
+  background: rgba(22, 163, 74, 0.12);
+  border-radius: 9999px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #16A34A;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Category Text Stack */
+.costing-category-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.costing-category-primary {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.costing-category-sub {
+  font-family: 'Inter', 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+/* Unit Text */
+.costing-unit-text {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+/* Price Cells (Base Cost & Selling Rate) */
+.costing-price-text {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  text-align: center;
+  color: #0F172A;
+}
+
+/* Margin Percentage */
+.costing-margin-text {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #16A34A;
+}
+
+.costing-margin-text.is-negative {
+  color: #DC2626;
+}
+
+/* Preferred Vendor Cell */
+.costing-vendor-cell {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.costing-vendor-avatar {
+  width: 24px;
+  height: 24px;
+  background: #D9D9D9;
+  border-radius: 999px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Urbanist', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.costing-vendor-name {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+/* Updated Date */
+.costing-updated-text {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  white-space: nowrap;
+}
+
+/* Pagination Bar (Frame 2147225166) */
+.costing-pagination-bar {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0px;
+  gap: 8px;
+  width: 100%;
+  min-height: 50px;
+  flex-wrap: wrap;
+}
+
+.costing-pagination-total {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.costing-pagination-pages {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.costing-page-btn {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid #EBEBEB;
+  border-radius: 6px;
+  background: #FFFFFF;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.costing-page-btn:hover:not(:disabled) {
+  border-color: #CBD5E1;
+  color: #0F172A;
+}
+
+.costing-page-btn.is-active {
+  background: #E4ECFB;
+  border: 1px solid #2563EB;
+  color: #2563EB;
+}
+
+.costing-page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.costing-page-size-wrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+}
+
+.costing-page-size-label {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.costing-page-size-select-box {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  position: relative;
+  width: 83px;
+  height: 34px;
+}
+
+.costing-page-size-select {
+  appearance: none;
+  width: 100%;
+  height: 100%;
+  padding: 0 24px 0 10px;
+  border: 1px solid #EBEBEB;
+  border-radius: 6px;
+  background: #FFFFFF;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  cursor: pointer;
+  outline: none;
+}
+
+.costing-page-size-select:focus {
+  border-color: #2563EB;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .costing-tabs-toolbar-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .costing-toolbar-group {
+    justify-content: space-between;
+    width: 100%;
+  }
+  .costing-search-box {
+    flex-grow: 1;
+    width: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .costing-heading-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .costing-import-excel-btn {
+    width: 100%;
+  }
+  .costing-pagination-bar {
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+}
+
+/* ==========================================================================
+   Costing Categories Redesign Styles (Frame 2147225084)
+   ========================================================================== */
+
+/* Two-Panel Categories Workspace (Frame 2147225084) */
+.costing-categories-workspace {
+  display: grid;
+  grid-template-columns: 310px minmax(0, 1fr);
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .costing-categories-workspace {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Left Panel: Category Structure Card (Frame 2147225071) ── */
+.costing-categories-tree-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 20px;
+  width: 100%;
+  max-width: 310px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+@media (max-width: 1024px) {
+  .costing-categories-tree-card {
+    max-width: 100%;
+  }
+}
+
+/* Category Structure Header (Frame 2147225199) */
+.costing-categories-tree-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 16px;
+}
+
+.costing-categories-tree-title-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.costing-categories-tree-title {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748B;
+  margin: 0;
+}
+
+.costing-categories-tree-subtitle {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  margin: 0;
+}
+
+/* Tree Search Icon Box (Frame 76 / Frame 70) */
+.costing-categories-tree-search-btn {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  padding: 5px;
+  width: 47px;
+  height: 46px;
+  background: #F0F4F9;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.costing-categories-tree-search-btn:hover {
+  background: #E2E8F0;
+}
+
+.costing-categories-tree-search-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: #FFFFFF;
+  border-radius: 6px;
+}
+
+/* Divider (Rectangle 72) */
+.costing-categories-tree-divider {
+  width: 100%;
+  height: 1px;
+  background: #EBEBEB;
+  border: none;
+  margin: 0;
+}
+
+/* Tree search input when toggled open */
+.costing-categories-tree-search-input-box {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.costing-categories-tree-search-input {
+  width: 100%;
+  height: 36px;
+  padding: 6px 12px;
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 6px;
+  font-family: 'Urbanist', sans-serif;
+  font-size: 13px;
+  color: #0F172A;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.costing-categories-tree-search-input:focus {
+  border-color: #2563EB;
+}
+
+/* Tree Structure List (Frame 2147225181) */
+.costing-categories-tree-list {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 8px;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.costing-categories-tree-node {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 4px;
+}
+
+/* Tree Item Row (Frame 2147225184) */
+.costing-categories-tree-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  background: transparent;
+  gap: 4px;
+}
+
+.costing-categories-tree-row:hover {
+  background: rgba(241, 245, 249, 0.8);
+}
+
+.costing-categories-tree-row.is-active {
+  background: #EFF6FF;
+}
+
+.costing-categories-tree-row-left {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.costing-categories-tree-arrow-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: #1C1B1F;
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.costing-categories-tree-row.is-active .costing-categories-tree-arrow-btn {
+  color: #2563EB;
+}
+
+.costing-categories-tree-label {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #1C1B1F;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.costing-categories-tree-row.is-active .costing-categories-tree-label {
+  color: #2563EB;
+}
+
+/* Badge (Frame 2147225014) */
+.costing-categories-tree-badge {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 2px 6px;
+  min-width: 24px;
+  height: 24px;
+  background: rgba(100, 116, 139, 0.12);
+  border-radius: 4px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+  flex-shrink: 0;
+}
+
+.costing-categories-tree-row.is-active .costing-categories-tree-badge {
+  background: #DBEAFE;
+  color: #2563EB;
+  font-weight: 600;
+}
+
+/* Tree Subcategory Subrow (Frame 2147225180, Frame 2147225171) */
+.costing-categories-tree-subrow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 8px 5px 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  background: transparent;
+  gap: 4px;
+}
+
+.costing-categories-tree-subrow:hover {
+  background: rgba(241, 245, 249, 0.8);
+}
+
+.costing-categories-tree-subrow.is-active {
+  background: #EFF6FF;
+}
+
+.costing-categories-tree-subrow .costing-categories-tree-label {
+  font-weight: 500;
+  color: #475569;
+  font-size: 13px;
+}
+
+.costing-categories-tree-subrow.is-active .costing-categories-tree-label {
+  color: #2563EB;
+  font-weight: 600;
+}
+
+.costing-categories-tree-subrow.is-active .costing-categories-tree-badge {
+  background: #DBEAFE;
+  color: #2563EB;
+  font-weight: 600;
+}
+
+/* ── Right Panel: Categories Table Card (Frame 2147225072) ── */
+.costing-categories-table-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  flex-grow: 1;
+}
+
+.costing-categories-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 8px;
+}
+
+.costing-categories-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  min-width: 1000px;
+}
+
+/* Header Row (Frame 57) */
+.costing-categories-th-row {
+  height: 36px;
+  background: #E4ECFB;
+}
+
+.costing-categories-th {
+  background: #E4ECFB;
+  padding: 8px 12px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  text-transform: uppercase;
+  color: #64748B;
+  white-space: nowrap;
+}
+
+.costing-categories-th.th-cb {
+  width: 40px;
+  padding: 8px;
+  text-align: center;
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+}
+
+.costing-categories-th.th-actions {
+  width: 64px;
+  text-align: center;
+  border-top-right-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+
+/* Table Row (Frame 59, Frame 60) */
+.costing-categories-tr {
+  height: 56px;
+  border-bottom: 1px solid #EBEBEB;
+  transition: background 0.15s ease;
+}
+
+.costing-categories-tr:hover {
+  background: rgba(248, 250, 252, 0.8);
+}
+
+.costing-categories-tr.is-selected {
+  background: #F1F5F9;
+}
+
+.costing-categories-td {
+  padding: 6px 12px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  vertical-align: middle;
+}
+
+.costing-categories-td.td-cb {
+  width: 40px;
+  text-align: center;
+}
+
+.costing-categories-td.td-name {
+  font-weight: 500;
+  color: #0F172A;
+}
+
+.costing-categories-td.td-items {
+  font-weight: 500;
+  color: #0F172A;
+}
+
+/* Status Pill (Frame 2147225015) */
+.costing-status-pill {
+  box-sizing: border-box;
+  display: inline-flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 2px 8px;
+  height: 18px;
+  background: rgba(22, 163, 74, 0.12);
+  border-radius: 9999px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #16A34A;
+  text-transform: uppercase;
+}
+
+.costing-status-pill.inactive {
+  background: rgba(239, 68, 68, 0.12);
+  color: #DC2626;
+}
+
+/* ==========================================================================
+   Costing Category Detail & Overview Redesign Styles
+   (Figma: Costing - Categories - Category Detail - Overview)
+   ========================================================================== */
+
+.costing-category-detail-shell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-sizing: border-box;
+}
+
+/* Back Link (Frame 2147225070) */
+.costing-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 120%;
+  color: #475569;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s ease;
+  width: fit-content;
+}
+
+.costing-back-link:hover {
+  color: #0F172A;
+}
+
+/* Category Detail Header Row (Frame 2147225066) */
+.costing-detail-header-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.costing-detail-title-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.costing-detail-name-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.costing-detail-title {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 24px;
+  line-height: 120%;
+  color: #0F172A;
+  margin: 0;
+}
+
+.costing-detail-description {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 120%;
+  color: #64748B;
+  margin: 0;
+  max-width: 700px;
+}
+
+.costing-detail-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.costing-detail-action-btn {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 14px 20px;
+  gap: 6px;
+  height: 46px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.costing-detail-action-btn:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+/* Category Summary Metric Cards Grid (Frame 2147225138) */
+.costing-detail-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 900px) {
+  .costing-detail-metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 500px) {
+  .costing-detail-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.costing-metric-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  min-height: 116px;
+}
+
+.costing-metric-label {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  margin: 0;
+}
+
+.costing-metric-value {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 24px;
+  line-height: 120%;
+  color: #0F172A;
+  margin: 0;
+}
+
+.costing-metric-link {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #2563EB;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  padding: 0;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  transition: color 0.15s ease;
+}
+
+.costing-metric-link:hover {
+  color: #1D4ED8;
+  text-decoration: underline;
+}
+
+/* Category Detail Sub-Tabs Toolbar (Frame 2147225076) */
+.costing-subtabs-bar {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.costing-subtabs-list {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 6px;
+  gap: 6px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.costing-subtab-btn {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 7px 16px;
+  min-width: 110px;
+  height: 34px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.costing-subtab-btn:hover {
+  color: #0F172A;
+}
+
+.costing-subtab-btn.is-active {
+  background: #EFF6FF;
+  color: #2563EB;
+}
+
+/* Main Overview 3-Column Grid (Frame 2147225128) */
+.costing-overview-main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.85fr) minmax(260px, 1fr) minmax(280px, 1.05fr);
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+  align-items: start;
+}
+
+@media (max-width: 1180px) {
+  .costing-overview-main-grid {
+    grid-template-columns: minmax(0, 1.5fr) minmax(260px, 1fr);
+  }
+}
+
+@media (max-width: 800px) {
+  .costing-overview-main-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Translucent Panel Outer Card */
+.costing-overview-panel-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 20px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+.costing-overview-panel-title {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748B;
+  margin: 0;
+}
+
+/* Inner White Card (Frame 2147225027) */
+.costing-overview-inner-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 16px;
+  gap: 16px;
+  width: 100%;
+  background: #FFFFFF;
+  box-shadow: 0px 0px 6px rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  border: 1px solid #F1F5F9;
+}
+
+/* Key-Value 2-Column Grid (Category Information) */
+.costing-kv-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 500px) {
+  .costing-kv-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.costing-kv-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+
+.costing-kv-label {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+  margin: 0;
+}
+
+.costing-kv-value {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  margin: 0;
+  word-break: break-word;
+}
+
+/* Pricing Row */
+.costing-pricing-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+/* Activity List & Items */
+.costing-activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.costing-activity-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.costing-activity-left {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.costing-activity-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 9999px;
+  background: #EFF6FF;
+  color: #2563EB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 600;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.costing-activity-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.costing-activity-title {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.costing-activity-details {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 10px;
+  line-height: 120%;
+  color: #64748B;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.costing-activity-time {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.costing-activity-divider {
+  width: 100%;
+  height: 1px;
+  background: #EBEBEB;
+  border: none;
+  margin: 0;
+}
+
+/* ── Category Detail: Pricing Defaults Tab (Frame 2147225128) ── */
+.costing-pricing-defaults-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+  align-items: start;
+}
+
+@media (max-width: 992px) {
+  .costing-pricing-defaults-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.costing-pricing-panel {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 20px;
+  width: 100%;
+  min-width: 0;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.costing-pricing-panel-title {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  text-transform: uppercase;
+  color: #64748B;
+  margin: 0;
+}
+
+.costing-pricing-inner-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 16px;
+  gap: 16px;
+  width: 100%;
+  background: #FFFFFF;
+  box-shadow: 0px 0px 6px rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  border: 1px solid #F1F5F9;
+}
+
+.costing-pricing-row-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 600px) {
+  .costing-pricing-row-2col {
+    grid-template-columns: 1fr;
+  }
+}
+
+.costing-pricing-field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0px;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+
+.costing-pricing-label {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+  margin: 0;
+}
+
+.costing-pricing-val {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  margin: 0;
+}
+
+.costing-pricing-sidebar {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 20px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.costing-pricing-side-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 16px;
+  gap: 12px;
+  width: 100%;
+  background: #FFFFFF;
+  box-shadow: 0px 0px 6px rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  border: 1px solid #F1F5F9;
+}
+
+.costing-pricing-side-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+/* ── Category Detail: Activity Tab (Frame 2147225069) ── */
+.costing-activity-table-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 20px;
+  width: 100%;
+  min-width: 0;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.costing-activity-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 8px;
+}
+
+.costing-activity-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  min-width: 700px;
+}
+
+.costing-activity-th-row {
+  height: 36px;
+  background: #E4ECFB;
+}
+
+.costing-activity-th {
+  background: #E4ECFB;
+  padding: 8px 12px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  text-transform: uppercase;
+  color: #64748B;
+  white-space: nowrap;
+}
+
+.costing-activity-tr {
+  height: 56px;
+  border-bottom: 1px solid #EBEBEB;
+  transition: background 0.15s ease;
+}
+
+.costing-activity-tr:hover {
+  background: rgba(248, 250, 252, 0.8);
+}
+
+.costing-activity-td {
+  padding: 6px 12px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  vertical-align: middle;
+}
+
+.costing-activity-td.td-action {
+  font-weight: 500;
+  color: #0F172A;
+}
+
+.costing-activity-td.td-details {
+  font-weight: 400;
+  color: #64748B;
+}
+
+.costing-activity-td.td-by {
+  font-weight: 400;
+  color: #64748B;
+}
+
+.costing-activity-td.td-date {
+  font-weight: 400;
+  color: #64748B;
+}
+
+
+

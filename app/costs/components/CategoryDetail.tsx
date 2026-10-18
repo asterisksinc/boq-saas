@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ChevronDown, ChevronLeft, Filter, MoreHorizontal, Plus, Search, Folder, RefreshCw, Layers, ExternalLink, Calendar, User, Tag, Copy, Trash2, Edit } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronLeft, Filter, MoreHorizontal, Plus, Search, Folder, RefreshCw, Layers, ExternalLink, Calendar, User, Tag, Copy, Trash2, Edit, X } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import {
     getCostingCategoryDetail,
@@ -26,10 +26,11 @@ interface CategoryDetailProps {
     category: CostingCategoryBackend;
     onBack: () => void;
     allCategories?: CostingCategoryBackend[];
+    initialTab?: SubTab;
 }
 
-export default function CategoryDetail({ category, onBack, allCategories = [] }: CategoryDetailProps) {
-    const [activeTab, setActiveTab] = useState<SubTab>("Overview");
+export default function CategoryDetail({ category, onBack, allCategories = [], initialTab = "Overview" }: CategoryDetailProps) {
+    const [activeTab, setActiveTab] = useState<SubTab>(initialTab);
     const [detail, setDetail] = useState<CostingCategoryDetailType | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -96,6 +97,19 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
         }
     };
 
+    const formatDateTime = (dateStr?: string) => {
+        if (!dateStr) return "-";
+        try {
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return "-";
+            const datePart = d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+            const timePart = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+            return `${datePart}, ${timePart}`;
+        } catch {
+            return "-";
+        }
+    };
+
     const formatMoney = (val: number | null | undefined) => {
         const num = Number(val || 0);
         return new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
@@ -146,12 +160,13 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
             return detail.activityLog;
         }
         const list: Array<{ id: string; action: string; details: string; by: string; date: string }> = [];
+        const author = (activeCat as any).updated_by_name || (activeCat as any).created_by_name || "Admin";
         if (activeCat.default_markup_percent !== null && activeCat.default_markup_percent !== undefined) {
             list.push({
                 id: `act-markup-${activeCat.id}`,
                 action: "Markup Updated",
                 details: `Default Markup Changed to ${activeCat.default_markup_percent}%`,
-                by: "Admin",
+                by: author,
                 date: activeCat.updated_at || activeCat.created_at
             });
         }
@@ -159,8 +174,8 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
             list.push({
                 id: `act-sub-${sub.id}`,
                 action: "Sub Category Added",
-                details: `Sub category "${sub.name}" added`,
-                by: "Admin",
+                details: `Sub category ${sub.name} Added`,
+                by: author,
                 date: sub.created_at || sub.updated_at || activeCat.updated_at
             });
         }
@@ -168,20 +183,32 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
             list.push({
                 id: `act-item-${itm.id}`,
                 action: "Item Added",
-                details: `Item "${itm.name}" added`,
-                by: "Admin",
+                details: `${itm.name} Added`,
+                by: author,
                 date: itm.created_at || itm.updated_at || activeCat.updated_at
             });
         }
         list.push({
+            id: `act-pricing-${activeCat.id}`,
+            action: "Pricing Defaults Updated",
+            details: `Default changed to GST ${activeCat.default_tax_percent || 18}%`,
+            by: author,
+            date: activeCat.created_at
+        });
+        list.push({
             id: `act-created-${activeCat.id}`,
             action: "Category Created",
-            details: `Category "${activeCat.name}" registered`,
-            by: "Admin",
+            details: `Category "${activeCat.name}" was registered`,
+            by: author,
             date: activeCat.created_at
         });
         return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [detail?.activityLog, activeCat, subCategoriesList, itemsList]);
+
+    const paginatedActivities = useMemo(() => {
+        const start = (activityPage - 1) * activityPageSize;
+        return dynamicActivities.slice(start, start + activityPageSize);
+    }, [dynamicActivities, activityPage, activityPageSize]);
 
     // Handlers for deleting/duplicating
     const handleDeleteSubCategory = async (subId: string) => {
@@ -248,101 +275,53 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
     }
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-            {/* Top Back Navigation & Action Bar */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                    <button
-                        type="button"
-                        onClick={onBack}
-                        style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            background: "transparent",
-                            border: "none",
-                            color: "#2563eb",
-                            fontWeight: 600,
-                            fontSize: "14px",
-                            cursor: "pointer",
-                            padding: 0
-                        }}
-                        className="hover:underline"
-                    >
-                        <ArrowLeft size={16} /> Back to Categories
-                    </button>
-                    <div style={{ width: "1px", height: "16px", background: "#e2e8f0" }} />
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <h2 style={{ fontSize: "24px", fontWeight: 700, color: "#111827", margin: 0 }}>
-                            {activeCat.name}
-                        </h2>
-                        <span
-                            style={{
-                                background: "#ecfdf5",
-                                color: "#10b981",
-                                padding: "3px 10px",
-                                borderRadius: "12px",
-                                fontSize: "11px",
-                                fontWeight: 600,
-                                letterSpacing: "0.04em",
-                                textTransform: "uppercase"
-                            }}
-                        >
+        <div className="costing-category-detail-shell">
+            {/* Top Back Navigation Link (Frame 2147225070) */}
+            <button
+                type="button"
+                className="costing-back-link"
+                onClick={onBack}
+            >
+                <ChevronLeft size={18} />
+                <span>Back to Categories</span>
+            </button>
+
+            {/* Category Detail Header Row (Frame 2147225066) */}
+            <div className="costing-detail-header-row">
+                <div className="costing-detail-title-group">
+                    <div className="costing-detail-name-row">
+                        <Folder size={24} color="#0F172A" />
+                        <h2 className="costing-detail-title">{activeCat.name}</h2>
+                        <span className={`costing-status-pill ${activeCat.status?.toUpperCase() === "INACTIVE" ? "inactive" : ""}`}>
                             {activeCat.status || "ACTIVE"}
                         </span>
                         {activeCat.code && (
-                            <span
-                                style={{
-                                    background: "#f1f5f9",
-                                    color: "#475569",
-                                    padding: "3px 8px",
-                                    borderRadius: "6px",
-                                    fontSize: "12px",
-                                    fontWeight: 500
-                                }}
-                            >
+                            <span className="costing-categories-tree-badge">
                                 {activeCat.code}
                             </span>
                         )}
                     </div>
+                    <p className="costing-detail-description">
+                        {activeCat.description || "Category for organizing items, rates, and margins."}
+                    </p>
                 </div>
 
-                <div style={{ display: "flex", gap: "12px", flexShrink: 0 }}>
+                <div className="costing-detail-actions">
                     <button
                         type="button"
+                        className="costing-detail-action-btn"
                         onClick={handleDuplicateCategory}
-                        style={{
-                            background: "#fff",
-                            border: "1px solid #e5e7eb",
-                            padding: "8px 18px",
-                            borderRadius: "8px",
-                            fontWeight: 500,
-                            fontSize: "14px",
-                            cursor: "pointer",
-                            color: "#1f2937",
-                            boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
-                        }}
-                        className="hover:bg-slate-50"
                     >
-                        Duplicate
+                        <Copy size={16} />
+                        <span>Duplicate</span>
                     </button>
                     <button
                         type="button"
+                        className="costing-detail-action-btn"
                         onClick={() => setIsEditCategoryOpen(true)}
-                        style={{
-                            background: "#fff",
-                            border: "1px solid #e5e7eb",
-                            padding: "8px 18px",
-                            borderRadius: "8px",
-                            fontWeight: 500,
-                            fontSize: "14px",
-                            cursor: "pointer",
-                            color: "#1f2937",
-                            boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
-                        }}
-                        className="hover:bg-slate-50"
                     >
-                        Edit Category
+                        <Edit size={16} />
+                        <span>Edit Category</span>
                     </button>
                 </div>
             </div>
@@ -351,27 +330,30 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                 <div
                     style={{
                         padding: "14px 16px",
-                        background: "#fef2f2",
-                        color: "#b91c1c",
-                        borderRadius: "10px",
+                        background: "#FEF2F2",
+                        color: "#B91C1C",
+                        borderRadius: "8px",
                         display: "flex",
                         justifyContent: "space-between",
                         alignItems: "center",
-                        border: "1px solid #fecaca"
+                        border: "1px solid #FECACA",
+                        fontFamily: "Urbanist"
                     }}
                 >
                     <span>{error}</span>
                     <button
+                        type="button"
                         onClick={loadDetail}
                         style={{
                             background: "none",
                             border: "none",
-                            color: "#b91c1c",
+                            color: "#B91C1C",
                             cursor: "pointer",
                             display: "flex",
                             alignItems: "center",
                             gap: "4px",
-                            fontWeight: 600
+                            fontWeight: 600,
+                            fontFamily: "Urbanist"
                         }}
                     >
                         <RefreshCw size={15} /> Retry
@@ -379,169 +361,68 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                 </div>
             )}
 
-            {/* Dynamic Summary Cards matching Image 1 */}
-            <div
-                style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(4, 1fr)",
-                    gap: "16px"
-                }}
-            >
+            {/* Dynamic Summary Cards (Frame 2147225138) */}
+            <div className="costing-detail-metrics-grid">
                 {/* 1. Items */}
-                <div
-                    style={{
-                        background: "#fff",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "12px",
-                        padding: "20px",
-                        boxShadow: "0 1px 3px rgba(0,0,0,0.04)"
-                    }}
-                >
-                    <div style={{ color: "#6b7280", fontSize: "13px", fontWeight: 500, marginBottom: "8px" }}>Items</div>
-                    <div style={{ fontSize: "28px", fontWeight: 700, color: "#111827", marginBottom: "8px" }}>
-                        {itemsCount}
-                    </div>
+                <div className="costing-metric-card">
+                    <span className="costing-metric-label">Items</span>
+                    <span className="costing-metric-value">{itemsCount}</span>
                     <button
                         type="button"
+                        className="costing-metric-link"
                         onClick={() => setActiveTab("Items")}
-                        style={{
-                            background: "none",
-                            border: "none",
-                            padding: 0,
-                            color: "#2563eb",
-                            fontSize: "13px",
-                            fontWeight: 600,
-                            cursor: "pointer"
-                        }}
                     >
-                        View Items &rarr;
+                        View Items →
                     </button>
                 </div>
 
                 {/* 2. Sub-Categories */}
-                <div
-                    style={{
-                        background: "#fff",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "12px",
-                        padding: "20px",
-                        boxShadow: "0 1px 3px rgba(0,0,0,0.04)"
-                    }}
-                >
-                    <div style={{ color: "#6b7280", fontSize: "13px", fontWeight: 500, marginBottom: "8px" }}>Sub-Categories</div>
-                    <div style={{ fontSize: "28px", fontWeight: 700, color: "#111827", marginBottom: "8px" }}>
-                        {subCategoriesCount}
-                    </div>
+                <div className="costing-metric-card">
+                    <span className="costing-metric-label">Sub-Categories</span>
+                    <span className="costing-metric-value">{subCategoriesCount}</span>
                     <button
                         type="button"
+                        className="costing-metric-link"
                         onClick={() => setActiveTab("Sub Categories")}
-                        style={{
-                            background: "none",
-                            border: "none",
-                            padding: 0,
-                            color: "#2563eb",
-                            fontSize: "13px",
-                            fontWeight: 600,
-                            cursor: "pointer"
-                        }}
                     >
-                        View Sub-Categories &rarr;
+                        View Sub-Categories →
                     </button>
                 </div>
 
                 {/* 3. Used in BOQs */}
-                <div
-                    style={{
-                        background: "#fff",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "12px",
-                        padding: "20px",
-                        boxShadow: "0 1px 3px rgba(0,0,0,0.04)"
-                    }}
-                >
-                    <div style={{ color: "#6b7280", fontSize: "13px", fontWeight: 500, marginBottom: "8px" }}>Used in BOQs</div>
-                    <div style={{ fontSize: "28px", fontWeight: 700, color: "#111827", marginBottom: "8px" }}>
-                        {usedInBoqsCount}
-                    </div>
+                <div className="costing-metric-card">
+                    <span className="costing-metric-label">Used in BOQs</span>
+                    <span className="costing-metric-value">{usedInBoqsCount}</span>
                     <a
                         href="/boqs"
-                        style={{
-                            color: "#2563eb",
-                            fontSize: "13px",
-                            fontWeight: 600,
-                            textDecoration: "none"
-                        }}
+                        className="costing-metric-link"
                     >
-                        View BOQs &rarr;
+                        View BOQs →
                     </a>
                 </div>
 
                 {/* 4. Used in Projects */}
-                <div
-                    style={{
-                        background: "#fff",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "12px",
-                        padding: "20px",
-                        boxShadow: "0 1px 3px rgba(0,0,0,0.04)"
-                    }}
-                >
-                    <div style={{ color: "#6b7280", fontSize: "13px", fontWeight: 500, marginBottom: "8px" }}>Used in Projects</div>
-                    <div style={{ fontSize: "28px", fontWeight: 700, color: "#111827", marginBottom: "8px" }}>
-                        {usedInProjectsCount}
-                    </div>
+                <div className="costing-metric-card">
+                    <span className="costing-metric-label">Used in Projects</span>
+                    <span className="costing-metric-value">{usedInProjectsCount}</span>
                     <a
                         href="/projects"
-                        style={{
-                            color: "#2563eb",
-                            fontSize: "13px",
-                            fontWeight: 600,
-                            textDecoration: "none"
-                        }}
+                        className="costing-metric-link"
                     >
-                        View Projects &rarr;
+                        View Projects →
                     </a>
                 </div>
             </div>
 
-            {/* Sub-Tabs Row */}
-            <div
-                style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                    gap: "16px",
-                    marginTop: "8px"
-                }}
-            >
-                <div
-                    style={{
-                        display: "flex",
-                        background: "#fff",
-                        padding: "4px",
-                        borderRadius: "8px",
-                        border: "1px solid #e5e7eb",
-                        boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
-                        overflowX: "auto"
-                    }}
-                >
+            {/* Sub-Tabs Toolbar Row (Frame 2147225076) */}
+            <div className="costing-subtabs-bar">
+                <div className="costing-subtabs-list">
                     {tabs.map((tab) => (
                         <button
                             key={tab}
                             type="button"
+                            className={`costing-subtab-btn ${activeTab === tab ? "is-active" : ""}`}
                             onClick={() => setActiveTab(tab)}
-                            style={{
-                                padding: "8px 22px",
-                                background: activeTab === tab ? "#eff6ff" : "transparent",
-                                color: activeTab === tab ? "#2563eb" : "#64748b",
-                                fontWeight: activeTab === tab ? 600 : 500,
-                                border: "none",
-                                borderRadius: "6px",
-                                cursor: "pointer",
-                                fontSize: "14px",
-                                whiteSpace: "nowrap"
-                            }}
                         >
                             {tab}
                         </button>
@@ -550,128 +431,120 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
 
                 {/* Sub Categories toolbar: Search, Filter, Import Excel, + Sub-Category */}
                 {activeTab === "Sub Categories" && (
-                    <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                        <label
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                background: "#fff",
-                                border: "1px solid #e5e7eb",
-                                borderRadius: "8px",
-                                padding: "0 10px"
-                            }}
-                        >
-                            <Search size={15} color="#6b7280" />
+                    <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+                        <div className="costing-search-box" style={{ width: "260px" }}>
+                            <div className="costing-search-icon-tile">
+                                <Search size={16} color="#475569" />
+                            </div>
                             <input
                                 placeholder="Search sub-category..."
                                 value={subCatSearch}
-                                onChange={(e) => setSubCatSearch(e.target.value)}
-                                style={{ border: "none", outline: "none", padding: "8px", fontSize: "13px", width: "160px" }}
+                                onChange={(e) => {
+                                    setSubCatSearch(e.target.value);
+                                    setSubCatPage(1);
+                                }}
+                                className="costing-search-input"
+                                aria-label="Search sub-categories"
                             />
-                        </label>
+                            {subCatSearch && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setSubCatSearch("");
+                                        setSubCatPage(1);
+                                    }}
+                                    style={{ background: "none", border: "none", cursor: "pointer", padding: "2px", color: "#94A3B8" }}
+                                    aria-label="Clear sub-category search"
+                                >
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
                         <CostingFilterPopover
                             currentStatus={subCatStatus}
-                            onApply={({ status }) => setSubCatStatus(status)}
-                            onReset={() => setSubCatStatus("all")}
+                            onApply={({ status }) => {
+                                setSubCatStatus(status);
+                                setSubCatPage(1);
+                            }}
+                            onReset={() => {
+                                setSubCatStatus("all");
+                                setSubCatPage(1);
+                            }}
+                            showLabel={true}
                         />
                         <button
                             type="button"
                             onClick={() => setIsExcelImportOpen(true)}
-                            style={{
-                                background: "#fff",
-                                border: "1px solid #e5e7eb",
-                                padding: "8px 14px",
-                                borderRadius: "8px",
-                                fontWeight: 500,
-                                fontSize: "13px",
-                                cursor: "pointer",
-                                color: "#374151"
-                            }}
+                            className="costing-import-excel-btn"
                         >
                             Import Excel
                         </button>
                         <button
                             type="button"
                             onClick={() => setIsSubCategoryModalOpen(true)}
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px",
-                                background: "#2563eb",
-                                color: "#fff",
-                                border: "none",
-                                padding: "8px 16px",
-                                borderRadius: "8px",
-                                fontWeight: 600,
-                                fontSize: "13px",
-                                cursor: "pointer"
-                            }}
+                            className="costing-new-item-btn"
                         >
-                            <Plus size={15} /> Sub-Category
+                            <Plus size={18} /> Sub-Category
                         </button>
                     </div>
                 )}
 
                 {/* Items toolbar: Search, Filter, Import Excel, + New Item */}
                 {activeTab === "Items" && (
-                    <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                        <label
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                background: "#fff",
-                                border: "1px solid #e5e7eb",
-                                borderRadius: "8px",
-                                padding: "0 10px"
-                            }}
-                        >
-                            <Search size={15} color="#6b7280" />
+                    <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+                        <div className="costing-search-box" style={{ width: "260px" }}>
+                            <div className="costing-search-icon-tile">
+                                <Search size={16} color="#475569" />
+                            </div>
                             <input
                                 placeholder="Search items..."
                                 value={itemSearch}
-                                onChange={(e) => setItemSearch(e.target.value)}
-                                style={{ border: "none", outline: "none", padding: "8px", fontSize: "13px", width: "160px" }}
+                                onChange={(e) => {
+                                    setItemSearch(e.target.value);
+                                    setItemPage(1);
+                                }}
+                                className="costing-search-input"
+                                aria-label="Search items"
                             />
-                        </label>
+                            {itemSearch && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setItemSearch("");
+                                        setItemPage(1);
+                                    }}
+                                    style={{ background: "none", border: "none", cursor: "pointer", padding: "2px", color: "#94A3B8" }}
+                                    aria-label="Clear items search"
+                                >
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
                         <CostingFilterPopover
                             currentStatus={itemStatus}
-                            onApply={({ status }) => setItemStatus(status)}
-                            onReset={() => setItemStatus("all")}
+                            onApply={({ status }) => {
+                                setItemStatus(status);
+                                setItemPage(1);
+                            }}
+                            onReset={() => {
+                                setItemStatus("all");
+                                setItemPage(1);
+                            }}
+                            showLabel={true}
                         />
                         <button
                             type="button"
                             onClick={() => setIsExcelImportOpen(true)}
-                            style={{
-                                background: "#fff",
-                                border: "1px solid #e5e7eb",
-                                padding: "8px 14px",
-                                borderRadius: "8px",
-                                fontWeight: 500,
-                                fontSize: "13px",
-                                cursor: "pointer",
-                                color: "#374151"
-                            }}
+                            className="costing-import-excel-btn"
                         >
                             Import Excel
                         </button>
                         <button
                             type="button"
                             onClick={() => setIsItemModalOpen(true)}
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px",
-                                background: "#2563eb",
-                                color: "#fff",
-                                border: "none",
-                                padding: "8px 16px",
-                                borderRadius: "8px",
-                                fontWeight: 600,
-                                fontSize: "13px",
-                                cursor: "pointer"
-                            }}
+                            className="costing-new-item-btn"
                         >
-                            <Plus size={15} /> New Item
+                            <Plus size={18} /> New Item
                         </button>
                     </div>
                 )}
@@ -679,266 +552,220 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
 
             {/* Sub-Tabs Content Area */}
             <div>
-                {/* 1. Overview Tab */}
+                {/* 1. Overview Tab (Figma Frame 2147225128: 3-Column Grid) */}
                 {activeTab === "Overview" && (
-                    <div
-                        style={{
-                            display: "grid",
-                            gridTemplateColumns: "1.4fr 1fr 1fr",
-                            gap: "20px",
-                            alignItems: "stretch"
-                        }}
-                    >
-                        {/* Category Information */}
-                        <div
-                            style={{
-                                background: "#fff",
-                                border: "1px solid #e5e7eb",
-                                borderRadius: "12px",
-                                padding: "24px",
-                                boxShadow: "0 1px 3px rgba(0,0,0,0.04)"
-                            }}
-                        >
-                            <div
-                                style={{
-                                    color: "#6b7280",
-                                    fontSize: "12px",
-                                    fontWeight: 700,
-                                    letterSpacing: "0.05em",
-                                    marginBottom: "20px",
-                                    textTransform: "uppercase"
-                                }}
-                            >
-                                CATEGORY INFORMATION
-                            </div>
-
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px 24px" }}>
-                                <div>
-                                    <div style={{ color: "#6b7280", fontSize: "12px", marginBottom: "4px" }}>Category Name</div>
-                                    <div style={{ color: "#111827", fontSize: "14px", fontWeight: 600 }}>{activeCat.name}</div>
-                                </div>
-                                <div>
-                                    <div style={{ color: "#6b7280", fontSize: "12px", marginBottom: "4px" }}>Category Code</div>
-                                    <div style={{ color: "#111827", fontSize: "14px", fontWeight: 600 }}>{activeCat.code || "-"}</div>
-                                </div>
-                                <div>
-                                    <div style={{ color: "#6b7280", fontSize: "12px", marginBottom: "4px" }}>Parent Category</div>
-                                    <div style={{ color: "#111827", fontSize: "14px", fontWeight: 500 }}>
-                                        {activeCat.parentName || (activeCat.parent_id ? allCategories.find((c) => c.id === activeCat.parent_id)?.name : null) || "-"}
+                    <div className="costing-overview-main-grid">
+                        {/* Column 1: Category Information (Frame 2147225071) */}
+                        <div className="costing-overview-panel-card">
+                            <h3 className="costing-overview-panel-title">CATEGORY INFORMATION</h3>
+                            <div className="costing-overview-inner-card">
+                                <div className="costing-kv-grid">
+                                    <div className="costing-kv-item">
+                                        <span className="costing-kv-label">Category Name</span>
+                                        <span className="costing-kv-value">{activeCat.name}</span>
                                     </div>
-                                </div>
-                                <div>
-                                    <div style={{ color: "#6b7280", fontSize: "12px", marginBottom: "4px" }}>Default Unit</div>
-                                    <div style={{ color: "#111827", fontSize: "14px", fontWeight: 500 }}>{activeCat.default_unit || "Nos"}</div>
-                                </div>
-                                <div>
-                                    <div style={{ color: "#6b7280", fontSize: "12px", marginBottom: "4px" }}>Created On</div>
-                                    <div style={{ color: "#111827", fontSize: "14px", fontWeight: 500 }}>{formatDate(activeCat.created_at)}</div>
-                                </div>
-                                <div>
-                                    <div style={{ color: "#6b7280", fontSize: "12px", marginBottom: "4px" }}>Updated On</div>
-                                    <div style={{ color: "#111827", fontSize: "14px", fontWeight: 500 }}>{formatDate(activeCat.updated_at)}</div>
-                                </div>
-                                <div style={{ gridColumn: "1 / -1" }}>
-                                    <div style={{ color: "#6b7280", fontSize: "12px", marginBottom: "4px" }}>Description</div>
-                                    <div style={{ color: "#374151", fontSize: "14px", lineHeight: "1.5" }}>
-                                        {activeCat.description || "Category for organizing items, rates, and margins."}
+                                    <div className="costing-kv-item">
+                                        <span className="costing-kv-label">Category Code</span>
+                                        <span className="costing-kv-value">{activeCat.code || "-"}</span>
+                                    </div>
+                                    <div className="costing-kv-item">
+                                        <span className="costing-kv-label">Parent Category</span>
+                                        <span className="costing-kv-value">
+                                            {activeCat.parentName || (activeCat.parent_id ? allCategories.find((c) => c.id === activeCat.parent_id)?.name : null) || "-"}
+                                        </span>
+                                    </div>
+                                    <div className="costing-kv-item">
+                                        <span className="costing-kv-label">Default Unit</span>
+                                        <span className="costing-kv-value">{activeCat.default_unit || "Nos"}</span>
+                                    </div>
+                                    <div className="costing-kv-item">
+                                        <span className="costing-kv-label">Created On</span>
+                                        <span className="costing-kv-value">{formatDate(activeCat.created_at)}</span>
+                                    </div>
+                                    <div className="costing-kv-item">
+                                        <span className="costing-kv-label">Created By</span>
+                                        <span className="costing-kv-value">{(activeCat as any).created_by || "Admin"}</span>
+                                    </div>
+                                    <div className="costing-kv-item">
+                                        <span className="costing-kv-label">Updated On</span>
+                                        <span className="costing-kv-value">{formatDate(activeCat.updated_at || activeCat.created_at)}</span>
+                                    </div>
+                                    <div className="costing-kv-item">
+                                        <span className="costing-kv-label">Updated By</span>
+                                        <span className="costing-kv-value">{(activeCat as any).updated_by || "Admin"}</span>
+                                    </div>
+                                    <div className="costing-kv-item" style={{ gridColumn: "1 / -1" }}>
+                                        <span className="costing-kv-label">Description</span>
+                                        <span className="costing-kv-value" style={{ lineHeight: "1.4" }}>
+                                            {activeCat.description || "Category for organizing items, rates, and margins."}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Hierarchy Card + Pricing Details Card */}
-                        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                        {/* Column 2: Hierarchy & Pricing Details */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: "16px", minWidth: 0 }}>
                             {/* Hierarchy Card */}
-                            <div
-                                style={{
-                                    background: "#fff",
-                                    border: "1px solid #e5e7eb",
-                                    borderRadius: "12px",
-                                    padding: "20px 24px",
-                                    boxShadow: "0 1px 3px rgba(0,0,0,0.04)"
-                                }}
-                            >
-                                <div
-                                    style={{
-                                        color: "#6b7280",
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        letterSpacing: "0.05em",
-                                        marginBottom: "16px",
-                                        textTransform: "uppercase"
-                                    }}
-                                >
-                                    HIERARCHY
-                                </div>
-                                <div
-                                    style={{
-                                        padding: "16px",
-                                        background: "#f8fafc",
-                                        borderRadius: "8px",
-                                        border: "1px solid #e2e8f0",
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        gap: "10px"
-                                    }}
-                                >
-                                    {activeCat.parentName ? (
-                                        <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#64748b", fontSize: "13px" }}>
-                                            <Folder size={15} color="#94a3b8" />
-                                            <span>{activeCat.parentName}</span>
+                            <div className="costing-overview-panel-card">
+                                <h3 className="costing-overview-panel-title">HIERARCHY</h3>
+                                <div className="costing-overview-inner-card">
+                                    <div style={{ display: "flex", flexDirection: "column", gap: "12px", width: "100%" }}>
+                                        {activeCat.parentName && (
+                                            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#64748B", fontSize: "13px", fontFamily: "Urbanist" }}>
+                                                <Folder size={16} color="#94A3B8" />
+                                                <span>{activeCat.parentName}</span>
+                                            </div>
+                                        )}
+                                        <div
+                                            style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "8px",
+                                                color: "#2563EB",
+                                                fontSize: "14px",
+                                                fontWeight: 600,
+                                                fontFamily: "Urbanist",
+                                                paddingLeft: activeCat.parentName ? "16px" : "0"
+                                            }}
+                                        >
+                                            <Folder size={18} color="#2563EB" />
+                                            <span>{activeCat.name}</span>
+                                            <span className="costing-categories-tree-badge" style={{ marginLeft: "auto" }}>
+                                                {itemsCount} items
+                                            </span>
                                         </div>
-                                    ) : null}
-
-                                    <div
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "8px",
-                                            color: "#2563eb",
-                                            fontSize: "14px",
-                                            fontWeight: 600,
-                                            paddingLeft: activeCat.parentName ? "16px" : "0"
-                                        }}
-                                    >
-                                        <Folder size={16} color="#2563eb" />
-                                        <span>{activeCat.name}</span>
+                                        {subCategoriesList.length > 0 && (
+                                            <div
+                                                style={{
+                                                    paddingLeft: activeCat.parentName ? "32px" : "16px",
+                                                    display: "flex",
+                                                    flexDirection: "column",
+                                                    gap: "8px"
+                                                }}
+                                            >
+                                                {subCategoriesList.slice(0, 4).map((s) => (
+                                                    <div
+                                                        key={s.id}
+                                                        onClick={() => setActiveSubCategory(s)}
+                                                        style={{
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            justifyContent: "space-between",
+                                                            gap: "8px",
+                                                            color: "#475569",
+                                                            fontSize: "13px",
+                                                            fontFamily: "Urbanist",
+                                                            cursor: "pointer",
+                                                            padding: "4px 8px",
+                                                            borderRadius: "4px"
+                                                        }}
+                                                        className="hover:bg-slate-50 hover:text-blue-600"
+                                                    >
+                                                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                                            <Layers size={14} color="#94A3B8" />
+                                                            <span>{s.name}</span>
+                                                        </div>
+                                                        <span style={{ fontSize: "12px", color: "#64748B" }}>
+                                                            {s.itemsCount ?? s.items ?? 0}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                                {subCategoriesList.length > 4 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setActiveTab("Sub Categories")}
+                                                        style={{
+                                                            background: "none",
+                                                            border: "none",
+                                                            padding: "4px 8px",
+                                                            color: "#2563EB",
+                                                            fontSize: "12px",
+                                                            fontWeight: 600,
+                                                            textAlign: "left",
+                                                            cursor: "pointer",
+                                                            fontFamily: "Urbanist"
+                                                        }}
+                                                    >
+                                                        + {subCategoriesList.length - 4} more sub-categories →
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
-
-                                    {subCategoriesList.length > 0 && (
-                                        <div style={{ paddingLeft: activeCat.parentName ? "32px" : "16px", display: "flex", flexDirection: "column", gap: "6px" }}>
-                                            {subCategoriesList.slice(0, 3).map((s) => (
-                                                <div
-                                                    key={s.id}
-                                                    onClick={() => setActiveSubCategory(s)}
-                                                    style={{ display: "flex", alignItems: "center", gap: "6px", color: "#64748b", fontSize: "12px", cursor: "pointer" }}
-                                                    className="hover:text-blue-600"
-                                                >
-                                                    <Layers size={13} color="#94a3b8" />
-                                                    <span>{s.name}</span>
-                                                </div>
-                                            ))}
-                                            {subCategoriesList.length > 3 && (
-                                                <div style={{ color: "#94a3b8", fontSize: "11px", paddingLeft: "18px" }}>
-                                                    + {subCategoriesList.length - 3} more sub-categories
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
                                 </div>
                             </div>
 
                             {/* Pricing Details Card */}
-                            <div
-                                style={{
-                                    background: "#fff",
-                                    border: "1px solid #e5e7eb",
-                                    borderRadius: "12px",
-                                    padding: "20px 24px",
-                                    boxShadow: "0 1px 3px rgba(0,0,0,0.04)"
-                                }}
-                            >
-                                <div
-                                    style={{
-                                        color: "#6b7280",
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        letterSpacing: "0.05em",
-                                        marginBottom: "16px",
-                                        textTransform: "uppercase"
-                                    }}
-                                >
-                                    PRICING DETAILS
-                                </div>
-                                <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                        <span style={{ color: "#6b7280", fontSize: "13px" }}>Default Markup</span>
-                                        <span style={{ color: "#111827", fontSize: "14px", fontWeight: 600 }}>
-                                            {activeCat.default_markup_percent !== null && activeCat.default_markup_percent !== undefined
-                                                ? `${activeCat.default_markup_percent}%`
-                                                : "20%"}
-                                        </span>
-                                    </div>
-                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                        <span style={{ color: "#6b7280", fontSize: "13px" }}>Default Tax</span>
-                                        <span style={{ color: "#111827", fontSize: "14px", fontWeight: 600 }}>
-                                            {activeCat.default_tax_percent !== null && activeCat.default_tax_percent !== undefined
-                                                ? `GST ${activeCat.default_tax_percent}%`
-                                                : "GST 18%"}
-                                        </span>
-                                    </div>
-                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                        <span style={{ color: "#6b7280", fontSize: "13px" }}>Default Wastage</span>
-                                        <span style={{ color: "#111827", fontSize: "14px", fontWeight: 600 }}>
-                                            {activeCat.default_waste_percent !== null && activeCat.default_waste_percent !== undefined
-                                                ? `${activeCat.default_waste_percent}%`
-                                                : "5%"}
-                                        </span>
-                                    </div>
-                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                        <span style={{ color: "#6b7280", fontSize: "13px" }}>Cost Code</span>
-                                        <span style={{ color: "#111827", fontSize: "14px", fontWeight: 600 }}>{activeCat.code || "-"}</span>
+                            <div className="costing-overview-panel-card">
+                                <h3 className="costing-overview-panel-title">PRICING DETAILS</h3>
+                                <div className="costing-overview-inner-card">
+                                    <div style={{ display: "flex", flexDirection: "column", gap: "10px", width: "100%" }}>
+                                        <div className="costing-pricing-row">
+                                            <span className="costing-kv-label" style={{ fontSize: "14px" }}>Default Markup</span>
+                                            <span className="costing-kv-value" style={{ fontWeight: 600 }}>
+                                                {activeCat.default_markup_percent !== null && activeCat.default_markup_percent !== undefined
+                                                    ? `${activeCat.default_markup_percent}%`
+                                                    : "20%"}
+                                            </span>
+                                        </div>
+                                        <hr className="costing-activity-divider" />
+                                        <div className="costing-pricing-row">
+                                            <span className="costing-kv-label" style={{ fontSize: "14px" }}>Default Tax</span>
+                                            <span className="costing-kv-value" style={{ fontWeight: 600 }}>
+                                                {activeCat.default_tax_percent !== null && activeCat.default_tax_percent !== undefined
+                                                    ? `GST ${activeCat.default_tax_percent}%`
+                                                    : "GST 18%"}
+                                            </span>
+                                        </div>
+                                        <hr className="costing-activity-divider" />
+                                        <div className="costing-pricing-row">
+                                            <span className="costing-kv-label" style={{ fontSize: "14px" }}>Default Wastage</span>
+                                            <span className="costing-kv-value" style={{ fontWeight: 600 }}>
+                                                {activeCat.default_waste_percent !== null && activeCat.default_waste_percent !== undefined
+                                                    ? `${activeCat.default_waste_percent}%`
+                                                    : "5%"}
+                                            </span>
+                                        </div>
+                                        <hr className="costing-activity-divider" />
+                                        <div className="costing-pricing-row">
+                                            <span className="costing-kv-label" style={{ fontSize: "14px" }}>Cost Code</span>
+                                            <span className="costing-kv-value" style={{ fontWeight: 600 }}>
+                                                {activeCat.code || "-"}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Column 3: Recent Activity */}
-                        <div
-                            style={{
-                                background: "#fff",
-                                border: "1px solid #e5e7eb",
-                                borderRadius: "12px",
-                                padding: "24px",
-                                boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-                                display: "flex",
-                                flexDirection: "column"
-                            }}
-                        >
-                            <div
-                                style={{
-                                    color: "#6b7280",
-                                    fontSize: "12px",
-                                    fontWeight: 700,
-                                    letterSpacing: "0.05em",
-                                    marginBottom: "20px",
-                                    textTransform: "uppercase"
-                                }}
-                            >
-                                RECENT ACTIVITY
-                            </div>
-
-                            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                                {dynamicActivities.slice(0, 5).map((act) => (
-                                    <div key={act.id} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-                                        <div
-                                            style={{
-                                                width: "32px",
-                                                height: "32px",
-                                                background: "#f1f5f9",
-                                                borderRadius: "50%",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                                color: "#64748b",
-                                                fontSize: "12px",
-                                                fontWeight: 600,
-                                                flexShrink: 0
-                                            }}
-                                        >
-                                            {act.action[0]}
-                                        </div>
-                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ fontSize: "13px", fontWeight: 600, color: "#111827" }}>{act.action}</div>
-                                            <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "2px" }}>
-                                                {act.details}
+                        {/* Column 3: Recent Activity (Frame 2147225071) */}
+                        <div className="costing-overview-panel-card">
+                            <h3 className="costing-overview-panel-title">RECENT ACTIVITY</h3>
+                            <div className="costing-overview-inner-card">
+                                <div className="costing-activity-list">
+                                    {dynamicActivities.slice(0, 5).map((act, idx) => (
+                                        <div key={act.id} style={{ display: "flex", flexDirection: "column", gap: "12px", width: "100%" }}>
+                                            <div className="costing-activity-row">
+                                                <div className="costing-activity-left">
+                                                    <div className="costing-activity-avatar">
+                                                        {(act.by || "AD").slice(0, 2).toUpperCase()}
+                                                    </div>
+                                                    <div className="costing-activity-info">
+                                                        <span className="costing-activity-title">{act.action}</span>
+                                                        <span className="costing-activity-details">{act.details}</span>
+                                                    </div>
+                                                </div>
+                                                <span className="costing-activity-time">
+                                                    {formatDate(act.date)}
+                                                </span>
                                             </div>
+                                            {idx < Math.min(dynamicActivities.length, 5) - 1 && (
+                                                <hr className="costing-activity-divider" />
+                                            )}
                                         </div>
-                                        <div style={{ textAlign: "right", flexShrink: 0 }}>
-                                            <div style={{ fontSize: "11px", color: "#9ca3af" }}>{formatDate(act.date)}</div>
-                                        </div>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -946,32 +773,32 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
 
                 {/* 2. Sub Categories Tab */}
                 {activeTab === "Sub Categories" && (
-                    <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-                        <div style={{ overflowX: "auto" }}>
-                            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13px", minWidth: "900px" }}>
+                    <div className="costing-categories-table-card">
+                        <div className="costing-categories-table-scroll">
+                            <table className="costing-categories-table">
                                 <thead>
-                                    <tr style={{ background: "#f8fafc", color: "#64748b", borderBottom: "1px solid #e2e8f0" }}>
-                                        <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>SUB-CATEGORY NAME</th>
-                                        <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>SUB-CATEGORY CODE</th>
-                                        <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em", textAlign: "center" }}>ITEMS</th>
-                                        <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em", textAlign: "center" }}>USED IN BOQS</th>
-                                        <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em", textAlign: "center" }}>USED IN PROJECTS</th>
-                                        <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>STATUS</th>
-                                        <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>UPDATED</th>
-                                        <th style={{ padding: "14px 16px", width: "48px" }}></th>
+                                    <tr className="costing-categories-th-row">
+                                        <th className="costing-categories-th" style={{ borderTopLeftRadius: "8px", borderBottomLeftRadius: "8px" }}>SUB-CATEGORY NAME</th>
+                                        <th className="costing-categories-th">SUB-CATEGORY CODE</th>
+                                        <th className="costing-categories-th" style={{ textAlign: "center" }}>ITEMS</th>
+                                        <th className="costing-categories-th" style={{ textAlign: "center" }}>USED IN BOQS</th>
+                                        <th className="costing-categories-th" style={{ textAlign: "center" }}>USED IN PROJECTS</th>
+                                        <th className="costing-categories-th">STATUS</th>
+                                        <th className="costing-categories-th">UPDATED</th>
+                                        <th className="costing-categories-th" style={{ width: "48px", borderTopRightRadius: "8px", borderBottomRightRadius: "8px" }}></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {paginatedSubCategories.length === 0 ? (
                                         <tr>
-                                            <td colSpan={8} style={{ padding: "48px", textAlign: "center", color: "#9ca3af" }}>
+                                            <td colSpan={8} style={{ padding: "48px", textAlign: "center", color: "#64748B", fontFamily: "Urbanist" }}>
                                                 No sub-categories found under {activeCat.name}.
                                             </td>
                                         </tr>
                                     ) : (
                                         paginatedSubCategories.map((sub) => (
-                                            <tr key={sub.id} style={{ borderBottom: "1px solid #f1f5f9" }} className="hover:bg-slate-50">
-                                                <td style={{ padding: "14px 16px", color: "#111827", fontWeight: 600 }}>
+                                            <tr key={sub.id} className="costing-categories-tr">
+                                                <td className="costing-categories-td td-name">
                                                     <div
                                                         onClick={() => setActiveSubCategory(sub)}
                                                         style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}
@@ -981,34 +808,23 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                                                         <span>{sub.name}</span>
                                                     </div>
                                                 </td>
-                                                <td style={{ padding: "14px 16px", color: "#64748b" }}>{sub.code || "-"}</td>
-                                                <td style={{ padding: "14px 16px", textAlign: "center", fontWeight: 600, color: "#111827" }}>
+                                                <td className="costing-categories-td">{sub.code || "-"}</td>
+                                                <td className="costing-categories-td" style={{ textAlign: "center", fontWeight: 600, color: "#0F172A" }}>
                                                     {sub.itemsCount ?? sub.items ?? 0}
                                                 </td>
-                                                <td style={{ padding: "14px 16px", textAlign: "center", color: "#475569" }}>
+                                                <td className="costing-categories-td" style={{ textAlign: "center" }}>
                                                     {sub.usedInBoqs ?? 0}
                                                 </td>
-                                                <td style={{ padding: "14px 16px", textAlign: "center", color: "#475569" }}>
+                                                <td className="costing-categories-td" style={{ textAlign: "center" }}>
                                                     {sub.usedInProjects ?? 0}
                                                 </td>
-                                                <td style={{ padding: "14px 16px" }}>
-                                                    <span
-                                                        style={{
-                                                            background: "#ecfdf5",
-                                                            color: "#10b981",
-                                                            padding: "3px 8px",
-                                                            borderRadius: "12px",
-                                                            fontSize: "11px",
-                                                            fontWeight: 600,
-                                                            letterSpacing: "0.02em",
-                                                            textTransform: "uppercase"
-                                                        }}
-                                                    >
+                                                <td className="costing-categories-td">
+                                                    <span className={`costing-status-pill ${sub.status?.toUpperCase() === "INACTIVE" ? "inactive" : ""}`}>
                                                         {sub.status || "ACTIVE"}
                                                     </span>
                                                 </td>
-                                                <td style={{ padding: "14px 16px", color: "#64748b" }}>{formatDate(sub.updated_at || sub.created_at)}</td>
-                                                <td style={{ padding: "14px 16px" }}>
+                                                <td className="costing-categories-td">{formatDate(sub.updated_at || sub.created_at)}</td>
+                                                <td className="costing-categories-td">
                                                     <CostingMoreMenu
                                                         entityName="Sub-Category"
                                                         onView={() => setActiveSubCategory(sub)}
@@ -1034,6 +850,7 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                                     setSubCatPageSize(newSize);
                                     setSubCatPage(1);
                                 }}
+                                label="Sub Categories"
                             />
                         )}
                     </div>
@@ -1041,27 +858,27 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
 
                 {/* 3. Items Tab */}
                 {activeTab === "Items" && (
-                    <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-                        <div style={{ overflowX: "auto" }}>
-                            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13px", minWidth: "950px" }}>
+                    <div className="costing-categories-table-card">
+                        <div className="costing-categories-table-scroll">
+                            <table className="costing-categories-table">
                                 <thead>
-                                    <tr style={{ background: "#f8fafc", color: "#64748b", borderBottom: "1px solid #e2e8f0" }}>
-                                        <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>ITEM</th>
-                                        <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>CODE</th>
-                                        <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>UNIT</th>
-                                        <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>BASE COST (₹)</th>
-                                        <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>SELLING RATE (₹)</th>
-                                        <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>MARGIN</th>
-                                        <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>PREFERRED VENDOR</th>
-                                        <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>RATE STATUS</th>
-                                        <th style={{ padding: "14px 16px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em" }}>UPDATED</th>
-                                        <th style={{ padding: "14px 16px", width: "48px" }}></th>
+                                    <tr className="costing-categories-th-row">
+                                        <th className="costing-categories-th" style={{ borderTopLeftRadius: "8px", borderBottomLeftRadius: "8px" }}>ITEM</th>
+                                        <th className="costing-categories-th">CODE</th>
+                                        <th className="costing-categories-th">UNIT</th>
+                                        <th className="costing-categories-th" style={{ textAlign: "right" }}>BASE COST (₹)</th>
+                                        <th className="costing-categories-th" style={{ textAlign: "right" }}>SELLING RATE (₹)</th>
+                                        <th className="costing-categories-th" style={{ textAlign: "center" }}>MARGIN</th>
+                                        <th className="costing-categories-th">PREFERRED VENDOR</th>
+                                        <th className="costing-categories-th">RATE STATUS</th>
+                                        <th className="costing-categories-th">UPDATED</th>
+                                        <th className="costing-categories-th" style={{ width: "48px", borderTopRightRadius: "8px", borderBottomRightRadius: "8px" }}></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {paginatedItems.length === 0 ? (
                                         <tr>
-                                            <td colSpan={10} style={{ padding: "48px", textAlign: "center", color: "#9ca3af" }}>
+                                            <td colSpan={10} style={{ padding: "48px", textAlign: "center", color: "#64748B", fontFamily: "Urbanist" }}>
                                                 No items under {activeCat.name} yet.
                                             </td>
                                         </tr>
@@ -1072,8 +889,8 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                                             const margin = sell > 0 ? Math.round(((sell - base) * 100) / sell) : 0;
 
                                             return (
-                                                <tr key={item.id} style={{ borderBottom: "1px solid #f1f5f9" }} className="hover:bg-slate-50">
-                                                    <td style={{ padding: "14px 16px" }}>
+                                                <tr key={item.id} className="costing-categories-tr">
+                                                    <td className="costing-categories-td td-name">
                                                         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                                                             {item.image_url ? (
                                                                 <img
@@ -1087,44 +904,46 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                                                                         width: "32px",
                                                                         height: "32px",
                                                                         borderRadius: "6px",
-                                                                        background: "#f1f5f9",
+                                                                        background: "#F1F5F9",
                                                                         display: "flex",
                                                                         alignItems: "center",
                                                                         justifyContent: "center",
-                                                                        color: "#94a3b8"
+                                                                        color: "#94A3B8"
                                                                     }}
                                                                 >
                                                                     <Tag size={15} />
                                                                 </div>
                                                             )}
-                                                            <span style={{ fontWeight: 600, color: "#111827" }}>{item.name}</span>
+                                                            <span style={{ fontWeight: 600, color: "#0F172A" }}>{item.name}</span>
                                                         </div>
                                                     </td>
-                                                    <td style={{ padding: "14px 16px", color: "#64748b" }}>{item.code || "-"}</td>
-                                                    <td style={{ padding: "14px 16px", color: "#475569" }}>{item.unit || "Nos"}</td>
-                                                    <td style={{ padding: "14px 16px", color: "#111827", fontWeight: 500 }}>
+                                                    <td className="costing-categories-td">{item.code || "-"}</td>
+                                                    <td className="costing-categories-td">{item.unit || "Nos"}</td>
+                                                    <td className="costing-categories-td" style={{ textAlign: "right", fontWeight: 500, color: "#0F172A" }}>
                                                         ₹{formatMoney(base)}
                                                     </td>
-                                                    <td style={{ padding: "14px 16px", color: "#111827", fontWeight: 600 }}>
+                                                    <td className="costing-categories-td" style={{ textAlign: "right", fontWeight: 600, color: "#0F172A" }}>
                                                         ₹{formatMoney(sell)}
                                                     </td>
-                                                    <td style={{ padding: "14px 16px", color: margin >= 0 ? "#10b981" : "#ef4444", fontWeight: 600 }}>
-                                                        {margin}%
+                                                    <td className="costing-categories-td" style={{ textAlign: "center" }}>
+                                                        <span className={`costing-margin-text ${margin < 0 ? "is-negative" : ""}`}>
+                                                            {margin}%
+                                                        </span>
                                                     </td>
-                                                    <td style={{ padding: "14px 16px", color: "#475569" }}>
+                                                    <td className="costing-categories-td">
                                                         {item.preferred_vendor || item.preferredVendor || "-"}
                                                     </td>
-                                                    <td style={{ padding: "14px 16px" }}>
+                                                    <td className="costing-categories-td">
                                                         <RateStatusDropdown
                                                             itemId={item.id}
                                                             currentStatus={item.rate_status || "active"}
-                                                            onStatusChange={(newStatus) => {
+                                                            onStatusChange={(_newStatus) => {
                                                                 void loadDetail();
                                                             }}
                                                         />
                                                     </td>
-                                                    <td style={{ padding: "14px 16px", color: "#64748b" }}>{formatDate(item.updated_at || item.created_at)}</td>
-                                                    <td style={{ padding: "14px 16px" }}>
+                                                    <td className="costing-categories-td">{formatDate(item.updated_at || item.created_at)}</td>
+                                                    <td className="costing-categories-td">
                                                         <CostingMoreMenu
                                                             entityName="Item"
                                                             onDuplicate={() => handleDuplicateItem(item.id)}
@@ -1150,57 +969,225 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                                     setItemPageSize(newSize);
                                     setItemPage(1);
                                 }}
+                                label="Items"
                             />
                         )}
                     </div>
                 )}
 
-                {/* 4. Pricing Defaults Tab */}
+                {/* 4. Pricing Defaults Tab (Figma Frame 2147225128) */}
                 {activeTab === "Pricing Defaults" && (
-                    <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", padding: "24px" }}>
-                        <h4 style={{ margin: "0 0 16px 0", fontSize: "16px", fontWeight: 600, color: "#111827" }}>
-                            Pricing Defaults for {activeCat.name}
-                        </h4>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px" }}>
-                            <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "8px" }}>
-                                <div style={{ fontSize: "12px", color: "#64748b" }}>Default Markup</div>
-                                <div style={{ fontSize: "20px", fontWeight: 700, color: "#1e293b", marginTop: "4px" }}>
-                                    {activeCat.default_markup_percent ?? 20}%
+                    <div className="costing-pricing-defaults-grid">
+                        {/* Left Column: PRICING DEFAULTS (Frame 2147225071) */}
+                        <div className="costing-pricing-panel">
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+                                <h3 className="costing-pricing-panel-title">PRICING DEFAULTS</h3>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsEditCategoryOpen(true)}
+                                    className="costing-detail-action-btn"
+                                    style={{ padding: "8px 14px", height: "36px", fontSize: "13px" }}
+                                >
+                                    <Edit size={14} />
+                                    <span>Edit Defaults</span>
+                                </button>
+                            </div>
+                            <div className="costing-pricing-inner-card">
+                                {/* Row 1: Default Markup & Default Tax */}
+                                <div className="costing-pricing-row-2col">
+                                    <div className="costing-pricing-field">
+                                        <span className="costing-pricing-label">Default Markup</span>
+                                        <span className="costing-pricing-val">
+                                            {activeCat.default_markup_percent !== null && activeCat.default_markup_percent !== undefined
+                                                ? `${activeCat.default_markup_percent}%`
+                                                : "20%"}
+                                        </span>
+                                    </div>
+                                    <div className="costing-pricing-field">
+                                        <span className="costing-pricing-label">Default Tax</span>
+                                        <span className="costing-pricing-val">
+                                            {activeCat.default_tax_percent !== null && activeCat.default_tax_percent !== undefined
+                                                ? `GST ${activeCat.default_tax_percent}%`
+                                                : "GST 18%"}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Row 2: Default Wastage & Default Unit */}
+                                <div className="costing-pricing-row-2col">
+                                    <div className="costing-pricing-field">
+                                        <span className="costing-pricing-label">Default Wastage</span>
+                                        <span className="costing-pricing-val">
+                                            {activeCat.default_waste_percent !== null && activeCat.default_waste_percent !== undefined
+                                                ? `${activeCat.default_waste_percent}%`
+                                                : "5%"}
+                                        </span>
+                                    </div>
+                                    <div className="costing-pricing-field">
+                                        <span className="costing-pricing-label">Default Unit</span>
+                                        <span className="costing-pricing-val">
+                                            {activeCat.default_unit || "Nos"}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Row 3: Transportation Included & Labour Included */}
+                                <div className="costing-pricing-row-2col">
+                                    <div className="costing-pricing-field">
+                                        <span className="costing-pricing-label">Transportation Included</span>
+                                        <span className="costing-pricing-val">
+                                            {activeCat.transport_included ? "Yes" : "No"}
+                                        </span>
+                                    </div>
+                                    <div className="costing-pricing-field">
+                                        <span className="costing-pricing-label">Labour Included</span>
+                                        <span className="costing-pricing-val">
+                                            {activeCat.labour_included ? "Yes" : "No"}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Row 4: Markup Type & Tax Applied On */}
+                                <div className="costing-pricing-row-2col">
+                                    <div className="costing-pricing-field">
+                                        <span className="costing-pricing-label">Markup Type</span>
+                                        <span className="costing-pricing-val">
+                                            {(activeCat as any).markup_type || "Percentage"}
+                                        </span>
+                                    </div>
+                                    <div className="costing-pricing-field">
+                                        <span className="costing-pricing-label">Tax Applied On</span>
+                                        <span className="costing-pricing-val">
+                                            {(activeCat as any).tax_applied_on || "Selling Price"}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Row 5: Cost Code & Rate Effected From */}
+                                <div className="costing-pricing-row-2col">
+                                    <div className="costing-pricing-field">
+                                        <span className="costing-pricing-label">Cost Code</span>
+                                        <span className="costing-pricing-val">
+                                            {activeCat.code || "-"}
+                                        </span>
+                                    </div>
+                                    <div className="costing-pricing-field">
+                                        <span className="costing-pricing-label">Rate Effected From</span>
+                                        <span className="costing-pricing-val">
+                                            {formatDate(activeCat.updated_at || activeCat.created_at)}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
-                            <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "8px" }}>
-                                <div style={{ fontSize: "12px", color: "#64748b" }}>Default Tax (GST)</div>
-                                <div style={{ fontSize: "20px", fontWeight: 700, color: "#1e293b", marginTop: "4px" }}>
-                                    {activeCat.default_tax_percent ?? 18}%
+                        </div>
+
+                        {/* Right Column: INHERITED FROM & LAST UPDATED (Frame 2147225074) */}
+                        <div className="costing-pricing-sidebar">
+                            {/* Section 1: INHERITED FROM */}
+                            <div style={{ display: "flex", flexDirection: "column", gap: "12px", width: "100%" }}>
+                                <h3 className="costing-pricing-panel-title">INHERITED FROM</h3>
+                                <div className="costing-pricing-side-card">
+                                    <div className="costing-pricing-side-row">
+                                        <span className="costing-pricing-label">Parent Category</span>
+                                        <span className="costing-pricing-val" style={{ fontWeight: 600 }}>
+                                            {activeCat.parentName || (activeCat.parent_id ? allCategories.find((c) => c.id === activeCat.parent_id)?.name : null) || "None (Root Category)"}
+                                        </span>
+                                    </div>
+                                    <div className="costing-pricing-side-row">
+                                        <span className="costing-pricing-label">Organisation Defaults</span>
+                                        <span className="costing-pricing-val" style={{ fontWeight: 600 }}>
+                                            {(activeCat as any).org_default_name || "Org Default V2.3"}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
-                            <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "8px" }}>
-                                <div style={{ fontSize: "12px", color: "#64748b" }}>Default Wastage</div>
-                                <div style={{ fontSize: "20px", fontWeight: 700, color: "#1e293b", marginTop: "4px" }}>
-                                    {activeCat.default_waste_percent ?? 5}%
+
+                            {/* Section 2: LAST UPDATED */}
+                            <div style={{ display: "flex", flexDirection: "column", gap: "12px", width: "100%" }}>
+                                <h3 className="costing-pricing-panel-title">LAST UPDATED</h3>
+                                <div className="costing-pricing-side-card">
+                                    <div className="costing-pricing-side-row">
+                                        <span className="costing-pricing-label">UPDATED ON</span>
+                                        <span className="costing-pricing-val">
+                                            {formatDate(activeCat.updated_at || activeCat.created_at)}
+                                        </span>
+                                    </div>
+                                    <div className="costing-pricing-side-row">
+                                        <span className="costing-pricing-label">UPDATED BY</span>
+                                        <span className="costing-pricing-val">
+                                            {(activeCat as any).updated_by_name || (activeCat as any).updated_by || "Admin"}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 )}
 
-                {/* 5. Activity Tab */}
+                {/* 5. Activity Tab (Figma Frame 2147225069) */}
                 {activeTab === "Activity" && (
-                    <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", padding: "24px" }}>
-                        <h4 style={{ margin: "0 0 16px 0", fontSize: "16px", fontWeight: 600, color: "#111827" }}>
-                            Activity History
-                        </h4>
-                        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                            {dynamicActivities.map((act) => (
-                                <div key={act.id} style={{ display: "flex", justifyContent: "space-between", padding: "12px", background: "#f8fafc", borderRadius: "8px" }}>
-                                    <div>
-                                        <div style={{ fontWeight: 600, color: "#1e293b", fontSize: "13px" }}>{act.action}</div>
-                                        <div style={{ color: "#64748b", fontSize: "12px" }}>{act.details}</div>
-                                    </div>
-                                    <div style={{ color: "#94a3b8", fontSize: "12px" }}>{formatDate(act.date)}</div>
-                                </div>
-                            ))}
+                    <div className="costing-activity-table-card">
+                        <div className="costing-activity-table-scroll">
+                            <table className="costing-activity-table">
+                                <thead>
+                                    <tr className="costing-activity-th-row">
+                                        <th className="costing-activity-th" style={{ width: "25%", borderTopLeftRadius: "8px", borderBottomLeftRadius: "8px" }}>
+                                            ACTION
+                                        </th>
+                                        <th className="costing-activity-th" style={{ width: "40%" }}>
+                                            DETAILS
+                                        </th>
+                                        <th className="costing-activity-th" style={{ width: "15%" }}>
+                                            BY
+                                        </th>
+                                        <th className="costing-activity-th" style={{ width: "20%", borderTopRightRadius: "8px", borderBottomRightRadius: "8px" }}>
+                                            DATE
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {paginatedActivities.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={4} style={{ padding: "48px", textAlign: "center", color: "#64748B", fontFamily: "Urbanist" }}>
+                                                No activity recorded for {activeCat.name} yet.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        paginatedActivities.map((act) => (
+                                            <tr key={act.id} className="costing-activity-tr">
+                                                <td className="costing-activity-td td-action">
+                                                    {act.action}
+                                                </td>
+                                                <td className="costing-activity-td td-details">
+                                                    {act.details}
+                                                </td>
+                                                <td className="costing-activity-td td-by">
+                                                    {act.by || "Admin"}
+                                                </td>
+                                                <td className="costing-activity-td td-date">
+                                                    {formatDateTime(act.date)}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
+
+                        {dynamicActivities.length > 0 && (
+                            <CostingPagination
+                                currentPage={activityPage}
+                                totalPages={Math.max(1, Math.ceil(dynamicActivities.length / activityPageSize))}
+                                totalItems={dynamicActivities.length}
+                                pageSize={activityPageSize}
+                                onPageChange={setActivityPage}
+                                onPageSizeChange={(newSize) => {
+                                    setActivityPageSize(newSize);
+                                    setActivityPage(1);
+                                }}
+                                label="Activity"
+                            />
+                        )}
                     </div>
                 )}
             </div>
@@ -1213,6 +1200,7 @@ export default function CategoryDetail({ category, onBack, allCategories = [] }:
                     void loadDetail();
                 }}
                 categories={allCategories.length ? allCategories : [category]}
+                categoryToEdit={activeCat}
             />
 
             {/* Create Subcategory Modal (Uses dedicated NewSubCategoryModal with 3 fields!) */}

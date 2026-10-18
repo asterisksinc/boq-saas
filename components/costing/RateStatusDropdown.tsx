@@ -18,7 +18,7 @@ interface RateStatusDropdownProps {
 }
 
 const DEFAULT_STATUSES: Array<{ label: string; value: string }> = [
-  { label: "Active", value: "active" },
+  { label: "Approved", value: "active" },
   { label: "Draft", value: "draft" },
   { label: "Expired", value: "expired" },
 ];
@@ -30,7 +30,6 @@ export default function RateStatusDropdown({
   editable = true,
   onStatusChange,
   allowedStatuses = DEFAULT_STATUSES,
-  size = "sm",
 }: RateStatusDropdownProps) {
   const effectivePropStatus = status ?? propStatus;
   const [currentStatus, setCurrentStatus] = useState<string>(
@@ -141,41 +140,34 @@ export default function RateStatusDropdown({
       case "active":
       case "approved":
         return {
-          bg: "#ecfdf5",
-          color: "#059669",
-          border: "#a7f3d0",
-          dot: "#10b981",
+          bg: "rgba(22, 163, 74, 0.12)",
+          color: "#16A34A",
+          label: "APPROVED",
         };
       case "draft":
       case "pending":
         return {
-          bg: "#f8fafc",
-          color: "#475569",
-          border: "#e2e8f0",
-          dot: "#94a3b8",
+          bg: "rgba(100, 116, 139, 0.12)",
+          color: "#64748B",
+          label: "DRAFT",
         };
       case "expired":
       case "inactive":
         return {
-          bg: "#fef2f2",
-          color: "#dc2626",
-          border: "#fecaca",
-          dot: "#ef4444",
+          bg: "rgba(220, 38, 38, 0.12)",
+          color: "#DC2626",
+          label: "EXPIRED",
         };
       default:
         return {
-          bg: "#f1f5f9",
-          color: "#334155",
-          border: "#cbd5e1",
-          dot: "#64748b",
+          bg: "rgba(100, 116, 139, 0.12)",
+          color: "#64748B",
+          label: norm.toUpperCase(),
         };
     }
   };
 
   const style = getStatusStyle(currentStatus);
-  const currentLabel =
-    allowedStatuses.find((x) => x.value.toLowerCase() === currentStatus.toLowerCase())?.label ||
-    currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1);
 
   return (
     <>
@@ -186,37 +178,34 @@ export default function RateStatusDropdown({
         disabled={!editable || loading}
         style={{
           display: "inline-flex",
+          flexDirection: "row",
+          justifyContent: "center",
           alignItems: "center",
-          gap: "6px",
+          padding: "2px 6px",
+          gap: "4px",
+          height: "18px",
           background: style.bg,
           color: style.color,
-          border: `1px solid ${style.border}`,
-          padding: size === "sm" ? "3px 8px" : "5px 12px",
-          borderRadius: "16px",
-          fontSize: size === "sm" ? "12px" : "13px",
-          fontWeight: 600,
+          border: "none",
+          borderRadius: "9999px",
+          fontFamily: "'Urbanist', sans-serif",
+          fontStyle: "normal",
+          fontWeight: 500,
+          fontSize: "12px",
+          lineHeight: "120%",
           cursor: editable && !loading ? "pointer" : "default",
           transition: "all 0.15s ease",
           outline: "none",
           userSelect: "none",
+          whiteSpace: "nowrap",
         }}
         title={editable ? "Click to change rate status" : undefined}
       >
         {loading ? (
-          <Loader2 size={12} className="animate-spin" />
-        ) : (
-          <span
-            style={{
-              width: "6px",
-              height: "6px",
-              borderRadius: "50%",
-              backgroundColor: style.dot,
-              display: "inline-block",
-            }}
-          />
-        )}
-        <span>{currentLabel}</span>
-        {editable && <ChevronDown size={12} style={{ opacity: 0.7 }} />}
+          <Loader2 size={11} className="animate-spin" />
+        ) : null}
+        <span>{style.label}</span>
+        {editable && <ChevronDown size={11} color={style.color} style={{ opacity: 0.8 }} />}
       </button>
 
       {isOpen &&
@@ -230,9 +219,9 @@ export default function RateStatusDropdown({
               left: `${menuPos.left}px`,
               zIndex: 99999,
               background: "#ffffff",
-              border: "1px solid #e2e8f0",
-              borderRadius: "8px",
-              boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
+              border: "1px solid #EBEBEB",
+              borderRadius: "10px",
+              boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.08)",
               padding: "4px",
               minWidth: "130px",
               animation: "fadeIn 0.1s ease-out",
@@ -252,18 +241,19 @@ export default function RateStatusDropdown({
                     alignItems: "center",
                     justifyContent: "space-between",
                     gap: "8px",
-                    padding: "7px 10px",
-                    background: isSelected ? "#f1f5f9" : "transparent",
+                    padding: "6px 8px",
+                    background: isSelected ? "#F1F5F9" : "transparent",
                     border: "none",
                     borderRadius: "6px",
                     cursor: "pointer",
-                    fontSize: "12.5px",
-                    color: "#1e293b",
+                    fontSize: "12px",
+                    fontFamily: "'Urbanist', sans-serif",
+                    color: "#0F172A",
                     textAlign: "left",
                     transition: "background 0.15s",
                   }}
                   onMouseEnter={(e) => {
-                    if (!isSelected) e.currentTarget.style.background = "#f8fafc";
+                    if (!isSelected) e.currentTarget.style.background = "#F8FAFC";
                   }}
                   onMouseLeave={(e) => {
                     if (!isSelected) e.currentTarget.style.background = "transparent";
@@ -272,16 +262,18 @@ export default function RateStatusDropdown({
                   <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                     <span
                       style={{
-                        width: "6px",
-                        height: "6px",
-                        borderRadius: "50%",
-                        backgroundColor: optStyle.dot,
-                        display: "inline-block",
+                        padding: "1px 6px",
+                        borderRadius: "9999px",
+                        background: optStyle.bg,
+                        color: optStyle.color,
+                        fontWeight: 600,
+                        fontSize: "11px",
                       }}
-                    />
-                    <span style={{ fontWeight: isSelected ? 600 : 500 }}>{opt.label}</span>
+                    >
+                      {optStyle.label}
+                    </span>
                   </span>
-                  {isSelected && <Check size={14} color="#2563eb" />}
+                  {isSelected && <Check size={13} color="#2563EB" />}
                 </button>
               );
             })}

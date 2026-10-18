@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { X, UploadCloud, ChevronDown, Loader2, Trash2 } from "lucide-react";
-import { getCostingCategories, createCostingItem, uploadCostingImage } from "@/lib/api/costing";
+import { getCostingCategories, createCostingItem, updateCostingItem, uploadCostingImage } from "@/lib/api/costing";
 import type { CostingCategoryBackend, CostingItemBackend } from "@/lib/types";
 
 interface AddItemModalProps {
@@ -10,6 +10,7 @@ interface AddItemModalProps {
     onClose: () => void;
     onSuccess: (item: CostingItemBackend) => void;
     existingVendors?: string[];
+    itemToEdit?: CostingItemBackend | null;
 }
 
 const POPULAR_UNITS = [
@@ -35,7 +36,7 @@ const DEFAULT_VENDORS = [
     "Apex Civil Solutions",
 ];
 
-export default function AddItemModal({ isOpen, onClose, onSuccess, existingVendors = [] }: AddItemModalProps) {
+export default function AddItemModal({ isOpen, onClose, onSuccess, existingVendors = [], itemToEdit }: AddItemModalProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Form fields
@@ -65,6 +66,43 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, existingVendo
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
 
+    // Populate or reset form fields on open
+    useEffect(() => {
+        if (!isOpen) return;
+        if (itemToEdit) {
+            setName(itemToEdit.name || "");
+            const base = itemToEdit.baseCost != null ? itemToEdit.baseCost : itemToEdit.base_cost != null ? itemToEdit.base_cost : "";
+            setBaseCost(base !== "" ? String(base) : "");
+            const selling = itemToEdit.sellingRate != null ? itemToEdit.sellingRate : itemToEdit.selling_rate != null ? itemToEdit.selling_rate : "";
+            setSellingRate(selling !== "" ? String(selling) : "");
+            setUnit(itemToEdit.unit || "");
+            setSpec(itemToEdit.spec || "");
+            setDescription(itemToEdit.description || itemToEdit.spec || "");
+            setRateStatus(itemToEdit.rate_status || itemToEdit.rateStatus || "active");
+            const v = itemToEdit.preferred_vendor || itemToEdit.preferredVendor || itemToEdit.vendor || "";
+            setVendor(v);
+            setImagePreview(itemToEdit.image_url || itemToEdit.imageUrl || null);
+            setImageFile(null);
+            setError("");
+        } else {
+            setName("");
+            setSelectedParentCatId("");
+            setSelectedSubCatId("");
+            setUnit("");
+            setBaseCost("");
+            setSellingRate("");
+            setSpec("");
+            setRateStatus("active");
+            setVendor("");
+            setIsCustomVendor(false);
+            setCustomVendorName("");
+            setDescription("");
+            setImageFile(null);
+            setImagePreview(null);
+            setError("");
+        }
+    }, [isOpen, itemToEdit]);
+
     // Load categories when modal opens
     useEffect(() => {
         if (!isOpen) return;
@@ -75,7 +113,20 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, existingVendo
         getCostingCategories({ pageSize: 100 })
             .then((res) => {
                 if (isMounted) {
-                    setCategories(res.items || []);
+                    const loadedCats = res.items || [];
+                    setCategories(loadedCats);
+                    if (itemToEdit && itemToEdit.category_id) {
+                        const targetCat = loadedCats.find((c) => c.id === itemToEdit.category_id);
+                        if (targetCat) {
+                            if (targetCat.parent_id) {
+                                setSelectedParentCatId(targetCat.parent_id);
+                                setSelectedSubCatId(targetCat.id);
+                            } else {
+                                setSelectedParentCatId(targetCat.id);
+                                setSelectedSubCatId("");
+                            }
+                        }
+                    }
                 }
             })
             .catch((err) => {
@@ -90,7 +141,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, existingVendo
         return () => {
             isMounted = false;
         };
-    }, [isOpen]);
+    }, [isOpen, itemToEdit]);
 
     // Parent categories (parent_id is null or empty)
     const parentCategories = categories.filter((c) => !c.parent_id);
@@ -240,6 +291,25 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, existingVendo
                 : "ITM";
             const autoCode = `${catCodePrefix}-${Math.floor(1000 + Math.random() * 9000)}`;
 
+            if (itemToEdit) {
+                const updatedItem = await updateCostingItem(itemToEdit.id, {
+                    name: name.trim(),
+                    categoryId: finalCategoryId,
+                    unit: unit.trim(),
+                    baseCost: parsedBaseCost,
+                    sellingRate: parsedSellingRate,
+                    preferredVendor: finalVendor,
+                    spec: spec.trim() || null,
+                    description: description.trim(),
+                    rateStatus,
+                    imageUrl: uploadedImageUrl || imagePreview,
+                });
+
+                onSuccess(updatedItem as CostingItemBackend);
+                handleClose();
+                return;
+            }
+
             const newItem = await createCostingItem({
                 name: name.trim(),
                 code: autoCode,
@@ -257,7 +327,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, existingVendo
             onSuccess(newItem);
             handleClose();
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to create costing item.");
+            setError(err instanceof Error ? err.message : (itemToEdit ? "Failed to update costing item." : "Failed to create costing item."));
         } finally {
             setSubmitting(false);
         }
@@ -324,7 +394,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, existingVendo
                         borderBottom: "1px solid #f1f5f9",
                     }}
                 >
-                    <h3 style={{ margin: 0, fontSize: "19px", fontWeight: 700, color: "#0f172a" }}>Add Item</h3>
+                    <h3 style={{ margin: 0, fontSize: "19px", fontWeight: 700, color: "#0f172a" }}>{itemToEdit ? "Edit Item" : "Add Item"}</h3>
                     <button
                         type="button"
                         onClick={handleClose}
@@ -887,7 +957,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, existingVendo
                         }}
                     >
                         {submitting && <Loader2 size={16} className="animate-spin" />}
-                        {submitting ? "Adding..." : "Add"}
+                        {submitting ? (itemToEdit ? "Saving..." : "Adding...") : (itemToEdit ? "Save Changes" : "Add Item")}
                     </button>
                 </div>
             </div>

@@ -23,7 +23,7 @@ interface CostingMoreMenuProps {
 }
 
 export default function CostingMoreMenu({
-  entityName,
+  entityName = "Item",
   onView,
   onEdit,
   onDuplicate,
@@ -40,7 +40,7 @@ export default function CostingMoreMenu({
   const updatePosition = () => {
     if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
-      const menuWidth = 160;
+      const menuWidth = 166;
       let left = align === "right" ? rect.right - menuWidth : rect.left;
 
       // Prevent offscreen
@@ -108,29 +108,29 @@ export default function CostingMoreMenu({
   const defaultActions: MoreMenuAction[] = [];
   if (onView) {
     defaultActions.push({
-      label: "View",
-      icon: <Eye size={15} />,
+      label: `View ${entityName}`,
+      icon: <Eye size={18} color="#64748B" />,
       onClick: onView,
     });
   }
   if (onEdit) {
     defaultActions.push({
-      label: "Edit",
-      icon: <Edit2 size={15} />,
+      label: "Edit Item",
+      icon: <Edit2 size={18} color="#64748B" />,
       onClick: onEdit,
     });
   }
   if (onDuplicate) {
     defaultActions.push({
-      label: "Duplicate",
-      icon: <Copy size={15} />,
+      label: "Duplicate Item",
+      icon: <Copy size={18} color="#64748B" />,
       onClick: onDuplicate,
     });
   }
   if (onDelete) {
     defaultActions.push({
-      label: "Delete",
-      icon: <Trash2 size={15} />,
+      label: "Delete Item",
+      icon: <Trash2 size={18} color="#DC2626" />,
       onClick: onDelete,
       danger: true,
     });
@@ -150,7 +150,7 @@ export default function CostingMoreMenu({
           background: "transparent",
           border: "none",
           cursor: "pointer",
-          color: "#94a3b8",
+          color: "#64748B",
           padding: "6px",
           borderRadius: "6px",
           display: "inline-flex",
@@ -158,18 +158,21 @@ export default function CostingMoreMenu({
           justifyContent: "center",
           transition: "all 0.15s ease",
           outline: "none",
+          width: "32px",
+          height: "32px",
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.color = "#1e293b";
-          e.currentTarget.style.background = "#f1f5f9";
+          e.currentTarget.style.color = "#0F172A";
+          e.currentTarget.style.background = "#E4ECFB";
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.color = "#94a3b8";
+          e.currentTarget.style.color = "#64748B";
           e.currentTarget.style.background = "transparent";
         }}
         title="More actions"
+        aria-label="More actions"
       >
-        <MoreHorizontal size={18} />
+        <MoreHorizontal size={20} />
       </button>
 
       {isOpen &&
@@ -178,16 +181,20 @@ export default function CostingMoreMenu({
           <div
             ref={menuRef}
             style={{
+              boxSizing: "border-box",
               position: "absolute",
               top: `${pos.top}px`,
               left: `${pos.left}px`,
               zIndex: 99999,
-              background: "#ffffff",
-              border: "1px solid #e2e8f0",
-              borderRadius: "8px",
-              boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08)",
-              padding: "4px",
-              minWidth: "150px",
+              width: "166px",
+              background: "#FFFFFF",
+              border: "1px solid #EBEBEB",
+              borderRadius: "16px",
+              boxShadow: "0px 16px 32px -12px rgba(14, 18, 27, 0.1)",
+              padding: "8px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "4px",
               animation: "fadeIn 0.1s ease-out",
             }}
           >
@@ -202,25 +209,30 @@ export default function CostingMoreMenu({
                   act.onClick();
                 }}
                 style={{
-                  width: "100%",
-                  textAlign: "left",
-                  padding: "8px 12px",
+                  boxSizing: "border-box",
+                  width: "150px",
+                  height: "40px",
+                  borderRadius: "8px",
+                  padding: "8px",
                   background: "transparent",
                   border: "none",
-                  borderRadius: "6px",
                   display: "flex",
                   alignItems: "center",
-                  gap: "10px",
+                  gap: "8px",
                   cursor: act.disabled ? "not-allowed" : "pointer",
-                  color: act.danger ? "#ef4444" : "#334155",
-                  fontSize: "13px",
+                  color: act.danger ? "#DC2626" : "#64748B",
+                  fontFamily: "'Urbanist', sans-serif",
+                  fontStyle: "normal",
                   fontWeight: 500,
+                  fontSize: "14px",
+                  lineHeight: "120%",
                   opacity: act.disabled ? 0.5 : 1,
                   transition: "background 0.15s ease",
+                  textAlign: "left",
                 }}
                 onMouseEnter={(e) => {
                   if (!act.disabled) {
-                    e.currentTarget.style.background = act.danger ? "#fef2f2" : "#f8fafc";
+                    e.currentTarget.style.background = act.danger ? "rgba(220, 38, 38, 0.08)" : "#EFF6FF";
                   }
                 }}
                 onMouseLeave={(e) => {
@@ -229,8 +241,12 @@ export default function CostingMoreMenu({
                   }
                 }}
               >
-                {act.icon}
-                <span>{act.label}</span>
+                <span style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+                  {act.icon}
+                </span>
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {act.label}
+                </span>
               </button>
             ))}
           </div>,

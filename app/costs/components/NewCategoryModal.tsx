@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { X, ChevronDown, Loader2 } from "lucide-react";
-import { createCostingCategory } from "@/lib/api/costing";
-import type { CostingCategoryBackend } from "@/lib/types";
+import { createCostingCategory, updateCostingCategory } from "@/lib/api/costing";
+import type { CostingCategoryBackend, CostingCategoryDetail } from "@/lib/types";
 
 interface NewCategoryModalProps {
     isOpen: boolean;
@@ -11,6 +11,7 @@ interface NewCategoryModalProps {
     onSuccess: () => void;
     categories: CostingCategoryBackend[];
     initialParentId?: string | null;
+    categoryToEdit?: CostingCategoryBackend | CostingCategoryDetail | null;
 }
 
 const UNIT_OPTIONS = [
@@ -34,7 +35,8 @@ export default function NewCategoryModal({
     onClose,
     onSuccess,
     categories,
-    initialParentId
+    initialParentId,
+    categoryToEdit
 }: NewCategoryModalProps) {
     const [title, setTitle] = useState("");
     const [parentId, setParentId] = useState<string>("");
@@ -51,23 +53,36 @@ export default function NewCategoryModal({
 
     useEffect(() => {
         if (isOpen) {
-            setTitle("");
-            setParentId(initialParentId || "");
-            setDefaultUnit("Nos");
-            setDefaultTax("18%");
-            setDefaultMarkup("");
-            setDefaultWastage("");
-            setTransportIncluded("");
-            setLabourIncluded("");
-            setDescription("");
-            setError("");
+            if (categoryToEdit) {
+                setTitle(categoryToEdit.name || "");
+                setParentId(categoryToEdit.parent_id || initialParentId || "");
+                setDefaultUnit(categoryToEdit.default_unit || "Nos");
+                setDefaultTax(categoryToEdit.default_tax_percent !== null && categoryToEdit.default_tax_percent !== undefined ? `${categoryToEdit.default_tax_percent}%` : "18%");
+                setDefaultMarkup(categoryToEdit.default_markup_percent !== null && categoryToEdit.default_markup_percent !== undefined ? `${categoryToEdit.default_markup_percent}` : "");
+                setDefaultWastage(categoryToEdit.default_waste_percent !== null && categoryToEdit.default_waste_percent !== undefined ? `${categoryToEdit.default_waste_percent}` : "");
+                setTransportIncluded(categoryToEdit.transport_included ? "Yes" : "No");
+                setLabourIncluded(categoryToEdit.labour_included ? "Yes" : "No");
+                setDescription(categoryToEdit.description || "");
+                setError("");
+            } else {
+                setTitle("");
+                setParentId(initialParentId || "");
+                setDefaultUnit("Nos");
+                setDefaultTax("18%");
+                setDefaultMarkup("");
+                setDefaultWastage("");
+                setTransportIncluded("");
+                setLabourIncluded("");
+                setDescription("");
+                setError("");
+            }
         }
-    }, [isOpen, initialParentId]);
+    }, [isOpen, initialParentId, categoryToEdit]);
 
     if (!isOpen) return null;
 
-    // Potential parent categories
-    const parentOptions = categories.filter((c) => !c.parent_id);
+    // Potential parent categories (exclude self if editing)
+    const parentOptions = categories.filter((c) => !c.parent_id && (!categoryToEdit || c.id !== categoryToEdit.id));
 
     const parsePercent = (val: string, fallback = 0): number => {
         if (!val) return fallback;
@@ -92,26 +107,40 @@ export default function NewCategoryModal({
         setLoading(true);
 
         try {
-            const prefix = title.trim().replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 4) || "CAT";
-            const autoCode = `${prefix}-${Math.floor(1000 + Math.random() * 9000)}`;
+            if (categoryToEdit) {
+                await updateCostingCategory(categoryToEdit.id, {
+                    name: title.trim(),
+                    parentId: parentId ? parentId : null,
+                    defaultUnit: defaultUnit.trim(),
+                    defaultTaxPercent: parsePercent(defaultTax, 18),
+                    defaultMarkupPercent: parsePercent(defaultMarkup, 0),
+                    defaultWastePercent: parsePercent(defaultWastage, 0),
+                    transportIncluded: transportIncluded === "Yes",
+                    labourIncluded: labourIncluded === "Yes",
+                    description: description.trim() || undefined
+                });
+            } else {
+                const prefix = title.trim().replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 4) || "CAT";
+                const autoCode = `${prefix}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-            await createCostingCategory({
-                name: title.trim(),
-                code: autoCode,
-                parentId: parentId ? parentId : undefined,
-                defaultUnit: defaultUnit.trim(),
-                defaultTaxPercent: parsePercent(defaultTax, 18),
-                defaultMarkupPercent: parsePercent(defaultMarkup, 0),
-                defaultWastePercent: parsePercent(defaultWastage, 0),
-                transportIncluded: transportIncluded === "Yes",
-                labourIncluded: labourIncluded === "Yes",
-                description: description.trim() || undefined
-            });
+                await createCostingCategory({
+                    name: title.trim(),
+                    code: autoCode,
+                    parentId: parentId ? parentId : undefined,
+                    defaultUnit: defaultUnit.trim(),
+                    defaultTaxPercent: parsePercent(defaultTax, 18),
+                    defaultMarkupPercent: parsePercent(defaultMarkup, 0),
+                    defaultWastePercent: parsePercent(defaultWastage, 0),
+                    transportIncluded: transportIncluded === "Yes",
+                    labourIncluded: labourIncluded === "Yes",
+                    description: description.trim() || undefined
+                });
+            }
 
             onSuccess();
             onClose();
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to create category");
+            setError(err instanceof Error ? err.message : (categoryToEdit ? "Failed to update category" : "Failed to create category"));
         } finally {
             setLoading(false);
         }
@@ -166,7 +195,7 @@ export default function NewCategoryModal({
                                 letterSpacing: "-0.01em"
                             }}
                         >
-                            New Category
+                            {categoryToEdit ? "Edit Category" : "New Category"}
                         </h3>
                         <div
                             style={{
@@ -175,7 +204,7 @@ export default function NewCategoryModal({
                                 marginTop: "4px"
                             }}
                         >
-                            Starting from: From Scratch
+                            {categoryToEdit ? "Modify category details and pricing defaults" : "Starting from: From Scratch"}
                         </div>
                     </div>
                     <button
@@ -645,7 +674,7 @@ export default function NewCategoryModal({
                                 }}
                             >
                                 {loading && <Loader2 size={16} className="animate-spin" />}
-                                Create Category
+                                {categoryToEdit ? "Save Changes" : "Create Category"}
                             </button>
                         </div>
                     </div>
