@@ -37,7 +37,7 @@ export async function listBoqs(params?: {
 }
 
 export async function createBoq(input: {
-    projectId: string; boqNumber: string; version?: string; assignedTo?: string;
+    projectId: string; boqNumber?: string; version?: string; assignedTo?: string;
     method?: string; templateId?: string; markupPercent?: number; taxPercent?: number;
 }): Promise<Boq> {
     return fetchApi<Boq>("/api/v1/boqs", { method: "POST", body: JSON.stringify(input) });
@@ -93,10 +93,24 @@ export async function deleteBoqCategory(boqId: string, categoryId: string): Prom
     return fetchApi(`/api/v1/boqs/${boqId}/categories/${categoryId}`, { method: "DELETE" });
 }
 
+// Subcategory CRUD
+export async function addBoqSubcategory(boqId: string, categoryId: string, input: { name: string; description?: string }): Promise<Record<string, unknown>> {
+    return fetchApi(`/api/v1/boqs/${boqId}/categories/${categoryId}/subcategories`, { method: "POST", body: JSON.stringify(input) });
+}
+
+export async function updateBoqSubcategory(boqId: string, categoryId: string, subcategoryId: string, input: Record<string, unknown>): Promise<Record<string, unknown>> {
+    return fetchApi(`/api/v1/boqs/${boqId}/categories/${categoryId}/subcategories/${subcategoryId}`, { method: "PATCH", body: JSON.stringify(input) });
+}
+
+export async function deleteBoqSubcategory(boqId: string, categoryId: string, subcategoryId: string): Promise<{ deleted: true; id: string }> {
+    return fetchApi(`/api/v1/boqs/${boqId}/categories/${categoryId}/subcategories/${subcategoryId}`, { method: "DELETE" });
+}
+
 // Item CRUD
 export async function addBoqItem(boqId: string, categoryId: string, input: {
     name: string; description?: string; unit?: string; quantity?: number; rate?: number;
     wastePercent?: number; taxPercent?: number; sortOrder?: number;
+    subcategoryId?: string; subcategoryName?: string;
 }): Promise<Record<string, unknown>> {
     return fetchApi(`/api/v1/boqs/${boqId}/categories/${categoryId}/items`, { method: "POST", body: JSON.stringify(input) });
 }

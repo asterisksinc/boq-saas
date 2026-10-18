@@ -60,6 +60,7 @@ import {
   boqStatusSchema,
   boqRoomSchema,
   boqCategorySchema,
+  boqSubcategorySchema,
   boqItemSchema,
   boqTemplateSchema,
   boqTemplatePatchSchema,
@@ -3835,6 +3836,52 @@ function serializeRoomMeta(userNotes: string | null | undefined, referenceImageU
   });
 }
 
+function parseCategoryMeta(raw: string | null | undefined) {
+  if (!raw) return { userDescription: "", subcategories: [] as any[] };
+  try {
+    const obj = JSON.parse(raw);
+    if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+      return {
+        userDescription: typeof obj.userDescription === "string" ? obj.userDescription : (typeof obj.description === "string" ? obj.description : ""),
+        subcategories: Array.isArray(obj.subcategories) ? obj.subcategories : [],
+      };
+    }
+  } catch {}
+  return { userDescription: raw || "", subcategories: [] as any[] };
+}
+
+function serializeCategoryMeta(userDescription: string | null | undefined, subcategories: any[] | undefined) {
+  return JSON.stringify({
+    userDescription: userDescription || "",
+    subcategories: Array.isArray(subcategories) ? subcategories : [],
+  });
+}
+
+function parseItemMeta(raw: string | null | undefined) {
+  if (!raw) return { spec: "", subcategoryId: null, subcategoryName: null };
+  try {
+    const obj = JSON.parse(raw);
+    if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+      return {
+        spec: typeof obj.spec === "string" ? obj.spec : (typeof obj.description === "string" ? obj.description : ""),
+        subcategoryId: typeof obj.subcategoryId === "string" ? obj.subcategoryId : null,
+        subcategoryName: typeof obj.subcategoryName === "string" ? obj.subcategoryName : null,
+      };
+    }
+  } catch {}
+  return { spec: raw || "", subcategoryId: null, subcategoryName: null };
+}
+
+function serializeItemMeta(spec: string | null | undefined, subcategoryId?: string | null | undefined, subcategoryName?: string | null | undefined) {
+  if (!subcategoryId) return spec || "";
+  return JSON.stringify({
+    spec: spec || "",
+    subcategoryId: subcategoryId || null,
+    subcategoryName: subcategoryName || null,
+  });
+}
+
+
 function formatRoom(row: Record<string, unknown>) {
   const meta = parseRoomMeta(row.notes as string | null | undefined);
   const length = row.length != null ? Number(row.length) : null;
@@ -6373,8 +6420,15 @@ async function createBoq(request: Request, supabase: SupabaseClient, id: string)
 
   let initialRoomCount = 0;
   if (input.data.method === "template" && input.data.templateId) {
-    if (template?.data && Array.isArray(template.data.snapshot)) {
-      for (const sourceRoom of template.data.snapshot as Array<Record<string, unknown>>) {
+    const rawSnapshot = template?.data?.snapshot;
+    const sourceRooms: Array<Record<string, unknown>> = Array.isArray(rawSnapshot)
+      ? rawSnapshot
+      : Array.isArray((rawSnapshot as Record<string, unknown>)?.rooms)
+      ? ((rawSnapshot as Record<string, unknown>).rooms as Array<Record<string, unknown>>)
+      : [];
+
+    if (sourceRooms.length > 0) {
+      for (const sourceRoom of sourceRooms) {
         const room = await supabase.from("boq_rooms").insert({ workspace_id: scoped.access.workspaceId, boq_id: inserted.data.id, name: sourceRoom.name, description: sourceRoom.description }).select("id").single();
         if (room.error || !room.data) {
           await cleanupCreatedBoq(supabase, scoped.access.workspaceId, inserted.data.id, id);
@@ -6397,7 +6451,7 @@ async function createBoq(request: Request, supabase: SupabaseClient, id: string)
           }
         }
       }
-      const templateUpdate = await supabase.from("boq_templates").update({ use_count: num(template.data.use_count) + 1 }).eq("id", input.data.templateId);
+      const templateUpdate = await supabase.from("boq_templates").update({ use_count: num(template?.data?.use_count) + 1 }).eq("id", input.data.templateId);
       if (templateUpdate.error) {
         await cleanupCreatedBoq(supabase, scoped.access.workspaceId, inserted.data.id, id);
         return fail("INTERNAL_ERROR", "The BOQ template usage could not be recorded.", 500, id);
@@ -6526,6 +6580,16 @@ async function getBoq(supabase: SupabaseClient, id: string, boqId: string) {
     boq.data.assigned_to ? supabase.from("user_profiles").select("display_name").eq("user_id", boq.data.assigned_to).maybeSingle() : Promise.resolve({ data: null }),
   ]);
 
+  const enrichedItems = uniqueItemRows.map((item: any) => {
+    const itemMeta = parseItemMeta(item.description);
+    return {
+      ...item,
+      description: itemMeta.spec || null,
+      subcategoryId: itemMeta.subcategoryId || null,
+      subcategoryName: itemMeta.subcategoryName || null,
+    };
+  });
+
   return ok({
     ...boqDto(
       boq.data as Record<string, unknown>,
@@ -6537,10 +6601,23 @@ async function getBoq(supabase: SupabaseClient, id: string, boqId: string) {
     ),
     rooms: uniqueRooms.map((room: any) => ({
       ...room,
-      categories: uniqueCatRows.filter((cat: any) => cat.room_id === room.id).map((category: any) => ({
-        ...category,
-        items: uniqueItemRows.filter((item: any) => item.category_id === category.id),
-      })),
+      categories: uniqueCatRows.filter((cat: any) => cat.room_id === room.id).map((category: any) => {
+        const catMeta = parseCategoryMeta(category.description);
+        const catItems = enrichedItems.filter((item: any) => item.category_id === category.id);
+        const subcategories = (catMeta.subcategories || []).map((sub: any) => ({
+          ...sub,
+          category_id: category.id,
+          items: catItems.filter((it: any) => it.subcategoryId === sub.id),
+        }));
+        const unassignedItems = catItems.filter((it: any) => !it.subcategoryId);
+        return {
+          ...category,
+          description: catMeta.userDescription || null,
+          subcategories,
+          items: catItems,
+          unassignedItems,
+        };
+      }),
     })),
   }, 200, id);
 }
@@ -7518,6 +7595,8 @@ async function boqTemplates(request: NextRequest, supabase: SupabaseClient, id: 
     const mapping = request.nextUrl.searchParams.get("mapping");
     const usedIn = request.nextUrl.searchParams.get("usedIn");
 
+    const includeSnapshot = request.nextUrl.searchParams.get("includeSnapshot") === "true";
+
     let query = supabase.from("boq_templates").select(boqTemplateSelectFull, { count: "exact" }).eq("workspace_id", scoped.access.workspaceId).order("use_count", { ascending: false });
     if (search) {
       const safe = search.replace(/[%_,()]/g, " ");
@@ -7525,11 +7604,25 @@ async function boqTemplates(request: NextRequest, supabase: SupabaseClient, id: 
     }
 
     let result = await query;
+    if (!result.error && (result.data ?? []).length === 0) {
+      for (const fix of defaultBoqTemplateFixtures) {
+        await supabase.from("boq_templates").insert({
+          workspace_id: scoped.access.workspaceId,
+          name: fix.name,
+          description: fix.description,
+          tags: fix.tags,
+          use_count: fix.use_count,
+          snapshot: { metadata: fix.metadata, rooms: fix.rooms },
+          created_by: scoped.access.userId,
+        });
+      }
+      result = await query;
+    }
     let total = result.count ?? 0;
 
     if (result.error) return fail("INTERNAL_ERROR", "BOQ templates could not be loaded.", 500, id);
 
-    let items = (result.data ?? []).map((r) => boqTemplateDto(r as Record<string, unknown>));
+    let items = (result.data ?? []).map((r) => boqTemplateDto(r as Record<string, unknown>, includeSnapshot));
 
     if (status && status !== "all") {
       const statusArr = status.toLowerCase().split(",").map(s => s.trim());
@@ -7873,24 +7966,137 @@ async function boqChild(request: Request, supabase: SupabaseClient, id: string, 
     if (kind === "item") {
       const category = await supabase.from("boq_categories").select("room_id").eq("workspace_id", scoped.access.workspaceId).eq("boq_id", boqId).eq("id", parentId!).maybeSingle();
       if (!category.data) return fail("NOT_FOUND", "BOQ category was not found.", 404, id);
-      Object.assign(values, { room_id: category.data.room_id, name: data.name, description: data.description, unit: data.unit, quantity: data.quantity, rate: data.rate, waste_percent: data.wastePercent, tax_percent: data.taxPercent, sort_order: data.sortOrder });
+      const rawDescription = serializeItemMeta(data.description as string, data.subcategoryId as string, data.subcategoryName as string);
+      Object.assign(values, { room_id: category.data.room_id, name: data.name, description: rawDescription, unit: data.unit, quantity: data.quantity, rate: data.rate, waste_percent: data.wastePercent, tax_percent: data.taxPercent, sort_order: data.sortOrder });
     } else Object.assign(values, data);
     const result = await supabase.from(config.table).insert(values).select("*").single();
-    return result.error ? fail("VALIDATION_ERROR", `BOQ ${kind} could not be created.`, 400, id) : ok(result.data, 201, id);
+    if (result.error) return fail("VALIDATION_ERROR", `BOQ ${kind} could not be created.`, 400, id);
+    if (kind === "item" && result.data) {
+      const itemMeta = parseItemMeta(result.data.description);
+      return ok({ ...result.data, description: itemMeta.spec || null, subcategoryId: itemMeta.subcategoryId, subcategoryName: itemMeta.subcategoryName }, 201, id);
+    }
+    return ok(result.data, 201, id);
   }
   if (request.method === "PATCH" && childId) {
     const input = await parsed(request, config.schema.partial().strict().refine((v) => Object.keys(v).length > 0), id); if (input.response) return input.response;
     const data = input.data as Record<string, unknown>;
-    const values = kind === "item" ? { name: data.name, description: data.description, unit: data.unit, quantity: data.quantity, rate: data.rate, waste_percent: data.wastePercent, tax_percent: data.taxPercent, sort_order: data.sortOrder } : data;
+    let values = data;
+    if (kind === "item") {
+      let rawDescription = data.description as string | undefined;
+      if (data.subcategoryId !== undefined || data.description !== undefined) {
+        const existing = await supabase.from("boq_items").select("description").eq("workspace_id", scoped.access.workspaceId).eq("id", childId).maybeSingle();
+        const currentMeta = parseItemMeta(existing.data?.description);
+        const nextSpec = data.description !== undefined ? (data.description as string) : currentMeta.spec;
+        const nextSubId = data.subcategoryId !== undefined ? (data.subcategoryId as string) : currentMeta.subcategoryId;
+        const nextSubName = data.subcategoryName !== undefined ? (data.subcategoryName as string) : currentMeta.subcategoryName;
+        rawDescription = serializeItemMeta(nextSpec, nextSubId, nextSubName);
+      }
+      values = { name: data.name, description: rawDescription, unit: data.unit, quantity: data.quantity, rate: data.rate, waste_percent: data.wastePercent, tax_percent: data.taxPercent, sort_order: data.sortOrder };
+    }
     const clean = Object.fromEntries(Object.entries(values).filter(([,v]) => v !== undefined));
     const result = await supabase.from(config.table).update(clean).eq("workspace_id", scoped.access.workspaceId).eq("boq_id", boqId).eq("id", childId).select("*").maybeSingle();
-    return result.data ? ok(result.data, 200, id) : fail("NOT_FOUND", `BOQ ${kind} was not found.`, 404, id);
+    if (!result.data) return fail("NOT_FOUND", `BOQ ${kind} was not found.`, 404, id);
+    if (kind === "item") {
+      const itemMeta = parseItemMeta(result.data.description);
+      return ok({ ...result.data, description: itemMeta.spec || null, subcategoryId: itemMeta.subcategoryId, subcategoryName: itemMeta.subcategoryName }, 200, id);
+    }
+    return ok(result.data, 200, id);
   }
   if (request.method === "DELETE" && childId) {
     const result = await supabase.from(config.table).delete().eq("workspace_id", scoped.access.workspaceId).eq("boq_id", boqId).eq("id", childId).select("id").maybeSingle();
     return result.data ? ok({ deleted: true, id: childId }, 200, id) : fail("NOT_FOUND", `BOQ ${kind} was not found.`, 404, id);
   }
   return methodNotAllowed(id);
+}
+
+async function createBoqSubcategory(request: Request, supabase: SupabaseClient, id: string, boqId: string, categoryId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const input = await parsed(request, boqSubcategorySchema, id); if (input.response) return input.response;
+  
+  const categoryRes = await supabase.from("boq_categories").select("id, room_id, description").eq("workspace_id", scoped.access.workspaceId).eq("boq_id", boqId).eq("id", categoryId).maybeSingle();
+  if (!categoryRes.data) return fail("NOT_FOUND", "BOQ category was not found.", 404, id);
+
+  const catMeta = parseCategoryMeta(categoryRes.data.description);
+  const existingSubcats = catMeta.subcategories || [];
+  
+  if (existingSubcats.some((s: any) => s.name.toLowerCase() === input.data.name.toLowerCase())) {
+    return fail("VALIDATION_ERROR", `Subcategory "${input.data.name}" already exists in this category.`, 400, id);
+  }
+
+  const newSubcat = {
+    id: randomUUID(),
+    category_id: categoryId,
+    name: input.data.name,
+    description: input.data.description || null,
+    sort_order: existingSubcats.length + 1,
+    items: [],
+  };
+
+  const updatedSubcats = [...existingSubcats, newSubcat];
+  const newRawDescription = serializeCategoryMeta(catMeta.userDescription, updatedSubcats);
+
+  const updateRes = await supabase.from("boq_categories").update({ description: newRawDescription }).eq("workspace_id", scoped.access.workspaceId).eq("boq_id", boqId).eq("id", categoryId).select("*").maybeSingle();
+  if (updateRes.error) return fail("INTERNAL_ERROR", "Failed to create subcategory.", 500, id);
+
+  return ok(newSubcat, 201, id);
+}
+
+async function updateBoqSubcategory(request: Request, supabase: SupabaseClient, id: string, boqId: string, categoryId: string, subcategoryId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const input = await parsed(request, boqSubcategorySchema.partial().strict().refine((v) => Object.keys(v).length > 0), id); if (input.response) return input.response;
+
+  const categoryRes = await supabase.from("boq_categories").select("id, room_id, description").eq("workspace_id", scoped.access.workspaceId).eq("boq_id", boqId).eq("id", categoryId).maybeSingle();
+  if (!categoryRes.data) return fail("NOT_FOUND", "BOQ category was not found.", 404, id);
+
+  const catMeta = parseCategoryMeta(categoryRes.data.description);
+  const existingSubcats = catMeta.subcategories || [];
+  const subcatIndex = existingSubcats.findIndex((s: any) => s.id === subcategoryId);
+  if (subcatIndex === -1) return fail("NOT_FOUND", "Subcategory was not found.", 404, id);
+
+  const current = existingSubcats[subcatIndex];
+  const updatedSubcat = {
+    ...current,
+    ...(input.data.name ? { name: input.data.name } : {}),
+    ...(input.data.description !== undefined ? { description: input.data.description } : {}),
+  };
+
+  existingSubcats[subcatIndex] = updatedSubcat;
+  const newRawDescription = serializeCategoryMeta(catMeta.userDescription, existingSubcats);
+
+  const updateRes = await supabase.from("boq_categories").update({ description: newRawDescription }).eq("workspace_id", scoped.access.workspaceId).eq("boq_id", boqId).eq("id", categoryId).select("*").maybeSingle();
+  if (updateRes.error) return fail("INTERNAL_ERROR", "Failed to update subcategory.", 500, id);
+
+  return ok(updatedSubcat, 200, id);
+}
+
+async function deleteBoqSubcategory(supabase: SupabaseClient, id: string, boqId: string, categoryId: string, subcategoryId: string) {
+  const scoped = await workspaceAccess(supabase, id, true, true); if ("response" in scoped) return scoped.response;
+
+  const categoryRes = await supabase.from("boq_categories").select("id, room_id, description").eq("workspace_id", scoped.access.workspaceId).eq("boq_id", boqId).eq("id", categoryId).maybeSingle();
+  if (!categoryRes.data) return fail("NOT_FOUND", "BOQ category was not found.", 404, id);
+
+  const catMeta = parseCategoryMeta(categoryRes.data.description);
+  const existingSubcats = catMeta.subcategories || [];
+  const filteredSubcats = existingSubcats.filter((s: any) => s.id !== subcategoryId);
+  if (filteredSubcats.length === existingSubcats.length) return fail("NOT_FOUND", "Subcategory was not found.", 404, id);
+
+  const newRawDescription = serializeCategoryMeta(catMeta.userDescription, filteredSubcats);
+  const updateRes = await supabase.from("boq_categories").update({ description: newRawDescription }).eq("workspace_id", scoped.access.workspaceId).eq("boq_id", boqId).eq("id", categoryId).select("*").maybeSingle();
+  if (updateRes.error) return fail("INTERNAL_ERROR", "Failed to delete subcategory.", 500, id);
+
+  const itemsRes = await supabase.from("boq_items").select("id, description").eq("workspace_id", scoped.access.workspaceId).eq("boq_id", boqId).eq("category_id", categoryId);
+  const itemIdsToDelete: string[] = [];
+  for (const it of itemsRes.data || []) {
+    const itMeta = parseItemMeta(it.description);
+    if (itMeta.subcategoryId === subcategoryId) {
+      itemIdsToDelete.push(it.id);
+    }
+  }
+  if (itemIdsToDelete.length > 0) {
+    await supabase.from("boq_items").delete().in("id", itemIdsToDelete);
+  }
+
+  return ok({ deleted: true, id: subcategoryId }, 200, id);
 }
 
 function costingCategoryValues(input: Record<string, unknown>, userId: string) {
@@ -12976,6 +13182,11 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (boqCategoriesMatch && request.method === "POST") return boqChild(request, supabase, id, boqCategoriesMatch[1], "category", boqCategoriesMatch[2]);
   const boqCategoryMatch = route.match(/^boqs\/([0-9a-f-]{36})\/categories\/([0-9a-f-]{36})$/i);
   if (boqCategoryMatch && ["PATCH","DELETE"].includes(request.method)) return boqChild(request, supabase, id, boqCategoryMatch[1], "category", undefined, boqCategoryMatch[2]);
+  const boqSubcategoriesMatch = route.match(/^boqs\/([0-9a-f-]{36})\/categories\/([0-9a-f-]{36})\/subcategories$/i);
+  if (boqSubcategoriesMatch && request.method === "POST") return createBoqSubcategory(request, supabase, id, boqSubcategoriesMatch[1], boqSubcategoriesMatch[2]);
+  const boqSubcategoryMatch = route.match(/^boqs\/([0-9a-f-]{36})\/categories\/([0-9a-f-]{36})\/subcategories\/([0-9a-f-]{36})$/i);
+  if (boqSubcategoryMatch && request.method === "PATCH") return updateBoqSubcategory(request, supabase, id, boqSubcategoryMatch[1], boqSubcategoryMatch[2], boqSubcategoryMatch[3]);
+  if (boqSubcategoryMatch && request.method === "DELETE") return deleteBoqSubcategory(supabase, id, boqSubcategoryMatch[1], boqSubcategoryMatch[2], boqSubcategoryMatch[3]);
   const boqItemsMatch = route.match(/^boqs\/([0-9a-f-]{36})\/categories\/([0-9a-f-]{36})\/items$/i);
   if (boqItemsMatch && request.method === "POST") return boqChild(request, supabase, id, boqItemsMatch[1], "item", boqItemsMatch[2]);
   const boqItemMatch = route.match(/^boqs\/([0-9a-f-]{36})\/items\/([0-9a-f-]{36})$/i);

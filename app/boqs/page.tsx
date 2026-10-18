@@ -2,7 +2,7 @@
 
 import {
     ArrowLeft,
-    ChevronDown,
+    ChevronLeft,
     ChevronRight,
     ChevronUp,
     FileText,
@@ -18,17 +18,29 @@ import {
     Upload,
     Download,
     Check,
+    Loader2,
+    RefreshCw,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { getApiErrorMessage, parseApiResponse, getWorkspaceUsers, type WorkspaceUserItem } from "@/lib/api/auth";
-import { BoqStatusUi, mapBoqListItem, type BoqListItem } from "@/lib/domain/boq-data";
+import {
+    mapBoqListItem,
+    type BoqListItem,
+    formatCompactCurrency,
+    formatBoqDisplayDate,
+} from "@/lib/domain/boq-data";
 import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
 import BoqRowActionMenu from "@/components/boqs/BoqRowActionMenu";
+import BoqStatusDropdown from "@/components/boqs/BoqStatusDropdown";
 import BoqDetailsModal from "@/components/boqs/BoqDetailsModal";
 import BoqTemplatesDrawer from "@/components/boqs/BoqTemplatesDrawer";
 import BoqRoomCategoryView from "@/components/boqs/BoqRoomCategoryView";
+import BoqEmptyIllustration from "@/components/boqs/BoqEmptyIllustration";
+import BoqExcelImportModal from "@/components/boqs/BoqExcelImportModal";
+import BoqDetailView from "@/components/boqs/BoqDetailView";
+import "@/app/boq-redesign.css";
 
 type CreateMode = "blank" | "template";
 
@@ -59,7 +71,6 @@ export default function BoqsPage() {
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(true);
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-    const [openStatusId, setOpenStatusId] = useState<string | null>(null);
     const [projects, setProjects] = useState<{ id: string; name: string; assignedDesignerId?: string | null; clientName?: string | null }[]>([]);
     const [templates, setTemplates] = useState<{ id: string; name: string; description: string | null; tags: string[] | null; use_count: number }[]>([]);
     const [workspaceUsers, setWorkspaceUsers] = useState<WorkspaceUserItem[]>([]);
@@ -75,6 +86,8 @@ export default function BoqsPage() {
     const [pageSize, setPageSize] = useState(10);
     const [total, setTotal] = useState(0);
     const [pendingApprovals, setPendingApprovals] = useState(0);
+    const [showExcelImportModal, setShowExcelImportModal] = useState(false);
+    const [searchQuery, setSearchQuery] = useState("");
 
     useEffect(() => {
         if (typeof window !== "undefined") {
@@ -114,7 +127,7 @@ export default function BoqsPage() {
                         setSelectedProjId(items[0].id);
                     }
                 }
-            } catch (e) {}
+            } catch (e) { }
         };
         const loadTemplates = async () => {
             try {
@@ -123,7 +136,7 @@ export default function BoqsPage() {
                     const d = await res.json();
                     setTemplates(d.data?.items ?? []);
                 }
-            } catch (e) {}
+            } catch (e) { }
         };
         const loadUsers = async () => {
             try {
@@ -131,7 +144,7 @@ export default function BoqsPage() {
                 if (res.items) {
                     setWorkspaceUsers(res.items);
                 }
-            } catch (e) {}
+            } catch (e) { }
         };
         void loadProj();
         void loadTemplates();
@@ -139,17 +152,17 @@ export default function BoqsPage() {
 
         const handleClick = () => {
             setOpenMenuId(null);
-            setOpenStatusId(null);
         };
         window.addEventListener("click", handleClick);
         return () => window.removeEventListener("click", handleClick);
     }, []);
 
-    const loadBoqs = useCallback(async () => {
+    const loadBoqs = useCallback(async (query = searchQuery) => {
         try {
             setLoading(true);
             setError("");
-            const response = await fetch(`/api/v1/boqs?page=${page}&pageSize=${pageSize}`, { credentials: "include" });
+            const searchParam = query ? `&search=${encodeURIComponent(query)}` : "";
+            const response = await fetch(`/api/v1/boqs?page=${page}&pageSize=${pageSize}${searchParam}`, { credentials: "include" });
             const payload = await response.json();
             if (!response.ok) {
                 setError(getApiErrorMessage(payload));
@@ -180,8 +193,19 @@ export default function BoqsPage() {
                 });
             });
 
-            setBoqRows(mapped);
-            setTotal(result.total ?? mapped.length);
+            // Client-side fallback search filter for project name & assignee
+            const filtered = query
+                ? mapped.filter(
+                    (b) =>
+                        b.boqNumber.toLowerCase().includes(query.toLowerCase()) ||
+                        b.projectName.toLowerCase().includes(query.toLowerCase()) ||
+                        b.assignedTo.toLowerCase().includes(query.toLowerCase()) ||
+                        b.version.toLowerCase().includes(query.toLowerCase())
+                )
+                : mapped;
+
+            setBoqRows(filtered);
+            setTotal(query ? filtered.length : (result.total ?? mapped.length));
             if (typeof result.pendingApprovals === "number") {
                 setPendingApprovals(result.pendingApprovals);
             } else {
@@ -199,7 +223,12 @@ export default function BoqsPage() {
         } finally {
             setLoading(false);
         }
-    }, [page, pageSize, projects]);
+    }, [page, pageSize, projects, searchQuery]);
+
+    const handleSearch = (q: string) => {
+        setSearchQuery(q);
+        setPage(1);
+    };
 
     useEffect(() => {
         void loadBoqs();
@@ -234,233 +263,293 @@ export default function BoqsPage() {
             <DashboardRail />
 
             <div className="fig-dashboard-main">
-                <DashboardHeader title="Bill of Quantities" onNew={() => setShowCreateModal(true)} />
+                <DashboardHeader title="BOQ" onSearch={handleSearch} onNew={() => setShowCreateModal(true)} />
 
                 {screen === "list" ? (
-                    <section className="boq-page-shell">
-                        <div className="boq-page-header-row">
-                            <div className="boq-page-title-block">
-                                <h2>Bill of Quantities</h2>
-                                <p>
-                                    {total} {total === 1 ? "BOQ" : "BOQs"} • {pendingApprovals} {pendingApprovals === 1 ? "Pending Approval" : "Pending Approvals"}
+                    <section className="boq-page-shell-redesign">
+                        {/* Page Header Row (Frame 2147225066) */}
+                        <div className="boq-header-row-redesign">
+                            <div className="boq-title-section-redesign">
+                                <h2 className="boq-main-title-redesign">Bill of Quantities</h2>
+                                <p className="boq-summary-line-redesign">
+                                    {total} {total === 1 ? "BOQ" : "BOQs"} | {pendingApprovals} pending approval
                                 </p>
                             </div>
-                            <div className="boq-page-actions">
+                            <div className="boq-toolbar-actions-redesign">
                                 <button
                                     type="button"
-                                    className="boq-ghost-button"
-                                    onClick={() => {
-                                        setCreateMode("blank");
-                                        setShowDetailsModal(true);
-                                    }}
+                                    className="boq-btn-import-excel-redesign"
+                                    onClick={() => setShowExcelImportModal(true)}
                                 >
                                     Import Excel
                                 </button>
-                                <button type="button" className="fig-dashboard-new boq-create-button" onClick={() => setShowCreateModal(true)}>
-                                    <Plus size={18} />
+                                <button
+                                    type="button"
+                                    className="boq-btn-new-boq-redesign"
+                                    onClick={() => setShowCreateModal(true)}
+                                >
+                                    <Plus size={20} color="#FFFFFF" strokeWidth={2.5} />
                                     <span>New BOQ</span>
                                 </button>
                             </div>
                         </div>
 
-                        {error ? <div className="boq-alert">{error}</div> : null}
+                        {error ? (
+                            <div className="boq-alert-redesign">
+                                <span>{error}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => void loadBoqs()}
+                                    style={{
+                                        background: "transparent",
+                                        border: "none",
+                                        color: "#991B1B",
+                                        cursor: "pointer",
+                                        fontWeight: 600,
+                                        textDecoration: "underline",
+                                    }}
+                                >
+                                    Retry
+                                </button>
+                            </div>
+                        ) : null}
 
-                        <div className="boq-list-table-wrap">
-                            <table className="boq-dashboard-table">
-                                <thead>
-                                    <tr>
-                                        <th>BOQ ID</th>
-                                        <th>Project</th>
-                                        <th>Version</th>
-                                        <th>Rooms</th>
-                                        <th>Items</th>
-                                        <th>Estimated Value</th>
-                                        <th>Assigned To</th>
-                                        <th>Date</th>
-                                        <th>Status</th>
-                                        <th></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {loading ? (
-                                        <tr>
-                                            <td colSpan={10} style={{ textAlign: "center", padding: "24px" }}>Loading BOQs...</td>
-                                        </tr>
-                                    ) : boqRows.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={10} style={{ padding: "0" }}>
-                                                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "64px 24px", background: "#fff" }}>
-                                                    <img src="/assets/dashboard/empty-boqs.png" alt="No BOQs found" style={{ width: "240px", marginBottom: "24px" }} />
-                                                    <strong style={{ fontSize: "20px", color: "#1f2d3d", marginBottom: "8px" }}>No BOQs found</strong>
-                                                    <p style={{ color: "#6b7280", fontSize: "15px", marginBottom: "24px", textAlign: "center" }}>Create your first BOQ to start managing<br />your project quantities and estimates.</p>
-                                                    <button type="button" className="fig-dashboard-new" onClick={() => setShowCreateModal(true)} style={{ padding: "10px 24px" }}>
-                                                        <Plus size={18} /><span>New BOQ</span>
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        boqRows.map((boq, index) => {
-                                            const isNearBottom = index >= boqRows.length - 2 && boqRows.length >= 2;
-                                            const isRowActive = openStatusId === boq.id || openMenuId === boq.id;
-                                            return (
-                                                <tr
-                                                    key={boq.id}
-                                                    className="boq-row"
-                                                    onClick={() => openBoq(boq.id)}
-                                                    style={{ position: "relative", zIndex: isRowActive ? 50 : 1 }}
-                                                >
-                                                    <td>{boq.boqNumber}</td>
-                                                    <td>
-                                                        <strong style={{ color: "#0f172a", fontWeight: 600 }}>{boq.projectName}</strong>
-                                                    </td>
-                                                    <td>{boq.version}</td>
-                                                    <td>{boq.rooms}</td>
-                                                    <td>{boq.items}</td>
-                                                    <td>{formatMoney(boq.estimatedValue)}</td>
-                                                    <td>{boq.assignedTo}</td>
-                                                    <td>{boq.date}</td>
-                                                    <td>
-                                                        <div className="boq-cell-dropdown-anchor" onClick={(e) => e.stopPropagation()}>
-                                                            <span
-                                                                className={`boq-status-pill ${boq.status.toLowerCase().replace(/\s/g, "-")}`}
-                                                                style={{ display: "inline-flex", alignItems: "center", gap: "4px", cursor: "pointer" }}
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setOpenStatusId(openStatusId === boq.id ? null : boq.id);
-                                                                    setOpenMenuId(null);
-                                                                }}
-                                                            >
-                                                                {boq.status} <ChevronDown size={14} />
-                                                            </span>
-                                                            {openStatusId === boq.id && (
-                                                                <div
-                                                                    className="boq-dropdown-menu"
-                                                                    style={{
-                                                                        left: 0,
-                                                                        ...(isNearBottom
-                                                                            ? { bottom: "100%", marginBottom: "6px" }
-                                                                            : { top: "100%", marginTop: "6px" })
-                                                                    }}
-                                                                >
-                                                                    {(["DRAFT", "IN REVIEW", "APPROVED", "ARCHIVED"] as BoqStatusUi[]).map((status) => (
-                                                                        <button
-                                                                            key={status}
-                                                                            onClick={async (e) => {
-                                                                                e.stopPropagation();
-                                                                                setOpenStatusId(null);
-                                                                                const backendStatus = status.toLowerCase().replace(/\s/g, "_");
-                                                                                const res = await fetch(`/api/v1/boqs/${boq.id}/status`, {
-                                                                                    method: "POST",
-                                                                                    headers: { "Content-Type": "application/json" },
-                                                                                    body: JSON.stringify({ status: backendStatus }),
-                                                                                    credentials: "include",
-                                                                                });
-                                                                                if (res.ok) {
-                                                                                    setBoqRows((prev) =>
-                                                                                        prev.map((b) => (b.id === boq.id ? { ...b, status } : b))
-                                                                                    );
-                                                                                    void loadBoqs();
-                                                                                }
-                                                                            }}
-                                                                        >
-                                                                            {status}
-                                                                        </button>
-                                                                    ))}
-                                                                </div>
-                                                            )}
+                        {/* Main Content Surface (Frame 2147225067) */}
+                        <div className="boq-content-surface-redesign">
+                            {loading ? (
+                                <div className="boq-state-feedback-card" style={{ minHeight: "360px" }}>
+                                    <Loader2 size={32} className="animate-spin" color="#2563EB" />
+                                    <span style={{ fontSize: "15px", color: "#64748B" }}>Loading Bill of Quantities...</span>
+                                </div>
+                            ) : boqRows.length === 0 ? (
+                                searchQuery ? (
+                                    /* Search No-Results State */
+                                    <div className="boq-empty-container-redesign">
+                                        <Search size={44} color="#94A3B8" />
+                                        <div className="boq-empty-text-block-redesign">
+                                            <h3 className="boq-empty-title-redesign">No matching BOQs found</h3>
+                                            <p className="boq-empty-subtitle-redesign">
+                                                No BOQs matched &ldquo;{searchQuery}&rdquo;. Try adjusting your keywords or clearing the search.
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className="boq-btn-import-excel-redesign"
+                                            onClick={() => {
+                                                setSearchQuery("");
+                                                setPage(1);
+                                            }}
+                                        >
+                                            Clear Search
+                                        </button>
+                                    </div>
+                                ) : (
+                                    /* Figma Empty State (Frame 2147225421 + Frame 2147225422) */
+                                    <div className="boq-empty-container-redesign">
+                                        <BoqEmptyIllustration />
+                                        <div className="boq-empty-text-block-redesign">
+                                            <h3 className="boq-empty-title-redesign">No BOQs found</h3>
+                                            <p className="boq-empty-subtitle-redesign">
+                                                Create your first BOQ to start managing your project quantities and estimates.
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className="boq-btn-new-boq-redesign"
+                                            onClick={() => setShowCreateModal(true)}
+                                        >
+                                            <Plus size={20} color="#FFFFFF" strokeWidth={2.5} />
+                                            <span>New BOQ</span>
+                                        </button>
+                                    </div>
+                                )
+                            ) : (
+                                /* Populated State Table */
+                                <div className="boq-table-responsive-wrap-redesign">
+                                    <div className="boq-table-redesign">
+                                        {/* Table Header Row (Frame 57) */}
+                                        <div className="boq-th-row-redesign">
+                                            <div className="boq-th-cell-redesign boq-col-id-w">BOQ ID</div>
+                                            <div className="boq-th-cell-redesign boq-col-project-w">PROJECT</div>
+                                            <div className="boq-th-cell-redesign boq-col-version-w">VERSION</div>
+                                            <div className="boq-th-cell-redesign boq-col-rooms-w">ROOMS</div>
+                                            <div className="boq-th-cell-redesign boq-col-items-w">ITEMS</div>
+                                            <div className="boq-th-cell-redesign boq-col-value-w">ESTIMATED VALUE</div>
+                                            <div className="boq-th-cell-redesign boq-col-assigned-w">ASSIGNED TO</div>
+                                            <div className="boq-th-cell-redesign boq-col-date-w">DATE</div>
+                                            <div className="boq-th-cell-redesign boq-col-status-w">STATUS</div>
+                                            <div className="boq-th-cell-redesign boq-col-actions-w"></div>
+                                        </div>
+
+                                        {/* Table Rows (Frame 61) */}
+                                        <div className="boq-tbody-redesign">
+                                            {boqRows.map((boq, index) => {
+                                                return (
+                                                    <div
+                                                        key={boq.id}
+                                                        className="boq-tr-redesign"
+                                                        onClick={() => openBoq(boq.id)}
+                                                    >
+                                                        <div className="boq-td-cell-redesign boq-col-id-w">
+                                                            {boq.boqNumber}
                                                         </div>
-                                                    </td>
-                                                    <td>
-                                                        <BoqRowActionMenu
-                                                            boqId={boq.id}
-                                                            onOpenEditor={() => openBoq(boq.id)}
-                                                            onDuplicate={async () => {
-                                                                try {
-                                                                    const res = await fetch(`/api/v1/boqs/${boq.id}/duplicate`, {
+                                                        <div
+                                                            className="boq-td-cell-redesign boq-col-project-w project-name"
+                                                            title={boq.projectName}
+                                                        >
+                                                            {boq.projectName}
+                                                        </div>
+                                                        <div className="boq-td-cell-redesign boq-col-version-w">
+                                                            {boq.version}
+                                                        </div>
+                                                        <div className="boq-td-cell-redesign boq-col-rooms-w">
+                                                            {boq.rooms}
+                                                        </div>
+                                                        <div className="boq-td-cell-redesign boq-col-items-w">
+                                                            {boq.items}
+                                                        </div>
+                                                        <div className="boq-td-cell-redesign boq-col-value-w estimated-value">
+                                                            {formatCompactCurrency(boq.estimatedValue)}
+                                                        </div>
+                                                        <div
+                                                            className="boq-td-cell-redesign boq-col-assigned-w"
+                                                            title={boq.assignedTo}
+                                                        >
+                                                            {boq.assignedTo}
+                                                        </div>
+                                                        <div className="boq-td-cell-redesign boq-col-date-w">
+                                                            {formatBoqDisplayDate(boq.date)}
+                                                        </div>
+                                                        <div
+                                                            className="boq-td-cell-redesign boq-col-status-w"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        >
+                                                            <BoqStatusDropdown
+                                                                value={boq.status}
+                                                                onChange={async (status) => {
+                                                                    const backendStatus = status.toLowerCase().replace(/\s/g, "_");
+                                                                    const res = await fetch(`/api/v1/boqs/${boq.id}/status`, {
                                                                         method: "POST",
+                                                                        headers: { "Content-Type": "application/json" },
+                                                                        body: JSON.stringify({ status: backendStatus }),
                                                                         credentials: "include",
                                                                     });
                                                                     if (res.ok) {
+                                                                        setBoqRows((prev) =>
+                                                                            prev.map((b) => (b.id === boq.id ? { ...b, status } : b))
+                                                                        );
                                                                         void loadBoqs();
-                                                                    } else {
-                                                                        const p = await res.json().catch(() => ({}));
-                                                                        setError(getApiErrorMessage(p));
                                                                     }
-                                                                } catch {
-                                                                    setError("Failed to duplicate BOQ");
-                                                                }
-                                                            }}
-                                                            onExportPdf={() => {
-                                                                window.open(`/api/v1/boqs/${boq.id}/pdf`, "_blank");
-                                                            }}
-                                                            onExportExcel={() => {
-                                                                window.open(`/api/v1/boqs/${boq.id}/excel`, "_blank");
-                                                            }}
-                                                        />
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        <div
+                                                            className="boq-td-cell-redesign boq-col-actions-w"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        >
+                                                            <BoqRowActionMenu
+                                                                boqId={boq.id}
+                                                                onOpenEditor={() => openBoq(boq.id)}
+                                                                onDuplicate={async () => {
+                                                                    try {
+                                                                        const res = await fetch(`/api/v1/boqs/${boq.id}/duplicate`, {
+                                                                            method: "POST",
+                                                                            credentials: "include",
+                                                                        });
+                                                                        if (res.ok) {
+                                                                            void loadBoqs();
+                                                                        } else {
+                                                                            const p = await res.json().catch(() => ({}));
+                                                                            setError(getApiErrorMessage(p));
+                                                                        }
+                                                                    } catch {
+                                                                        setError("Failed to duplicate BOQ");
+                                                                    }
+                                                                }}
+                                                                onExportPdf={() => {
+                                                                    window.open(`/api/v1/boqs/${boq.id}/pdf`, "_blank");
+                                                                }}
+                                                                onExportExcel={() => {
+                                                                    window.open(`/api/v1/boqs/${boq.id}/excel`, "_blank");
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
 
-                        <div className="boq-footer-row">
-                            <span className="boq-footer-total">Total: {total}</span>
-                            <div className="boq-pagination">
-                                <button
-                                    type="button"
-                                    disabled={page <= 1}
-                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                                    aria-label="Previous page"
-                                >
-                                    ‹
-                                </button>
-                                {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((p) => (
-                                    <button
-                                        key={p}
-                                        type="button"
-                                        className={page === p ? "active" : ""}
-                                        onClick={() => setPage(p)}
-                                    >
-                                        {p}
-                                    </button>
-                                ))}
-                                <button
-                                    type="button"
-                                    disabled={page >= totalPages}
-                                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                                    aria-label="Next page"
-                                >
-                                    ›
-                                </button>
-                            </div>
-                            <label className="boq-page-size">
-                                <span>Show per Page:</span>
-                                <select
-                                    value={pageSize}
-                                    onChange={(e) => {
-                                        setPageSize(Number(e.target.value));
-                                        setPage(1);
-                                    }}
-                                >
-                                    <option value="10">10</option>
-                                    <option value="20">20</option>
-                                    <option value="50">50</option>
-                                </select>
-                            </label>
+                                        {/* Pagination Footer Row (Frame 2147225166) */}
+                                        <div className="boq-table-footer-row-redesign">
+                                            <div className="boq-footer-total-label-redesign">
+                                                Total: {total}
+                                            </div>
+                                            <div className="boq-pagination-controls-redesign">
+                                                <button
+                                                    type="button"
+                                                    className="boq-page-btn-redesign"
+                                                    disabled={page <= 1}
+                                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                                    aria-label="Previous page"
+                                                >
+                                                    <ChevronLeft size={18} color={page <= 1 ? "#94A3B8" : "#64748B"} />
+                                                </button>
+                                                {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((p) => (
+                                                    <button
+                                                        key={p}
+                                                        type="button"
+                                                        className={`boq-page-btn-redesign ${page === p ? "active" : ""}`}
+                                                        onClick={() => setPage(p)}
+                                                    >
+                                                        {p}
+                                                    </button>
+                                                ))}
+                                                <button
+                                                    type="button"
+                                                    className="boq-page-btn-redesign"
+                                                    disabled={page >= totalPages}
+                                                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                                                    aria-label="Next page"
+                                                >
+                                                    <ChevronRight size={18} color={page >= totalPages ? "#94A3B8" : "#0F172A"} />
+                                                </button>
+                                            </div>
+                                            <div className="boq-page-size-wrap-redesign">
+                                                <span className="boq-page-size-label-redesign">Show per Page:</span>
+                                                <select
+                                                    className="boq-page-size-select-redesign"
+                                                    value={pageSize}
+                                                    onChange={(e) => {
+                                                        setPageSize(Number(e.target.value));
+                                                        setPage(1);
+                                                    }}
+                                                >
+                                                    <option value="10">10</option>
+                                                    <option value="20">20</option>
+                                                    <option value="50">50</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </section>
                 ) : activeBoq ? (
-                    <BoqDetail
-                        activeBoq={activeBoq}
-                        onBack={() => {
-                            setScreen("list");
-                            void loadBoqs();
-                        }}
-                    />
+                    <div>
+                        {/* {activeBoq.projectId && (
+                            <a href={`/projects/${activeBoq.projectId}`} className="sr-only">
+                                Back to Project
+                            </a>
+                        )} */}
+                        <BoqDetail
+                            activeBoq={activeBoq}
+                            onBack={() => {
+                                setScreen("list");
+                                void loadBoqs();
+                            }}
+                        />
+                    </div>
                 ) : null}
             </div>
 
@@ -552,1247 +641,20 @@ export default function BoqsPage() {
                     }
                 }}
             />
+
+            {/* Excel Import Modal for BOQs */}
+            <BoqExcelImportModal
+                isOpen={showExcelImportModal}
+                onClose={() => setShowExcelImportModal(false)}
+                projects={projects}
+                onSuccess={() => {
+                    void loadBoqs();
+                }}
+            />
         </main>
     );
 }
 
-function parseSafeRoomDescription(rawDescription: any): string {
-    if (!rawDescription || typeof rawDescription !== "string") return "";
-    const trimmed = rawDescription.trim();
-    if (trimmed.startsWith("{")) {
-        try {
-            const parsed = JSON.parse(trimmed);
-            if (parsed.userNotes && typeof parsed.userNotes === "string" && !parsed.userNotes.trim().startsWith("{")) {
-                return parsed.userNotes.trim();
-            }
-            if (Array.isArray(parsed.requirements) && parsed.requirements.length > 0) {
-                const r0 = parsed.requirements[0];
-                if (r0.name && r0.notes && !r0.notes.startsWith("{")) return `${r0.name} - ${r0.notes}`;
-                if (r0.name) return r0.name;
-            }
-        } catch {
-            // ignore
-        }
-        return "";
-    }
-    return trimmed;
-}
-
-function getRoomPresentation(room: any) {
-    const cats = room.categories || [];
-    const uniqueCats = Array.from(new Map(cats.map((c: any) => [c.id, c])).values());
-    const rawItems = uniqueCats.flatMap((c: any) => c.items || []);
-    const uniqueItems = Array.from(new Map(rawItems.map((i: any) => [i.id, i])).values());
-
-    const categoryCount = uniqueCats.length > 0 ? uniqueCats.length : (room.categoryCount || 1);
-    const itemCount = uniqueItems.length;
-
-    const roomAmount = uniqueItems.reduce((sum: number, it: any) => {
-        const amt = Number(it.amount);
-        if (!isNaN(amt) && amt > 0) return sum + amt;
-        const q = Number(it.quantity) || 0;
-        const r = Number(it.rate) || 0;
-        return sum + (q * r);
-    }, 0);
-
-    const firstItem = uniqueItems[0];
-
-    const rLower = (room.name || "").toLowerCase();
-    const fallbackSpec =
-        rLower.includes("master") ? "Custom, 6×6.5ft" :
-        rLower.includes("bedroom") ? "Custom, 18×24in" :
-        rLower.includes("living") ? "MDF + PU Lacquer" :
-        rLower.includes("din") ? "18mm thick, honed" :
-        "Double layer GRP";
-
-    const fallbackUnit =
-        (rLower.includes("bedroom 02") || rLower.includes("bedroom 03")) ? "Set" :
-        rLower.includes("living") ? "RFt" :
-        rLower.includes("din") ? "Sqft" : "No";
-
-    const spec = firstItem?.description || firstItem?.spec || (itemCount === 0 ? fallbackSpec : "-");
-    const unit = firstItem?.unit || (itemCount === 0 ? fallbackUnit : "-");
-
-    let displayDesc = "";
-    if (firstItem) {
-        const iName = (firstItem.name || "").trim();
-        const iDesc = (firstItem.description || "").trim();
-        if (iName && iDesc && iDesc !== iName && !iDesc.startsWith("{")) {
-            displayDesc = `${iName} — ${iDesc}`;
-        } else if (iName) {
-            displayDesc = iName;
-        } else if (iDesc && !iDesc.startsWith("{")) {
-            displayDesc = iDesc;
-        }
-    }
-
-    if (!displayDesc) {
-        const userNotes = parseSafeRoomDescription(room.description);
-        if (userNotes) {
-            displayDesc = userNotes;
-        } else {
-            displayDesc =
-                rLower.includes("master") ? "King Size Platform Bed with Upholstered Headboard" :
-                rLower.includes("bedroom") ? "Bedside Tables - Pair, with Soft-Close Drawers" :
-                rLower.includes("living") ? "Sliding Wardrobe 3-Panel Mirror Finish, 10ft Width" :
-                rLower.includes("din") ? "Italian Marble 600×600mm -Bianco Carrara" :
-                rLower.includes("kitchen") || rLower.includes("study") || rLower.includes("guest") ? "False Ceiling - Gypsum Board with Cove Lighting" :
-                "Interior woodwork & finishes";
-        }
-    }
-
-    const fullTooltip = uniqueItems.length > 0
-        ? `${room.name} (${uniqueItems.length} items):\n` +
-          uniqueItems.map((it: any) => `• ${it.name}${it.description ? ` [${it.description}]` : ''} — ${it.quantity} ${it.unit || ''} @ ₹${Number(it.rate || 0).toLocaleString('en-IN')}`).join('\n')
-        : displayDesc;
-
-    return {
-        uniqueCats,
-        uniqueItems,
-        categoryCount,
-        itemCount,
-        roomAmount,
-        spec,
-        unit,
-        displayDesc,
-        fullTooltip,
-    };
-}
-
 function BoqDetail({ activeBoq, onBack }: { activeBoq: BoqListItem; onBack: () => void }) {
-    const [loading, setLoading] = useState(true);
-    const [rooms, setRooms] = useState<any[]>([]);
-    const [boqData, setBoqData] = useState<any>(null);
-    const [actionError, setActionError] = useState("");
-    const [searchQuery, setSearchQuery] = useState("");
-
-    // Action modals & drawers
-    const [showImportModal, setShowImportModal] = useState(false);
-    const [showTemplateModal, setShowTemplateModal] = useState(false);
-    const [addingRoom, setAddingRoom] = useState(false);
-    const [newRoomName, setNewRoomName] = useState("");
-    const [selectedRoomForItems, setSelectedRoomForItems] = useState<any | null>(null);
-    const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
-    const [openRowMenuId, setOpenRowMenuId] = useState<string | null>(null);
-    const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
-    const [editRoomName, setEditRoomName] = useState("");
-
-    useEffect(() => {
-        if (typeof window !== "undefined") {
-            const sp = new URLSearchParams(window.location.search);
-            const rId = sp.get("roomId");
-            if (rId) {
-                setSelectedRoomId(rId);
-            }
-        }
-    }, []);
-
-    // Add item form state inside Manage Items Modal
-    const [itemName, setItemName] = useState("");
-    const [itemSpec, setItemSpec] = useState("");
-    const [itemUnit, setItemUnit] = useState("No");
-    const [itemQty, setItemQty] = useState("1");
-    const [itemRate, setItemRate] = useState("1000");
-
-    // Excel import state
-    const [importingExcel, setImportingExcel] = useState(false);
-    const [importSuccessMsg, setImportSuccessMsg] = useState("");
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    const loadDetail = async () => {
-        setLoading(true);
-        setActionError("");
-        try {
-            const res = await fetch(`/api/v1/boqs/${activeBoq.id}`, { credentials: "include" });
-            if (!res.ok) throw new Error("Failed to load BOQ details");
-            const data = await res.json();
-            const boq = data.data;
-            setBoqData(boq);
-            const loadedRooms = boq?.rooms && Array.isArray(boq.rooms) ? boq.rooms : [];
-            const uniqueRooms = Array.from(new Map(loadedRooms.map((r: any) => [r.id, r])).values());
-            setRooms(uniqueRooms);
-            if (selectedRoomForItems) {
-                const refreshed = uniqueRooms.find((r: any) => r.id === selectedRoomForItems.id);
-                if (refreshed) setSelectedRoomForItems(refreshed);
-            }
-        } catch (err) {
-            setActionError(err instanceof Error ? err.message : "Failed to load BOQ details");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        void loadDetail();
-    }, [activeBoq.id]);
-
-    useEffect(() => {
-        const handleOutsideClick = () => {
-            setOpenRowMenuId(null);
-        };
-        window.addEventListener("click", handleOutsideClick);
-        return () => window.removeEventListener("click", handleOutsideClick);
-    }, []);
-
-    const handleDuplicateRoom = async (roomId: string) => {
-        try {
-            const res = await fetch(`/api/v1/boqs/${activeBoq.id}/rooms/${roomId}/duplicate`, {
-                method: "POST",
-                credentials: "include",
-            });
-            if (!res.ok) {
-                const p = await res.json().catch(() => ({}));
-                throw new Error(getApiErrorMessage(p));
-            }
-            void loadDetail();
-        } catch (err) {
-            setActionError(err instanceof Error ? err.message : "Failed to duplicate room");
-        }
-    };
-
-    const handleDuplicate = async () => {
-        try {
-            const res = await fetch(`/api/v1/boqs/${activeBoq.id}/duplicate`, { method: "POST", credentials: "include" });
-            if (!res.ok) {
-                const p = await res.json().catch(() => ({}));
-                throw new Error(getApiErrorMessage(p));
-            }
-            onBack();
-        } catch (err) {
-            setActionError(err instanceof Error ? err.message : "Failed to duplicate");
-        }
-    };
-
-    const handleStatusChange = async (status: string) => {
-        try {
-            const res = await fetch(`/api/v1/boqs/${activeBoq.id}/status`, {
-                method: "POST",
-                credentials: "include",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status }),
-            });
-            if (!res.ok) {
-                const p = await res.json().catch(() => ({}));
-                throw new Error(getApiErrorMessage(p));
-            }
-            void loadDetail();
-        } catch (err) {
-            setActionError(err instanceof Error ? err.message : "Failed to change status");
-        }
-    };
-
-    const handleAddRoom = async (customName?: string) => {
-        const nameToUse = customName || newRoomName;
-        if (!nameToUse.trim()) return;
-        try {
-            const res = await fetch(`/api/v1/boqs/${activeBoq.id}/rooms`, {
-                method: "POST",
-                credentials: "include",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name: nameToUse.trim() }),
-            });
-            if (!res.ok) {
-                const p = await res.json().catch(() => ({}));
-                throw new Error(getApiErrorMessage(p));
-            }
-            setNewRoomName("");
-            setAddingRoom(false);
-            void loadDetail();
-        } catch (err) {
-            setActionError(err instanceof Error ? err.message : "Failed to add room");
-        }
-    };
-
-    const handleEditRoom = async (roomId: string) => {
-        if (!editRoomName.trim()) return;
-        try {
-            const res = await fetch(`/api/v1/boqs/${activeBoq.id}/rooms/${roomId}`, {
-                method: "PATCH",
-                credentials: "include",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name: editRoomName.trim() }),
-            });
-            if (!res.ok) {
-                const p = await res.json().catch(() => ({}));
-                throw new Error(getApiErrorMessage(p));
-            }
-            setEditingRoomId(null);
-            setEditRoomName("");
-            void loadDetail();
-        } catch (err) {
-            setActionError(err instanceof Error ? err.message : "Failed to edit room");
-        }
-    };
-
-    const handleDeleteRoom = async (roomId: string) => {
-        if (!confirm("Are you sure you want to delete this room?")) return;
-        try {
-            const res = await fetch(`/api/v1/boqs/${activeBoq.id}/rooms/${roomId}`, {
-                method: "DELETE",
-                credentials: "include",
-            });
-            if (!res.ok) {
-                const p = await res.json().catch(() => ({}));
-                throw new Error(getApiErrorMessage(p));
-            }
-            if (selectedRoomForItems?.id === roomId) setSelectedRoomForItems(null);
-            void loadDetail();
-        } catch (err) {
-            setActionError(err instanceof Error ? err.message : "Failed to delete room");
-        }
-    };
-
-    const handleAddItem = async (roomId: string) => {
-        if (!itemName.trim() || Number(itemQty) <= 0 || Number(itemRate) < 0) return;
-        try {
-            const currentRoom = rooms.find((r) => r.id === roomId);
-            let categoryId = currentRoom?.categories?.[0]?.id;
-
-            if (!categoryId) {
-                const catRes = await fetch(`/api/v1/boqs/${activeBoq.id}/rooms/${roomId}/categories`, {
-                    method: "POST",
-                    credentials: "include",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ name: "General" }),
-                });
-                if (!catRes.ok) {
-                    const p = await catRes.json().catch(() => ({}));
-                    throw new Error(getApiErrorMessage(p));
-                }
-                const catData = await catRes.json();
-                categoryId = catData.data?.id;
-            }
-
-            const itemRes = await fetch(`/api/v1/boqs/${activeBoq.id}/categories/${categoryId}/items`, {
-                method: "POST",
-                credentials: "include",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    name: itemName.trim(),
-                    description: itemSpec.trim() || undefined,
-                    unit: itemUnit,
-                    quantity: Number(itemQty),
-                    rate: Number(itemRate),
-                }),
-            });
-            if (!itemRes.ok) {
-                const p = await itemRes.json().catch(() => ({}));
-                throw new Error(getApiErrorMessage(p));
-            }
-
-            setItemName("");
-            setItemSpec("");
-            setItemQty("1");
-            setItemRate("1000");
-            void loadDetail();
-        } catch (err) {
-            setActionError(err instanceof Error ? err.message : "Failed to add item");
-        }
-    };
-
-    const handleDeleteItem = async (itemId: string) => {
-        try {
-            const res = await fetch(`/api/v1/boqs/${activeBoq.id}/items/${itemId}`, {
-                method: "DELETE",
-                credentials: "include",
-            });
-            if (!res.ok) {
-                const p = await res.json().catch(() => ({}));
-                throw new Error(getApiErrorMessage(p));
-            }
-            void loadDetail();
-        } catch (err) {
-            setActionError(err instanceof Error ? err.message : "Failed to delete item");
-        }
-    };
-
-    // Load sample design data (8 rooms) matching reference design perfectly
-    const handleLoadSampleDesignData = async () => {
-        setImportingExcel(true);
-        setImportSuccessMsg("");
-        setActionError("");
-        try {
-            const sampleData = [
-                { room: "Master Bedroom", catCount: 3, name: "King Size Platform Bed with Upholstered Headboard W...", spec: "Custom, 6×6.5ft", unit: "No", qty: 8, rate: 23125 },
-                { room: "Bedroom 02", catCount: 2, name: "Bedside Tables - Pair, with Soft-Close Drawers", spec: "Custom, 18×24in", unit: "Set", qty: 15, rate: 2800 },
-                { room: "Bedroom 03", catCount: 2, name: "Bedside Tables - Pair, with Soft-Close Drawers", spec: "Custom, 18×24in", unit: "Set", qty: 20, rate: 2100 },
-                { room: "Living Room", catCount: 2, name: "Sliding Wardrobe 3-Panel Mirror Finish, 10ft Width", spec: "MDF + PU Lacquer", unit: "RFt", qty: 10, rate: 12500 },
-                { room: "Dinning Room", catCount: 3, name: "Italian Marble 600×600mm -Bianco Carrara", spec: "18mm thick, honed", unit: "Sqft", qty: 320, rate: 480 },
-                { room: "Kitchen", catCount: 2, name: "False Ceiling - Gypsum Board with Cove Lighting", spec: "Double layer GRP", unit: "No", qty: 24, rate: 3300 },
-                { room: "Study Room", catCount: 1, name: "False Ceiling - Gypsum Board with Cove Lighting", spec: "Double layer GRP", unit: "No", qty: 24, rate: 3300 },
-                { room: "Guest Bedroom", catCount: 3, name: "False Ceiling - Gypsum Board with Cove Lighting", spec: "Double layer GRP", unit: "No", qty: 24, rate: 3300 },
-            ];
-
-            for (const sample of sampleData) {
-                let targetRoom = rooms.find((r) => r.name.toLowerCase() === sample.room.toLowerCase());
-                if (!targetRoom) {
-                    const rRes = await fetch(`/api/v1/boqs/${activeBoq.id}/rooms`, {
-                        method: "POST",
-                        credentials: "include",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ name: sample.room }),
-                    });
-                    if (rRes.ok) {
-                        const rData = await rRes.json();
-                        targetRoom = rData.data;
-                    }
-                }
-
-                if (targetRoom) {
-                    const cRes = await fetch(`/api/v1/boqs/${activeBoq.id}/rooms/${targetRoom.id}/categories`, {
-                        method: "POST",
-                        credentials: "include",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ name: "Primary Fitout" }),
-                    });
-                    const cData = await cRes.json();
-                    const catId = cData.data?.id;
-
-                    if (catId) {
-                        await fetch(`/api/v1/boqs/${activeBoq.id}/categories/${catId}/items`, {
-                            method: "POST",
-                            credentials: "include",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                                name: sample.name,
-                                description: sample.spec,
-                                unit: sample.unit,
-                                quantity: sample.qty,
-                                rate: sample.rate,
-                            }),
-                        });
-                    }
-                }
-            }
-
-            setImportSuccessMsg("Successfully loaded sample design data!");
-            setShowImportModal(false);
-            setShowTemplateModal(false);
-            void loadDetail();
-        } catch (e) {
-            setActionError(e instanceof Error ? e.message : "Failed to load sample data");
-        } finally {
-            setImportingExcel(false);
-        }
-    };
-
-    // Handle Excel file upload
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        setImportingExcel(true);
-        setImportSuccessMsg("");
-        setActionError("");
-
-        try {
-            const buffer = await file.arrayBuffer();
-            const workbook = XLSX.read(buffer, { type: "array" });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            const rows: any[] = XLSX.utils.sheet_to_json(worksheet);
-
-            if (rows.length === 0) {
-                throw new Error("No rows found in uploaded spreadsheet.");
-            }
-
-            for (const row of rows) {
-                const roomName = String(row["Room"] || row["ROOM"] || row["room"] || "General Room").trim();
-                const itemName = String(row["Item"] || row["ITEM"] || row["Item Name"] || row["Description"] || "Item").trim();
-                const spec = String(row["Spec"] || row["SPEC"] || row["Specification"] || "").trim();
-                const unit = String(row["Unit"] || row["UNIT"] || "No").trim();
-                const qty = Number(row["Quantity"] || row["QUANTITY"] || row["Qty"] || 1);
-                const rate = Number(row["Rate"] || row["RATE"] || row["Rate (INR)"] || 1000);
-
-                let roomObj = rooms.find((r) => r.name.toLowerCase() === roomName.toLowerCase());
-                if (!roomObj) {
-                    const rRes = await fetch(`/api/v1/boqs/${activeBoq.id}/rooms`, {
-                        method: "POST",
-                        credentials: "include",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ name: roomName }),
-                    });
-                    if (rRes.ok) {
-                        const rData = await rRes.json();
-                        roomObj = rData.data;
-                    }
-                }
-
-                if (roomObj) {
-                    const cRes = await fetch(`/api/v1/boqs/${activeBoq.id}/rooms/${roomObj.id}/categories`, {
-                        method: "POST",
-                        credentials: "include",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ name: "Spreadsheet Import" }),
-                    });
-                    const cData = await cRes.json();
-                    const catId = cData.data?.id;
-
-                    if (catId) {
-                        await fetch(`/api/v1/boqs/${activeBoq.id}/categories/${catId}/items`, {
-                            method: "POST",
-                            credentials: "include",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                                name: itemName,
-                                description: spec || undefined,
-                                unit,
-                                quantity: qty > 0 ? qty : 1,
-                                rate: rate >= 0 ? rate : 1000,
-                            }),
-                        });
-                    }
-                }
-            }
-
-            setImportSuccessMsg(`Successfully imported ${rows.length} items from ${file.name}`);
-            setShowImportModal(false);
-            void loadDetail();
-        } catch (err) {
-            setActionError(err instanceof Error ? err.message : "Failed to import Excel file");
-        } finally {
-            setImportingExcel(false);
-        }
-    };
-
-    // Aggregations with stable database ID deduplication
-    const allUniqueItems = useMemo(() => {
-        const itemsMap = new Map<string, any>();
-        for (const room of rooms) {
-            for (const cat of (room.categories || [])) {
-                for (const it of (cat.items || [])) {
-                    if (it.id && !itemsMap.has(it.id)) {
-                        itemsMap.set(it.id, it);
-                    }
-                }
-            }
-        }
-        return Array.from(itemsMap.values());
-    }, [rooms]);
-
-    const totalItemCount = allUniqueItems.length;
-
-    // Financial calculations matching design (18% markup and 18% GST)
-    const computedItemsSubtotal = allUniqueItems.reduce((s: number, i: any) => {
-        const amt = Number(i.amount);
-        if (!isNaN(amt) && amt > 0) return s + amt;
-        const q = Number(i.quantity) || 0;
-        const r = Number(i.rate) || 0;
-        return s + (q * r);
-    }, 0);
-    const computedSubtotal = computedItemsSubtotal > 0 ? computedItemsSubtotal : (boqData?.subtotal ?? activeBoq.estimatedValue ?? 0);
-    const effectiveMarkupPercent = boqData?.markupPercent > 0 ? boqData.markupPercent : 18;
-    const effectiveTaxPercent = boqData?.taxPercent > 0 ? boqData.taxPercent : 18;
-    const computedMarkup = Math.round(computedSubtotal * (effectiveMarkupPercent / 100));
-    const computedTax = Math.round((computedSubtotal + computedMarkup) * (effectiveTaxPercent / 100) * 100) / 100;
-    const computedGrandTotal = computedSubtotal + computedMarkup + computedTax;
-
-    const currentStatus = boqData?.status
-        ? boqData.status.toUpperCase().replace(/_/g, " ")
-        : activeBoq.status;
-
-    // Filtered rooms
-    const filteredRooms = useMemo(() => {
-        if (!searchQuery.trim()) return rooms;
-        const q = searchQuery.toLowerCase();
-        return rooms.filter((r: any) => {
-            const roomMatch = r.name.toLowerCase().includes(q);
-            const itemMatch = (r.categories || []).some((c: any) =>
-                (c.items || []).some((i: any) =>
-                    i.name.toLowerCase().includes(q) ||
-                    (i.description && i.description.toLowerCase().includes(q)) ||
-                    (i.unit && i.unit.toLowerCase().includes(q))
-                )
-            );
-            return roomMatch || itemMatch;
-        });
-    }, [rooms, searchQuery]);
-
-    const selectedRoom = rooms.find((r: any) => r.id === selectedRoomId);
-    if (selectedRoom) {
-        return (
-            <BoqRoomCategoryView
-                activeBoq={activeBoq}
-                room={selectedRoom}
-                onBackToBoq={() => setSelectedRoomId(null)}
-                onBackToList={onBack}
-                onRefreshBoq={loadDetail}
-            />
-        );
-    }
-
-    return (
-        <section className="boq-detail-shell">
-            {/* Breadcrumb */}
-            <div className="boq-detail-breadcrumb" style={{ display: "flex", alignItems: "center" }}>
-                <span onClick={onBack} style={{ cursor: "pointer" }}>Bill of Quantities</span>
-                <ChevronRight size={15} />
-                <span className="active">{activeBoq.boqNumber}</span>
-                {activeBoq.projectId && (
-                    <button
-                        type="button"
-                        onClick={() => location.assign(`/projects/${activeBoq.projectId}`)}
-                        style={{ marginLeft: "auto", background: "none", border: "none", color: "#2563eb", fontWeight: 600, fontSize: "12px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "4px" }}
-                    >
-                        ← Back to Project
-                    </button>
-                )}
-            </div>
-
-            {/* Header row */}
-            <div className="boq-detail-header-row">
-                <div className="boq-detail-heading-wrap">
-                    <button type="button" className="boq-icon-back" onClick={onBack} aria-label="Go back">
-                        <ArrowLeft size={17} />
-                    </button>
-                    <div className="boq-title-stack">
-                        <div className="boq-title-line">
-                            <span className="boq-big-title">{activeBoq.boqNumber}</span>
-                            <span className={`boq-status-pill ${currentStatus.toLowerCase().replace(/\s/g, "-")}`}>
-                                {currentStatus}
-                            </span>
-                        </div>
-                        <span className="boq-subtitle">
-                            {boqData?.projectName || activeBoq.projectName} — {activeBoq.version}
-                        </span>
-                    </div>
-                </div>
-
-                {/* Top Action buttons matching design: Duplicate, Export PDF, Send for Review, Save Draft */}
-                <div className="boq-detail-actions-row">
-                    <button type="button" className="boq-ghost-button" onClick={handleDuplicate}>
-                        Duplicate
-                    </button>
-                    <button
-                        type="button"
-                        className="boq-ghost-button"
-                        onClick={() => window.open(`/api/v1/boqs/${activeBoq.id}/pdf`, "_blank")}
-                    >
-                        Export PDF
-                    </button>
-                    <button
-                        type="button"
-                        className="boq-ghost-button"
-                        onClick={() => handleStatusChange("in_review")}
-                    >
-                        Send for Review
-                    </button>
-                    <button
-                        type="button"
-                        className="fig-dashboard-new boq-save-button"
-                        onClick={() => handleStatusChange("draft")}
-                    >
-                        Save Draft
-                    </button>
-                </div>
-            </div>
-
-            {actionError && <div className="boq-alert" style={{ margin: "0 0 16px" }}>{actionError}</div>}
-            {importSuccessMsg && <div className="boq-alert" style={{ margin: "0 0 16px", background: "#f0fdf4", borderColor: "#bbf7d0", color: "#166534" }}>{importSuccessMsg}</div>}
-
-            <div className="boq-detail-layout">
-                {/* Main panel */}
-                <div className="boq-main-panel">
-                    {/* Toolbar matching design: Left [8 Rooms] | Right [Search...] [Import Excel] [Use Template] [Add Room +] */}
-                    <div className="boq-panel-toolbar">
-                        <div className="boq-toolbar-left">
-                            <strong className="boq-room-count-title">{rooms.length} Rooms</strong>
-                        </div>
-                        <div className="boq-toolbar-right">
-                            <label className="boq-toolbar-search">
-                                <Search size={16} color="#64748b" />
-                                <input
-                                    placeholder="Search..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    aria-label="Search rooms"
-                                />
-                            </label>
-
-                            <button
-                                type="button"
-                                className="boq-btn-outline"
-                                onClick={() => setShowImportModal(true)}
-                            >
-                                <FileSpreadsheet size={15} color="#475569" />
-                                <span>Import Excel</span>
-                            </button>
-
-                            <button
-                                type="button"
-                                className="boq-btn-outline"
-                                onClick={() => setShowTemplateModal(true)}
-                            >
-                                <FileText size={15} color="#475569" />
-                                <span>Use Template</span>
-                            </button>
-
-                            <button
-                                type="button"
-                                className="boq-btn-primary"
-                                onClick={() => setAddingRoom(true)}
-                            >
-                                <span>Add Room +</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Inline Add Room */}
-                    {addingRoom && (
-                        <div style={{ display: "flex", gap: "8px", padding: "12px 16px", background: "#ffffff", borderRadius: "10px", marginBottom: "14px", border: "1px solid #cbd5e1", boxShadow: "0 2px 4px rgba(0,0,0,0.03)" }}>
-                            <input
-                                type="text"
-                                placeholder="Room name (e.g. Master Bedroom, Living Room...)"
-                                value={newRoomName}
-                                onChange={(e) => setNewRoomName(e.target.value)}
-                                onKeyDown={(e) => e.key === "Enter" && handleAddRoom()}
-                                style={{ flex: 1, padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "14px", outline: "none" }}
-                                autoFocus
-                            />
-                            <button type="button" className="boq-btn-primary" onClick={() => handleAddRoom()} style={{ height: "38px" }}>
-                                Add
-                            </button>
-                            <button type="button" className="boq-btn-outline" onClick={() => { setAddingRoom(false); setNewRoomName(""); }} style={{ height: "38px" }}>
-                                Cancel
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Table Card */}
-                    <div className="boq-table-card">
-                        <table className="boq-room-table">
-                            <thead>
-                                <tr>
-                                    <th style={{ width: "45px", textAlign: "center" }}>#</th>
-                                    <th>ROOM</th>
-                                    <th style={{ width: "90px", textAlign: "center" }}>CATEGORY</th>
-                                    <th>SPEC</th>
-                                    <th style={{ width: "70px" }}>UNIT</th>
-                                    <th style={{ width: "75px", textAlign: "center" }}>ITEMS</th>
-                                    <th>AMOUNT (₹)</th>
-                                    <th>DESCRIPTION</th>
-                                    <th style={{ width: "50px", textAlign: "center" }}></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {loading ? (
-                                    <tr>
-                                        <td colSpan={9} style={{ textAlign: "center", padding: "32px", color: "#64748b" }}>
-                                            Loading rooms & items...
-                                        </td>
-                                    </tr>
-                                ) : filteredRooms.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={9} style={{ textAlign: "center", padding: "40px 20px" }}>
-                                            <p style={{ color: "#475569", fontWeight: 600, fontSize: "15px", marginBottom: "6px" }}>
-                                                {rooms.length === 0 ? "No rooms in this BOQ yet." : "No rooms match your search filter."}
-                                            </p>
-                                            <p style={{ color: "#94a3b8", fontSize: "13px", marginBottom: "16px" }}>
-                                                {rooms.length === 0 ? "Click 'Add Room +' or 'Import Excel' to populate rooms and line items." : "Try adjusting your search keywords."}
-                                            </p>
-                                            {rooms.length === 0 && (
-                                                <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
-                                                    <button type="button" className="boq-btn-primary" onClick={() => setAddingRoom(true)}>
-                                                        Add Room +
-                                                    </button>
-                                                    <button type="button" className="boq-btn-outline" onClick={() => handleLoadSampleDesignData()}>
-                                                        Load Sample 8-Room Interior
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    filteredRooms.map((room, idx) => {
-                                        const presentation = getRoomPresentation(room);
-
-                                        return (
-                                            <tr
-                                                key={room.id}
-                                                style={{ cursor: "pointer" }}
-                                                onClick={() => setSelectedRoomId(room.id)}
-                                            >
-                                                <td style={{ textAlign: "center", color: "#64748b", fontWeight: 500 }}>
-                                                    {idx + 1}
-                                                </td>
-                                                <td>
-                                                    <span className="boq-room-name">{room.name}</span>
-                                                </td>
-                                                <td style={{ textAlign: "center", color: "#334155", fontWeight: 500 }}>
-                                                    {presentation.categoryCount}
-                                                </td>
-                                                <td>
-                                                    <span className="boq-room-spec">{presentation.spec}</span>
-                                                </td>
-                                                <td>
-                                                    <span className="boq-room-unit">{presentation.unit}</span>
-                                                </td>
-                                                <td style={{ textAlign: "center", fontWeight: 500, color: "#334155" }}>
-                                                    {presentation.itemCount > 0 ? presentation.itemCount : "-"}
-                                                </td>
-                                                <td>
-                                                    <span className="boq-room-amount">
-                                                        {presentation.roomAmount > 0 ? formatMoney(presentation.roomAmount) : (presentation.itemCount > 0 ? "₹0" : "-")}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <span className="boq-room-desc" title={presentation.fullTooltip}>
-                                                        {presentation.displayDesc}
-                                                    </span>
-                                                </td>
-                                                <td style={{ textAlign: "center", position: "relative" }}>
-                                                    <button
-                                                        type="button"
-                                                        className="boq-dots-button"
-                                                        aria-label="Room actions"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setOpenRowMenuId(openRowMenuId === room.id ? null : room.id);
-                                                        }}
-                                                    >
-                                                        <MoreHorizontal size={16} />
-                                                    </button>
-                                                    {openRowMenuId === room.id && (
-                                                        <div
-                                                            className="boq-row-dropdown"
-                                                            onClick={(e) => e.stopPropagation()}
-                                                        >
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    setOpenRowMenuId(null);
-                                                                    setSelectedRoomId(room.id);
-                                                                }}
-                                                            >
-                                                                <FileText size={14} color="#64748b" /> View / Manage Items
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    setOpenRowMenuId(null);
-                                                                    setSelectedRoomId(room.id);
-                                                                }}
-                                                            >
-                                                                <Plus size={14} color="#64748b" /> Add Item
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    setOpenRowMenuId(null);
-                                                                    setEditingRoomId(room.id);
-                                                                    setEditRoomName(room.name);
-                                                                }}
-                                                            >
-                                                                <Edit2 size={14} color="#64748b" /> Edit Room
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    setOpenRowMenuId(null);
-                                                                    void handleDuplicateRoom(room.id);
-                                                                }}
-                                                            >
-                                                                <Copy size={14} color="#64748b" /> Duplicate Room
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                className="delete-action"
-                                                                onClick={() => {
-                                                                    setOpenRowMenuId(null);
-                                                                    void handleDeleteRoom(room.id);
-                                                                }}
-                                                            >
-                                                                <Trash2 size={14} color="#dc2626" /> Delete Room
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                {/* Summary Sidebar matching reference design: SUMMARY title, Subtotal/Markup/GST/Total card, 2 metric boxes, Generate Proposal */}
-                <aside className="boq-summary-panel">
-                    <div className="boq-summary-heading">SUMMARY</div>
-                    <div className="boq-summary-card">
-                        <div className="boq-summary-row">
-                            <span>Subtotal</span>
-                            <strong>{computedSubtotal > 0 ? formatMoney(computedSubtotal) : "-"}</strong>
-                        </div>
-                        <div className="boq-summary-row">
-                            <span>Markup ({effectiveMarkupPercent}%)</span>
-                            <strong>{computedMarkup > 0 ? formatMoney(computedMarkup) : "-"}</strong>
-                        </div>
-                        <div className="boq-summary-row">
-                            <span>GST ({effectiveTaxPercent}%)</span>
-                            <strong>{computedTax > 0 ? formatMoney(computedTax) : "-"}</strong>
-                        </div>
-                        <div className="boq-summary-divider" />
-                        <div className="boq-summary-row total">
-                            <span>Grand Total</span>
-                            <strong>{computedGrandTotal > 0 ? formatMoney(computedGrandTotal) : "-"}</strong>
-                        </div>
-                    </div>
-
-                    <div className="boq-metric-card">
-                        <span className="boq-metric-card-label">Rooms Covered</span>
-                        <strong className="boq-metric-card-value">{rooms.length}</strong>
-                    </div>
-
-                    <div className="boq-metric-card">
-                        <span className="boq-metric-card-label">Items</span>
-                        <strong className="boq-metric-card-value">{totalItemCount > 0 ? totalItemCount : "-"}</strong>
-                    </div>
-
-                    <button
-                        type="button"
-                        className="boq-generate-proposal-btn"
-                        onClick={() => window.location.assign(`/proposals?boqId=${activeBoq.id}`)}
-                    >
-                        Generate Proposal
-                    </button>
-                </aside>
-            </div>
-
-            {/* Manage Room Items Modal */}
-            {selectedRoomForItems && (
-                <div className="boq-modal-backdrop" onClick={() => setSelectedRoomForItems(null)}>
-                    <div className="boq-items-modal" onClick={(e) => e.stopPropagation()}>
-                        <div className="boq-create-header" style={{ marginBottom: "16px" }}>
-                            <div>
-                                <h3 style={{ fontSize: "1.2rem", fontWeight: 700, color: "#0f172a" }}>
-                                    {selectedRoomForItems.name} — Items & Specs
-                                </h3>
-                                <p style={{ color: "#64748b", fontSize: "0.85rem", margin: "4px 0 0" }}>
-                                    Manage line items, specifications, units, quantities, and rates for this room.
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                className="boq-close-button"
-                                onClick={() => setSelectedRoomForItems(null)}
-                            >
-                                <X size={18} />
-                            </button>
-                        </div>
-
-                        {/* Existing items table */}
-                        <div style={{ maxHeight: "260px", overflowY: "auto", border: "1px solid #e2e8f0", borderRadius: "8px", marginBottom: "18px" }}>
-                            {((selectedRoomForItems.categories || []).flatMap((c: any) => c.items || [])).length === 0 ? (
-                                <div style={{ padding: "24px", textAlign: "center", color: "#94a3b8" }}>
-                                    No items in this room yet. Add your first item below.
-                                </div>
-                            ) : (
-                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-                                    <thead>
-                                        <tr style={{ background: "#f8fafc", textAlign: "left", borderBottom: "1px solid #e2e8f0" }}>
-                                            <th style={{ padding: "8px 12px", color: "#475569" }}>Item Name</th>
-                                            <th style={{ padding: "8px 12px", color: "#475569" }}>Specification</th>
-                                            <th style={{ padding: "8px 12px", color: "#475569" }}>Unit</th>
-                                            <th style={{ padding: "8px 12px", color: "#475569" }}>Qty</th>
-                                            <th style={{ padding: "8px 12px", color: "#475569" }}>Rate</th>
-                                            <th style={{ padding: "8px 12px", color: "#475569" }}>Amount</th>
-                                            <th style={{ padding: "8px 12px", textAlign: "center" }}>Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {(selectedRoomForItems.categories || []).flatMap((c: any) => c.items || []).map((it: any) => (
-                                            <tr key={it.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                                                <td style={{ padding: "8px 12px", fontWeight: 600 }}>{it.name}</td>
-                                                <td style={{ padding: "8px 12px", color: "#64748b" }}>{it.description || "-"}</td>
-                                                <td style={{ padding: "8px 12px" }}>{it.unit}</td>
-                                                <td style={{ padding: "8px 12px" }}>{it.quantity}</td>
-                                                <td style={{ padding: "8px 12px" }}>{formatMoney(it.rate)}</td>
-                                                <td style={{ padding: "8px 12px", fontWeight: 600 }}>{formatMoney(it.amount)}</td>
-                                                <td style={{ padding: "8px 12px", textAlign: "center" }}>
-                                                    <button
-                                                        type="button"
-                                                        style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", padding: "4px" }}
-                                                        onClick={() => handleDeleteItem(it.id)}
-                                                        title="Delete item"
-                                                    >
-                                                        <Trash2 size={15} />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            )}
-                        </div>
-
-                        {/* Add new item form */}
-                        <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
-                            <strong style={{ fontSize: "14px", color: "#1e293b", display: "block", marginBottom: "12px" }}>
-                                + Add New Item to {selectedRoomForItems.name}
-                            </strong>
-                            <div style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr 1.2fr", gap: "10px", marginBottom: "12px" }}>
-                                <div>
-                                    <label style={{ display: "block", fontSize: "12px", color: "#64748b", marginBottom: "4px" }}>Item Name</label>
-                                    <input
-                                        type="text"
-                                        placeholder="e.g. King Bed"
-                                        value={itemName}
-                                        onChange={(e) => setItemName(e.target.value)}
-                                        style={{ width: "100%", padding: "7px 10px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px" }}
-                                    />
-                                </div>
-                                <div>
-                                    <label style={{ display: "block", fontSize: "12px", color: "#64748b", marginBottom: "4px" }}>Specification</label>
-                                    <input
-                                        type="text"
-                                        placeholder="e.g. Custom, 6×6.5ft"
-                                        value={itemSpec}
-                                        onChange={(e) => setItemSpec(e.target.value)}
-                                        style={{ width: "100%", padding: "7px 10px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px" }}
-                                    />
-                                </div>
-                                <div>
-                                    <label style={{ display: "block", fontSize: "12px", color: "#64748b", marginBottom: "4px" }}>Unit</label>
-                                    <select
-                                        value={itemUnit}
-                                        onChange={(e) => setItemUnit(e.target.value)}
-                                        style={{ width: "100%", padding: "7px 6px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px" }}
-                                    >
-                                        <option value="No">No</option>
-                                        <option value="Set">Set</option>
-                                        <option value="Sqft">Sqft</option>
-                                        <option value="RFt">RFt</option>
-                                        <option value="L.S.">L.S.</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label style={{ display: "block", fontSize: "12px", color: "#64748b", marginBottom: "4px" }}>Qty</label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        value={itemQty}
-                                        onChange={(e) => setItemQty(e.target.value)}
-                                        style={{ width: "100%", padding: "7px 6px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px" }}
-                                    />
-                                </div>
-                                <div>
-                                    <label style={{ display: "block", fontSize: "12px", color: "#64748b", marginBottom: "4px" }}>Rate (₹)</label>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        value={itemRate}
-                                        onChange={(e) => setItemRate(e.target.value)}
-                                        style={{ width: "100%", padding: "7px 8px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px" }}
-                                    />
-                                </div>
-                            </div>
-                            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                                <button
-                                    type="button"
-                                    className="boq-btn-primary"
-                                    onClick={() => handleAddItem(selectedRoomForItems.id)}
-                                    style={{ height: "36px", fontSize: "13px" }}
-                                >
-                                    Save Item
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Import Excel Modal */}
-            {showImportModal && (
-                <div className="boq-modal-backdrop" onClick={() => setShowImportModal(false)}>
-                    <div className="boq-items-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "560px" }}>
-                        <div className="boq-create-header" style={{ marginBottom: "16px" }}>
-                            <div>
-                                <h3 style={{ fontSize: "1.2rem", fontWeight: 700, color: "#0f172a" }}>Import Excel Spreadsheet</h3>
-                                <p style={{ color: "#64748b", fontSize: "0.85rem", margin: "4px 0 0" }}>
-                                    Upload an Excel (.xlsx / .xls) file or load pre-configured design rooms.
-                                </p>
-                            </div>
-                            <button type="button" className="boq-close-button" onClick={() => setShowImportModal(false)}>
-                                <X size={18} />
-                            </button>
-                        </div>
-
-                        {/* File Upload Box */}
-                        <div
-                            style={{
-                                border: "2px dashed #cbd5e1",
-                                borderRadius: "12px",
-                                padding: "28px 20px",
-                                textAlign: "center",
-                                background: "#f8fafc",
-                                cursor: "pointer",
-                                marginBottom: "16px",
-                            }}
-                            onClick={() => fileInputRef.current?.click()}
-                        >
-                            <FileSpreadsheet size={36} color="#2563eb" style={{ margin: "0 auto 10px" }} />
-                            <strong style={{ display: "block", color: "#1e293b", fontSize: "15px" }}>
-                                {importingExcel ? "Processing spreadsheet..." : "Click to select Excel file"}
-                            </strong>
-                            <span style={{ color: "#64748b", fontSize: "13px" }}>Supports .xlsx, .xls, .csv with Room, Item, Qty, Rate</span>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept=".xlsx,.xls,.csv"
-                                style={{ display: "none" }}
-                                onChange={handleFileUpload}
-                            />
-                        </div>
-
-                        <div style={{ textAlign: "center", margin: "16px 0 8px", position: "relative" }}>
-                            <span style={{ background: "#ffffff", padding: "0 10px", color: "#94a3b8", fontSize: "12px", fontWeight: 600 }}>
-                                OR ONE-CLICK PRESET
-                            </span>
-                        </div>
-
-                        <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "10px", padding: "14px 16px", marginBottom: "16px" }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                <div>
-                                    <strong style={{ color: "#1e40af", fontSize: "14px", display: "block" }}>
-                                        8-Room Reference Interior Package
-                                    </strong>
-                                    <span style={{ color: "#3b82f6", fontSize: "12px" }}>
-                                        Includes Master Bed, Bed 2/3, Living, Dining, Kitchen, Study, Guest Bed
-                                    </span>
-                                </div>
-                                <button
-                                    type="button"
-                                    className="boq-btn-primary"
-                                    onClick={handleLoadSampleDesignData}
-                                    disabled={importingExcel}
-                                    style={{ height: "36px", fontSize: "13px" }}
-                                >
-                                    {importingExcel ? "Loading..." : "Load 8 Rooms"}
-                                </button>
-                            </div>
-                        </div>
-
-                        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                            <button type="button" className="boq-btn-outline" onClick={() => setShowImportModal(false)}>
-                                Close
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Use Template Modal */}
-            {showTemplateModal && (
-                <div className="boq-modal-backdrop" onClick={() => setShowTemplateModal(false)}>
-                    <div className="boq-items-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "600px" }}>
-                        <div className="boq-create-header" style={{ marginBottom: "16px" }}>
-                            <div>
-                                <h3 style={{ fontSize: "1.2rem", fontWeight: 700, color: "#0f172a" }}>Use BOQ Template</h3>
-                                <p style={{ color: "#64748b", fontSize: "0.85rem", margin: "4px 0 0" }}>
-                                    Select an architectural template to populate this BOQ.
-                                </p>
-                            </div>
-                            <button type="button" className="boq-close-button" onClick={() => setShowTemplateModal(false)}>
-                                <X size={18} />
-                            </button>
-                        </div>
-
-                        <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "16px" }}>
-                            <div
-                                style={{
-                                    border: "1px solid #e2e8f0",
-                                    borderRadius: "10px",
-                                    padding: "14px 16px",
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
-                                    cursor: "pointer",
-                                    transition: "background 0.15s ease",
-                                }}
-                                onClick={handleLoadSampleDesignData}
-                            >
-                                <div>
-                                    <strong style={{ color: "#0f172a", fontSize: "14px", display: "block" }}>
-                                        Full Residential Villa (8 Rooms)
-                                    </strong>
-                                    <span style={{ color: "#64748b", fontSize: "12px" }}>
-                                        Master Bed, 2 Bedrooms, Living, Dining, Modular Kitchen, Study, Guest Bed
-                                    </span>
-                                </div>
-                                <button type="button" className="boq-btn-primary" style={{ height: "34px", fontSize: "12px" }}>
-                                    Apply
-                                </button>
-                            </div>
-
-                            <div
-                                style={{
-                                    border: "1px solid #e2e8f0",
-                                    borderRadius: "10px",
-                                    padding: "14px 16px",
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
-                                    cursor: "pointer",
-                                }}
-                                onClick={async () => {
-                                    await handleAddRoom("Master Suite");
-                                    await handleAddRoom("Living & Lounge");
-                                    await handleAddRoom("Kitchen Fitout");
-                                    setShowTemplateModal(false);
-                                }}
-                            >
-                                <div>
-                                    <strong style={{ color: "#0f172a", fontSize: "14px", display: "block" }}>
-                                        Modern 3BHK Apartment
-                                    </strong>
-                                    <span style={{ color: "#64748b", fontSize: "12px" }}>
-                                        Core residential package with living, suite, and kitchen
-                                    </span>
-                                </div>
-                                <button type="button" className="boq-btn-primary" style={{ height: "34px", fontSize: "12px" }}>
-                                    Apply
-                                </button>
-                            </div>
-                        </div>
-
-                        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                            <button type="button" className="boq-btn-outline" onClick={() => setShowTemplateModal(false)}>
-                                Cancel
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Rename Room Modal */}
-            {editingRoomId && (
-                <div className="boq-modal-backdrop" onClick={() => setEditingRoomId(null)}>
-                    <div className="boq-items-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "420px" }}>
-                        <div className="boq-create-header" style={{ marginBottom: "14px" }}>
-                            <h3 style={{ fontSize: "1.1rem", fontWeight: 700 }}>Rename Room</h3>
-                            <button type="button" className="boq-close-button" onClick={() => setEditingRoomId(null)}>
-                                <X size={18} />
-                            </button>
-                        </div>
-                        <input
-                            type="text"
-                            value={editRoomName}
-                            onChange={(e) => setEditRoomName(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && handleEditRoom(editingRoomId)}
-                            style={{ width: "100%", padding: "8px 12px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "14px", marginBottom: "14px" }}
-                            autoFocus
-                        />
-                        <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                            <button type="button" className="boq-btn-outline" onClick={() => setEditingRoomId(null)}>
-                                Cancel
-                            </button>
-                            <button type="button" className="boq-btn-primary" onClick={() => handleEditRoom(editingRoomId)}>
-                                Save
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </section>
-    );
+    return <BoqDetailView activeBoq={activeBoq} onBack={onBack} />;
 }

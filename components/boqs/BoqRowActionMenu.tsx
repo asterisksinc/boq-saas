@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { MoreHorizontal, Edit2, Copy, FileDown, FileSpreadsheet } from "lucide-react";
+import { MoreHorizontal, Edit2, Copy, FileDown, FileSpreadsheet, History, Plus } from "lucide-react";
 
 interface BoqRowActionMenuProps {
     boqId: string;
@@ -10,6 +10,8 @@ interface BoqRowActionMenuProps {
     onDuplicate: () => void;
     onExportPdf: () => void;
     onExportExcel: () => void;
+    onCreateRevision?: () => void;
+    onViewHistory?: () => void;
 }
 
 export default function BoqRowActionMenu({
@@ -18,6 +20,8 @@ export default function BoqRowActionMenu({
     onDuplicate,
     onExportPdf,
     onExportExcel,
+    onCreateRevision,
+    onViewHistory,
 }: BoqRowActionMenuProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
@@ -28,8 +32,9 @@ export default function BoqRowActionMenu({
     const updatePosition = () => {
         if (!buttonRef.current) return;
         const rect = buttonRef.current.getBoundingClientRect();
-        const menuWidth = 160;
-        const menuHeight = 162;
+        const menuWidth = 166;
+        const extraItems = (onCreateRevision ? 1 : 0) + (onViewHistory ? 1 : 0);
+        const menuHeight = 188 + extraItems * 44;
 
         let left = rect.right - menuWidth;
         if (left + menuWidth > window.innerWidth - 12) {
@@ -99,13 +104,13 @@ export default function BoqRowActionMenu({
             <button
                 ref={buttonRef}
                 type="button"
-                className="boq-row-menu"
+                className="boq-row-action-trigger"
                 aria-label={`More actions for BOQ ${boqId}`}
                 aria-haspopup="menu"
                 aria-expanded={isOpen}
                 onClick={handleToggle}
             >
-                <MoreHorizontal size={16} />
+                <MoreHorizontal size={20} color="#64748B" />
             </button>
 
             {isOpen &&
@@ -115,73 +120,108 @@ export default function BoqRowActionMenu({
                     <div
                         ref={menuRef}
                         role="menu"
-                        className="boq-floating-action-menu"
+                        className="boq-action-dropdown-menu"
                         style={{
                             position: "fixed",
                             top: `${coords.top}px`,
                             left: `${coords.left}px`,
-                            width: "160px",
+                            width: "166px",
+                            height: "188px",
                             zIndex: 99999,
-                            background: "#ffffff",
-                            border: "1px solid #e2e8f0",
-                            borderRadius: "10px",
-                            boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08)",
-                            padding: "6px 0",
+                            background: "#FFFFFF",
+                            border: "1px solid #EBEBEB",
+                            boxShadow: "0px 16px 32px -12px rgba(14, 18, 27, 0.1)",
+                            borderRadius: "16px",
+                            padding: "8px",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "4px",
+                            boxSizing: "border-box",
                         }}
                         onClick={(e) => e.stopPropagation()}
                     >
                         <button
                             type="button"
                             role="menuitem"
-                            className="boq-floating-action-item"
+                            className="boq-action-dropdown-item"
                             onClick={(e) => {
                                 e.stopPropagation();
                                 setIsOpen(false);
                                 onOpenEditor();
                             }}
                         >
-                            <Edit2 size={14} color="#6b7280" />
+                            <Edit2 size={16} color="#64748B" />
                             <span>Open Editor</span>
                         </button>
                         <button
                             type="button"
                             role="menuitem"
-                            className="boq-floating-action-item"
+                            className="boq-action-dropdown-item"
                             onClick={(e) => {
                                 e.stopPropagation();
                                 setIsOpen(false);
                                 onDuplicate();
                             }}
                         >
-                            <Copy size={14} color="#6b7280" />
+                            <Copy size={16} color="#64748B" />
                             <span>Duplicate BOQ</span>
                         </button>
                         <button
                             type="button"
                             role="menuitem"
-                            className="boq-floating-action-item"
+                            className="boq-action-dropdown-item"
                             onClick={(e) => {
                                 e.stopPropagation();
                                 setIsOpen(false);
                                 onExportPdf();
                             }}
                         >
-                            <FileDown size={14} color="#6b7280" />
+                            <FileDown size={16} color="#64748B" />
                             <span>Export as PDF</span>
                         </button>
                         <button
                             type="button"
                             role="menuitem"
-                            className="boq-floating-action-item"
+                            className="boq-action-dropdown-item"
                             onClick={(e) => {
                                 e.stopPropagation();
                                 setIsOpen(false);
                                 onExportExcel();
                             }}
                         >
-                            <FileSpreadsheet size={14} color="#6b7280" />
-                            <span>Export Excel</span>
+                            <FileSpreadsheet size={16} color="#64748B" />
+                            <span>Export as Excel</span>
                         </button>
+                        {onCreateRevision && (
+                            <button
+                                type="button"
+                                role="menuitem"
+                                className="boq-action-dropdown-item"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsOpen(false);
+                                    onCreateRevision();
+                                }}
+                            >
+                                <Plus size={16} color="#64748B" />
+                                <span>Create Revision</span>
+                            </button>
+                        )}
+                        {onViewHistory && (
+                            <button
+                                type="button"
+                                role="menuitem"
+                                className="boq-action-dropdown-item"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsOpen(false);
+                                    onViewHistory();
+                                }}
+                            >
+                                <History size={16} color="#64748B" />
+                                <span>Version History</span>
+                            </button>
+                        )}
                     </div>,
                     document.body
                 )}

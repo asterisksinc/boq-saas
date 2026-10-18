@@ -112,6 +112,8 @@ export interface BoqItem {
   id: string;
   room_id: string;
   category_id: string;
+  subcategoryId?: string | null;
+  subcategoryName?: string | null;
   name: string;
   description: string | null;
   unit: string | null;
@@ -123,13 +125,24 @@ export interface BoqItem {
   sort_order: number | null;
 }
 
+export interface BoqSubcategory {
+  id: string;
+  category_id?: string;
+  name: string;
+  description?: string | null;
+  sort_order?: number | null;
+  items?: BoqItem[];
+}
+
 export interface BoqCategory {
   id: string;
   room_id: string;
   name: string;
   description: string | null;
   sort_order: number | null;
+  subcategories?: BoqSubcategory[];
   items: BoqItem[];
+  unassignedItems?: BoqItem[];
 }
 
 export interface BoqRoom {

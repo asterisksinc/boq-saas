@@ -1,0 +1,3553 @@
+/* BOQ Page Redesign Styles - Scoped to User Dashboard → Bill of Quantities */
+/* Based on Figma Export Specifications */
+
+.boq-modal-backdrop {
+    z-index: 1000;
+}
+
+.boq-page-shell-redesign {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    box-sizing: border-box;
+}
+
+/* Header Row: Bill of Quantities + Count Summary (Left) & Actions (Right) */
+.boq-header-row-redesign {
+    width: 100%;
+    min-height: 49px;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    box-sizing: border-box;
+    flex-wrap: wrap;
+}
+
+.boq-title-section-redesign {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.boq-main-title-redesign {
+    margin: 0;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.boq-summary-line-redesign {
+    margin: 0;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.boq-toolbar-actions-redesign {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.boq-btn-import-excel-redesign {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px;
+    gap: 6px;
+    min-width: 107px;
+    height: 46px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.boq-btn-import-excel-redesign:hover {
+    background: #F8FAFC;
+    border-color: #CBD5E1;
+}
+
+.boq-btn-new-boq-redesign {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px;
+    gap: 6px;
+    min-width: 116px;
+    height: 46px;
+    background: #2563EB;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #FFFFFF;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.boq-btn-new-boq-redesign:hover {
+    background: #1D4ED8;
+}
+
+/* Content Surface (Frame 2147225067) */
+.boq-content-surface-redesign {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px;
+    gap: 24px;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 6px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+/* Empty State Container */
+.boq-empty-container-redesign {
+    width: 100%;
+    min-height: 520px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    gap: 24px;
+    box-sizing: border-box;
+    margin: auto;
+}
+
+.boq-empty-illustration-wrap {
+    width: 411px;
+    max-width: 100%;
+    height: 196px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.boq-empty-text-block-redesign {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    max-width: 340px;
+    text-align: center;
+}
+
+.boq-empty-title-redesign {
+    margin: 0;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 20px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.boq-empty-subtitle-redesign {
+    margin: 0;
+    max-width: 306px;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 120%;
+    text-align: center;
+    color: #64748B;
+}
+
+/* Table Architecture (Populated State) */
+.boq-table-responsive-wrap-redesign {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.boq-table-redesign {
+    width: 100%;
+    min-width: 1100px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Table Header Row (Frame 57) */
+.boq-th-row-redesign {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0px;
+    width: 100%;
+    height: 36px;
+    background: #E4ECFB;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.boq-th-cell-redesign {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 8px 12px;
+    gap: 10px;
+    height: 36px;
+    background: #E4ECFB;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+    white-space: nowrap;
+}
+
+/* Table Row (Frame 59, 83, 81, 82, 84) */
+.boq-tbody-redesign {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+.boq-tr-redesign {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0px;
+    width: 100%;
+    height: 56px;
+    border-bottom: 1px solid #EBEBEB;
+    background: transparent;
+    transition: background 0.15s ease;
+    cursor: pointer;
+}
+
+.boq-status-dropdown-portal {
+    box-sizing: border-box;
+    z-index: 100000;
+    padding: 6px 0;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+}
+
+.boq-status-dropdown-portal button {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    min-height: 36px;
+    padding: 8px 14px;
+    border: 0;
+    background: transparent;
+    color: #334155;
+    font: 500 13px/1.2 'Urbanist', Inter, sans-serif;
+    text-align: left;
+    cursor: pointer;
+}
+
+.boq-status-dropdown-portal button:hover,
+.boq-status-dropdown-portal button[aria-checked="true"] {
+    background: #F1F5F9;
+    color: #0F172A;
+}
+
+.boq-tr-redesign:hover {
+    background: rgba(37, 99, 235, 0.04);
+}
+
+.boq-td-cell-redesign {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 6px 20px 6px 12px;
+    gap: 8px;
+    height: 56px;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.boq-td-cell-redesign.project-name {
+    font-weight: 500;
+    color: #0F172A;
+}
+
+.boq-td-cell-redesign.estimated-value {
+    font-weight: 500;
+    color: #0F172A;
+}
+
+/* Column Dimensions (Matching Figma Widths) */
+.boq-col-id-w { width: 120px; flex-shrink: 0; }
+.boq-col-project-w { flex: 1 1 272px; min-width: 200px; }
+.boq-col-version-w { width: 100px; flex-shrink: 0; }
+.boq-col-rooms-w { width: 90px; flex-shrink: 0; }
+.boq-col-items-w { width: 90px; flex-shrink: 0; }
+.boq-col-value-w { width: 160px; flex-shrink: 0; }
+.boq-col-assigned-w { width: 140px; flex-shrink: 0; }
+.boq-col-date-w { width: 120px; flex-shrink: 0; }
+.boq-col-status-w { width: 130px; flex-shrink: 0; }
+.boq-col-actions-w { width: 64px; flex-shrink: 0; justify-content: center; padding: 6px 12px; }
+
+/* Status Badge Pills (Frame 2147225014, 2147225015) */
+.boq-status-badge-redesign {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 2px 6px;
+    gap: 10px;
+    height: 18px;
+    border-radius: 9999px;
+    border: 0;
+    outline: 0;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    cursor: pointer;
+    user-select: none;
+    appearance: none;
+    transition: opacity 0.15s ease;
+}
+
+.boq-status-badge-redesign:hover {
+    opacity: 0.85;
+}
+
+.boq-status-badge-redesign.draft {
+    background: rgba(100, 116, 139, 0.12);
+    color: #64748B;
+}
+
+.boq-status-badge-redesign.approved {
+    background: rgba(22, 163, 74, 0.12);
+    color: #16A34A;
+}
+
+.boq-status-badge-redesign.in-review {
+    background: rgba(217, 119, 6, 0.12);
+    color: #D97706;
+}
+
+.boq-status-badge-redesign.archived {
+    background: rgba(100, 116, 139, 0.12);
+    color: #64748B;
+}
+
+/* Row Action Trigger */
+.boq-row-action-trigger {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: #64748B;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.boq-row-action-trigger:hover {
+    background: #F1F5F9;
+    color: #0F172A;
+}
+
+/* Floating Action Dropdown Menu (Frame 90) */
+.boq-action-dropdown-menu {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 8px;
+    gap: 4px;
+    width: 166px;
+    background: #FFFFFF;
+    border: 1px solid #EBEBEB;
+    box-shadow: 0px 16px 32px -12px rgba(14, 18, 27, 0.1);
+    border-radius: 16px;
+}
+
+.boq-action-dropdown-item {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 8px;
+    gap: 8px;
+    width: 150px;
+    height: 40px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+    transition: background 0.15s ease, color 0.15s ease;
+    text-align: left;
+}
+
+.boq-action-dropdown-item:hover {
+    background: #F1F5F9;
+    color: #0F172A;
+}
+
+/* Pagination Footer Row (Frame 2147225166) */
+.boq-table-footer-row-redesign {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0px;
+    gap: 8px;
+    width: 100%;
+    min-width: 1100px;
+    height: 50px;
+}
+
+.boq-footer-total-label-redesign {
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    min-width: 140px;
+}
+
+.boq-pagination-controls-redesign {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+}
+
+.boq-page-btn-redesign {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 8px 0px;
+    width: 34px;
+    height: 34px;
+    border: 1px solid #EBEBEB;
+    border-radius: 6px;
+    background: #FFFFFF;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.boq-page-btn-redesign:hover:not(:disabled):not(.active) {
+    background: #F8FAFC;
+    border-color: #CBD5E1;
+    color: #0F172A;
+}
+
+.boq-page-btn-redesign.active {
+    background: #E4ECFB;
+    border: 1px solid #2563EB;
+    color: #2563EB;
+}
+
+.boq-page-btn-redesign:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.boq-page-size-wrap-redesign {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+}
+
+.boq-page-size-label-redesign {
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    white-space: nowrap;
+}
+
+.boq-page-size-select-redesign {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 6px 12px;
+    gap: 10px;
+    width: 83px;
+    height: 34px;
+    border: 1px solid #EBEBEB;
+    border-radius: 6px;
+    background: #FFFFFF;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+    cursor: pointer;
+    outline: none;
+}
+
+/* Loading, Error and Search Feedback */
+.boq-state-feedback-card {
+    width: 100%;
+    padding: 32px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    text-align: center;
+    color: #64748B;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.boq-alert-redesign {
+    width: 100%;
+    padding: 12px 16px;
+    background: #FEF2F2;
+    border: 1px solid #FCA5A5;
+    border-radius: 6px;
+    color: #991B1B;
+    font-size: 14px;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    box-sizing: border-box;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .boq-content-surface-redesign {
+        padding: 14px;
+        gap: 16px;
+    }
+
+    .boq-header-row-redesign {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .boq-toolbar-actions-redesign {
+        width: 100%;
+    }
+
+    .boq-btn-import-excel-redesign,
+    .boq-btn-new-boq-redesign {
+        flex: 1;
+    }
+
+    .boq-table-footer-row-redesign {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+        min-width: 0;
+        height: auto;
+    }
+}
+
+/* ======================================================== */
+/* BOQ DETAIL PAGE REDESIGN STYLES (Figma Specification)    */
+/* ======================================================== */
+
+.boq-detail-shell-redesign {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    box-sizing: border-box;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Breadcrumb (Frame 240) */
+.boq-detail-breadcrumb-redesign {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0px;
+    gap: 6px;
+    height: 22px;
+    box-sizing: border-box;
+}
+
+.boq-breadcrumb-parent-link {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 18px;
+    line-height: 120%;
+    color: #64748B;
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+
+.boq-breadcrumb-parent-link:hover {
+    color: #2563EB;
+}
+
+.boq-breadcrumb-chevron {
+    color: #5C5C5C;
+    display: flex;
+    align-items: center;
+}
+
+.boq-breadcrumb-current-id {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.boq-breadcrumb-back-project {
+    margin-left: auto;
+    background: transparent;
+    border: none;
+    color: #2563EB;
+    font-family: 'Urbanist', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: opacity 0.15s ease;
+}
+
+.boq-breadcrumb-back-project:hover {
+    opacity: 0.8;
+}
+
+/* Identity & Action Buttons Row (Frame 2147225066) */
+.boq-detail-identity-row-redesign {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0px;
+    gap: 16px;
+    width: 100%;
+    min-height: 49px;
+    box-sizing: border-box;
+    flex-wrap: wrap;
+}
+
+.boq-detail-identity-left {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0px;
+    gap: 16px;
+}
+
+.boq-detail-back-arrow-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: #0F172A;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.boq-detail-back-arrow-btn:hover {
+    background: #E2E8F0;
+}
+
+.boq-detail-identity-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0px;
+    gap: 8px;
+}
+
+.boq-detail-identity-top-line {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0px;
+    gap: 8px;
+}
+
+.boq-detail-heading-boq-id {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+/* Status Pill (Frame 2147225014) */
+.boq-detail-status-pill-redesign {
+    display: inline-flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 0px 8px;
+    gap: 10px;
+    height: 22px;
+    border-radius: 9999px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 13px;
+    line-height: 120%;
+    color: #FFFFFF;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.boq-detail-status-pill-redesign.draft {
+    background: #64748B;
+}
+
+.boq-detail-status-pill-redesign.in_review,
+.boq-detail-status-pill-redesign.in-review {
+    background: #2563EB;
+}
+
+.boq-detail-status-pill-redesign.approved {
+    background: #059669;
+}
+
+.boq-detail-status-pill-redesign.rejected,
+.boq-detail-status-pill-redesign.archived {
+    background: #DC2626;
+}
+
+.boq-detail-project-version-sub {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+/* Identity Actions Right (Frame 2147225069) */
+.boq-detail-actions-right {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0px;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.boq-detail-btn-action-ghost {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px 18px;
+    height: 46px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.boq-detail-btn-action-ghost:hover {
+    background: #F8FAFC;
+    border-color: #CBD5E1;
+}
+
+.boq-detail-btn-action-save {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px 20px;
+    height: 46px;
+    background: #2563EB;
+    border: none;
+    border-radius: 6px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #FFFFFF;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    white-space: nowrap;
+}
+
+.boq-detail-btn-action-save:hover {
+    background: #1D4ED8;
+}
+
+/* Two-Column Main Layout (Frame 2147225084) */
+.boq-detail-two-column-layout {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    padding: 0px;
+    gap: 8px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Left Column (Frame 2147225085) */
+.boq-detail-left-content {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0px;
+    gap: 8px;
+    flex: 1 1 960px;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+/* Rooms Toolbar (Frame 2147225066) */
+.boq-rooms-toolbar-row {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0px;
+    gap: 16px;
+    width: 100%;
+    height: 46px;
+    box-sizing: border-box;
+    flex-wrap: wrap;
+}
+
+.boq-room-count-title-tag {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 16px;
+    line-height: 120%;
+    color: #0F172A;
+    white-space: nowrap;
+}
+
+.boq-rooms-controls-right {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0px;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+/* Search Box (Frame 76) */
+.boq-rooms-search-box {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 5px 12px 5px 5px;
+    gap: 8px;
+    width: 260px;
+    height: 46px;
+    background: rgba(255, 255, 255, 0.36);
+    border: 1px solid rgba(255, 255, 255, 0.32);
+    backdrop-filter: blur(20.4px);
+    -webkit-backdrop-filter: blur(20.4px);
+    border-radius: 8px;
+}
+
+.boq-rooms-search-icon-tile {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: #FFFFFF;
+    border-radius: 6px;
+    color: #475569;
+    flex-shrink: 0;
+}
+
+.boq-rooms-search-input {
+    border: none;
+    background: transparent;
+    outline: none;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    width: 100%;
+}
+
+.boq-rooms-search-input::placeholder {
+    color: #64748B;
+}
+
+/* Toolbar Buttons */
+.boq-btn-toolbar-import,
+.boq-btn-toolbar-template {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 13px 20px;
+    gap: 8px;
+    height: 46px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    color: #0F172A;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.boq-btn-toolbar-import:hover,
+.boq-btn-toolbar-template:hover {
+    background: #F8FAFC;
+    border-color: #CBD5E1;
+}
+
+.boq-btn-toolbar-add-room {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 13px 20px;
+    gap: 8px;
+    height: 46px;
+    background: #2563EB;
+    border: none;
+    border-radius: 6px;
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    color: #FFFFFF;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    white-space: nowrap;
+}
+
+.boq-btn-toolbar-add-room:hover {
+    background: #1D4ED8;
+}
+
+/* Rooms Table Container (Frame 2147225072) */
+.boq-rooms-table-surface {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px;
+    gap: 12px;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 6px;
+    box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.boq-rooms-table-scrollable {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.boq-rooms-table-inner {
+    width: 100%;
+    min-width: 968px;
+    display: flex;
+    flex-direction: column;
+    gap: 0px;
+}
+
+/* Table Header (Frame 57) */
+.boq-rooms-thead-row {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0px;
+    width: 100%;
+    height: 36px;
+    border-radius: 8px;
+    background: #E4ECFB;
+    overflow: hidden;
+}
+
+.boq-rooms-th-cell {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 8px 12px;
+    gap: 10px;
+    height: 36px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+    white-space: nowrap;
+}
+
+/* Table Column Widths matching Figma specs */
+.boq-room-col-idx { width: 44px; flex-shrink: 0; }
+.boq-room-col-name { width: 160px; flex-shrink: 0; }
+.boq-room-col-category { width: 110px; flex-shrink: 0; }
+.boq-room-col-spec { width: 140px; flex-shrink: 0; }
+.boq-room-col-unit { width: 64px; flex-shrink: 0; }
+.boq-room-col-items { width: 70px; flex-shrink: 0; }
+.boq-room-col-amount { width: 112px; flex-shrink: 0; }
+.boq-room-col-desc { flex: 1 1 204px; min-width: 160px; }
+.boq-room-col-actions { width: 64px; flex-shrink: 0; justify-content: center; }
+
+/* Table Rows (Frame 59, 83, 85, etc.) */
+.boq-rooms-tr-row {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0px;
+    width: 100%;
+    height: 56px;
+    border-bottom: 1px solid #EBEBEB;
+    background: transparent;
+    transition: background 0.15s ease;
+    cursor: pointer;
+}
+
+.boq-rooms-tr-row:hover {
+    background: rgba(37, 99, 235, 0.04);
+}
+
+.boq-rooms-td-cell {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 6px 20px 6px 12px;
+    gap: 8px;
+    height: 56px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.boq-rooms-td-cell.room-name {
+    font-weight: 500;
+    color: #0F172A;
+}
+
+.boq-rooms-td-cell.category-count {
+    font-weight: 500;
+    color: #0F172A;
+}
+
+.boq-rooms-td-cell.amount {
+    font-weight: 500;
+    color: #0F172A;
+}
+
+.boq-rooms-td-cell.items-count {
+    color: #0F172A;
+}
+
+.boq-rooms-td-cell.description-cell {
+    color: #64748B;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 125%;
+}
+
+.boq-room-row-action-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    color: #64748B;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.boq-room-row-action-btn:hover {
+    background: #E2E8F0;
+    color: #0F172A;
+}
+
+/* Right Summary Panel (Frame 2147225071) */
+.boq-detail-summary-panel-redesign {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px;
+    gap: 24px;
+    width: 310px;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 6px;
+    box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.boq-summary-heading-label {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+    text-transform: uppercase;
+}
+
+.boq-summary-horizontal-divider {
+    width: 100%;
+    height: 1px;
+    background: #EBEBEB;
+}
+
+/* Financial Breakdown (Frame 2147225075) */
+.boq-summary-breakdown-box {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0px;
+    gap: 8px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.boq-summary-financial-row {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0px;
+    gap: 8px;
+    width: 100%;
+    height: 17px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-size: 14px;
+    line-height: 120%;
+}
+
+.boq-summary-financial-row .label {
+    font-weight: 400;
+    color: #64748B;
+}
+
+.boq-summary-financial-row .val {
+    font-weight: 500;
+    color: #0F172A;
+}
+
+.boq-summary-financial-row.grand-total {
+    height: 19px;
+    margin-top: 4px;
+}
+
+.boq-summary-financial-row.grand-total .label {
+    font-weight: 500;
+    font-size: 16px;
+    color: #0F172A;
+}
+
+.boq-summary-financial-row.grand-total .val {
+    font-weight: 600;
+    font-size: 16px;
+    color: #0F172A;
+}
+
+/* Stat Cards (Frame 2147225090) */
+.boq-summary-stat-cards-wrap {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 0px;
+    gap: 8px;
+    width: 100%;
+}
+
+.boq-summary-stat-box {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 16px;
+    gap: 8px;
+    width: 100%;
+    height: 76px;
+    background: #F2F3F2;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+}
+
+.boq-summary-stat-box-label {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.boq-summary-stat-box-value {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 16px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+/* Primary Action: Generate Proposal */
+.boq-btn-generate-proposal-primary {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px;
+    gap: 6px;
+    width: 100%;
+    height: 46px;
+    background: #2563EB;
+    border: none;
+    border-radius: 6px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #FFFFFF;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.boq-btn-generate-proposal-primary:hover {
+    background: #1D4ED8;
+}
+
+/* Secondary Hidden Action: Compare Vendors */
+.boq-btn-compare-vendors-secondary {
+    display: none;
+    box-sizing: border-box;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px;
+    gap: 6px;
+    width: 100%;
+    height: 46px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+/* Media Queries for Two-Column layout */
+@media (max-width: 1120px) {
+    .boq-detail-two-column-layout {
+        flex-direction: column;
+    }
+
+    .boq-detail-summary-panel-redesign {
+        width: 100%;
+    }
+}
+
+/* ==========================================================================
+   ROOM DETAILS REDESIGN: Category → Subcategory → Items
+   Based on Figma Master Bedroom & Hierarchy Specifications
+   ========================================================================== */
+
+/* Page Shell & Ambient Gradient Overlay */
+.boq-room-detail-shell {
+    --boq-room-workspace-background: #F2F5FA;
+    position: relative;
+    width: 100%;
+    min-height: calc(100vh - 80px);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    box-sizing: border-box;
+    font-family: 'Urbanist', Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #0F172A;
+    /* background: var(--boq-room-workspace-background); */
+}
+
+.boq-room-gradient-ambient {
+    position: absolute;
+    width: 100%;
+    height: 622px;
+    left: 0;
+    top: 0;
+    display: none;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Breadcrumb Navigation (Frame 240) */
+.boq-room-breadcrumb-redesign {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    min-height: 24px;
+    box-sizing: border-box;
+    font-family: 'Urbanist', sans-serif;
+    font-size: 18px;
+    line-height: 120%;
+    margin-bottom: 4px;
+}
+
+.boq-room-breadcrumb-link {
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 18px;
+    line-height: 120%;
+    color: #64748B;
+    cursor: pointer;
+    transition: color 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+}
+
+.boq-room-breadcrumb-link:hover {
+    color: #2563EB;
+}
+
+.boq-room-breadcrumb-sep {
+    color: #5C5C5C;
+    flex-shrink: 0;
+}
+
+.boq-room-breadcrumb-active {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+/* Two-Column Layout (Frame 2147225085) */
+.boq-room-two-column-layout {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Left Category Panel (Frame 2147225071) */
+.boq-room-category-panel {
+    box-sizing: border-box;
+    width: 310px;
+    min-width: 310px;
+    max-width: 310px;
+    background: var(--boq-room-workspace-background);
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+    flex-shrink: 0;
+}
+
+.boq-room-category-panel-title {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 16px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+/* Add More Category Button (Frame Buttons) */
+.boq-btn-add-more-category {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 13px 20px;
+    gap: 8px;
+    width: 100%;
+    height: 46px;
+    background: #2563EB;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    color: #FFFFFF;
+    transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.boq-btn-add-more-category:hover {
+    background: #1D4ED8;
+}
+
+.boq-btn-add-more-category:active {
+    transform: scale(0.99);
+}
+
+.boq-room-panel-divider {
+    width: 100%;
+    height: 1px;
+    background: #EBEBEB;
+    border: none;
+    margin: 0;
+}
+
+/* Category List (Frame 2147225387) */
+.boq-room-category-list {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    box-sizing: border-box;
+}
+
+.boq-room-category-item-row {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    gap: 10px;
+    width: 100%;
+    min-height: 36px;
+    border-radius: 4px;
+    cursor: pointer;
+    background: transparent;
+    border: 1px solid transparent;
+    transition: all 0.15s ease;
+    user-select: none;
+}
+
+.boq-room-category-item-row:hover {
+    background: rgba(100, 116, 139, 0.06);
+}
+
+.boq-room-category-item-row.active {
+    background: rgba(37, 99, 235, 0.1);
+    border-color: rgba(37, 99, 235, 0.15);
+}
+
+.boq-room-category-item-left {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.boq-room-category-item-icon {
+    width: 20px;
+    height: 20px;
+    color: #64748B;
+    flex-shrink: 0;
+}
+
+.boq-room-category-item-row.active .boq-room-category-item-icon {
+    color: #2563EB;
+}
+
+.boq-room-category-item-name {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.boq-room-category-item-row.active .boq-room-category-item-name {
+    font-weight: 600;
+    color: #2563EB;
+}
+
+.boq-room-category-item-badge {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 2px 6px;
+    gap: 10px;
+    min-width: 46px;
+    height: 18px;
+    background: rgba(100, 116, 139, 0.12);
+    border-radius: 4px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.boq-room-category-item-row.active .boq-room-category-item-badge {
+    background: #E4ECFB;
+    color: #2563EB;
+    font-weight: 600;
+}
+
+/* Right Main Content Panel (Frame 2147225072) */
+.boq-room-main-panel {
+    box-sizing: border-box;
+    flex: 1;
+    min-width: 0;
+    background: var(--boq-room-workspace-background);
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+}
+
+/* Category Header Row (Frame 2147225198) */
+.boq-room-category-header-row {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    box-sizing: border-box;
+    flex-wrap: wrap;
+}
+
+.boq-room-category-title-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.boq-room-category-heading-title {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 24px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.boq-room-category-heading-sub {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+/* Category Action Buttons (Frame 2147225194) */
+.boq-room-category-actions-group {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.boq-room-square-btn {
+    box-sizing: border-box;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    width: 48px;
+    height: 46px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #1C1B1F;
+    transition: all 0.15s ease;
+}
+
+.boq-room-square-btn:hover {
+    background: #F8FAFC;
+    border-color: #CBD5E1;
+}
+
+.boq-btn-add-subcategory-primary {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 46px;
+    padding: 0 16px;
+    background: #2563EB;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #FFFFFF;
+    transition: background 0.15s ease;
+    white-space: nowrap;
+}
+
+.boq-btn-add-subcategory-primary:hover {
+    background: #1D4ED8;
+}
+
+/* Summary Stats Label */
+.boq-room-category-stats-banner {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+/* Subcategories Container */
+.boq-subcategories-stack {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    box-sizing: border-box;
+}
+
+/* Subcategory Card Group */
+.boq-subcategory-card {
+    width: 100%;
+    background: var(--boq-room-workspace-background);
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    box-sizing: border-box;
+    overflow: hidden;
+    transition: box-shadow 0.15s ease;
+}
+
+.boq-subcategory-card:hover {
+    box-shadow: 0 2px 6px -1px rgba(0, 0, 0, 0.04);
+}
+
+.boq-subcategory-header-bar {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--boq-room-workspace-background);
+    border-bottom: 1px solid #E2E8F0;
+    gap: 12px;
+    flex-wrap: wrap;
+    box-sizing: border-box;
+}
+
+.boq-subcategory-header-left {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.boq-subcategory-toggle-icon {
+    color: #64748B;
+    transition: transform 0.15s ease;
+}
+
+.boq-subcategory-title-text {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 16px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.boq-subcategory-count-pill {
+    background: #E4ECFB;
+    color: #2563EB;
+    font-family: 'Urbanist', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 12px;
+}
+
+.boq-subcategory-subtotal-val {
+    font-family: 'Urbanist', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: #16A34A;
+}
+
+.boq-subcategory-header-right {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+}
+
+.boq-btn-add-item-subcategory {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 34px;
+    padding: 0 12px;
+    background: #2563EB;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 6px;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.boq-btn-add-item-subcategory:hover {
+    background: #1D4ED8;
+}
+
+.boq-btn-subcat-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    color: #64748B;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.boq-btn-subcat-icon:hover {
+    background: #F1F5F9;
+    color: #0F172A;
+}
+
+.boq-btn-subcat-icon.delete:hover {
+    background: #FEE2E2;
+    border-color: #FCA5A5;
+    color: #DC2626;
+}
+
+/* BOQ Items Table Specification */
+.boq-items-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    background: #F9FBFD;
+    box-sizing: border-box;
+}
+
+.boq-items-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Urbanist', sans-serif;
+    min-width: 820px;
+}
+
+/* Header Row (Frame 57) */
+.boq-items-table thead tr {
+    height: 36px;
+    background: #E4ECFB;
+    border-radius: 8px;
+}
+
+.boq-items-table th {
+    padding: 8px 12px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    text-transform: uppercase;
+    color: #64748B;
+    text-align: left;
+    white-space: nowrap;
+    border: none;
+}
+
+.boq-items-table th.col-num { width: 44px; text-align: center; }
+.boq-items-table th.col-item { min-width: 260px; }
+.boq-items-table th.col-unit { width: 80px; }
+.boq-items-table th.col-qty { width: 70px; text-align: right; }
+.boq-items-table th.col-rate { width: 110px; text-align: right; }
+.boq-items-table th.col-waste { width: 90px; text-align: center; }
+.boq-items-table th.col-tax { width: 85px; text-align: center; }
+.boq-items-table th.col-amount { width: 120px; text-align: right; }
+.boq-items-table th.col-actions { width: 48px; text-align: center; }
+
+/* Body Rows (Frame 59, 60, 61...) */
+.boq-items-table tbody tr {
+    height: 56px;
+    border-bottom: 1px solid #EBEBEB;
+    background: #FFFFFF;
+    transition: background 0.15s ease;
+}
+
+.boq-items-table tbody tr:hover {
+    background: #F8FAFC;
+}
+
+.boq-items-table td {
+    padding: 6px 12px;
+    vertical-align: middle;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-size: 14px;
+    line-height: 120%;
+}
+
+.boq-items-table td.col-num {
+    text-align: center;
+    color: #64748B;
+}
+
+.boq-item-num-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.boq-item-drag-handle {
+    color: #B8B9B9;
+    cursor: grab;
+}
+
+.boq-item-identity-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    min-width: 0;
+}
+
+.boq-item-title-text {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    word-break: break-word;
+}
+
+.boq-item-spec-text {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 400;
+    font-size: 13px;
+    line-height: 120%;
+    color: #64748B;
+    word-break: break-word;
+}
+
+.boq-items-table td.col-unit {
+    color: #64748B;
+    font-weight: 400;
+}
+
+.boq-items-table td.col-qty {
+    text-align: right;
+    color: #64748B;
+    font-weight: 400;
+}
+
+.boq-items-table td.col-rate {
+    text-align: right;
+    color: #0F172A;
+    font-weight: 500;
+}
+
+.boq-items-table td.col-waste {
+    text-align: center;
+    color: #64748B;
+    font-weight: 400;
+}
+
+.boq-items-table td.col-tax {
+    text-align: center;
+    color: #64748B;
+    font-weight: 400;
+}
+
+.boq-items-table td.col-amount {
+    text-align: right;
+    color: #16A34A;
+    font-weight: 600;
+}
+
+.boq-items-table td.col-actions {
+    text-align: center;
+    position: relative;
+}
+
+.boq-item-action-trigger {
+    background: none;
+    border: none;
+    padding: 6px;
+    color: #64748B;
+    cursor: pointer;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.boq-item-action-trigger:hover {
+    background: #E2E8F0;
+    color: #0F172A;
+}
+
+/* Footer / Subtotal Row (Frame 63) */
+.boq-items-table tfoot tr {
+    height: 36px;
+    background: #E4ECFB;
+    border-radius: 8px;
+}
+
+.boq-items-table tfoot td {
+    padding: 8px 12px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    text-transform: uppercase;
+    color: #0F172A;
+    border: none;
+}
+
+/* Pagination Footer (Frame 2147225166) */
+.boq-room-pagination-bar {
+    width: 100%;
+    height: 50px;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    gap: 16px;
+    box-sizing: border-box;
+    flex-wrap: wrap;
+    border-top: 1px solid #EBEBEB;
+    margin-top: 8px;
+}
+
+.boq-room-total-items-tag {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.boq-room-pagination-controls {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+}
+
+.boq-room-page-btn {
+    box-sizing: border-box;
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    background: #FFFFFF;
+    border: 1px solid #EBEBEB;
+    border-radius: 6px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    color: #64748B;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.boq-room-page-btn:hover:not(:disabled) {
+    background: #F1F5F9;
+    color: #0F172A;
+}
+
+.boq-room-page-btn.active {
+    background: #E4ECFB;
+    border-color: #2563EB;
+    color: #2563EB;
+}
+
+.boq-room-page-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.boq-room-page-size-wrap {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Urbanist', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    color: #0F172A;
+}
+
+.boq-room-page-size-select {
+    box-sizing: border-box;
+    height: 34px;
+    padding: 0 10px;
+    background: #FFFFFF;
+    border: 1px solid #EBEBEB;
+    border-radius: 6px;
+    font-family: 'Urbanist', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    color: #64748B;
+    cursor: pointer;
+}
+
+/* Empty States */
+.boq-empty-subcategories-box {
+    width: 100%;
+    padding: 40px 24px;
+    background: #FFFFFF;
+    border: 1px dashed #CBD5E1;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+.boq-empty-subcategories-box p {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: #0F172A;
+}
+
+.boq-empty-subcategories-box span {
+    font-family: 'Urbanist', sans-serif;
+    font-size: 13px;
+    color: #64748B;
+}
+
+.boq-empty-items-row {
+    padding: 32px 16px;
+    text-align: center;
+    color: #64748B;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+    .boq-room-two-column-layout {
+        flex-direction: column;
+    }
+
+    .boq-room-category-panel {
+        width: 100%;
+        min-width: 100%;
+        max-width: 100%;
+    }
+}
+
+/* ==========================================================================
+   Screen 1: New BOQ Selection Modal (Figma Frame 2147225092)
+   ========================================================================== */
+
+.boq-create-modal-redesign {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 16px;
+    gap: 16px;
+    width: 590px;
+    max-width: calc(100vw - 32px);
+    min-height: 285px;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.32);
+    box-shadow: 0px 20px 40px rgba(15, 23, 42, 0.12);
+    backdrop-filter: blur(20.4px);
+    -webkit-backdrop-filter: blur(20.4px);
+    border-radius: 8px;
+    animation: boqModalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.boq-create-header-redesign {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+    width: 100%;
+    min-height: 42px;
+}
+
+.boq-create-header-title {
+    margin: 0;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.boq-create-header-sub {
+    margin: 4px 0 0 0;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.boq-close-btn-redesign {
+    background: transparent;
+    border: none;
+    padding: 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #0F172A;
+    transition: background 0.15s ease;
+}
+
+.boq-close-btn-redesign:hover {
+    background: rgba(15, 23, 42, 0.06);
+}
+
+/* White Options Panel (Frame 2147225091) */
+.boq-create-options-panel-redesign {
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    align-items: center;
+    padding: 16px;
+    gap: 16px;
+    width: 100%;
+    min-height: 127px;
+    background: #FFFFFF;
+    border-radius: 8px;
+}
+
+@media (max-width: 540px) {
+    .boq-create-options-panel-redesign {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Creation Option Cards (Frame 2147225087 & 2147225088) */
+.boq-create-card-redesign {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 16px;
+    height: 95px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+    outline: none;
+}
+
+.boq-create-card-redesign:hover {
+    border-color: #94A3B8;
+    background: #F8FAFC;
+}
+
+.boq-create-card-redesign.selected {
+    border: 1.5px solid #2563EB;
+    background: #FFFFFF;
+    box-shadow: 0px 4px 12px rgba(37, 99, 235, 0.08);
+}
+
+.boq-card-selected-indicator {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #2563EB;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.boq-card-icon-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+}
+
+.boq-card-text-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.boq-card-title-text {
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 15px;
+    line-height: 120%;
+}
+
+.boq-card-subtitle-text {
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 400;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+/* Modal Footer Actions (Frame 2147225069) */
+.boq-create-footer-redesign {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0px;
+    gap: 12px;
+    width: 100%;
+    min-height: 46px;
+}
+
+.boq-btn-create-cancel-redesign {
+    box-sizing: border-box;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0px 16px;
+    min-width: 71px;
+    height: 46px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.boq-btn-create-cancel-redesign:hover {
+    background: #F8FAFC;
+    border-color: #CBD5E1;
+}
+
+.boq-btn-create-continue-redesign {
+    box-sizing: border-box;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0px 16px;
+    min-width: 85px;
+    height: 46px;
+    background: #2563EB;
+    border: none;
+    border-radius: 6px;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #FFFFFF;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.boq-btn-create-continue-redesign:hover {
+    background: #1D4ED8;
+}
+
+/* ==========================================================================
+   Screen 2: BOQ Details Modal Form (Figma Frame 2147225096)
+   ========================================================================== */
+
+.boq-details-modal-redesign {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 16px;
+    gap: 16px;
+    width: 590px;
+    max-width: calc(100vw - 32px);
+    min-height: 508px;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.32);
+    box-shadow: 0px 20px 40px rgba(15, 23, 42, 0.12);
+    backdrop-filter: blur(20.4px);
+    -webkit-backdrop-filter: blur(20.4px);
+    border-radius: 8px;
+    animation: boqModalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.boq-details-header-redesign {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+    width: 100%;
+    min-height: 42px;
+}
+
+.boq-details-title-redesign {
+    margin: 0;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.boq-details-subtitle-redesign {
+    margin: 4px 0 0 0;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+/* Inner White Form Container (Frame 2147225027) */
+.boq-details-form-panel-redesign {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 16px;
+    gap: 16px;
+    width: 100%;
+    background: #FFFFFF;
+    border-radius: 8px;
+}
+
+.boq-form-field-redesign {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    width: 100%;
+    position: relative;
+    box-sizing: border-box;
+}
+
+.boq-form-label-redesign {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 13px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.boq-required-star-redesign {
+    color: #EF4444;
+    font-weight: 700;
+}
+
+/* 48px Input Controls */
+.boq-form-input-redesign {
+    box-sizing: border-box;
+    width: 100%;
+    height: 48px;
+    padding: 12px 14px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.boq-form-input-redesign:focus {
+    border-color: #2563EB;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+.boq-form-input-readonly {
+    background: #F8FAFC !important;
+    color: #64748B !important;
+    border-color: #E2E8F0 !important;
+    cursor: not-allowed;
+    user-select: none;
+}
+
+/* Two Column Layout (Frame 2147225098) */
+.boq-form-row-2col-redesign {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 16px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+@media (max-width: 500px) {
+    .boq-form-row-2col-redesign {
+        flex-direction: column;
+    }
+}
+
+/* Custom Dropdown Trigger */
+.boq-custom-select-trigger-redesign {
+    box-sizing: border-box;
+    width: 100%;
+    height: 48px;
+    padding: 12px 14px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.boq-custom-select-trigger-redesign:focus,
+.boq-custom-select-trigger-redesign.open {
+    border-color: #2563EB;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+.boq-selected-value-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.boq-select-chevron {
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+}
+
+.boq-select-chevron.rotated {
+    transform: rotate(180deg);
+}
+
+/* Custom Dropdown Popup */
+.boq-dropdown-popup-redesign {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    box-shadow: 0px 14px 28px rgba(15, 23, 42, 0.12);
+    z-index: 1050;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: boqDropdownPop 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.boq-dropdown-search-wrap {
+    padding: 8px 12px;
+    border-bottom: 1px solid #F1F5F9;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #F8FAFC;
+}
+
+.boq-dropdown-search-input {
+    border: none;
+    background: transparent;
+    outline: none;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-size: 13px;
+    color: #0F172A;
+    width: 100%;
+}
+
+.boq-dropdown-options-list {
+    max-height: 180px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    padding: 4px 0;
+}
+
+.boq-dropdown-option-item {
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+
+.boq-dropdown-option-item:hover {
+    background: #F1F5F9;
+}
+
+.boq-dropdown-option-item.selected {
+    background: #E4ECFB;
+}
+
+.boq-option-title {
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    color: #0F172A;
+}
+
+.boq-option-subtitle {
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-size: 12px;
+    color: #64748B;
+    margin-top: 1px;
+}
+
+.boq-dropdown-empty-text {
+    padding: 16px;
+    text-align: center;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-size: 13px;
+    color: #94A3B8;
+}
+
+/* Persistent Bottom Action: + Add Project / + Add Team Member */
+.boq-dropdown-action-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    height: 44px;
+    background: #F8FAFC;
+    border: none;
+    border-top: 1px solid #E2E8F0;
+    color: #2563EB;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 13.5px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.boq-dropdown-action-bottom:hover {
+    background: #EFF6FF;
+    color: #1D4ED8;
+}
+
+/* Method Summary Box (Figma Frame 12) */
+.boq-method-box-redesign {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 16px;
+    gap: 8px;
+    width: 100%;
+    height: 52px;
+    background: #F2F3F2;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+}
+
+.boq-method-box-label {
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.boq-method-box-val {
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+/* Form Footer Actions (Frame 2147225094) */
+.boq-details-footer-redesign {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    min-height: 46px;
+    box-sizing: border-box;
+}
+
+.boq-details-footer-right-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.boq-btn-details-back-redesign {
+    box-sizing: border-box;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0px 16px;
+    min-width: 59px;
+    height: 46px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.boq-btn-details-back-redesign:hover:not(:disabled) {
+    background: #F8FAFC;
+    border-color: #CBD5E1;
+}
+
+.boq-btn-details-cancel-redesign {
+    box-sizing: border-box;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0px 16px;
+    min-width: 71px;
+    height: 46px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.boq-btn-details-cancel-redesign:hover:not(:disabled) {
+    background: #F8FAFC;
+    border-color: #CBD5E1;
+}
+
+.boq-btn-details-create-redesign {
+    box-sizing: border-box;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0px 18px;
+    min-width: 104px;
+    height: 46px;
+    background: #2563EB;
+    border: none;
+    border-radius: 6px;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #FFFFFF;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    gap: 8px;
+}
+
+.boq-btn-details-create-redesign:hover:not(:disabled) {
+    background: #1D4ED8;
+}
+
+.boq-btn-details-create-redesign:disabled,
+.boq-btn-details-cancel-redesign:disabled,
+.boq-btn-details-back-redesign:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ==========================================================================
+   Nested Embedded Creation Dialogs (+ Add Project / + Add Member)
+   ========================================================================== */
+
+.boq-nested-creation-modal {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    width: 520px;
+    max-width: calc(100vw - 32px);
+    background: #FFFFFF;
+    border-radius: 8px;
+    box-shadow: 0px 24px 48px rgba(15, 23, 42, 0.2);
+    padding: 20px;
+    animation: boqModalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ==========================================================================
+   Version History Modal & Snapshots
+   ========================================================================== */
+
+.boq-version-history-modal {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    width: 680px;
+    max-width: calc(100vw - 32px);
+    max-height: 85vh;
+    background: #FFFFFF;
+    border-radius: 12px;
+    box-shadow: 0px 24px 48px rgba(15, 23, 42, 0.2);
+    padding: 20px;
+    gap: 16px;
+    animation: boqModalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.boq-version-history-header {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    border-bottom: 1px solid #E2E8F0;
+    padding-bottom: 14px;
+}
+
+.boq-version-history-header h3 {
+    margin: 0;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-weight: 600;
+    font-size: 18px;
+    color: #0F172A;
+}
+
+.boq-version-history-header p {
+    margin: 4px 0 0 0;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-size: 13.5px;
+    color: #64748B;
+}
+
+.boq-btn-create-revision-header {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 38px;
+    padding: 0 14px;
+    background: #2563EB;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 6px;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.boq-btn-create-revision-header:hover:not(:disabled) {
+    background: #1D4ED8;
+}
+
+.boq-btn-create-revision-header:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.boq-details-close-btn {
+    background: transparent;
+    border: none;
+    padding: 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #64748B;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.boq-details-close-btn:hover {
+    background: #F1F5F9;
+    color: #0F172A;
+}
+
+.boq-version-history-body {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    padding-right: 4px;
+}
+
+.boq-version-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.boq-version-item-card {
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    padding: 14px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #FFFFFF;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.boq-version-item-card:hover {
+    border-color: #CBD5E1;
+}
+
+.boq-version-item-card.is-current {
+    border: 1.5px solid #2563EB;
+    background: #F8FAFC;
+}
+
+.boq-version-meta-left {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.boq-version-tag {
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    color: #0F172A;
+}
+
+.boq-version-current-badge {
+    background: #2563EB;
+    color: #FFFFFF;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+}
+
+.boq-version-status-pill {
+    background: #F1F5F9;
+    color: #475569;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+}
+
+.boq-version-subtext {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-size: 12.5px;
+    color: #64748B;
+}
+
+.boq-version-meta-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.boq-version-price-tag {
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    color: #0F172A;
+}
+
+.boq-btn-version-select {
+    height: 34px;
+    padding: 0 12px;
+    border-radius: 6px;
+    border: 1px solid #E2E8F0;
+    background: #FFFFFF;
+    color: #0F172A;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-weight: 600;
+    font-size: 12.5px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.boq-btn-version-select:hover {
+    background: #F8FAFC;
+    border-color: #CBD5E1;
+}
+
+.boq-btn-version-select.active {
+    background: #E4ECFB;
+    border-color: #2563EB;
+    color: #2563EB;
+}
+
+.boq-version-history-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid #E2E8F0;
+    padding-top: 14px;
+    width: 100%;
+}
+
+/* ==========================================================================
+   Toast Notification & Keyframes
+   ========================================================================== */
+
+.boq-toast-notification-redesign {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: #FFFFFF;
+    border: 1px solid #BBF7D0;
+    box-shadow: 0px 10px 25px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: #166534;
+    z-index: 99999;
+    animation: boqToastFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes boqModalFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.97) translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes boqDropdownPop {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes boqToastFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ==========================================================================
+   Use Template Drawer (Figma Frame 2147225093 & Frame 2147225096)
+   ========================================================================== */
+
+.boq-templates-drawer-redesign {
+    position: fixed;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 590px;
+    max-width: calc(100vw - 24px);
+    height: 876px;
+    max-height: calc(100vh - 24px);
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 16px;
+    backdrop-filter: blur(20.4px);
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    gap: 16px;
+    box-sizing: border-box;
+    box-shadow: 0px 20px 50px rgba(0, 0, 0, 0.12);
+    z-index: 1001;
+    animation: boqDrawerSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.boq-templates-drawer-header {
+    width: 100%;
+    height: 47px;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.boq-templates-drawer-title {
+    margin: 0;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.boq-templates-drawer-subtitle {
+    margin: 4px 0 0;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.boq-templates-inner-panel {
+    width: 100%;
+    flex: 1;
+    background: #FFFFFF;
+    border-radius: 14px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    box-sizing: border-box;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.boq-templates-drawer-search-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0;
+    gap: 16px;
+    width: 100%;
+    height: 46px;
+    box-sizing: border-box;
+}
+
+.boq-templates-search-input-wrap {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 5px 12px 5px 5px;
+    gap: 8px;
+    flex: 1;
+    height: 46px;
+    background: rgba(255, 255, 255, 0.36);
+    border: 1px solid rgba(255, 255, 255, 0.32);
+    border-radius: 8px;
+}
+
+.boq-templates-search-input-wrap .boq-search-icon {
+    width: 36px;
+    height: 36px;
+    padding: 10px;
+    flex-shrink: 0;
+    background: #FFFFFF;
+    border-radius: 6px;
+}
+
+.boq-templates-search-input {
+    border: none;
+    outline: none;
+    width: 100%;
+    background: transparent;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-size: 14px;
+    color: #0F172A;
+}
+
+.boq-templates-search-input::placeholder {
+    color: #64748B;
+}
+
+.boq-templates-new-btn {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 13px 20px;
+    gap: 8px;
+    width: 164px;
+    height: 46px;
+    background: #2563EB;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-family: 'Inter', 'Urbanist', ui-sans-serif, system-ui, sans-serif;
+    font-weight: 500;
+    font-size: 14px;
+    color: #FFFFFF;
+    transition: background 0.15s ease;
+    white-space: nowrap;
+}
+
+.boq-templates-new-btn:hover {
+    background: #1D4ED8;
+}
+
+.boq-templates-drawer-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow-y: auto;
+    flex: 1;
+    padding-right: 4px;
+}
+
+.boq-template-expanded-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    background: #F3F4F6;
+    border: 1px solid #E2E8F0;
+    border-radius: 16px;
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+
+.boq-template-collapsed-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 16px;
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+
+.boq-template-collapsed-card:hover {
+    border-color: #CBD5E1;
+}
+
+.boq-template-card-header {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 12px 14px;
+    gap: 12px;
+    width: 100%;
+    min-height: 86px;
+}
+
+.boq-template-expand-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+}
+
+.boq-template-card-main-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.boq-template-title {
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.boq-template-meta-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.boq-meta-divider {
+    width: 1px;
+    height: 14px;
+    background: #64748B;
+    display: inline-block;
+}
+
+.boq-template-tags-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+}
+
+.boq-template-tag-pill {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2px 6px;
+    background: rgba(100, 116, 139, 0.12);
+    border-radius: 9999px;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.boq-template-use-btn {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 8px 16px;
+    width: 56px;
+    height: 34px;
+    background: #FFFFFF;
+    border: 1px solid #2563EB;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #2563EB;
+    transition: all 0.15s ease;
+}
+
+.boq-template-use-btn:hover {
+    background: #2563EB;
+    color: #FFFFFF;
+}
+
+.boq-template-card-expanded-body {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    padding: 12px 14px;
+    gap: 12px;
+    width: 100%;
+    background: #FFFFFF;
+    border-top: 1px solid #E2E8F0;
+}
+
+.boq-template-preview-divider {
+    width: 100%;
+    height: 1px;
+    background: #E2E8F0;
+}
+
+.boq-template-preview-row {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+}
+
+.boq-template-preview-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+.boq-preview-item-name {
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.boq-preview-item-spec {
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 13px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.boq-preview-pills {
+    display: flex;
+    flex-direction: row;
+    gap: 6px;
+    margin-top: 2px;
+}
+
+.boq-preview-room-pill,
+.boq-preview-cat-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 6px;
+    background: rgba(100, 116, 139, 0.12);
+    border-radius: 9999px;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    color: #64748B;
+}
+
+.boq-template-preview-price {
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 15px;
+    line-height: 120%;
+    color: #0F172A;
+    white-space: nowrap;
+}
+
+.boq-placeholder-text {
+    color: #64748B;
+    font-family: 'Urbanist', Inter, ui-sans-serif, system-ui, sans-serif;
+    font-size: 14px;
+}
+
+@keyframes boqDrawerSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-50%) translateX(40px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(-50%) translateX(0);
+    }
+}

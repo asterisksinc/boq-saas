@@ -289,11 +289,27 @@ export const boqPatchSchema = z.object({
 
 export const boqStatusSchema = z.object({ status: z.enum(["draft", "in_review", "approved", "archived"]) }).strict();
 export const boqRoomSchema = z.object({ name: z.string().trim().min(1).max(120), description: z.string().trim().max(1000).nullable().optional() }).strict();
-export const boqCategorySchema = z.object({ name: z.string().trim().min(1).max(120), description: z.string().trim().max(1000).nullable().optional() }).strict();
+export const boqCategorySchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(1000).nullable().optional(),
+  subcategories: z.array(z.any()).optional(),
+}).strict();
+export const boqSubcategorySchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(1000).nullable().optional(),
+  sortOrder: z.number().int().min(0).optional(),
+}).strict();
 export const boqItemSchema = z.object({
-  name: z.string().trim().min(1).max(200), description: z.string().trim().max(2000).nullable().optional(),
-  unit: z.string().trim().min(1).max(40), quantity: z.coerce.number().finite().positive().max(999_999_999),
-  rate: money, wastePercent: percent.default(0), taxPercent: percent.default(18), sortOrder: z.number().int().min(0).optional(),
+  name: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(2000).nullable().optional(),
+  unit: z.string().trim().min(1).max(40),
+  quantity: z.coerce.number().finite().positive().max(999_999_999),
+  rate: money,
+  wastePercent: percent.default(0),
+  taxPercent: percent.default(18),
+  sortOrder: z.number().int().min(0).optional(),
+  subcategoryId: z.string().trim().nullable().optional(),
+  subcategoryName: z.string().trim().nullable().optional(),
 }).strict();
 export const boqTemplateSchema = z.object({
   name: z.string().trim().min(1).max(160),
