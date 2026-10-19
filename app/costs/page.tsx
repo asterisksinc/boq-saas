@@ -11,9 +11,11 @@ import AnalysisTab from "./components/AnalysisTab";
 import ScenariosTab from "./components/ScenariosTab";
 import MarginsTab from "./components/MarginsTab";
 import SettingsTab from "./components/SettingsTab";
+import AddItemModal from "./components/AddItemModal";
 import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
 import CostingExcelImportModal from "@/components/costing/CostingExcelImportModal";
+import CostingFilterPopover, { type FilterOption } from "@/components/costing/CostingFilterPopover";
 import "./costing-redesign.css";
 
 type MainTab = "Library" | "Categories" | "Analysis" | "Scenarios" | "Margins" | "Settings";
@@ -26,9 +28,31 @@ export default function CostsPage() {
     const [categorySearch, setCategorySearch] = useState("");
     const [isCategoryDetailActive, setIsCategoryDetailActive] = useState(false);
 
+    // Analysis filter states
+    const [analysisProjectFilter, setAnalysisProjectFilter] = useState("all");
+    const [analysisCategoryFilter, setAnalysisCategoryFilter] = useState("all");
+    const [analysisProjectOptions, setAnalysisProjectOptions] = useState<FilterOption[]>([]);
+    const [analysisCategoryOptions, setAnalysisCategoryOptions] = useState<FilterOption[]>([]);
+
+    // Scenarios filter & action states
+    const [scenarioStatusFilter, setScenarioStatusFilter] = useState("all");
+    const [scenarioSearchQuery, setScenarioSearchQuery] = useState("");
+    const [isNewScenarioOpen, setIsNewScenarioOpen] = useState(false);
+
+    // Margins filter states
+    const [marginsProjectFilter, setMarginsProjectFilter] = useState("all");
+    const [marginsCategoryFilter, setMarginsCategoryFilter] = useState("all");
+    const [marginsProjectOptions, setMarginsProjectOptions] = useState<FilterOption[]>([]);
+    const [marginsCategoryOptions, setMarginsCategoryOptions] = useState<FilterOption[]>([]);
+
     useEffect(() => {
         if (typeof window !== "undefined") {
             const sp = new URLSearchParams(window.location.search);
+            const tabParam = sp.get("tab");
+            if (tabParam) {
+                const matched = tabs.find(t => t.toLowerCase() === tabParam.toLowerCase());
+                if (matched) setActiveTab(matched);
+            }
             if (sp.get("create") === "true" || sp.get("new") === "true") {
                 setActiveTab("Library");
                 setIsAddOpen(true);
@@ -70,6 +94,13 @@ export default function CostsPage() {
                                         className="costing-import-excel-btn"
                                     >
                                         Import Excel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsAddOpen(true)}
+                                        className="costing-new-item-btn"
+                                    >
+                                        <Plus size={18} /> New Item
                                     </button>
                                 </div>
                             </div>
@@ -114,6 +145,86 @@ export default function CostsPage() {
                                         </button>
                                     </div>
                                 )}
+
+                                {/* Right Actions for Analysis tab: Filter Button (Figma Frame 109) */}
+                                {activeTab === "Analysis" && (
+                                    <div className="costing-toolbar-group">
+                                        <CostingFilterPopover
+                                            showLabel={true}
+                                            title="Filter Analysis"
+                                            projectFilter={analysisProjectFilter}
+                                            projectOptions={analysisProjectOptions}
+                                            onProjectChange={setAnalysisProjectFilter}
+                                            categoryFilter={analysisCategoryFilter}
+                                            categoryOptions={analysisCategoryOptions}
+                                            onCategoryChange={setAnalysisCategoryFilter}
+                                            onReset={() => {
+                                                setAnalysisProjectFilter("all");
+                                                setAnalysisCategoryFilter("all");
+                                            }}
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Right Actions for Scenarios tab: Filter Button (Figma Frame 109), Search & New Scenario */}
+                                {activeTab === "Scenarios" && (
+                                    <div className="costing-toolbar-group">
+                                        <div className="costing-search-box">
+                                            <div className="costing-search-icon-tile">
+                                                <Search size={16} color="#475569" />
+                                            </div>
+                                            <input
+                                                placeholder="Search scenarios…"
+                                                value={scenarioSearchQuery}
+                                                onChange={(e) => setScenarioSearchQuery(e.target.value)}
+                                                className="costing-search-input"
+                                                aria-label="Search scenarios"
+                                            />
+                                        </div>
+                                        <CostingFilterPopover
+                                            showLabel={true}
+                                            title="Filter Scenarios"
+                                            currentStatus={scenarioStatusFilter}
+                                            statusFilter={scenarioStatusFilter}
+                                            onStatusChange={setScenarioStatusFilter}
+                                            statusOptions={[
+                                                { label: "All Statuses", value: "all" },
+                                                { label: "Active", value: "active" },
+                                                { label: "Quoted", value: "quoted" },
+                                                { label: "Applied", value: "applied" },
+                                                { label: "Draft", value: "draft" },
+                                            ]}
+                                            onReset={() => setScenarioStatusFilter("all")}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsNewScenarioOpen(true)}
+                                            className="costing-new-item-btn"
+                                        >
+                                            <Plus size={18} /> New Scenario
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Right Actions for Margins tab: Filter Button (Figma Frame 109) */}
+                                {activeTab === "Margins" && (
+                                    <div className="costing-toolbar-group">
+                                        <CostingFilterPopover
+                                            showLabel={true}
+                                            title="Filter Margins"
+                                            projectFilter={marginsProjectFilter}
+                                            projectOptions={marginsProjectOptions}
+                                            onProjectChange={setMarginsProjectFilter}
+                                            categoryFilter={marginsCategoryFilter}
+                                            categoryOptions={marginsCategoryOptions}
+                                            onCategoryChange={setMarginsCategoryFilter}
+                                            onReset={() => {
+                                                setMarginsProjectFilter("all");
+                                                setMarginsCategoryFilter("all");
+                                            }}
+                                        />
+                                    </div>
+                                )}
                             </div>
                         </>
                     )}
@@ -129,9 +240,39 @@ export default function CostsPage() {
                                 onDetailViewChange={setIsCategoryDetailActive}
                             />
                         )}
-                        {activeTab === "Analysis" && <AnalysisTab />}
-                        {activeTab === "Scenarios" && <ScenariosTab />}
-                        {activeTab === "Margins" && <MarginsTab onNavigateTab={setActiveTab} />}
+                        {activeTab === "Analysis" && (
+                            <AnalysisTab
+                                selectedProjectId={analysisProjectFilter}
+                                onProjectChange={setAnalysisProjectFilter}
+                                selectedCategory={analysisCategoryFilter}
+                                onCategoryChange={setAnalysisCategoryFilter}
+                                onFilterOptionsLoaded={(projects, categories) => {
+                                    setAnalysisProjectOptions(projects);
+                                    setAnalysisCategoryOptions(categories);
+                                }}
+                            />
+                        )}
+                        {activeTab === "Scenarios" && (
+                            <ScenariosTab
+                                statusFilter={scenarioStatusFilter}
+                                onStatusFilterChange={setScenarioStatusFilter}
+                                searchQuery={scenarioSearchQuery}
+                                onSearchQueryChange={setScenarioSearchQuery}
+                                isNewScenarioOpen={isNewScenarioOpen}
+                                setIsNewScenarioOpen={setIsNewScenarioOpen}
+                            />
+                        )}
+                        {activeTab === "Margins" && (
+                            <MarginsTab
+                                onNavigateTab={handleTabChange}
+                                projectFilter={marginsProjectFilter}
+                                categoryFilter={marginsCategoryFilter}
+                                onFilterOptionsLoaded={(projects, categories) => {
+                                    setMarginsProjectOptions(projects);
+                                    setMarginsCategoryOptions(categories);
+                                }}
+                            />
+                        )}
                         {activeTab === "Settings" && <SettingsTab />}
                     </div>
                 </section>
@@ -147,6 +288,20 @@ export default function CostsPage() {
                     }
                 }}
             />
+
+            {/* Global Add Item Modal (rendered only when not on Library tab to prevent duplicate drawer mounting) */}
+            {activeTab !== "Library" && (
+                <AddItemModal
+                    isOpen={isAddOpen}
+                    onClose={() => setIsAddOpen(false)}
+                    onSuccess={() => {
+                        setIsAddOpen(false);
+                        if (typeof window !== "undefined") {
+                            window.location.reload();
+                        }
+                    }}
+                />
+            )}
         </main>
     );
 }

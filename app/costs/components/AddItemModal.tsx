@@ -356,87 +356,47 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, existingVendo
 
     return (
         <div
-            style={{
-                position: "fixed",
-                inset: 0,
-                backgroundColor: "rgba(15, 23, 42, 0.45)",
-                backdropFilter: "blur(4px)",
-                WebkitBackdropFilter: "blur(4px)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "20px",
-                zIndex: 1000,
-            }}
+            className="costing-drawer-overlay"
             onClick={handleClose}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="costing-drawer-title"
         >
             <div
-                style={{
-                    backgroundColor: "#ffffff",
-                    width: "100%",
-                    maxWidth: "560px",
-                    maxHeight: "92vh",
-                    borderRadius: "20px",
-                    boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(226, 232, 240, 0.8)",
-                    display: "flex",
-                    flexDirection: "column",
-                    overflow: "hidden",
-                }}
+                className="costing-add-item-drawer"
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Modal Header */}
-                <div
-                    style={{
-                        padding: "22px 28px 18px",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        borderBottom: "1px solid #f1f5f9",
-                    }}
-                >
-                    <h3 style={{ margin: 0, fontSize: "19px", fontWeight: 700, color: "#0f172a" }}>{itemToEdit ? "Edit Item" : "Add Item"}</h3>
+                {/* Drawer Header (Frame 2147225093) */}
+                <div className="costing-drawer-header">
+                    <h2 id="costing-drawer-title" className="costing-drawer-title">
+                        {itemToEdit ? "Edit Item" : "Add Item"}
+                    </h2>
                     <button
                         type="button"
                         onClick={handleClose}
-                        style={{
-                            background: "#f8fafc",
-                            border: "1px solid #e2e8f0",
-                            borderRadius: "8px",
-                            width: "32px",
-                            height: "32px",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            cursor: "pointer",
-                            color: "#64748b",
-                            transition: "all 0.15s",
-                        }}
+                        className="costing-drawer-close-btn"
+                        aria-label="Close dialog"
                     >
-                        <X size={18} />
+                        <X size={20} />
                     </button>
                 </div>
 
-                {/* Form Body */}
+                {/* Inner White Card (Frame 2147225027) */}
                 <form
                     onSubmit={handleSubmit}
-                    style={{
-                        padding: "20px 28px",
-                        overflowY: "auto",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "16px",
-                        flex: 1,
-                    }}
+                    className="costing-drawer-inner-card"
                 >
                     {error && (
                         <div
                             style={{
-                                padding: "12px 16px",
-                                background: "#fef2f2",
-                                color: "#b91c1c",
-                                borderRadius: "10px",
-                                fontSize: "13.5px",
-                                border: "1px solid #fecaca",
+                                width: "100%",
+                                padding: "12px 14px",
+                                background: "#FEF2F2",
+                                color: "#B91C1C",
+                                borderRadius: "8px",
+                                fontSize: "13px",
+                                border: "1px solid #FECACA",
+                                boxSizing: "border-box",
                                 display: "flex",
                                 alignItems: "center",
                                 gap: "8px",
@@ -446,36 +406,30 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, existingVendo
                         </div>
                     )}
 
-                    {/* Item Name */}
-                    <div>
-                        <label style={{ display: "block", fontSize: "13.5px", fontWeight: 600, color: "#1e293b", marginBottom: "6px" }}>
-                            Item Name <span style={{ color: "#ef4444" }}>*</span>
-                        </label>
+                    {/* 1. Item Name (Frame 16 + Frame 12) */}
+                    <div className="costing-form-field">
+                        <div className="costing-form-label-row">
+                            <label className="costing-form-label" htmlFor="costing-item-name">
+                                Item Name
+                            </label>
+                            <span className="costing-form-required">*</span>
+                        </div>
                         <input
+                            id="costing-item-name"
                             type="text"
                             placeholder="Enter Item Name"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
-                            style={{
-                                width: "100%",
-                                height: "44px",
-                                padding: "0 14px",
-                                border: "1px solid #e2e8f0",
-                                borderRadius: "10px",
-                                outline: "none",
-                                fontSize: "14px",
-                                color: "#0f172a",
-                                boxSizing: "border-box",
-                                transition: "border-color 0.15s",
-                            }}
+                            className="costing-form-input"
+                            required
                         />
                     </div>
 
-                    {/* Item Image (Drag & Drop) */}
-                    <div>
-                        <label style={{ display: "block", fontSize: "13.5px", fontWeight: 600, color: "#1e293b", marginBottom: "6px" }}>
-                            Item Image
-                        </label>
+                    {/* 2. Item Image (Drag & Drop Zone Frame 2147225027 + Icon Tile Frame 2147225048) */}
+                    <div className="costing-form-field">
+                        <div className="costing-form-label-row">
+                            <span className="costing-form-label">Item Image</span>
+                        </div>
                         <input
                             type="file"
                             ref={fileInputRef}
@@ -489,30 +443,19 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, existingVendo
                         />
 
                         {imagePreview ? (
-                            <div
-                                style={{
-                                    border: "1.5px solid #e2e8f0",
-                                    borderRadius: "14px",
-                                    padding: "12px 16px",
-                                    background: "#f8fafc",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    gap: "12px",
-                                }}
-                            >
+                            <div className="costing-form-upload-preview">
                                 <div style={{ display: "flex", alignItems: "center", gap: "12px", overflow: "hidden" }}>
                                     <img
                                         src={imagePreview}
                                         alt="Preview"
-                                        style={{ width: "48px", height: "48px", borderRadius: "8px", objectFit: "cover", border: "1px solid #e2e8f0" }}
+                                        style={{ width: "52px", height: "52px", borderRadius: "8px", objectFit: "cover", border: "1px solid #E2E8F0" }}
                                     />
                                     <div style={{ overflow: "hidden" }}>
-                                        <div style={{ fontSize: "13.5px", fontWeight: 600, color: "#0f172a", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", maxWidth: "300px" }}>
+                                        <div style={{ fontSize: "14px", fontWeight: 600, color: "#0F172A", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", maxWidth: "220px", fontFamily: "'Urbanist', sans-serif" }}>
                                             {imageFile?.name || "Uploaded Image"}
                                         </div>
-                                        <div style={{ fontSize: "12px", color: "#64748b" }}>
-                                            {imageFile ? `${(imageFile.size / 1024).toFixed(1)} KB` : "Ready"}
+                                        <div style={{ fontSize: "12px", color: "#64748B", fontFamily: "'Urbanist', sans-serif" }}>
+                                            {imageFile ? `${(imageFile.size / 1024).toFixed(1)} KB` : "Attached"}
                                         </div>
                                     </div>
                                 </div>
@@ -520,20 +463,21 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, existingVendo
                                     type="button"
                                     onClick={handleRemoveImage}
                                     style={{
-                                        background: "#fee2e2",
+                                        background: "#FEE2E2",
                                         border: "none",
-                                        borderRadius: "8px",
-                                        padding: "8px",
-                                        color: "#ef4444",
+                                        borderRadius: "6px",
+                                        padding: "8px 12px",
+                                        color: "#EF4444",
                                         cursor: "pointer",
                                         display: "flex",
                                         alignItems: "center",
                                         gap: "4px",
                                         fontSize: "12px",
-                                        fontWeight: 500,
+                                        fontWeight: 600,
+                                        fontFamily: "'Urbanist', sans-serif",
                                     }}
                                 >
-                                    <Trash2 size={16} /> Remove
+                                    <Trash2 size={14} /> Remove
                                 </button>
                             </div>
                         ) : (
@@ -542,265 +486,206 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, existingVendo
                                 onDragLeave={handleDragLeave}
                                 onDrop={handleDrop}
                                 onClick={() => fileInputRef.current?.click()}
-                                style={{
-                                    border: isDragging ? "2px dashed #3b82f6" : "1.5px dashed #cbd5e1",
-                                    borderRadius: "14px",
-                                    padding: "24px 16px",
-                                    textAlign: "center",
-                                    background: isDragging ? "#eff6ff" : "#f8fafc",
-                                    cursor: "pointer",
-                                    transition: "all 0.15s ease",
+                                className={`costing-form-upload-zone ${isDragging ? "is-dragging" : ""}`}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                        fileInputRef.current?.click();
+                                    }
                                 }}
                             >
-                                <div
-                                    style={{
-                                        width: "48px",
-                                        height: "48px",
-                                        background: "#eff6ff",
-                                        border: "1px solid #bfdbfe",
-                                        color: "#2563eb",
-                                        borderRadius: "12px",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        margin: "0 auto 10px",
-                                    }}
-                                >
-                                    <UploadCloud size={24} />
+                                <div className="costing-form-upload-icon-tile">
+                                    <UploadCloud size={24} color="#2563EB" />
                                 </div>
-                                <p style={{ margin: 0, color: "#1e293b", fontWeight: 600, fontSize: "14px" }}>
+                                <p className="costing-form-upload-text">
                                     Drag & Drop Your File Here
-                                </p>
-                                <p style={{ margin: "4px 0 0", color: "#94a3b8", fontSize: "12px" }}>
-                                    or click to browse from device (PNG, JPG, WEBP)
                                 </p>
                             </div>
                         )}
                     </div>
 
-                    {/* Category */}
-                    <div>
-                        <label style={{ display: "block", fontSize: "13.5px", fontWeight: 600, color: "#1e293b", marginBottom: "6px" }}>
-                            Category <span style={{ color: "#ef4444" }}>*</span>
-                        </label>
-                        <div style={{ position: "relative" }}>
+                    {/* 3. Category (Frame 16 + Frame 12) */}
+                    <div className="costing-form-field">
+                        <div className="costing-form-label-row">
+                            <label className="costing-form-label" htmlFor="costing-category-select">
+                                Category
+                            </label>
+                            <span className="costing-form-required">*</span>
+                        </div>
+                        <div className="costing-form-select-wrap">
                             <select
+                                id="costing-category-select"
                                 value={selectedParentCatId}
                                 onChange={(e) => handleParentCatChange(e.target.value)}
-                                style={{
-                                    width: "100%",
-                                    height: "44px",
-                                    padding: "0 36px 0 14px",
-                                    border: "1px solid #e2e8f0",
-                                    borderRadius: "10px",
-                                    outline: "none",
-                                    fontSize: "14px",
-                                    appearance: "none",
-                                    color: selectedParentCatId ? "#0f172a" : "#94a3b8",
-                                    background: "#ffffff",
-                                    boxSizing: "border-box",
-                                    cursor: "pointer",
-                                }}
+                                className={`costing-form-select ${!selectedParentCatId ? "is-placeholder" : ""}`}
+                                required
                             >
                                 <option value="" disabled>Select category</option>
                                 {loadingCategories ? (
                                     <option value="" disabled>Loading categories...</option>
                                 ) : (
                                     parentCategories.map((cat) => (
-                                        <option key={cat.id} value={cat.id} style={{ color: "#0f172a" }}>
+                                        <option key={cat.id} value={cat.id}>
                                             {cat.name}
                                         </option>
                                     ))
                                 )}
                             </select>
-                            <ChevronDown size={16} color="#64748b" style={{ position: "absolute", right: "14px", top: "14px", pointerEvents: "none" }} />
+                            <div className="costing-form-select-arrow">
+                                <ChevronDown size={18} />
+                            </div>
                         </div>
                     </div>
 
-                    {/* Sub-Category (Dynamically shown if selected category has subcategories) */}
+                    {/* Sub-Category (conditional if parent has children) */}
                     {availableSubCategories.length > 0 && (
-                        <div>
-                            <label style={{ display: "block", fontSize: "13.5px", fontWeight: 600, color: "#1e293b", marginBottom: "6px" }}>
-                                Sub-category <span style={{ color: "#64748b", fontWeight: 400 }}>(Optional)</span>
-                            </label>
-                            <div style={{ position: "relative" }}>
+                        <div className="costing-form-field">
+                            <div className="costing-form-label-row">
+                                <label className="costing-form-label" htmlFor="costing-subcategory-select">
+                                    Sub-category
+                                </label>
+                            </div>
+                            <div className="costing-form-select-wrap">
                                 <select
+                                    id="costing-subcategory-select"
                                     value={selectedSubCatId}
                                     onChange={(e) => handleSubCatChange(e.target.value)}
-                                    style={{
-                                        width: "100%",
-                                        height: "44px",
-                                        padding: "0 36px 0 14px",
-                                        border: "1px solid #e2e8f0",
-                                        borderRadius: "10px",
-                                        outline: "none",
-                                        fontSize: "14px",
-                                        appearance: "none",
-                                        color: selectedSubCatId ? "#0f172a" : "#94a3b8",
-                                        background: "#ffffff",
-                                        boxSizing: "border-box",
-                                        cursor: "pointer",
-                                    }}
+                                    className={`costing-form-select ${!selectedSubCatId ? "is-placeholder" : ""}`}
                                 >
                                     <option value="">Select sub-category (Optional)</option>
                                     {availableSubCategories.map((sub) => (
-                                        <option key={sub.id} value={sub.id} style={{ color: "#0f172a" }}>
+                                        <option key={sub.id} value={sub.id}>
                                             {sub.name}
                                         </option>
                                     ))}
                                 </select>
-                                <ChevronDown size={16} color="#64748b" style={{ position: "absolute", right: "14px", top: "14px", pointerEvents: "none" }} />
+                                <div className="costing-form-select-arrow">
+                                    <ChevronDown size={18} />
+                                </div>
                             </div>
                         </div>
                     )}
 
-                    {/* Unit */}
-                    <div>
-                        <label style={{ display: "block", fontSize: "13.5px", fontWeight: 600, color: "#1e293b", marginBottom: "6px" }}>
-                            Unit <span style={{ color: "#ef4444" }}>*</span>
-                        </label>
-                        <div style={{ position: "relative" }}>
+                    {/* 4. Unit (Frame 16 + Frame 12) */}
+                    <div className="costing-form-field">
+                        <div className="costing-form-label-row">
+                            <label className="costing-form-label" htmlFor="costing-unit-select">
+                                Unit
+                            </label>
+                            <span className="costing-form-required">*</span>
+                        </div>
+                        <div className="costing-form-select-wrap">
                             <select
+                                id="costing-unit-select"
                                 value={unit}
                                 onChange={(e) => setUnit(e.target.value)}
-                                style={{
-                                    width: "100%",
-                                    height: "44px",
-                                    padding: "0 36px 0 14px",
-                                    border: "1px solid #e2e8f0",
-                                    borderRadius: "10px",
-                                    outline: "none",
-                                    fontSize: "14px",
-                                    appearance: "none",
-                                    color: unit ? "#0f172a" : "#94a3b8",
-                                    background: "#ffffff",
-                                    boxSizing: "border-box",
-                                    cursor: "pointer",
-                                }}
+                                className={`costing-form-select ${!unit ? "is-placeholder" : ""}`}
+                                required
                             >
                                 <option value="" disabled>Select Unit</option>
                                 {POPULAR_UNITS.map((u) => (
-                                    <option key={u.value} value={u.value} style={{ color: "#0f172a" }}>
+                                    <option key={u.value} value={u.value}>
                                         {u.label}
                                     </option>
                                 ))}
                             </select>
-                            <ChevronDown size={16} color="#64748b" style={{ position: "absolute", right: "14px", top: "14px", pointerEvents: "none" }} />
-                        </div>
-                    </div>
-
-                    {/* Base Cost & Selling Rate Grid */}
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
-                        <div>
-                            <label style={{ display: "block", fontSize: "13.5px", fontWeight: 600, color: "#1e293b", marginBottom: "6px" }}>
-                                Base Cost (₹) <span style={{ color: "#ef4444" }}>*</span>
-                            </label>
-                            <input
-                                type="text"
-                                placeholder="ex. 45,00,000"
-                                value={baseCost}
-                                onChange={(e) => setBaseCost(e.target.value)}
-                                style={{
-                                    width: "100%",
-                                    height: "44px",
-                                    padding: "0 14px",
-                                    border: "1px solid #e2e8f0",
-                                    borderRadius: "10px",
-                                    outline: "none",
-                                    fontSize: "14px",
-                                    color: "#0f172a",
-                                    boxSizing: "border-box",
-                                }}
-                            />
-                        </div>
-                        <div>
-                            <label style={{ display: "block", fontSize: "13.5px", fontWeight: 600, color: "#1e293b", marginBottom: "6px" }}>
-                                Selling Rate
-                            </label>
-                            <input
-                                type="text"
-                                placeholder="ex. 55,00,000"
-                                value={sellingRate}
-                                onChange={(e) => setSellingRate(e.target.value)}
-                                style={{
-                                    width: "100%",
-                                    height: "44px",
-                                    padding: "0 14px",
-                                    border: "1px solid #e2e8f0",
-                                    borderRadius: "10px",
-                                    outline: "none",
-                                    fontSize: "14px",
-                                    color: "#0f172a",
-                                    boxSizing: "border-box",
-                                }}
-                            />
-                        </div>
-                    </div>
-
-                    {/* Spec / Finish & Rate Status Grid */}
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
-                        <div>
-                            <label style={{ display: "block", fontSize: "13.5px", fontWeight: 600, color: "#1e293b", marginBottom: "6px" }}>
-                                Spec / Finish
-                            </label>
-                            <input
-                                type="text"
-                                placeholder="ex. Custom, 6x6.5ft"
-                                value={spec}
-                                onChange={(e) => setSpec(e.target.value)}
-                                style={{
-                                    width: "100%",
-                                    height: "44px",
-                                    padding: "0 14px",
-                                    border: "1px solid #e2e8f0",
-                                    borderRadius: "10px",
-                                    outline: "none",
-                                    fontSize: "14px",
-                                    color: "#0f172a",
-                                    boxSizing: "border-box",
-                                }}
-                            />
-                        </div>
-                        <div>
-                            <label style={{ display: "block", fontSize: "13.5px", fontWeight: 600, color: "#1e293b", marginBottom: "6px" }}>
-                                Rate Status
-                            </label>
-                            <div style={{ position: "relative" }}>
-                                <select
-                                    value={rateStatus}
-                                    onChange={(e) => setRateStatus(e.target.value)}
-                                    style={{
-                                        width: "100%",
-                                        height: "44px",
-                                        padding: "0 36px 0 14px",
-                                        border: "1px solid #e2e8f0",
-                                        borderRadius: "10px",
-                                        outline: "none",
-                                        fontSize: "14px",
-                                        appearance: "none",
-                                        color: "#0f172a",
-                                        background: "#ffffff",
-                                        boxSizing: "border-box",
-                                        cursor: "pointer",
-                                    }}
-                                >
-                                    <option value="active">Active</option>
-                                    <option value="draft">Draft</option>
-                                    <option value="expired">Expired</option>
-                                </select>
-                                <ChevronDown size={16} color="#64748b" style={{ position: "absolute", right: "14px", top: "14px", pointerEvents: "none" }} />
+                            <div className="costing-form-select-arrow">
+                                <ChevronDown size={18} />
                             </div>
                         </div>
                     </div>
 
-                    {/* Vendor */}
-                    <div>
-                        <label style={{ display: "block", fontSize: "13.5px", fontWeight: 600, color: "#1e293b", marginBottom: "6px" }}>
-                            Vendor <span style={{ color: "#ef4444" }}>*</span>
-                        </label>
-                        {!isCustomVendor ? (
-                            <div style={{ position: "relative" }}>
+                    {/* 5. Base Cost & Selling Rate (Frame 2147225099: 2 Columns, gap: 16px) */}
+                    <div className="costing-form-row-2col">
+                        <div className="costing-form-field">
+                            <div className="costing-form-label-row">
+                                <label className="costing-form-label" htmlFor="costing-base-cost">
+                                    Base Cost (₹)
+                                </label>
+                                <span className="costing-form-required">*</span>
+                            </div>
+                            <input
+                                id="costing-base-cost"
+                                type="text"
+                                placeholder="ex. 45,00,000"
+                                value={baseCost}
+                                onChange={(e) => setBaseCost(e.target.value)}
+                                className="costing-form-input"
+                                required
+                            />
+                        </div>
+                        <div className="costing-form-field">
+                            <div className="costing-form-label-row">
+                                <label className="costing-form-label" htmlFor="costing-selling-rate">
+                                    Selling Rate
+                                </label>
+                            </div>
+                            <input
+                                id="costing-selling-rate"
+                                type="text"
+                                placeholder="ex. WoodCraft Studio"
+                                value={sellingRate}
+                                onChange={(e) => setSellingRate(e.target.value)}
+                                className="costing-form-input"
+                            />
+                        </div>
+                    </div>
+
+                    {/* 6. Spec / Finish & Rate Status (Frame 2147225100: 2 Columns, gap: 16px) */}
+                    <div className="costing-form-row-2col">
+                        <div className="costing-form-field">
+                            <div className="costing-form-label-row">
+                                <label className="costing-form-label" htmlFor="costing-spec-finish">
+                                    Spec / Finish
+                                </label>
+                            </div>
+                            <input
+                                id="costing-spec-finish"
+                                type="text"
+                                placeholder="ex. Custom, 6x6.5ft"
+                                value={spec}
+                                onChange={(e) => setSpec(e.target.value)}
+                                className="costing-form-input"
+                            />
+                        </div>
+                        <div className="costing-form-field">
+                            <div className="costing-form-label-row">
+                                <label className="costing-form-label" htmlFor="costing-rate-status">
+                                    Rate Status
+                                </label>
+                            </div>
+                            <div className="costing-form-select-wrap">
                                 <select
+                                    id="costing-rate-status"
+                                    value={rateStatus}
+                                    onChange={(e) => setRateStatus(e.target.value)}
+                                    className="costing-form-select"
+                                >
+                                    <option value="active">Approved</option>
+                                    <option value="draft">Draft</option>
+                                    <option value="review">Review</option>
+                                    <option value="outdated">Outdated</option>
+                                </select>
+                                <div className="costing-form-select-arrow">
+                                    <ChevronDown size={18} />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 7. Vendor (Frame 16 + Frame 12) */}
+                    <div className="costing-form-field">
+                        <div className="costing-form-label-row">
+                            <label className="costing-form-label" htmlFor="costing-vendor-select">
+                                Vendor
+                            </label>
+                            <span className="costing-form-required">*</span>
+                        </div>
+                        {!isCustomVendor ? (
+                            <div className="costing-form-select-wrap">
+                                <select
+                                    id="costing-vendor-select"
                                     value={vendor}
                                     onChange={(e) => {
                                         if (e.target.value === "__custom__") {
@@ -810,52 +695,34 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, existingVendo
                                             setVendor(e.target.value);
                                         }
                                     }}
-                                    style={{
-                                        width: "100%",
-                                        height: "44px",
-                                        padding: "0 36px 0 14px",
-                                        border: "1px solid #e2e8f0",
-                                        borderRadius: "10px",
-                                        outline: "none",
-                                        fontSize: "14px",
-                                        appearance: "none",
-                                        color: vendor ? "#0f172a" : "#94a3b8",
-                                        background: "#ffffff",
-                                        boxSizing: "border-box",
-                                        cursor: "pointer",
-                                    }}
+                                    className={`costing-form-select ${!vendor ? "is-placeholder" : ""}`}
+                                    required
                                 >
                                     <option value="" disabled>ex. WoodCraft Studios</option>
                                     {allVendors.map((v) => (
-                                        <option key={v} value={v} style={{ color: "#0f172a" }}>
+                                        <option key={v} value={v}>
                                             {v}
                                         </option>
                                     ))}
-                                    <option value="__custom__" style={{ color: "#2563eb", fontWeight: 600 }}>
+                                    <option value="__custom__">
                                         + Add New / Custom Vendor...
                                     </option>
                                 </select>
-                                <ChevronDown size={16} color="#64748b" style={{ position: "absolute", right: "14px", top: "14px", pointerEvents: "none" }} />
+                                <div className="costing-form-select-arrow">
+                                    <ChevronDown size={18} />
+                                </div>
                             </div>
                         ) : (
-                            <div style={{ display: "flex", gap: "8px" }}>
+                            <div style={{ display: "flex", gap: "8px", width: "100%" }}>
                                 <input
                                     type="text"
                                     placeholder="Enter new vendor name"
                                     value={customVendorName}
                                     onChange={(e) => setCustomVendorName(e.target.value)}
                                     autoFocus
-                                    style={{
-                                        flex: 1,
-                                        height: "44px",
-                                        padding: "0 14px",
-                                        border: "1px solid #e2e8f0",
-                                        borderRadius: "10px",
-                                        outline: "none",
-                                        fontSize: "14px",
-                                        color: "#0f172a",
-                                        boxSizing: "border-box",
-                                    }}
+                                    className="costing-form-input"
+                                    style={{ flex: 1 }}
+                                    required
                                 />
                                 <button
                                     type="button"
@@ -863,76 +730,41 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, existingVendo
                                         setIsCustomVendor(false);
                                         setVendor(allVendors[0] || "");
                                     }}
-                                    style={{
-                                        padding: "0 14px",
-                                        height: "44px",
-                                        background: "#f1f5f9",
-                                        border: "1px solid #e2e8f0",
-                                        borderRadius: "10px",
-                                        color: "#475569",
-                                        fontSize: "13px",
-                                        cursor: "pointer",
-                                    }}
+                                    className="costing-drawer-cancel-btn"
+                                    style={{ width: "auto", padding: "0 14px", fontSize: "13px" }}
                                 >
-                                    Choose Existing
+                                    Cancel
                                 </button>
                             </div>
                         )}
                     </div>
 
-                    {/* Description */}
-                    <div>
-                        <label style={{ display: "block", fontSize: "13.5px", fontWeight: 600, color: "#1e293b", marginBottom: "6px" }}>
-                            Description <span style={{ color: "#ef4444" }}>*</span>
-                        </label>
+                    {/* 8. Description (Frame 16 + Frame 12 Textarea) */}
+                    <div className="costing-form-field">
+                        <div className="costing-form-label-row">
+                            <label className="costing-form-label" htmlFor="costing-description">
+                                Description
+                            </label>
+                            <span className="costing-form-required">*</span>
+                        </div>
                         <textarea
+                            id="costing-description"
                             placeholder="ex. lorem ipsum dolor sit amet, consectetur adipiscing elit..."
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
-                            rows={3}
-                            style={{
-                                width: "100%",
-                                padding: "12px 14px",
-                                border: "1px solid #e2e8f0",
-                                borderRadius: "10px",
-                                outline: "none",
-                                fontSize: "14px",
-                                color: "#0f172a",
-                                minHeight: "85px",
-                                resize: "vertical",
-                                boxSizing: "border-box",
-                                fontFamily: "inherit",
-                            }}
+                            className="costing-form-textarea"
+                            required
                         />
                     </div>
                 </form>
 
-                {/* Modal Footer */}
-                <div
-                    style={{
-                        padding: "16px 28px 22px",
-                        background: "#ffffff",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        borderTop: "1px solid #f1f5f9",
-                    }}
-                >
+                {/* Bottom Action Buttons (Frame 2147225069) */}
+                <div className="costing-drawer-footer">
                     <button
                         type="button"
                         onClick={handleClose}
                         disabled={submitting}
-                        style={{
-                            background: "#ffffff",
-                            border: "1px solid #e2e8f0",
-                            padding: "10px 24px",
-                            borderRadius: "10px",
-                            fontWeight: 600,
-                            color: "#334155",
-                            cursor: submitting ? "not-allowed" : "pointer",
-                            fontSize: "14px",
-                            transition: "background 0.15s",
-                        }}
+                        className="costing-drawer-cancel-btn"
                     >
                         Cancel
                     </button>
@@ -940,24 +772,12 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, existingVendo
                         type="button"
                         onClick={handleSubmit}
                         disabled={submitting}
-                        style={{
-                            background: submitting ? "#93c5fd" : "#2563eb",
-                            color: "#ffffff",
-                            border: "none",
-                            padding: "10px 30px",
-                            borderRadius: "10px",
-                            fontWeight: 600,
-                            fontSize: "14px",
-                            cursor: submitting ? "not-allowed" : "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            boxShadow: "0 4px 14px rgba(37, 99, 235, 0.25)",
-                            transition: "all 0.15s",
-                        }}
+                        className="costing-drawer-add-btn"
                     >
                         {submitting && <Loader2 size={16} className="animate-spin" />}
-                        {submitting ? (itemToEdit ? "Saving..." : "Adding...") : (itemToEdit ? "Save Changes" : "Add Item")}
+                        {submitting
+                            ? (itemToEdit ? "Saving..." : "Adding...")
+                            : (itemToEdit ? "Save Changes" : "Add")}
                     </button>
                 </div>
             </div>

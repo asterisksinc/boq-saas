@@ -1,0 +1,1874 @@
+/* ==========================================================================
+   Proposals Redesign Stylesheet
+   Faithfully matching Figma CSS specifications for User Dashboard -> Proposals
+   ========================================================================== */
+
+/* Main Container Area */
+.proposals-main-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    gap: 16px;
+    width: 100%;
+    box-sizing: border-box;
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Toast Notification */
+.proposals-toast {
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    background: #0F172A;
+    color: #FFFFFF;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-family: 'Urbanist', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 16px 32px -12px rgba(14, 18, 27, 0.2);
+    z-index: 1200;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: proposalsFadeSlide 0.25s ease forwards;
+}
+
+@keyframes proposalsFadeSlide {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Error Banner */
+.proposals-error-banner {
+    width: 100%;
+    padding: 12px 16px;
+    background: #FEE2E2;
+    border: 1px solid #FCA5A5;
+    border-radius: 6px;
+    color: #991B1B;
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-sizing: border-box;
+}
+
+.proposals-error-banner button {
+    background: transparent;
+    border: none;
+    color: #991B1B;
+    text-decoration: underline;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+/* --------------------------------------------------------------------------
+   Proposals Sub-Header (Frame 2147225066)
+   -------------------------------------------------------------------------- */
+.proposals-sub-header {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0;
+    gap: 16px;
+    width: 100%;
+    min-height: 49px;
+    box-sizing: border-box;
+}
+
+.proposals-title-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    gap: 8px;
+}
+
+.proposals-title-group h2 {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.proposals-title-group p {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.proposals-header-buttons {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0;
+    gap: 16px;
+}
+
+/* Templates Button (Frame 2147225069 / Buttons) */
+.btn-templates {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px;
+    gap: 6px;
+    min-width: 95px;
+    height: 46px;
+    background: #FFFFFF;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    border-radius: 6px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.btn-templates:hover {
+    background: #F8FAFC;
+    border-color: #CBD5E1;
+    color: #0F172A;
+}
+
+/* New Proposal Button (Frame 2147225069 / Buttons) */
+.btn-new-proposal {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px;
+    gap: 6px;
+    min-width: 140px;
+    height: 46px;
+    background: #2563EB;
+    border: none;
+    border-radius: 6px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #FFFFFF;
+    cursor: pointer;
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25);
+}
+
+.btn-new-proposal:hover {
+    background: #1D4ED8;
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+}
+
+.btn-new-proposal svg {
+    flex-shrink: 0;
+}
+
+/* --------------------------------------------------------------------------
+   KPI Summary Cards Row (Frame 2147225138)
+   -------------------------------------------------------------------------- */
+.proposals-summary-row {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    padding: 0;
+    gap: 8px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.proposals-kpi-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px;
+    gap: 8px;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 116px;
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 6px;
+    backdrop-filter: blur(12px);
+    transition: background 0.15s ease;
+}
+
+.proposals-kpi-card:hover {
+    background: rgba(255, 255, 255, 0.85);
+}
+
+.proposals-kpi-label {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.proposals-kpi-value {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 400;
+    font-size: 24px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.proposals-kpi-period {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+/* Skeletons for KPI cards */
+.proposals-kpi-card.is-skeleton .proposals-kpi-value-skeleton {
+    width: 60px;
+    height: 28px;
+    background: rgba(148, 163, 184, 0.2);
+    border-radius: 4px;
+    animation: proposalsShimmer 1.5s infinite;
+}
+
+@keyframes proposalsShimmer {
+    0% { opacity: 0.6; }
+    50% { opacity: 0.3; }
+    100% { opacity: 0.6; }
+}
+
+/* --------------------------------------------------------------------------
+   Table Container (Frame 2147225139)
+   -------------------------------------------------------------------------- */
+.proposals-table-container {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px;
+    gap: 32px;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(12px);
+    border-radius: 6px;
+    overflow: visible;
+}
+
+/* Device Management_iOS (table wrapper) */
+.proposals-table-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    gap: 8px;
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: visible;
+    scrollbar-width: thin;
+}
+
+.proposals-table-wrapper::-webkit-scrollbar {
+    height: 6px;
+}
+
+.proposals-table-wrapper::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.3);
+    border-radius: 999px;
+}
+
+.proposals-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-family: 'Urbanist', sans-serif;
+    min-width: 980px;
+}
+
+/* Table Header Row (Frame 57) */
+.proposals-table thead tr {
+    height: 36px;
+}
+
+.proposals-table thead th {
+    box-sizing: border-box;
+    background: #E4ECFB;
+    padding: 8px 12px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    text-transform: uppercase;
+    color: #64748B;
+    text-align: left;
+    white-space: nowrap;
+    border: none;
+}
+
+.proposals-table thead th:first-child {
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
+}
+
+.proposals-table thead th:last-child {
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+    text-align: right;
+}
+
+/* Column Dimensions matching Figma specifications */
+.col-th-id { width: 110px; }
+.col-th-project { width: 260px; }
+.col-th-client { width: 140px; }
+.col-th-status { width: 100px; }
+.col-th-value { width: 100px; }
+.col-th-sent { width: 120px; }
+.col-th-expiry { width: 120px; }
+.col-th-views { width: 120px; }
+.col-th-date { width: 120px; }
+.col-th-actions { width: 176px; }
+
+/* Table Data Rows (Frame 59, 81, 82, 84, 85) */
+.proposals-table tbody tr {
+    height: 56px;
+    border-bottom: 1px solid #EBEBEB;
+    transition: background 0.15s ease;
+}
+
+.proposals-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.65);
+}
+
+.proposals-table tbody td {
+    box-sizing: border-box;
+    padding: 6px 12px;
+    vertical-align: middle;
+    border-bottom: 1px solid #EBEBEB;
+}
+
+/* Table Cells Typography & Layout */
+.cell-id {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+    white-space: nowrap;
+}
+
+.cell-project {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.cell-project-text {
+    display: block;
+    max-width: 250px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cell-client {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+    white-space: nowrap;
+}
+
+/* Status Badges (Frame 2147225014, 2147225015, 2147225016) */
+.status-badge {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 2px 6px;
+    gap: 10px;
+    border-radius: 9999px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.status-badge.sent-status,
+.status-badge.draft-status {
+    background: rgba(100, 116, 139, 0.12);
+    color: #64748B;
+}
+
+.status-badge.approved-status,
+.status-badge.won-status {
+    background: rgba(22, 163, 74, 0.12);
+    color: #16A34A;
+}
+
+.status-badge.revisions-status {
+    background: rgba(217, 119, 6, 0.12);
+    color: #D97706;
+}
+
+.status-badge.lost-status {
+    background: rgba(239, 68, 68, 0.12);
+    color: #EF4444;
+}
+
+.cell-value {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    white-space: nowrap;
+}
+
+.cell-sent,
+.cell-expiry,
+.cell-date {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+    white-space: nowrap;
+}
+
+/* Views Column (Frame 2147225152) */
+.proposal-views-active {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+}
+
+.view-indicator-dot {
+    box-sizing: border-box;
+    width: 14px;
+    height: 14px;
+    border: 1px solid #16A34A;
+    border-radius: 99999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.view-indicator-inner {
+    width: 8px;
+    height: 8px;
+    background: #16A34A;
+    border-radius: 50%;
+}
+
+.view-count-number {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.proposal-views-empty {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+    white-space: nowrap;
+}
+
+/* Actions Column & Buttons */
+.proposals-actions-cell {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    position: relative;
+}
+
+.btn-send-draft {
+    background: transparent;
+    border: none;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 0.15s ease, background 0.15s ease;
+}
+
+.btn-send-draft:hover {
+    color: #2563EB;
+    background: rgba(37, 99, 235, 0.08);
+}
+
+.btn-preview {
+    background: transparent;
+    border: none;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    transition: color 0.15s ease;
+}
+
+.btn-preview:hover {
+    color: #0F172A;
+    text-decoration: underline;
+}
+
+.actions-menu-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.btn-row-more {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: #64748B;
+    font-size: 18px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.15s ease;
+}
+
+.btn-row-more:hover {
+    background: rgba(100, 116, 139, 0.12);
+    color: #0F172A;
+}
+
+/* More Options Dropdown (Sent Status more options) */
+.proposals-dropdown-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    width: 166px;
+    background: #FFFFFF;
+    border: 1px solid #EBEBEB;
+    box-shadow: 0px 16px 32px -12px rgba(14, 18, 27, 0.1);
+    border-radius: 16px;
+    padding: 8px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 120;
+    animation: proposalsDropdownFade 0.15s ease forwards;
+}
+
+@keyframes proposalsDropdownFade {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.proposals-dropdown-item {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 8px;
+    gap: 8px;
+    width: 150px;
+    height: 40px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+    text-align: left;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.proposals-dropdown-item:hover {
+    background: #F8FAFC;
+    color: #0F172A;
+}
+
+.proposals-dropdown-item img,
+.proposals-dropdown-item svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Pagination Row (Frame 2147225166)
+   -------------------------------------------------------------------------- */
+.proposals-pagination {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    gap: 8px;
+    width: 100%;
+    height: 50px;
+}
+
+.proposals-total-arrivals {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.pagination-controls {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0;
+    gap: 8px;
+    height: 34px;
+}
+
+.pagination-controls button {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 8px 0;
+    width: 34px;
+    height: 34px;
+    border: 1px solid #EBEBEB;
+    border-radius: 6px;
+    background: transparent;
+    cursor: pointer;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+    transition: all 0.15s ease;
+}
+
+.pagination-controls button:hover:not(:disabled) {
+    border-color: #CBD5E1;
+    color: #0F172A;
+    background: #F8FAFC;
+}
+
+.pagination-controls button.active {
+    background: #E4ECFB;
+    border: 1px solid #2563EB;
+    color: #2563EB;
+}
+
+.pagination-controls button:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.page-size-control {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0;
+    gap: 8px;
+    height: 34px;
+}
+
+.page-size-label {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    white-space: nowrap;
+}
+
+.page-size-select-box {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 8px 12px;
+    gap: 6px;
+    min-width: 83px;
+    height: 34px;
+    border: 1px solid #EBEBEB;
+    border-radius: 6px;
+    background: #FFFFFF;
+    position: relative;
+}
+
+.page-size-select-box select {
+    border: none;
+    background: transparent;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+    cursor: pointer;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 18px;
+}
+
+.page-size-select-box svg {
+    position: absolute;
+    right: 8px;
+    pointer-events: none;
+    color: #64748B;
+}
+
+/* --------------------------------------------------------------------------
+   Table Empty & Loading States
+   -------------------------------------------------------------------------- */
+.proposals-table-empty {
+    text-align: center;
+    padding: 64px 24px;
+    color: #64748B;
+}
+
+.proposals-table-empty h3 {
+    margin: 0 0 8px 0;
+    font-family: 'Urbanist', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: #0F172A;
+}
+
+.proposals-table-empty p {
+    margin: 0 0 16px 0;
+    font-family: 'Urbanist', sans-serif;
+    font-size: 14px;
+    color: #64748B;
+}
+
+.proposals-table-loading {
+    text-align: center;
+    padding: 64px 24px;
+    color: #64748B;
+    font-family: 'Urbanist', sans-serif;
+    font-size: 14px;
+}
+
+/* --------------------------------------------------------------------------
+   Responsive Breakpoints
+   -------------------------------------------------------------------------- */
+@media (max-width: 1024px) {
+    .proposals-summary-row {
+        flex-wrap: wrap;
+    }
+    .proposals-kpi-card {
+        flex: 1 1 calc(50% - 8px);
+    }
+}
+
+@media (max-width: 768px) {
+    .proposals-sub-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+    .proposals-header-buttons {
+        width: 100%;
+        justify-content: flex-start;
+    }
+    .proposals-summary-row {
+        flex-direction: column;
+    }
+    .proposals-kpi-card {
+        flex: 1 1 100%;
+        width: 100%;
+    }
+    .proposals-pagination {
+        flex-direction: column;
+        align-items: flex-start;
+        height: auto;
+        gap: 16px;
+    }
+}
+
+/* ==========================================================================
+   Figma Modal System: New Proposal & Proposal Details (Frames 2147225092 & 2147225094)
+   ========================================================================== */
+
+/* Translucent backdrop overlay (Rectangle 69) */
+.proposal-modal-overlay {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 16px;
+    box-sizing: border-box;
+    animation: proposalModalFade 0.2s ease forwards;
+}
+
+@keyframes proposalModalFade {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Outer Modal Frame (Frame 2147225092 / 2147225094) */
+.proposal-modal-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 16px;
+    gap: 16px;
+    width: 100%;
+    max-width: 590px;
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 16px;
+    backdrop-filter: blur(20.4px);
+    -webkit-backdrop-filter: blur(20.4px);
+    border: 1px solid rgba(255, 255, 255, 0.32);
+    box-shadow: 0px 20px 40px rgba(15, 23, 42, 0.08);
+    position: relative;
+    max-height: 94vh;
+    overflow-y: auto;
+    animation: proposalCardZoom 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes proposalCardZoom {
+    from {
+        opacity: 0;
+        transform: scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Modal Header (Frame 2147225093) */
+.proposal-modal-header {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0;
+    gap: 24px;
+    width: 100%;
+    min-height: 48px;
+    box-sizing: border-box;
+}
+
+.proposal-modal-title-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    gap: 6px;
+}
+
+.proposal-modal-title {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 120%; /* 22px */
+    color: #0F172A;
+}
+
+.proposal-modal-subtitle {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 120%; /* 19px */
+    color: #64748B;
+}
+
+.proposal-modal-close-btn {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: #0F172A;
+    padding: 0;
+    border-radius: 4px;
+    transition: background 0.15s ease;
+}
+
+.proposal-modal-close-btn:hover {
+    background: rgba(15, 23, 42, 0.06);
+}
+
+/* Inner White Card (Frame 2147225091 / Frame 2147225027) */
+.proposal-modal-inner-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 16px;
+    gap: 16px;
+    width: 100%;
+    background: #FFFFFF;
+    border-radius: 14px;
+}
+
+/* Step 1 Options 2x2 Grid (Frame 2147225089 / 2147225090) */
+.proposal-options-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.proposal-option-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 16px;
+    gap: 8px;
+    width: 100%;
+    min-height: 95px;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    background: #FFFFFF;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: left;
+    outline: none;
+}
+
+.proposal-option-card:hover {
+    border-color: #2563EB;
+    background: #FAFCFF;
+}
+
+.proposal-option-card.selected {
+    border: 1.5px solid #2563EB;
+    background: #EFF6FF;
+}
+
+.proposal-option-icon {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #0F172A;
+}
+
+.proposal-option-icon img,
+.proposal-option-icon svg {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+}
+
+.proposal-option-text {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 0;
+    gap: 4px;
+}
+
+.proposal-option-title {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%; /* 17px */
+    color: #0F172A;
+    margin: 0;
+}
+
+.proposal-option-desc {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%; /* 14px */
+    color: #64748B;
+    margin: 0;
+}
+
+/* Step 1 Footer (Frame 2147225069) */
+.proposal-modal-footer {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0;
+    gap: 16px;
+    width: 100%;
+    height: 46px;
+    box-sizing: border-box;
+}
+
+.proposal-btn-cancel {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px;
+    gap: 6px;
+    width: 71px;
+    height: 46px;
+    background: #FFFFFF;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    border-radius: 6px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%; /* 17px */
+    color: #0F172A;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.proposal-btn-cancel:hover {
+    background: #F8FAFC;
+    border-color: #CBD5E1;
+}
+
+.proposal-btn-continue {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px;
+    gap: 6px;
+    width: 84px;
+    height: 46px;
+    background: #2563EB;
+    border-radius: 6px;
+    border: none;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%; /* 17px */
+    color: #FFFFFF;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.proposal-btn-continue:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.proposal-btn-continue:hover:not(:disabled) {
+    background: #1D4ED8;
+}
+
+/* Step 2 Form Controls (Input Field / Frame 16 / Frame 12) */
+.proposal-form-field {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    gap: 8px;
+    width: 100%;
+}
+
+.proposal-form-label-row {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    padding: 0;
+    gap: 4px;
+    width: 100%;
+}
+
+.proposal-form-label {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.proposal-form-required {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #DC2626;
+}
+
+.proposal-form-control-box {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 14px 16px;
+    gap: 8px;
+    width: 100%;
+    height: 48px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    position: relative;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.proposal-form-control-box:focus-within {
+    border-color: #2563EB;
+    box-shadow: 0 0 0 1px #2563EB;
+}
+
+.proposal-form-input,
+.proposal-form-select {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: transparent;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    outline: none;
+    padding: 0;
+    margin: 0;
+}
+
+.proposal-form-select {
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 28px;
+}
+
+.proposal-form-input::placeholder {
+    color: #64748B;
+    font-family: 'Urbanist', sans-serif;
+    font-weight: 400;
+    font-size: 14px;
+}
+
+.proposal-form-icon-right {
+    position: absolute;
+    right: 16px;
+    pointer-events: none;
+    color: #0F172A;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+}
+
+.proposal-form-row-2col {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    padding: 0;
+    gap: 16px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.proposal-form-col {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    gap: 8px;
+    box-sizing: border-box;
+}
+
+.proposal-form-control-box-textarea {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    padding: 14px 16px;
+    gap: 8px;
+    width: 100%;
+    height: 85px;
+    min-height: 85px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.proposal-form-control-box-textarea:focus-within {
+    border-color: #2563EB;
+    box-shadow: 0 0 0 1px #2563EB;
+}
+
+.proposal-form-textarea {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: transparent;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    outline: none;
+    padding: 0;
+    margin: 0;
+    resize: vertical;
+}
+
+.proposal-form-textarea::placeholder {
+    color: #64748B;
+    font-family: 'Urbanist', sans-serif;
+    font-weight: 400;
+    font-size: 14px;
+}
+
+/* Step 2 Footer (Frame 2147225095) */
+.proposal-modal-footer-details {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0;
+    gap: 16px;
+    width: 100%;
+    height: 46px;
+    box-sizing: border-box;
+}
+
+.proposal-btn-back {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px;
+    gap: 6px;
+    width: 59px;
+    height: 46px;
+    background: #FFFFFF;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    border-radius: 6px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.proposal-btn-back:hover {
+    background: #F8FAFC;
+    border-color: #CBD5E1;
+}
+
+.proposal-footer-right-group {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0;
+    gap: 16px;
+    height: 46px;
+}
+
+.proposal-btn-create {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px 16px;
+    gap: 6px;
+    min-width: 128px;
+    height: 46px;
+    background: #2563EB;
+    border-radius: 6px;
+    border: none;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #FFFFFF;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.proposal-btn-create:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.proposal-btn-create:hover:not(:disabled) {
+    background: #1D4ED8;
+}
+
+/* Success State in Modal */
+.proposal-success-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 16px;
+    gap: 12px;
+    width: 100%;
+    text-align: center;
+}
+
+.proposal-success-icon-badge {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: rgba(22, 163, 74, 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 8px;
+}
+
+.proposal-success-title {
+    font-family: 'Urbanist', sans-serif;
+    font-weight: 600;
+    font-size: 20px;
+    line-height: 120%;
+    color: #0F172A;
+    margin: 0;
+}
+
+.proposal-success-subtitle {
+    font-family: 'Urbanist', sans-serif;
+    font-weight: 500;
+    font-size: 15px;
+    line-height: 120%;
+    color: #64748B;
+    margin: 0;
+}
+
+.proposal-success-detail-box {
+    margin-top: 8px;
+    padding: 12px 16px;
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    font-family: 'Urbanist', sans-serif;
+    font-size: 14px;
+    color: #0F172A;
+    max-width: 440px;
+    width: 100%;
+}
+
+/* Modal Responsive rules */
+@media (max-width: 640px) {
+    .proposal-options-grid {
+        grid-template-columns: 1fr;
+    }
+    .proposal-form-row-2col {
+        flex-direction: column;
+    }
+    .proposal-modal-card {
+        padding: 12px;
+        gap: 12px;
+    }
+    .proposal-modal-footer,
+    .proposal-modal-footer-details {
+        flex-wrap: wrap;
+        height: auto;
+        gap: 8px;
+    }
+}
+
+/* ==========================================================================
+   Figma Proposal Preview Modal (Frames 2147225094, 2147225096, Frame 12, etc.)
+   ========================================================================== */
+
+/* Outer Preview Modal Card - 720px max-width (Frame 2147225094) */
+.proposal-preview-card {
+    max-width: 720px;
+    width: 100%;
+}
+
+/* Inner White Preview Card (Frame 2147225096) */
+.proposal-preview-inner-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 24px 16px;
+    gap: 20px;
+    width: 100%;
+    background: #FFFFFF;
+    border-radius: 14px;
+}
+
+/* Company & Proposal Code Top Row (Frame 2147225153) */
+.preview-company-row {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0;
+    gap: 16px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.preview-company-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 0;
+    gap: 8px;
+    max-width: 340px;
+}
+
+.preview-company-title {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 24px;
+    line-height: 120%; /* 29px */
+    color: #0F172A;
+}
+
+.preview-company-details {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 140%; /* 20px */
+    color: #64748B;
+}
+
+.preview-proposal-code-box {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    padding: 0;
+    gap: 8px;
+    text-align: right;
+}
+
+.preview-proposal-code-title {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 24px;
+    line-height: 120%; /* 29px */
+    color: #0F172A;
+}
+
+.preview-proposal-dates {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.preview-proposal-date-line {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 140%; /* 20px */
+    color: #64748B;
+    text-align: right;
+}
+
+/* Horizontal Dividers */
+.preview-divider-line {
+    width: 100%;
+    height: 1px;
+    background: #E2E8F0;
+    border: none;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Prepared For Section (Frame 2147225154) */
+.preview-prepared-for-section {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    gap: 12px;
+    width: 100%;
+}
+
+.preview-prepared-for-label {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 140%; /* 17px */
+    color: #64748B;
+}
+
+.preview-client-project-group {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 0;
+    gap: 4px;
+}
+
+.preview-client-heading {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 28px;
+    line-height: 120%; /* 34px */
+    color: #0F172A;
+}
+
+.preview-project-subheading {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 140%; /* 20px */
+    color: #64748B;
+}
+
+/* Proposal Summary Box (Frame 12) */
+.preview-summary-box {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 16px;
+    gap: 12px;
+    width: 100%;
+    background: #F2F3F2;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+}
+
+.preview-summary-box-title {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 20px;
+    color: #475569;
+}
+
+.preview-summary-box-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0;
+    gap: 16px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.preview-summary-box-col {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    gap: 8px;
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.preview-summary-box-col-label {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 140%; /* 20px */
+    color: #64748B;
+    text-transform: uppercase;
+}
+
+.preview-summary-box-col-value {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 120%; /* 22px */
+    color: #0F172A;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+}
+
+.preview-summary-vdivider {
+    width: 1px;
+    height: 34px;
+    background: #E2E8F0;
+    flex-shrink: 0;
+}
+
+/* Scope Includes Section (Frame 2147225155) */
+.preview-scope-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    gap: 12px;
+    width: 100%;
+}
+
+.preview-scope-title {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 18px;
+    line-height: 120%; /* 22px */
+    color: #0F172A;
+}
+
+.preview-scope-items-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    gap: 6px;
+    width: 100%;
+}
+
+.preview-scope-line-item {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0;
+    gap: 6px;
+    width: 100%;
+}
+
+.preview-scope-dash {
+    width: 10px;
+    height: 1px;
+    background: #64748B;
+    flex-shrink: 0;
+}
+
+.preview-scope-text {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%; /* 17px */
+    color: #64748B;
+}
+
+/* Grand Total (Frame 2147224969) */
+.preview-total-block {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-end;
+    padding: 0;
+    gap: 4px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.preview-total-label {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 140%; /* 20px */
+    color: #64748B;
+}
+
+.preview-total-amount {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 28px;
+    line-height: 120%; /* 34px */
+    color: #2563EB;
+}
+
+/* Preview Footer Buttons (Frame 2147225095) */
+.proposal-btn-edit {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px;
+    gap: 6px;
+    width: 52px;
+    height: 46px;
+    background: #FFFFFF;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    border-radius: 6px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.proposal-btn-edit:hover:not(:disabled) {
+    background: #F8FAFC;
+    border-color: #CBD5E1;
+}
+
+.proposal-btn-download-pdf {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px;
+    gap: 6px;
+    width: 119px;
+    height: 46px;
+    background: #2563EB;
+    border-radius: 6px;
+    border: none;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #FFFFFF;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.proposal-btn-download-pdf:hover:not(:disabled) {
+    background: #1D4ED8;
+}
+
+.proposal-btn-download-pdf:disabled,
+.proposal-btn-edit:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}

@@ -338,8 +338,13 @@ export interface CostingScenario {
   totalCost?: number;
   sellingValue?: number;
   margin?: number;
+  marginPercent?: number;
   variance?: number;
+  variancePercent?: number;
   status?: string;
+  projectName?: string;
+  boqNumber?: string;
+  boqVersion?: string;
 }
 
 export interface VarianceCategory {
@@ -641,6 +646,11 @@ export interface AnalyticsResponse {
     totalCost: number;
     grossMarginPercent: number;
     averageProjectValue: number;
+    revenueChangePercent?: number | null;
+    costChangePercent?: number | null;
+    marginChangePoints?: number | null;
+    avgProjectValueChangePercent?: number | null;
+    comparisonPeriodLabel?: string;
   };
   monthlyRevenueVsCost: Array<{ period: string; revenue: number; cost: number }>;
   grossMarginTrend: Array<{ period: string; marginPercent: number }>;
@@ -648,10 +658,14 @@ export interface AnalyticsResponse {
   pipelineByType: Array<{ type: string; projects: number; value: number }>;
   teamPerformance: Array<{
     userId: string;
+    name?: string | null;
+    avatarUrl?: string | null;
     role: string;
     projects: number;
     boqs: number;
     projectValue: number;
+    revenue?: number;
+    marginPercent?: number | null;
     rating: number | null;
   }>;
   clientAnalysis: Array<{
@@ -660,8 +674,51 @@ export interface AnalyticsResponse {
     totalValue: number;
     revenue: number;
     marginPercent: number | null;
+    isRepeat?: boolean;
   }>;
   counts: { projects: number; boqs: number };
+  pipeline?: {
+    totalProjects: number;
+    totalValue: number;
+    byStatus: {
+      planning: number;
+      active: number;
+      in_progress: number;
+      on_hold: number;
+      completed: number;
+    };
+    projects: Array<{
+      id: string;
+      name: string;
+      projectCode: string;
+      clientName: string;
+      projectType: string;
+      status: string;
+      projectValue: number;
+      startDate: string | null;
+      targetCompletionDate: string | null;
+      createdAt: string;
+    }>;
+  };
+  boqSummary?: {
+    totalBoqs: number;
+    byStatus: {
+      draft: number;
+      in_review: number;
+      approved: number;
+      archived: number;
+    };
+    byVersion: Array<{ version: string; count: number }>;
+    boqs: Array<{
+      id: string;
+      boqNumber: string;
+      version: string;
+      status: string;
+      markupPercent: number;
+      taxPercent: number;
+      createdAt: string;
+    }>;
+  };
 }
 
 // ── Activities ────────────────────────────────────────────────────────────────

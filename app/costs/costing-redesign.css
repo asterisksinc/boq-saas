@@ -1817,5 +1817,2797 @@
   color: #64748B;
 }
 
+/* ── Costing Analysis - Cost Overview (Figma Specifications) ─────────────────── */
+
+/* Frame 2147225138: 5 KPI Cards Row */
+.costing-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.costing-kpi-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 16px;
+  min-height: 114px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 6px;
+  backdrop-filter: blur(10px);
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.costing-kpi-card:hover {
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+}
+
+.costing-kpi-text-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+}
+
+.costing-kpi-title {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+.costing-kpi-value {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 24px;
+  line-height: 120%;
+  color: #0F172A;
+  letter-spacing: -0.02em;
+}
+
+.costing-kpi-track {
+  width: 100%;
+  height: 4px;
+  background: #E4ECFB;
+  border-radius: 2px;
+  overflow: hidden;
+  align-self: stretch;
+  margin-top: auto;
+}
+
+.costing-kpi-fill {
+  height: 4px;
+  background: #2563EB;
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+
+/* Frame 2147224980: Analysis Sub-Navigation Tabs */
+.costing-analysis-subnav {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  padding: 0px;
+  gap: 16px;
+  width: 100%;
+  height: 31px;
+  border-bottom: 1px solid #D7DFEA;
+}
+
+.costing-analysis-tab-btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0px 16px;
+  gap: 10px;
+  height: 31px;
+  background: transparent;
+  border: none;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s ease;
+}
+
+.costing-analysis-tab-btn:hover {
+  color: #0F172A;
+}
+
+.costing-analysis-tab-btn.is-active {
+  font-weight: 600;
+  color: #0F172A;
+}
+
+.costing-analysis-tab-btn.is-active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: #0F172A;
+  z-index: 1;
+}
+
+/* Frame 2147224997: Main Content 2-Column Row */
+.costing-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 898fr) minmax(0, 420fr);
+  gap: 8px;
+  width: 100%;
+  align-items: stretch;
+}
+
+/* Left Panel: Budget vs Actual by Category Chart (Frame 93) */
+.costing-overview-chart-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 24px;
+  min-height: 333px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 6px;
+  backdrop-filter: blur(10px);
+  position: relative;
+}
+
+.costing-overview-chart-header {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.costing-overview-chart-titles {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.costing-overview-chart-title {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.costing-overview-chart-subtitle {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+.costing-overview-chart-legend {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+.costing-legend-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+}
+
+.costing-legend-item.is-budget {
+  color: #2563EB;
+}
+
+.costing-legend-item.is-actual {
+  color: #64748B;
+}
+
+.costing-legend-line {
+  width: 12px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+.costing-legend-line.is-budget {
+  background: #2563EB;
+}
+
+.costing-legend-line.is-actual {
+  background: #64748B;
+}
+
+/* Chart Canvas & Bars */
+.costing-chart-container {
+  box-sizing: border-box;
+  position: relative;
+  width: 100%;
+  height: 224px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.costing-chart-gridlines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.costing-gridline-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.costing-gridline-label {
+  width: 44px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  text-align: right;
+  color: #64748B;
+  flex-shrink: 0;
+}
+
+.costing-gridline-dash {
+  flex: 1;
+  height: 0px;
+  border-top: 1px dashed #64748B;
+  opacity: 0.2;
+}
+
+.costing-chart-bars-wrap {
+  position: absolute;
+  top: 0;
+  left: 60px;
+  right: 0;
+  bottom: 24px;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: space-around;
+  gap: 12px;
+}
+
+.costing-category-bar-group {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+  height: 100%;
+  flex: 1;
+  position: relative;
+  cursor: pointer;
+}
+
+.costing-bar {
+  width: 36px;
+  max-width: 40px;
+  border-radius: 4px 4px 0px 0px;
+  transition: height 0.4s ease, opacity 0.15s ease;
+}
+
+.costing-bar.is-budget {
+  background: #DAE0E6;
+}
+
+.costing-bar.is-actual {
+  background: #2563EB;
+}
+
+.costing-category-bar-group:hover .costing-bar {
+  opacity: 0.85;
+}
+
+.costing-chart-categories-row {
+  position: absolute;
+  left: 60px;
+  right: 0;
+  bottom: 0px;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  gap: 12px;
+}
+
+.costing-chart-cat-label {
+  flex: 1;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  text-align: center;
+  color: #64748B;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Tooltip */
+.costing-chart-tooltip {
+  position: absolute;
+  bottom: 105%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #0F172A;
+  color: #FFFFFF;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-family: 'Urbanist', sans-serif;
+  font-size: 12px;
+  line-height: 140%;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.costing-chart-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 4px;
+  border-style: solid;
+  border-color: #0F172A transparent transparent transparent;
+}
+
+/* Right Panel: Budget Utilization (Frame 2147225000) */
+.costing-overview-utilization-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 20px;
+  min-height: 333px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 6px;
+  backdrop-filter: blur(10px);
+}
+
+.costing-utilization-title {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.costing-utilization-list {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0px;
+  gap: 14px;
+  width: 100%;
+  overflow-y: auto;
+  max-height: 256px;
+}
+
+.costing-utilization-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+}
+
+.costing-utilization-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 16px;
+}
+
+.costing-utilization-name {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+
+.costing-utilization-pct {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  flex-shrink: 0;
+}
+
+.costing-utilization-track {
+  width: 100%;
+  height: 6px;
+  background: #E4ECFB;
+  border-radius: 9999px;
+  overflow: hidden;
+  align-self: stretch;
+}
+
+.costing-utilization-fill {
+  height: 6px;
+  background: #2563EB;
+  border-radius: 9999px;
+  transition: width 0.4s ease;
+}
+
+/* Bottom Card: Markup & Tax (Frame 2147225000) */
+.costing-overview-markup-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 20px;
+  width: 100%;
+  min-height: 188px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 6px;
+  backdrop-filter: blur(10px);
+}
+
+.costing-markup-title {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.costing-markup-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+}
+
+.costing-markup-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 32px;
+}
+
+.costing-markup-label {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+.costing-markup-val {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.costing-markup-divider {
+  width: 100%;
+  height: 1px;
+  background: #DCE1E6;
+  border: none;
+  margin: 0;
+}
+
+.costing-markup-total-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 32px;
+}
+
+.costing-markup-total-label {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.costing-markup-total-val {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .costing-kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .costing-overview-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .costing-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .costing-chart-container {
+    height: 260px;
+  }
+}
+
+/* ==========================================================================
+   Costing - Analysis - Vendor Comparison (Frame 2147225071)
+   ========================================================================== */
+
+/* Main Container Frame 2147225071 */
+.costing-vendor-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 20px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 6px;
+  backdrop-filter: blur(10px);
+}
+
+/* Header Frame 2147225151 */
+.costing-vendor-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0px;
+  gap: 20px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+/* Left Group Frame 2147224969 */
+.costing-vendor-header-left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.costing-vendor-header-title {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.costing-vendor-header-subtitle {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+/* Right Group: Dropdown & Action */
+.costing-vendor-header-right {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Dropdown Selector Frame 2147225103 */
+.costing-vendor-item-select-wrap {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 10px 16px;
+  gap: 8px;
+  width: 289px;
+  height: 46px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  position: relative;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.costing-vendor-item-select-wrap:focus-within {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.costing-vendor-item-select {
+  width: 100%;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  cursor: pointer;
+  appearance: none;
+  padding-right: 28px;
+  text-overflow: ellipsis;
+}
+
+.costing-vendor-item-select-icon {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: #0F172A;
+}
+
+/* Add quote button in header */
+.costing-vendor-add-btn {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 0 16px;
+  gap: 6px;
+  height: 46px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  color: #2563EB;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.costing-vendor-add-btn:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+/* Table Area: Device Management_iOS / Frame 61 */
+.costing-vendor-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.costing-vendor-table-scroll {
+  min-width: 920px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0px;
+}
+
+/* Table Header Frame 57 */
+.costing-vendor-table-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 0px;
+  width: 100%;
+  height: 36px;
+  background: #E4ECFB;
+  border-radius: 8px;
+  box-sizing: border-box;
+  margin-bottom: 6px;
+}
+
+.costing-vendor-th {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 8px 12px;
+  height: 36px;
+  box-sizing: border-box;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  text-transform: uppercase;
+  color: #64748B;
+  flex-shrink: 0;
+}
+
+/* Column Dimensions (exact Figma proportions) */
+.costing-col-check {
+  width: 44px;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.costing-col-vendor {
+  flex: 1 1 360px;
+  min-width: 240px;
+}
+
+.costing-col-quote {
+  width: 200px;
+}
+
+.costing-col-lead {
+  width: 140px;
+}
+
+.costing-col-rating {
+  width: 160px;
+}
+
+.costing-col-status {
+  width: 200px;
+}
+
+.costing-col-action {
+  width: 140px;
+  justify-content: center;
+}
+
+/* Table Rows Frame 59, 83, 81 */
+.costing-vendor-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 0px;
+  width: 100%;
+  height: 56px;
+  background: transparent;
+  box-sizing: border-box;
+  transition: background 0.15s ease;
+}
+
+.costing-vendor-row:hover {
+  background: rgba(241, 245, 249, 0.6);
+}
+
+.costing-vendor-row.is-selected {
+  background: rgba(239, 246, 255, 0.4);
+}
+
+/* Horizontal Divider (Rectangle 30, Rectangle 39) */
+.costing-vendor-row-divider {
+  width: 100%;
+  height: 1px;
+  background: #EBEBEB;
+  border: none;
+  margin: 0;
+}
+
+/* Table Cells */
+.costing-vendor-td {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 6px 20px 6px 12px;
+  height: 56px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.costing-vendor-td.costing-col-check {
+  padding: 6px 12px;
+  justify-content: center;
+}
+
+.costing-vendor-td.costing-col-action {
+  padding: 6px 12px;
+  justify-content: center;
+}
+
+/* Checkbox control */
+.costing-vendor-checkbox-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: #FFFFFF;
+  border: 1.5px solid #CBD5E1;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.costing-vendor-checkbox-btn.is-checked {
+  background: #16A34A;
+  border-color: #16A34A;
+  color: #FFFFFF;
+}
+
+.costing-vendor-checkbox-btn:hover:not(.is-checked) {
+  border-color: #2563EB;
+}
+
+/* Typography in Rows */
+.costing-vendor-name {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.costing-vendor-item-hint {
+  font-size: 11px;
+  color: #64748B;
+  margin-top: 2px;
+}
+
+.costing-vendor-quote {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+.costing-vendor-lead-time {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+.costing-vendor-rating {
+  margin: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #D97706;
+}
+
+.costing-vendor-star-icon {
+  width: 16px;
+  height: 16px;
+  color: #D97706;
+  fill: #D97706;
+}
+
+/* Status Badges Frame 2147225015 */
+.costing-vendor-status-badge {
+  box-sizing: border-box;
+  display: inline-flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 2px 6px;
+  gap: 10px;
+  height: 18px;
+  border-radius: 9999px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  text-transform: uppercase;
+}
+
+.costing-vendor-status-badge.is-selected {
+  background: rgba(22, 163, 74, 0.12);
+  color: #16A34A;
+}
+
+.costing-vendor-status-badge.is-quoted {
+  background: rgba(100, 116, 139, 0.12);
+  color: #64748B;
+}
+
+/* Action Button (Buttons in Figma) */
+.costing-select-vendor-btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 0px 14px;
+  gap: 6px;
+  width: 62px;
+  height: 34px;
+  background: transparent;
+  border: 1px solid #2563EB;
+  border-radius: 6px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 120%;
+  color: #2563EB;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.costing-select-vendor-btn:hover:not(:disabled) {
+  background: #EFF6FF;
+  border-color: #1D4ED8;
+  color: #1D4ED8;
+}
+
+.costing-select-vendor-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.costing-selected-action-pill {
+  box-sizing: border-box;
+  display: inline-flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 0px 10px;
+  gap: 4px;
+  height: 34px;
+  color: #16A34A;
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+/* Empty State */
+.costing-vendor-empty-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  width: 100%;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.costing-vendor-empty-title {
+  margin: 12px 0 6px 0;
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  color: #0F172A;
+}
+
+.costing-vendor-empty-desc {
+  margin: 0 0 16px 0;
+  font-family: 'Urbanist', sans-serif;
+  font-size: 13px;
+  color: #64748B;
+  max-width: 420px;
+}
+
+/* ==========================================================================
+   Costing Scenarios Table & Components (Figma: Costing - Scenarios)
+   Frame 2147225072, Frame 57, Frame 59, 60, 61, 62...
+   ========================================================================== */
+
+/* Main Container Card (Frame 2147225072) */
+.costing-scenarios-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 12px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 6px;
+}
+
+/* Scenarios Table Wrapper */
+.costing-scenarios-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  position: relative;
+}
+
+.costing-scenarios-table {
+  width: 100%;
+  min-width: 1240px;
+  border-collapse: separate;
+  border-spacing: 0;
+  text-align: left;
+}
+
+/* Header Row (Frame 57) */
+.costing-scenarios-table-header {
+  height: 36px;
+  background: #E4ECFB;
+  border-radius: 8px;
+}
+
+.costing-scenarios-th {
+  padding: 0 12px;
+  height: 36px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  letter-spacing: 0.05em;
+  color: #64748B;
+  text-transform: uppercase;
+  box-sizing: border-box;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.costing-scenarios-th:first-child {
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+  padding-left: 14px;
+}
+
+.costing-scenarios-th:last-child {
+  border-top-right-radius: 8px;
+  border-bottom-right-radius: 8px;
+  padding-right: 14px;
+}
+
+/* 11 Column Width Specifications (Figma Components) */
+.costing-col-sc-check {
+  width: 40px;
+  text-align: center;
+}
+
+.costing-col-sc-name {
+  width: 241px;
+  min-width: 200px;
+}
+
+.costing-col-sc-baseline {
+  width: 165px;
+  min-width: 150px;
+}
+
+.costing-col-sc-type {
+  width: 88px;
+  min-width: 88px;
+}
+
+.costing-col-sc-cost {
+  width: 129px;
+  min-width: 110px;
+}
+
+.costing-col-sc-selling {
+  width: 153px;
+  min-width: 130px;
+}
+
+.costing-col-sc-margin {
+  width: 88px;
+  min-width: 80px;
+}
+
+.costing-col-sc-variance {
+  width: 112px;
+  min-width: 100px;
+}
+
+.costing-col-sc-status {
+  width: 91px;
+  min-width: 80px;
+}
+
+.costing-col-sc-updated {
+  width: 125px;
+  min-width: 120px;
+}
+
+.costing-col-sc-actions {
+  width: 64px;
+  min-width: 64px;
+  text-align: center;
+}
+
+/* Table Row (Frame 59, 60, 61, 62...) */
+.costing-scenarios-row {
+  height: 56px;
+  transition: background 0.15s ease;
+}
+
+.costing-scenarios-row:hover {
+  background: #F8FAFC;
+}
+
+.costing-scenarios-row.is-selected {
+  background: #EFF6FF;
+}
+
+.costing-scenarios-td {
+  padding: 8px 12px;
+  height: 56px;
+  border-bottom: 1px solid #EBEBEB;
+  vertical-align: middle;
+  box-sizing: border-box;
+}
+
+.costing-scenarios-td:first-child {
+  padding-left: 14px;
+}
+
+.costing-scenarios-td:last-child {
+  padding-right: 14px;
+}
+
+/* Checkbox Button (Component 16 / Frame) */
+.costing-scenarios-checkbox-btn {
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+  vertical-align: middle;
+}
+
+.costing-scenarios-checkbox-btn:hover {
+  border-color: #CBD5E1;
+}
+
+.costing-scenarios-checkbox-btn.is-checked {
+  background: #2563EB;
+  border-color: #2563EB;
+  color: #FFFFFF;
+}
+
+.costing-scenarios-checkbox-btn.is-indeterminate {
+  background: #2563EB;
+  border-color: #2563EB;
+  color: #FFFFFF;
+}
+
+/* Scenario Name & Description (Component 5) */
+.costing-sc-name-title {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.costing-sc-name-desc {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+  margin: 2px 0 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Baseline (Component 25) */
+.costing-sc-baseline-proj {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.costing-sc-baseline-boq {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+  margin: 2px 0 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Type Badge (Component 18) */
+.costing-sc-type-badge {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  background: rgba(100, 116, 139, 0.12);
+  border-radius: 4px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #475569;
+  white-space: nowrap;
+}
+
+/* Numeric Values */
+.costing-sc-value-text {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  white-space: nowrap;
+}
+
+.costing-sc-margin-text {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #16A34A;
+  white-space: nowrap;
+}
+
+.costing-sc-variance-text {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  white-space: nowrap;
+}
+
+.costing-sc-variance-text.is-favorable {
+  color: #16A34A;
+}
+
+.costing-sc-variance-text.is-unfavorable {
+  color: #EF4444;
+}
+
+/* Status Badges (Component 10) */
+.costing-sc-status-badge {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 11px;
+  line-height: 120%;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.costing-sc-status-badge.status-active {
+  background: #ECFDF5;
+  color: #16A34A;
+}
+
+.costing-sc-status-badge.status-applied {
+  background: #EFF6FF;
+  color: #2563EB;
+}
+
+.costing-sc-status-badge.status-quoted {
+  background: #EFF6FF;
+  color: #2563EB;
+}
+
+.costing-sc-status-badge.status-draft {
+  background: #F1F5F9;
+  color: #64748B;
+}
+
+/* Updated On Date Text */
+.costing-sc-updated-text {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   Costing Margins Components (Figma: Costing - Margins)
+   Frame 2147225138, Frame 2147225233, Frame 2147225129, Frame 57, Frame 61...
+   ========================================================================== */
+
+/* 1. Row 1: Four KPI Cards (Frame 2147225138) */
+.costing-margins-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1024px) {
+  .costing-margins-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .costing-margins-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.costing-margins-kpi-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 8px;
+  width: 100%;
+  min-height: 116px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 6px;
+}
+
+.costing-margins-kpi-title {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+.costing-margins-kpi-value {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 24px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.costing-margins-kpi-subtitle {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.costing-margins-kpi-subtitle.is-negative {
+  color: #CE0045;
+}
+
+.costing-margins-kpi-subtitle.is-positive {
+  color: #16A34A;
+}
+
+/* 2. Row 2: 3 Analytics Panels (Frame 2147225233 / Frame 2147225200) */
+.costing-margins-row2-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1024px) {
+  .costing-margins-row2-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.costing-margins-panel-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 12px;
+  min-height: 268px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+/* Panel A: Margin Trend (Frame 93) */
+.costing-trend-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 12px;
+}
+
+.costing-panel-title {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.costing-trend-legend {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 500;
+  font-size: 12px;
+  color: #64748B;
+}
+
+.costing-legend-badge-current {
+  width: 8px;
+  height: 8px;
+  background: #2563EB;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.costing-legend-badge-target {
+  width: 8px;
+  height: 8px;
+  background: rgba(37, 99, 235, 0.12);
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.costing-trend-chart-body {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  width: 100%;
+  height: 199px;
+  gap: 14px;
+  position: relative;
+}
+
+.costing-trend-y-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding-bottom: 24px;
+  width: 25px;
+  height: 100%;
+  box-sizing: border-box;
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 500;
+  font-size: 12px;
+  color: rgba(31, 31, 33, 0.56);
+}
+
+.costing-trend-chart-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 100%;
+  position: relative;
+}
+
+.costing-trend-x-axis {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  height: 24px;
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 500;
+  font-size: 12px;
+  color: rgba(31, 31, 33, 0.56);
+}
+
+.costing-trend-tooltip {
+  box-sizing: border-box;
+  position: absolute;
+  background: #010101;
+  border-radius: 6px;
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #FFFFFF;
+  pointer-events: none;
+  transform: translate(-50%, -100%);
+  margin-top: -12px;
+  z-index: 10;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+.costing-trend-tooltip-val {
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 20px;
+  color: #FFFFFF;
+}
+
+.costing-trend-tooltip-label {
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 500;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Panel B: Margin by Category (Frame 2147225073) */
+.costing-catmargin-list {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 100%;
+  height: 199px;
+  gap: 8px;
+  box-sizing: border-box;
+}
+
+.costing-catmargin-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  height: 28px;
+  gap: 12px;
+}
+
+.costing-catmargin-name {
+  width: 90px;
+  min-width: 80px;
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.costing-catmargin-bar-group {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.costing-catmargin-track {
+  width: 147px;
+  max-width: 147px;
+  height: 8px;
+  background: #E2E8F0;
+  border-radius: 100px;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-start;
+}
+
+.costing-catmargin-fill {
+  height: 8px;
+  border-radius: 118px;
+  transition: width 0.3s ease;
+}
+
+.costing-catmargin-pct {
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  width: 40px;
+}
+
+.costing-catmargin-delta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  width: 75px;
+  text-align: right;
+  line-height: 1.1;
+}
+
+.costing-catmargin-delta-val {
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 120%;
+  text-align: right;
+}
+
+.costing-catmargin-delta-sub {
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 400;
+  font-size: 9px;
+  color: #94A3B8;
+  text-align: right;
+}
+
+/* Panel C: Low Margin Items Summary (Frame 2147225071) */
+.costing-lowmargin-list {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.costing-lowmargin-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 50px;
+  border-bottom: 1px solid #EBEBEB;
+  padding: 4px 0;
+  gap: 8px;
+  box-sizing: border-box;
+}
+
+.costing-lowmargin-row:last-child {
+  border-bottom: none;
+}
+
+.costing-lowmargin-left {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.costing-lowmargin-thumb {
+  width: 32px;
+  height: 32px;
+  background: #D9D9D9;
+  border-radius: 2px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748B;
+}
+
+.costing-lowmargin-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.costing-lowmargin-title {
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 120%;
+  color: #0F172A;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+
+.costing-lowmargin-subtitle {
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 400;
+  font-size: 11px;
+  line-height: 120%;
+  color: #64748B;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 2px 0 0 0;
+}
+
+.costing-lowmargin-pct {
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 120%;
+  color: #16A34A;
+  padding: 0 8px;
+  white-space: nowrap;
+}
+
+.costing-lowmargin-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  border-radius: 9999px;
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 500;
+  font-size: 11px;
+  line-height: 120%;
+  white-space: nowrap;
+}
+
+.costing-lowmargin-badge.is-critical {
+  background: rgba(220, 38, 38, 0.1);
+  color: #DC2626;
+}
+
+.costing-lowmargin-badge.is-active {
+  background: rgba(22, 163, 74, 0.12);
+  color: #16A34A;
+}
+
+/* 3. Row 3: Two Panels (Frame 2147225129) */
+.costing-margins-row3-grid {
+  display: grid;
+  grid-template-columns: 1.8fr 1.2fr;
+  gap: 16px;
+  width: 100%;
+  min-height: 391px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1024px) {
+  .costing-margins-row3-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Left Panel: Margin Impact Drivers (Frame 2147225071) */
+.costing-impact-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 16px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 6px;
+  width: 100%;
+  min-height: 391px;
+}
+
+.costing-impact-title {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  text-transform: uppercase;
+}
+
+.costing-impact-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.costing-impact-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: separate;
+  border-spacing: 0;
+  text-align: left;
+}
+
+.costing-impact-table-header {
+  height: 36px;
+  background: #E4ECFB;
+  border-radius: 8px;
+}
+
+.costing-impact-th {
+  padding: 0 12px;
+  height: 36px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 120%;
+  color: #64748B;
+  text-transform: uppercase;
+  vertical-align: middle;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+.costing-impact-th:first-child {
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+  padding-left: 14px;
+}
+
+.costing-impact-th:last-child {
+  border-top-right-radius: 8px;
+  border-bottom-right-radius: 8px;
+  padding-right: 14px;
+}
+
+/* Impact Drivers Column Widths */
+.costing-col-impact-driver {
+  width: 200px;
+  min-width: 160px;
+}
+
+.costing-col-impact-val {
+  width: 157px;
+  min-width: 120px;
+}
+
+.costing-col-impact-vs {
+  width: 133px;
+  min-width: 110px;
+}
+
+.costing-col-impact-items {
+  width: 136px;
+  min-width: 100px;
+}
+
+.costing-col-impact-primary {
+  width: 281px;
+  min-width: 180px;
+}
+
+.costing-impact-row {
+  height: 56px;
+  transition: background 0.15s;
+}
+
+.costing-impact-row:hover {
+  background: #F8FAFC;
+}
+
+.costing-impact-td {
+  padding: 8px 12px;
+  height: 56px;
+  border-bottom: 1px solid #EBEBEB;
+  vertical-align: middle;
+  box-sizing: border-box;
+}
+
+.costing-impact-td:first-child {
+  padding-left: 14px;
+}
+
+.costing-impact-td:last-child {
+  padding-right: 14px;
+}
+
+.costing-impact-driver-text {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.costing-impact-val-text {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #DC2626;
+}
+
+.costing-impact-vs-text {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #DC2626;
+}
+
+.costing-impact-items-text {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.costing-impact-primary-text {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+/* Right Panel: Margin Insights (Frame 2147225074) */
+.costing-insights-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 16px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 6px;
+  width: 100%;
+  min-height: 391px;
+}
+
+.costing-insights-title {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+.costing-insights-list {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 8px;
+  flex: 1;
+}
+
+.costing-insight-item {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #EBEBEB;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.costing-insight-item:last-child {
+  border-bottom: none;
+}
+
+.costing-insight-left {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.costing-insight-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: #1C1B1F;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.costing-insight-text {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.costing-insight-action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #2563EB;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+
+.costing-insight-action-btn:hover {
+  text-decoration: underline;
+  color: #1D4ED8;
+}
+
+/* ==========================================================================
+   Costing - Library - Add New Item Drawer (Figma Frame 2147225094 & 2147225027)
+   ========================================================================== */
+
+/* Full-viewport Backdrop Overlay (rgba(0, 0, 0, 0.1)) */
+.costing-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 1000;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* Translucent Outer Card Frame 2147225094 (width: 460px; border-radius: 16px) */
+.costing-add-item-drawer {
+  box-sizing: border-box;
+  width: 460px;
+  max-width: calc(100vw - 40px);
+  height: calc(100vh - 40px);
+  max-height: 981px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  backdrop-filter: blur(20.4px);
+  -webkit-backdrop-filter: blur(20.4px);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0px 20px 40px -10px rgba(15, 23, 42, 0.15);
+  animation: costingDrawerSlideIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes costingDrawerSlideIn {
+  from {
+    transform: translateX(36px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Drawer Header Frame 2147225093 (width: 428px; height: 24px) */
+.costing-drawer-header {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0px;
+  width: 100%;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+/* Title: Add Item / Edit Item */
+.costing-drawer-title {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+/* Close Icon Button */
+.costing-drawer-close-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #0F172A;
+  padding: 0;
+  border-radius: 4px;
+  transition: opacity 0.15s ease;
+}
+
+.costing-drawer-close-btn:hover {
+  opacity: 0.7;
+}
+
+/* Inner White Card Frame 2147225027 (background: #FFFFFF; border-radius: 14px) */
+.costing-drawer-inner-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 16px;
+  gap: 16px;
+  width: 100%;
+  background: #FFFFFF;
+  border-radius: 14px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Custom Scrollbar for Inner Card */
+.costing-drawer-inner-card::-webkit-scrollbar,
+.costing-modal-inner-card::-webkit-scrollbar {
+  width: 6px;
+}
+
+.costing-drawer-inner-card::-webkit-scrollbar-track,
+.costing-modal-inner-card::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.costing-drawer-inner-card::-webkit-scrollbar-thumb,
+.costing-modal-inner-card::-webkit-scrollbar-thumb {
+  background: #E2E8F0;
+  border-radius: 999px;
+}
+
+.costing-drawer-inner-card::-webkit-scrollbar-thumb:hover,
+.costing-modal-inner-card::-webkit-scrollbar-thumb:hover {
+  background: #CBD5E1;
+}
+
+/* Form Field Container */
+.costing-form-field {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0px;
+  gap: 8px;
+  width: 100%;
+}
+
+/* Label Row Frame 16 */
+.costing-form-label-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  padding: 0px;
+  gap: 4px;
+  width: 100%;
+  height: 17px;
+}
+
+.costing-form-label {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.costing-form-required {
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #DC2626;
+}
+
+/* Input Box Frame 12 (height: 48px; border: 1px solid #E2E8F0; border-radius: 8px) */
+.costing-form-input {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 14px 16px;
+  gap: 8px;
+  width: 100%;
+  height: 48px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.costing-form-input::placeholder {
+  color: #64748B;
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 400;
+}
+
+.costing-form-input:focus {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* Drag & Drop File Upload Box Frame 2147225027 (height: 130px; border-radius: 20px) */
+.costing-form-upload-zone {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 12px;
+  gap: 12px;
+  width: 100%;
+  height: 130px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.costing-form-upload-zone:hover,
+.costing-form-upload-zone.is-dragging {
+  border-color: #2563EB;
+  background-color: rgba(37, 99, 235, 0.03);
+}
+
+/* Upload Icon Tile Frame 2147225048 (62x62px; background: rgba(37, 99, 235, 0.1); border: 1px solid #2563EB; border-radius: 8px) */
+.costing-form-upload-icon-tile {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  gap: 10px;
+  width: 62px;
+  height: 62px;
+  background: rgba(37, 99, 235, 0.1);
+  border: 1px solid #2563EB;
+  border-radius: 8px;
+  color: #2563EB;
+}
+
+/* "Drag & Drop Your File Here" Text */
+.costing-form-upload-text {
+  font-family: 'Inter', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  text-align: center;
+  margin: 0;
+}
+
+/* Upload Preview State */
+.costing-form-upload-preview {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  gap: 12px;
+  width: 100%;
+  height: 130px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 20px;
+}
+
+/* Dropdown Select Wrapper Frame 12 */
+.costing-form-select-wrap {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  width: 100%;
+  height: 48px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  position: relative;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.costing-form-select-wrap:focus-within {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.costing-form-select {
+  width: 100%;
+  height: 100%;
+  padding: 14px 40px 14px 16px;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  appearance: none;
+  cursor: pointer;
+}
+
+.costing-form-select.is-placeholder {
+  color: #64748B;
+}
+
+.costing-form-select-arrow {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  width: 20px;
+  height: 20px;
+  color: #0F172A;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 2-Column Row (Frame 2147225099 & Frame 2147225100; gap: 16px) */
+.costing-form-row-2col {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  padding: 0px;
+  gap: 16px;
+  width: 100%;
+}
+
+.costing-form-row-2col > .costing-form-field {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Textarea Frame 12 (height: 85px) */
+.costing-form-textarea {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  padding: 14px 16px;
+  gap: 8px;
+  width: 100%;
+  height: 85px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  outline: none;
+  resize: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.costing-form-textarea::placeholder {
+  color: #64748B;
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 400;
+}
+
+.costing-form-textarea:focus {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* Bottom Action Buttons Frame 2147225069 (width: 428px; height: 46px; gap: 16px) */
+.costing-drawer-footer {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0px;
+  gap: 16px;
+  width: 100%;
+  height: 46px;
+  flex-shrink: 0;
+}
+
+/* Cancel Button: 71x46px; background: #FFFFFF; border-radius: 6px */
+.costing-drawer-cancel-btn {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 14px;
+  gap: 6px;
+  width: 71px;
+  height: 46px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.costing-drawer-cancel-btn:hover {
+  background-color: #F8FAFC;
+}
+
+/* Add Button: 71x46px; background: #2563EB; border-radius: 6px */
+.costing-drawer-add-btn {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 14px 18px;
+  gap: 6px;
+  min-width: 71px;
+  height: 46px;
+  background: #2563EB;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #FFFFFF;
+  cursor: pointer;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.costing-drawer-add-btn:hover:not(:disabled) {
+  background-color: #1D4ED8;
+}
+
+.costing-drawer-add-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ==========================================================================
+   Costing - Categories - Add New Category Modal (Figma Frame 2147225094 & 2147225027)
+   ========================================================================== */
+
+/* Centered Backdrop Overlay */
+.costing-modal-overlay-centered {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* Translucent Outer Container Frame 2147225094 (width: 590px; border-radius: 16px) */
+.costing-new-category-modal {
+  box-sizing: border-box;
+  width: 590px;
+  max-width: calc(100vw - 40px);
+  max-height: calc(100vh - 40px);
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  backdrop-filter: blur(20.4px);
+  -webkit-backdrop-filter: blur(20.4px);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0px 20px 40px -10px rgba(15, 23, 42, 0.15);
+  animation: costingModalScaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes costingModalScaleIn {
+  from {
+    transform: scale(0.97);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Header Frame 2147225093 (height: 48px; gap: 24px) */
+.costing-modal-header {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0px;
+  width: 100%;
+  height: 48px;
+  flex-shrink: 0;
+}
+
+/* Title Stack Frame 2147224969 */
+.costing-modal-title-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0px;
+  gap: 6px;
+}
+
+.costing-modal-title {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.costing-modal-subtitle {
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+/* Close Icon Button */
+.costing-modal-close-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #0F172A;
+  padding: 0;
+  border-radius: 4px;
+  transition: opacity 0.15s ease;
+}
+
+.costing-modal-close-btn:hover {
+  opacity: 0.7;
+}
+
+/* Inner White Card Frame 2147225027 (width: 558px; background: #FFFFFF; border-radius: 14px) */
+.costing-modal-inner-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 16px;
+  gap: 16px;
+  width: 100%;
+  background: #FFFFFF;
+  border-radius: 14px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  max-height: calc(100vh - 180px);
+}
+
+/* Modal Bottom Action Footer Frame 2147225069 */
+.costing-modal-footer {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0px;
+  gap: 16px;
+  width: 100%;
+  height: 46px;
+  flex-shrink: 0;
+}
+
+.costing-modal-cancel-btn {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 14px;
+  gap: 6px;
+  width: 71px;
+  height: 46px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.costing-modal-cancel-btn:hover {
+  background-color: #F8FAFC;
+}
+
+.costing-modal-submit-btn {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 14px 20px;
+  gap: 6px;
+  min-width: 140px;
+  height: 46px;
+  background: #2563EB;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Urbanist', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #FFFFFF;
+  cursor: pointer;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.costing-modal-submit-btn:hover:not(:disabled) {
+  background-color: #1D4ED8;
+}
+
+.costing-modal-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+
 
 

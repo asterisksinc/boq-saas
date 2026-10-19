@@ -13,16 +13,41 @@ async function fetchApi<T>(path: string): Promise<T> {
     return parseApiResponse<T>(payload);
 }
 
-export async function getAnalytics(period?: "month" | "quarter" | "year"): Promise<AnalyticsResponse> {
+export interface AnalyticsFilterParams {
+    period?: "month" | "quarter" | "year" | "all" | "custom" | string;
+    tab?: string;
+    from?: string;
+    to?: string;
+}
+
+export async function getAnalytics(
+    params?: "month" | "quarter" | "year" | "all" | "custom" | string | AnalyticsFilterParams
+): Promise<AnalyticsResponse> {
     const sp = new URLSearchParams();
-    if (period) sp.set("period", period);
+    if (typeof params === "string") {
+        if (params) sp.set("period", params);
+    } else if (params) {
+        if (params.period) sp.set("period", params.period);
+        if (params.tab) sp.set("tab", params.tab);
+        if (params.from) sp.set("from", params.from);
+        if (params.to) sp.set("to", params.to);
+    }
     const q = sp.toString();
     return fetchApi<AnalyticsResponse>(`/api/v1/reports/analytics${q ? `?${q}` : ""}`);
 }
 
-export async function getAnalyticsPdf(period?: "month" | "quarter" | "year"): Promise<Blob> {
+export async function getAnalyticsPdf(
+    params?: "month" | "quarter" | "year" | "all" | "custom" | string | AnalyticsFilterParams
+): Promise<Blob> {
     const sp = new URLSearchParams();
-    if (period) sp.set("period", period);
+    if (typeof params === "string") {
+        if (params) sp.set("period", params);
+    } else if (params) {
+        if (params.period) sp.set("period", params.period);
+        if (params.tab) sp.set("tab", params.tab);
+        if (params.from) sp.set("from", params.from);
+        if (params.to) sp.set("to", params.to);
+    }
     const q = sp.toString();
     const response = await fetch(`/api/v1/reports/analytics/pdf${q ? `?${q}` : ""}`, { credentials: "include" });
     if (!response.ok) {

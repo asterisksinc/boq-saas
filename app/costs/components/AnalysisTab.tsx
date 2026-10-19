@@ -14,25 +14,60 @@ import {
     CheckCircle2,
     Clock,
     Tag,
+    ChevronDown,
 } from "lucide-react";
+import { formatMoney, formatFullCurrency } from "@/lib/costing-format";
 
-type SubTab = "Cost Overview" | "Vendor Comparison" | "Variance Analysis";
+export { formatMoney, formatFullCurrency };
+export type SubTab = "Cost Overview" | "Vendor Comparison" | "Variance Analysis";
 
-export default function AnalysisTab() {
+interface AnalysisTabProps {
+    selectedProjectId?: string;
+    onProjectChange?: (id: string) => void;
+    selectedCategory?: string;
+    onCategoryChange?: (cat: string) => void;
+    onFilterOptionsLoaded?: (
+        projects: Array<{ label: string; value: string }>,
+        categories: Array<{ label: string; value: string }>
+    ) => void;
+}
+
+export default function AnalysisTab({
+    selectedProjectId,
+    onProjectChange,
+    selectedCategory,
+    onCategoryChange,
+    onFilterOptionsLoaded,
+}: AnalysisTabProps = {}) {
     const [activeTab, setActiveTab] = useState<SubTab>("Cost Overview");
     const [data, setData] = useState<CostingAnalysisResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [isAddQuoteOpen, setIsAddQuoteOpen] = useState(false);
+    const [addQuoteInitialItemId, setAddQuoteInitialItemId] = useState<string | undefined>(undefined);
+    const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
 
     const tabs: SubTab[] = ["Cost Overview", "Vendor Comparison", "Variance Analysis"];
+    const effectiveProjectId = selectedProjectId && selectedProjectId !== "all" ? selectedProjectId : undefined;
 
-    const loadData = async () => {
+    const loadData = async (projId?: string) => {
         setLoading(true);
         setError("");
         try {
-            const res = await getCostingAnalysis();
+            const res = await getCostingAnalysis(projId ? { projectId: projId } : undefined);
             setData(res);
+
+            if (onFilterOptionsLoaded) {
+                const projectOpts = (res.projectsList || []).map(p => ({
+                    label: p.name,
+                    value: p.id,
+                }));
+                const categoryOpts = (res.varianceByCategory || []).map(c => ({
+                    label: c.category,
+                    value: c.category,
+                }));
+                onFilterOptionsLoaded(projectOpts, categoryOpts);
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to load analysis");
         } finally {
@@ -41,25 +76,44 @@ export default function AnalysisTab() {
     };
 
     useEffect(() => {
-        void loadData();
-    }, []);
-
-    const formatMoney = (val: number) => {
-        if (val === undefined || val === null || isNaN(val)) return "₹0";
-        const sign = val < 0 ? "-" : "";
-        const abs = Math.abs(val);
-        if (abs >= 10000000) return `${sign}₹${(abs / 10000000).toFixed(2)}Cr`;
-        if (abs >= 100000) return `${sign}₹${(abs / 100000).toFixed(1)}L`;
-        if (abs >= 1000) return `${sign}₹${(abs / 1000).toFixed(1)}K`;
-        return `${sign}₹${abs.toLocaleString("en-IN")}`;
-    };
+        void loadData(effectiveProjectId);
+    }, [effectiveProjectId]);
 
     if (loading) {
         return (
-            <div style={{ textAlign: "center", padding: "64px", color: "#6b7280", background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb" }}>
-                <RefreshCw size={24} className="animate-spin" style={{ margin: "0 auto 12px auto", color: "#2563eb" }} />
-                <div style={{ fontWeight: 500, color: "#1f2d3d" }}>Loading Costing Analysis...</div>
-                <div style={{ fontSize: "13px", color: "#9ca3af", marginTop: "4px" }}>Aggregating project budgets, actual costs, and vendor comparisons</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "24px", width: "100%" }}>
+                {/* 5 KPI Skeletons */}
+                <div className="costing-kpi-grid">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                        <div key={i} className="costing-kpi-card" style={{ opacity: 0.6 }}>
+                            <div className="costing-kpi-text-group">
+                                <div style={{ width: "80px", height: "14px", background: "#E2E8F0", borderRadius: "4px" }} />
+                                <div style={{ width: "100px", height: "24px", background: "#CBD5E1", borderRadius: "4px" }} />
+                            </div>
+                            <div className="costing-kpi-track">
+                                <div className="costing-kpi-fill" style={{ width: "50%", background: "#CBD5E1" }} />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Subnav Skeleton */}
+                <div className="costing-analysis-subnav" style={{ opacity: 0.6 }}>
+                    <div style={{ width: "120px", height: "16px", background: "#E2E8F0", borderRadius: "4px", margin: "6px 16px" }} />
+                    <div style={{ width: "140px", height: "16px", background: "#E2E8F0", borderRadius: "4px", margin: "6px 16px" }} />
+                    <div style={{ width: "140px", height: "16px", background: "#E2E8F0", borderRadius: "4px", margin: "6px 16px" }} />
+                </div>
+
+                {/* Content Grid Skeleton */}
+                <div className="costing-overview-grid" style={{ opacity: 0.6 }}>
+                    <div className="costing-overview-chart-card" style={{ minHeight: "333px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <RefreshCw size={24} className="animate-spin" style={{ color: "#2563EB" }} />
+                    </div>
+                    <div className="costing-overview-utilization-card" style={{ minHeight: "333px" }} />
+                </div>
+
+                {/* Markup Skeleton */}
+                <div className="costing-overview-markup-card" style={{ minHeight: "188px", opacity: 0.6 }} />
             </div>
         );
     }
@@ -72,7 +126,7 @@ export default function AnalysisTab() {
                     <span>{error || "Unable to load costing analysis data."}</span>
                 </div>
                 <button
-                    onClick={loadData}
+                    onClick={() => loadData(effectiveProjectId)}
                     style={{ background: "#fff", border: "1px solid #fca5a5", color: "#b91c1c", borderRadius: "6px", padding: "6px 14px", fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", fontSize: "13px" }}
                 >
                     <RefreshCw size={14} /> Retry
@@ -86,138 +140,79 @@ export default function AnalysisTab() {
     const actualCostProgress = budget > 0 ? Math.min(100, Math.round((summary.actualCost / budget) * 100)) : (summary.actualCost > 0 ? 100 : 0);
     const committedProgress = budget > 0 ? Math.min(100, Math.round((summary.committed / budget) * 100)) : (summary.committed > 0 ? 100 : 0);
     const forecastProgress = budget > 0 ? Math.min(100, Math.round((summary.forecast / budget) * 100)) : (summary.forecast > 0 ? 100 : 0);
-    const varianceProgress = budget > 0 ? Math.min(100, Math.abs(Math.round((summary.variance / budget) * 100))) : 0;
+    const varianceProgress = budget > 0 ? Math.min(100, Math.round((Math.abs(summary.variance) / budget) * 100)) : 0;
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-            {/* Top Metrics */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "16px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "24px", width: "100%" }}>
+            {/* Top 5 KPI Cards (Frame 2147225138) */}
+            <div className="costing-kpi-grid">
                 <MetricCard
                     title="Total Budget"
                     amount={formatMoney(summary.totalBudget)}
-                    progress={100}
-                    subtitle={data.projectName ? `${data.projectName}` : "All active projects"}
-                    progressColor="#2563eb"
+                    progress={summary.totalBudget > 0 ? 100 : 0}
+                    progressColor="#2563EB"
                 />
                 <MetricCard
                     title="Actual Cost"
                     amount={formatMoney(summary.actualCost)}
                     progress={actualCostProgress}
-                    subtitle={`${actualCostProgress}% of budget spent`}
-                    progressColor={actualCostProgress > 100 ? "#ef4444" : actualCostProgress > 80 ? "#f59e0b" : "#2563eb"}
+                    progressColor="#2563EB"
                 />
                 <MetricCard
                     title="Committed"
                     amount={formatMoney(summary.committed)}
                     progress={committedProgress}
-                    subtitle={`${committedProgress}% vendor quotes committed`}
-                    progressColor="#6366f1"
+                    progressColor="#2563EB"
                 />
                 <MetricCard
                     title="Forecast"
                     amount={formatMoney(summary.forecast)}
                     progress={forecastProgress}
-                    subtitle={`${forecastProgress}% projected completion`}
-                    progressColor="#0284c7"
+                    progressColor="#2563EB"
                 />
                 <MetricCard
                     title="Variance"
-                    amount={formatMoney(summary.variance)}
+                    amount={summary.variance < 0 ? `-${formatMoney(Math.abs(summary.variance))}` : formatMoney(summary.variance)}
                     progress={varianceProgress}
-                    subtitle={summary.variance >= 0 ? "Under budget surplus" : "Over budget deficit"}
-                    progressColor={summary.variance >= 0 ? "#10b981" : "#ef4444"}
-                    isPositive={summary.variance >= 0}
+                    progressColor="#2563EB"
                 />
             </div>
 
-            {/* Sub Tabs */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #e5e7eb" }}>
-                <div style={{ display: "flex", gap: "28px" }}>
-                    {tabs.map(tab => (
-                        <button
-                            key={tab}
-                            onClick={() => setActiveTab(tab)}
-                            style={{
-                                padding: "12px 0",
-                                background: "none",
-                                border: "none",
-                                borderBottom: activeTab === tab ? "2px solid #2563eb" : "2px solid transparent",
-                                color: activeTab === tab ? "#2563eb" : "#6b7280",
-                                fontWeight: activeTab === tab ? 600 : 500,
-                                cursor: "pointer",
-                                fontSize: "14px",
-                                transition: "all 0.15s ease",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px"
-                            }}
-                        >
-                            {tab}
-                            {tab === "Vendor Comparison" && data.vendorQuotes.length > 0 && (
-                                <span style={{ background: activeTab === tab ? "#eff6ff" : "#f3f4f6", color: activeTab === tab ? "#2563eb" : "#4b5563", padding: "1px 7px", borderRadius: "10px", fontSize: "12px", fontWeight: 600 }}>
-                                    {data.vendorQuotes.length}
-                                </span>
-                            )}
-                            {tab === "Variance Analysis" && data.varianceByCategory.length > 0 && (
-                                <span style={{ background: activeTab === tab ? "#eff6ff" : "#f3f4f6", color: activeTab === tab ? "#2563eb" : "#4b5563", padding: "1px 7px", borderRadius: "10px", fontSize: "12px", fontWeight: 600 }}>
-                                    {data.varianceByCategory.length}
-                                </span>
-                            )}
-                        </button>
-                    ))}
-                </div>
-
-                <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            {/* Analysis Sub-Navigation Tabs (Frame 2147224980) */}
+            <div className="costing-analysis-subnav" role="tablist">
+                {tabs.map(tab => (
                     <button
-                        onClick={loadData}
-                        title="Refresh data"
-                        style={{
-                            background: "#fff",
-                            border: "1px solid #e5e7eb",
-                            padding: "6px 12px",
-                            borderRadius: "6px",
-                            color: "#4b5563",
-                            fontSize: "13px",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "6px"
-                        }}
+                        key={tab}
+                        role="tab"
+                        aria-selected={activeTab === tab}
+                        onClick={() => setActiveTab(tab)}
+                        className={`costing-analysis-tab-btn ${activeTab === tab ? "is-active" : ""}`}
                     >
-                        <RefreshCw size={14} /> Refresh
+                        {tab}
                     </button>
-                    {activeTab === "Vendor Comparison" && (
-                        <button
-                            onClick={() => setIsAddQuoteOpen(true)}
-                            style={{
-                                background: "#2563eb",
-                                border: "none",
-                                padding: "6px 14px",
-                                borderRadius: "6px",
-                                color: "#fff",
-                                fontSize: "13px",
-                                fontWeight: 500,
-                                cursor: "pointer",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px"
-                            }}
-                        >
-                            <Plus size={14} /> Add Vendor Quote
-                        </button>
-                    )}
-                </div>
+                ))}
             </div>
 
             {/* Content Area */}
             <div>
-                {activeTab === "Cost Overview" && <CostOverview data={data} formatMoney={formatMoney} />}
+                {activeTab === "Cost Overview" && (
+                    <CostOverview
+                        data={data}
+                        formatMoney={formatMoney}
+                        selectedCategory={selectedCategory}
+                        hoveredCategory={hoveredCategory}
+                        setHoveredCategory={setHoveredCategory}
+                    />
+                )}
                 {activeTab === "Vendor Comparison" && (
                     <VendorComparison
                         data={data}
                         formatMoney={formatMoney}
-                        onRefresh={loadData}
-                        onOpenAddModal={() => setIsAddQuoteOpen(true)}
+                        onRefresh={() => loadData(effectiveProjectId)}
+                        onOpenAddModal={(itemId?: string) => {
+                            setAddQuoteInitialItemId(itemId);
+                            setIsAddQuoteOpen(true);
+                        }}
                     />
                 )}
                 {activeTab === "Variance Analysis" && <VarianceAnalysis data={data} formatMoney={formatMoney} />}
@@ -227,10 +222,15 @@ export default function AnalysisTab() {
             {isAddQuoteOpen && (
                 <AddVendorQuoteModal
                     items={data.items}
-                    onClose={() => setIsAddQuoteOpen(false)}
+                    initialItemId={addQuoteInitialItemId}
+                    onClose={() => {
+                        setIsAddQuoteOpen(false);
+                        setAddQuoteInitialItemId(undefined);
+                    }}
                     onSuccess={() => {
                         setIsAddQuoteOpen(false);
-                        void loadData();
+                        setAddQuoteInitialItemId(undefined);
+                        void loadData(effectiveProjectId);
                     }}
                 />
             )}
@@ -242,56 +242,67 @@ function MetricCard({
     title,
     amount,
     progress,
-    subtitle,
-    progressColor = "#2563eb",
-    isPositive
+    progressColor = "#2563EB",
 }: {
     title: string;
     amount: string;
     progress: number;
-    subtitle?: string;
     progressColor?: string;
-    isPositive?: boolean;
 }) {
     return (
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "18px 20px", display: "flex", flexDirection: "column", justifyContent: "space-between", boxShadow: "0 1px 2px rgba(0,0,0,0.03)" }}>
-            <div>
-                <div style={{ color: "#6b7280", fontSize: "13px", fontWeight: 500, marginBottom: "6px" }}>{title}</div>
-                <div style={{ fontSize: "26px", fontWeight: 700, color: "#111827", letterSpacing: "-0.5px" }}>{amount}</div>
+        <div className="costing-kpi-card">
+            <div className="costing-kpi-text-group">
+                <span className="costing-kpi-title">{title}</span>
+                <span className="costing-kpi-value">{amount}</span>
             </div>
-            <div style={{ marginTop: "16px" }}>
-                <div style={{ height: "4px", background: "#f3f4f6", borderRadius: "2px", overflow: "hidden", marginBottom: "8px" }}>
-                    <div style={{ width: `${Math.min(100, Math.max(0, progress))}%`, height: "100%", background: progressColor, transition: "width 0.4s ease" }} />
-                </div>
-                {subtitle && (
-                    <div style={{ fontSize: "12px", color: isPositive !== undefined ? (isPositive ? "#059669" : "#dc2626") : "#6b7280", fontWeight: 400, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {subtitle}
-                    </div>
-                )}
+            <div className="costing-kpi-track">
+                <div
+                    className="costing-kpi-fill"
+                    style={{
+                        width: `${Math.min(100, Math.max(0, progress))}%`,
+                        background: progressColor,
+                    }}
+                />
             </div>
         </div>
     );
 }
 
-// ── Sub-Tab 1: Cost Overview ───────────────────────────────────────────────────
+// ── Sub-Tab 1: Cost Overview (Figma Frame 2147224997 & Frame 2147225000) ─────────
 
-function CostOverview({ data, formatMoney }: { data: CostingAnalysisResponse; formatMoney: (val: number) => string }) {
-    const categories = data.varianceByCategory;
+function CostOverview({
+    data,
+    formatMoney,
+    selectedCategory,
+    hoveredCategory,
+    setHoveredCategory,
+}: {
+    data: CostingAnalysisResponse;
+    formatMoney: (val: number, isTick?: boolean) => string;
+    selectedCategory?: string;
+    hoveredCategory: string | null;
+    setHoveredCategory: (cat: string | null) => void;
+}) {
+    const rawCategories = data.varianceByCategory || [];
+    const categories = useMemo(() => {
+        if (!selectedCategory || selectedCategory === "all") return rawCategories;
+        return rawCategories.filter(c => c.category.toLowerCase() === selectedCategory.toLowerCase());
+    }, [rawCategories, selectedCategory]);
 
     // Calculate max value for scaling the chart
     const maxVal = useMemo(() => {
         if (!categories.length) return 100000;
-        const maxCat = Math.max(...categories.map(c => Math.max(c.budget, c.actual)));
+        const maxCat = Math.max(...categories.map(c => Math.max(c.budget || 0, c.actual || 0)));
         return Math.max(maxCat * 1.15, 50000);
     }, [categories]);
 
     const yAxisTicks = useMemo(() => {
         return [
-            formatMoney(maxVal),
-            formatMoney(maxVal * 0.75),
-            formatMoney(maxVal * 0.5),
-            formatMoney(maxVal * 0.25),
-            "₹0",
+            { label: formatMoney(maxVal, true), val: maxVal },
+            { label: formatMoney(maxVal * 0.75, true), val: maxVal * 0.75 },
+            { label: formatMoney(maxVal * 0.5, true), val: maxVal * 0.5 },
+            { label: formatMoney(maxVal * 0.25, true), val: maxVal * 0.25 },
+            { label: formatMoney(0, true), val: 0 },
         ];
     }, [maxVal, formatMoney]);
 
@@ -304,172 +315,173 @@ function CostOverview({ data, formatMoney }: { data: CostingAnalysisResponse; fo
         clientPrice: data.summary.totalBudget > 0 ? Math.round(data.summary.totalBudget * 1.18) : 0
     };
 
+    const hasData = categories.length > 0;
+
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "24px" }}>
-                {/* Budget vs Actual Chart */}
-                <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "24px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "28px" }}>
-                        <div>
-                            <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 600, color: "#1f2d3d" }}>Budget vs Actual by Category</h3>
-                            <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "4px" }}>
-                                {data.projectName || "All Projects"} | {categories.length} Categories
-                            </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "24px", width: "100%" }}>
+            {/* 2-Column Grid (Frame 2147224997): Budget vs Actual Chart (Left) & Budget Utilization (Right) */}
+            <div className="costing-overview-grid">
+                {/* Left Panel: Budget vs Actual by Category Chart (Frame 93) */}
+                <div className="costing-overview-chart-card">
+                    {/* Header Row (Frame 2147225140) */}
+                    <div className="costing-overview-chart-header">
+                        <div className="costing-overview-chart-titles">
+                            <h3 className="costing-overview-chart-title">Budget vs Actual by Category</h3>
+                            <p className="costing-overview-chart-subtitle">
+                                {data.projectName || "All Projects"} | {selectedCategory && selectedCategory !== "all" ? selectedCategory : "All categories"}
+                            </p>
                         </div>
-                        <div style={{ display: "flex", gap: "18px", fontSize: "12px", color: "#4b5563" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                                <span style={{ width: "12px", height: "12px", background: "#cbd5e1", borderRadius: "2px" }} /> Budget
+                        {/* Legend (Frame 2147224996) */}
+                        <div className="costing-overview-chart-legend">
+                            <div className="costing-legend-item is-budget">
+                                <span className="costing-legend-line is-budget" />
+                                <span>Budget</span>
                             </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                                <span style={{ width: "12px", height: "12px", background: "#2563eb", borderRadius: "2px" }} /> Actual
+                            <div className="costing-legend-item is-actual">
+                                <span className="costing-legend-line is-actual" />
+                                <span>Actual</span>
                             </div>
                         </div>
                     </div>
 
-                    {/* Chart Canvas */}
-                    <div style={{ height: "260px", display: "flex", alignItems: "flex-end", gap: "24px", paddingLeft: "60px", paddingBottom: "28px", position: "relative" }}>
-                        {/* Y-Axis labels */}
-                        <div style={{ position: "absolute", left: 0, top: 0, bottom: "28px", display: "flex", flexDirection: "column", justifyContent: "space-between", color: "#9ca3af", fontSize: "11px", fontWeight: 500, width: "52px", textAlign: "right" }}>
+                    {/* Chart Canvas Area (Frame 2147224994) */}
+                    <div className="costing-chart-container">
+                        {/* 5 Dashed Gridlines with Y-Axis Ticks */}
+                        <div className="costing-chart-gridlines">
                             {yAxisTicks.map((tick, i) => (
-                                <span key={i}>{tick}</span>
-                            ))}
-                        </div>
-
-                        {/* Grid lines */}
-                        <div style={{ position: "absolute", left: "60px", right: 0, top: 0, bottom: "28px", display: "flex", flexDirection: "column", justifyContent: "space-between", zIndex: 0, pointerEvents: "none" }}>
-                            {[1, 2, 3, 4, 5].map(i => (
-                                <div key={i} style={{ borderBottom: "1px dashed #f1f5f9", width: "100%" }} />
-                            ))}
-                        </div>
-
-                        {/* Dynamic Category Bars */}
-                        {categories.slice(0, 7).map((cat) => {
-                            const bHeight = Math.min(100, Math.max(4, Math.round((cat.budget / maxVal) * 100)));
-                            const aHeight = Math.min(100, Math.max(4, Math.round((cat.actual / maxVal) * 100)));
-                            return (
-                                <div
-                                    key={cat.id}
-                                    title={`${cat.category}\nBudget: ${formatMoney(cat.budget)}\nActual: ${formatMoney(cat.actual)}\nVariance: ${formatMoney(cat.variance)}`}
-                                    style={{
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        alignItems: "center",
-                                        zIndex: 1,
-                                        height: "100%",
-                                        justifyContent: "flex-end",
-                                        flex: 1,
-                                        position: "relative",
-                                        cursor: "pointer"
-                                    }}
-                                >
-                                    <div style={{ display: "flex", alignItems: "flex-end", gap: "6px", height: "100%", width: "100%", justifyContent: "center" }}>
-                                        {/* Budget bar */}
-                                        <div
-                                            style={{
-                                                width: "36%",
-                                                maxWidth: "24px",
-                                                height: `${bHeight}%`,
-                                                background: "#cbd5e1",
-                                                borderRadius: "4px 4px 0 0",
-                                                transition: "height 0.4s ease"
-                                            }}
-                                        />
-                                        {/* Actual bar */}
-                                        <div
-                                            style={{
-                                                width: "36%",
-                                                maxWidth: "24px",
-                                                height: `${aHeight}%`,
-                                                background: cat.actual > cat.budget && cat.budget > 0 ? "#ef4444" : "#2563eb",
-                                                borderRadius: "4px 4px 0 0",
-                                                transition: "height 0.4s ease"
-                                            }}
-                                        />
-                                    </div>
-                                    <div
-                                        style={{
-                                            color: "#6b7280",
-                                            fontSize: "11px",
-                                            position: "absolute",
-                                            bottom: "-24px",
-                                            whiteSpace: "nowrap",
-                                            maxWidth: "80px",
-                                            overflow: "hidden",
-                                            textOverflow: "ellipsis",
-                                            textAlign: "center"
-                                        }}
-                                    >
-                                        {cat.category}
-                                    </div>
+                                <div key={i} className="costing-gridline-row">
+                                    <span className="costing-gridline-label">{tick.label}</span>
+                                    <div className="costing-gridline-dash" />
                                 </div>
-                            );
-                        })}
+                            ))}
+                        </div>
+
+                        {!hasData ? (
+                            <div style={{ position: "absolute", inset: "0 0 24px 60px", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748B", fontSize: "13px" }}>
+                                No costing records available yet.
+                            </div>
+                        ) : (
+                            <>
+                                {/* Category Grouped Bars (Rectangle 57 & Rectangle 58) */}
+                                <div className="costing-chart-bars-wrap">
+                                    {categories.slice(0, 8).map((cat) => {
+                                        const bHeight = Math.min(100, Math.max(2, Math.round(((cat.budget || 0) / maxVal) * 100)));
+                                        const aHeight = Math.min(100, Math.max(2, Math.round(((cat.actual || 0) / maxVal) * 100)));
+                                        const isHovered = hoveredCategory === cat.id;
+
+                                        return (
+                                            <div
+                                                key={cat.id}
+                                                className="costing-category-bar-group"
+                                                onMouseEnter={() => setHoveredCategory(cat.id)}
+                                                onMouseLeave={() => setHoveredCategory(null)}
+                                            >
+                                                {/* Budget Bar (Rectangle 57) */}
+                                                <div
+                                                    className="costing-bar is-budget"
+                                                    style={{ height: `${bHeight}%` }}
+                                                    title={`Budget: ${formatMoney(cat.budget)}`}
+                                                />
+                                                {/* Actual Bar (Rectangle 58) */}
+                                                <div
+                                                    className="costing-bar is-actual"
+                                                    style={{ height: `${aHeight}%` }}
+                                                    title={`Actual: ${formatMoney(cat.actual)}`}
+                                                />
+
+                                                {/* Interactive Tooltip */}
+                                                {isHovered && (
+                                                    <div className="costing-chart-tooltip">
+                                                        <div style={{ fontWeight: 600, marginBottom: "2px" }}>{cat.category}</div>
+                                                        <div>Budget: {formatMoney(cat.budget)}</div>
+                                                        <div>Actual: {formatMoney(cat.actual)}</div>
+                                                        <div>Variance: {formatMoney(cat.variance)}</div>
+                                                        <div>Utilization: {cat.utilization}%</div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Category Labels Below (Frame 2147224993) */}
+                                <div className="costing-chart-categories-row">
+                                    {categories.slice(0, 8).map((cat) => (
+                                        <div key={cat.id} className="costing-chart-cat-label" title={cat.category}>
+                                            {cat.category}
+                                        </div>
+                                    ))}
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
 
-                {/* Budget Utilization Column */}
-                <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "24px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-                        <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 600, color: "#1f2d3d" }}>Budget Utilization</h3>
-                        <span style={{ fontSize: "12px", color: "#6b7280" }}>{categories.length} Categories</span>
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "18px", maxHeight: "300px", overflowY: "auto", paddingRight: "4px" }}>
-                        {categories.map((cat) => {
-                            const barColor = cat.utilization > 100 ? "#ef4444" : cat.utilization >= 80 ? "#f59e0b" : "#2563eb";
-                            return (
-                                <div key={cat.id}>
-                                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px", fontSize: "13px" }}>
-                                        <span style={{ fontWeight: 500, color: "#1f2d3d", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "160px" }}>
-                                            {cat.category}
-                                        </span>
-                                        <span style={{ color: barColor, fontWeight: 600, fontSize: "12px" }}>
-                                            {cat.utilization}%
-                                        </span>
+                {/* Right Panel: Budget Utilization (Frame 2147225000) */}
+                <div className="costing-overview-utilization-card">
+                    <h3 className="costing-utilization-title">Budget Utilization</h3>
+
+                    {!hasData ? (
+                        <div style={{ color: "#64748B", fontSize: "13px", padding: "16px 0" }}>
+                            No category budget data available.
+                        </div>
+                    ) : (
+                        <div className="costing-utilization-list">
+                            {categories.map((cat) => {
+                                const clampedPct = Math.min(100, Math.max(0, cat.utilization || 0));
+                                return (
+                                    <div key={cat.id} className="costing-utilization-item">
+                                        <div className="costing-utilization-header">
+                                            <span className="costing-utilization-name" title={cat.category}>
+                                                {cat.category}
+                                            </span>
+                                            <span className="costing-utilization-pct">
+                                                {cat.utilization}%
+                                            </span>
+                                        </div>
+                                        <div className="costing-utilization-track">
+                                            <div
+                                                className="costing-utilization-fill"
+                                                style={{ width: `${clampedPct}%` }}
+                                            />
+                                        </div>
                                     </div>
-                                    <div style={{ height: "6px", background: "#f3f4f6", borderRadius: "3px", overflow: "hidden" }}>
-                                        <div
-                                            style={{
-                                                width: `${Math.min(100, Math.max(0, cat.utilization))}%`,
-                                                height: "100%",
-                                                background: barColor,
-                                                borderRadius: "3px",
-                                                transition: "width 0.4s ease"
-                                            }}
-                                        />
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             </div>
 
-            {/* Markup & Tax Summary Card */}
-            <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "24px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                    <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 600, color: "#1f2d3d" }}>Markup & Tax Summary</h3>
-                    <span style={{ fontSize: "12px", color: "#6b7280" }}>Calculated across workspace inventory & active rates</span>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "20px", background: "#f9fafb", padding: "20px", borderRadius: "10px", border: "1px solid #e5e7eb" }}>
-                    <div>
-                        <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}>Base Cost</div>
-                        <div style={{ fontSize: "18px", fontWeight: 600, color: "#1f2d3d" }}>{formatMoney(costOverview.baseCost)}</div>
-                        <div style={{ fontSize: "11px", color: "#9ca3af", marginTop: "2px" }}>Direct material & labor</div>
+            {/* Bottom Card: Markup & Tax (Frame 2147225000) */}
+            <div className="costing-overview-markup-card">
+                <h3 className="costing-markup-title">Markup & Tax</h3>
+                <div className="costing-markup-stack">
+                    {/* Base Cost */}
+                    <div className="costing-markup-row">
+                        <span className="costing-markup-label">Base Cost</span>
+                        <span className="costing-markup-val">{formatMoney(costOverview.baseCost)}</span>
                     </div>
-                    <div>
-                        <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}>Markup ({costOverview.markupPercent}%)</div>
-                        <div style={{ fontSize: "18px", fontWeight: 600, color: "#059669" }}>{formatMoney(costOverview.markupAmount)}</div>
-                        <div style={{ fontSize: "11px", color: "#9ca3af", marginTop: "2px" }}>Contractor margin</div>
+
+                    {/* Markup */}
+                    <div className="costing-markup-row">
+                        <span className="costing-markup-label">Markup ({costOverview.markupPercent}%)</span>
+                        <span className="costing-markup-val">{formatMoney(costOverview.markupAmount)}</span>
                     </div>
-                    <div>
-                        <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}>GST ({costOverview.taxPercent}%)</div>
-                        <div style={{ fontSize: "18px", fontWeight: 600, color: "#1f2d3d" }}>{formatMoney(costOverview.taxAmount)}</div>
-                        <div style={{ fontSize: "11px", color: "#9ca3af", marginTop: "2px" }}>Applicable goods tax</div>
+
+                    {/* GST */}
+                    <div className="costing-markup-row">
+                        <span className="costing-markup-label">GST ({costOverview.taxPercent}%)</span>
+                        <span className="costing-markup-val">{formatMoney(costOverview.taxAmount)}</span>
                     </div>
-                    <div style={{ borderLeft: "2px solid #e5e7eb", paddingLeft: "20px" }}>
-                        <div style={{ fontSize: "12px", color: "#2563eb", fontWeight: 600, marginBottom: "4px" }}>Total Client Price</div>
-                        <div style={{ fontSize: "20px", fontWeight: 700, color: "#2563eb" }}>{formatMoney(costOverview.clientPrice)}</div>
-                        <div style={{ fontSize: "11px", color: "#6b7280", marginTop: "2px" }}>Final quote value</div>
+
+                    {/* Divider (Rectangle 77) */}
+                    <hr className="costing-markup-divider" />
+
+                    {/* Total Client Price */}
+                    <div className="costing-markup-total-row">
+                        <span className="costing-markup-total-label">Client Price</span>
+                        <span className="costing-markup-total-val">{formatMoney(costOverview.clientPrice)}</span>
                     </div>
                 </div>
             </div>
@@ -488,285 +500,221 @@ function VendorComparison({
     data: CostingAnalysisResponse;
     formatMoney: (val: number) => string;
     onRefresh: () => void;
-    onOpenAddModal: () => void;
+    onOpenAddModal: (itemId?: string) => void;
 }) {
-    const [search, setSearch] = useState("");
-    const [categoryFilter, setCategoryFilter] = useState("All");
+    const quotes = data.vendorQuotes;
+    const items = data.items;
+
+    // Pick first item that has quotes, or first item, or "all"
+    const firstItemWithQuotes = useMemo(() => {
+        const itemWithQuote = items.find(i => quotes.some(q => q.item_id === i.id));
+        return itemWithQuote ? itemWithQuote.id : (items[0]?.id || "all");
+    }, [items, quotes]);
+
+    const [selectedItemId, setSelectedItemId] = useState<string>(firstItemWithQuotes);
     const [selectingId, setSelectingId] = useState<string | null>(null);
 
-    const quotes = data.vendorQuotes;
+    // Keep selectedItemId valid if items change
+    useEffect(() => {
+        if (selectedItemId !== "all" && !items.some(i => i.id === selectedItemId)) {
+            setSelectedItemId(firstItemWithQuotes);
+        }
+    }, [items, selectedItemId, firstItemWithQuotes]);
 
-    const availableCategories = useMemo(() => {
-        const set = new Set<string>();
-        quotes.forEach(q => {
-            if (q.categoryName && q.categoryName !== "-") set.add(q.categoryName);
-        });
-        return ["All", ...Array.from(set)];
-    }, [quotes]);
+    const selectedItem = useMemo(() => {
+        if (selectedItemId === "all") return null;
+        return items.find(i => i.id === selectedItemId) || null;
+    }, [items, selectedItemId]);
 
-    const filteredQuotes = useMemo(() => {
-        return quotes.filter(q => {
-            const matchesSearch =
-                !search ||
-                q.vendor_name.toLowerCase().includes(search.toLowerCase()) ||
-                (q.itemName && q.itemName.toLowerCase().includes(search.toLowerCase())) ||
-                (q.itemCode && q.itemCode.toLowerCase().includes(search.toLowerCase()));
-            const matchesCat = categoryFilter === "All" || q.categoryName === categoryFilter;
-            return matchesSearch && matchesCat;
-        });
-    }, [quotes, search, categoryFilter]);
+    const displayQuotes = useMemo(() => {
+        if (selectedItemId === "all") {
+            return quotes;
+        }
+        return quotes.filter(q => q.item_id === selectedItemId);
+    }, [quotes, selectedItemId]);
 
-    const minQuotePerItem = useMemo(() => {
-        const map = new Map<string, number>();
-        quotes.forEach(q => {
-            const current = map.get(q.item_id);
-            if (current === undefined || q.quote < current) {
-                map.set(q.item_id, q.quote);
-            }
-        });
-        return map;
-    }, [quotes]);
-
-    const handleSelectQuote = async (quoteId: string) => {
+    const handleSelectQuote = async (quoteId: string, select: boolean = true) => {
         if (quoteId.startsWith("pref-")) {
             return;
         }
         setSelectingId(quoteId);
         try {
-            await selectVendorQuote(quoteId, true);
+            await selectVendorQuote(quoteId, select);
             onRefresh();
         } catch (err) {
-            alert(err instanceof Error ? err.message : "Failed to select vendor quote");
+            alert(err instanceof Error ? err.message : "Failed to update vendor selection");
         } finally {
             setSelectingId(null);
         }
     };
 
-    const selectedCount = quotes.filter(q => q.selected).length;
-    const avgLeadTime = quotes.length
-        ? Math.round(quotes.reduce((s, q) => s + (q.lead_time_days || 0), 0) / quotes.length)
-        : 0;
+    const subtitleText = selectedItem
+        ? selectedItem.name
+        : (quotes.length > 0 ? `All Items (${quotes.length} quotes)` : "No items selected");
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-            {/* Top Stat Ribbon */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px" }}>
-                <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "10px", padding: "16px" }}>
-                    <div style={{ fontSize: "12px", color: "#6b7280" }}>Total Quotes</div>
-                    <div style={{ fontSize: "22px", fontWeight: 700, color: "#1f2d3d", marginTop: "4px" }}>{quotes.length}</div>
-                    <div style={{ fontSize: "11px", color: "#9ca3af", marginTop: "2px" }}>Active vendor proposals</div>
+        <div className="costing-vendor-card">
+            {/* Header Frame 2147225151 */}
+            <div className="costing-vendor-header">
+                {/* Left Frame 2147224969 */}
+                <div className="costing-vendor-header-left">
+                    <h3 className="costing-vendor-header-title">Items</h3>
+                    <p className="costing-vendor-header-subtitle">{subtitleText}</p>
                 </div>
-                <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "10px", padding: "16px" }}>
-                    <div style={{ fontSize: "12px", color: "#6b7280" }}>Selected Vendors</div>
-                    <div style={{ fontSize: "22px", fontWeight: 700, color: "#059669", marginTop: "4px" }}>{selectedCount}</div>
-                    <div style={{ fontSize: "11px", color: "#9ca3af", marginTop: "2px" }}>Committed suppliers</div>
-                </div>
-                <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "10px", padding: "16px" }}>
-                    <div style={{ fontSize: "12px", color: "#6b7280" }}>Average Lead Time</div>
-                    <div style={{ fontSize: "22px", fontWeight: 700, color: "#2563eb", marginTop: "4px" }}>{avgLeadTime} days</div>
-                    <div style={{ fontSize: "11px", color: "#9ca3af", marginTop: "2px" }}>Delivery timeline</div>
-                </div>
-                <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "10px", padding: "16px" }}>
-                    <div style={{ fontSize: "12px", color: "#6b7280" }}>Costing Items Tracked</div>
-                    <div style={{ fontSize: "22px", fontWeight: 700, color: "#1f2d3d", marginTop: "4px" }}>{data.items.length}</div>
-                    <div style={{ fontSize: "11px", color: "#9ca3af", marginTop: "2px" }}>Available in library</div>
-                </div>
-            </div>
 
-            {/* Filter and Action Bar */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#fff", border: "1px solid #e5e7eb", borderRadius: "10px", padding: "12px 16px" }}>
-                <div style={{ display: "flex", gap: "12px", alignItems: "center", flex: 1 }}>
-                    <label style={{ display: "flex", alignItems: "center", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "0 12px", width: "260px" }}>
-                        <Search size={16} color="#6b7280" />
-                        <input
-                            placeholder="Search item or vendor..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            style={{ border: "none", outline: "none", padding: "8px", fontSize: "13px", width: "100%", background: "transparent" }}
-                        />
-                    </label>
-
-                    {availableCategories.length > 1 && (
+                {/* Right Frame 2147225103 */}
+                <div className="costing-vendor-header-right">
+                    <div className="costing-vendor-item-select-wrap">
                         <select
-                            value={categoryFilter}
-                            onChange={(e) => setCategoryFilter(e.target.value)}
-                            style={{ padding: "8px 12px", borderRadius: "8px", border: "1px solid #e5e7eb", fontSize: "13px", color: "#374151", background: "#f9fafb", outline: "none", cursor: "pointer" }}
+                            className="costing-vendor-item-select"
+                            value={selectedItemId}
+                            onChange={(e) => setSelectedItemId(e.target.value)}
+                            aria-label="Select BOQ item"
                         >
-                            {availableCategories.map(cat => (
-                                <option key={cat} value={cat}>
-                                    Category: {cat}
+                            {items.length > 1 && (
+                                <option value="all">All Items ({quotes.length})</option>
+                            )}
+                            {items.map(item => (
+                                <option key={item.id} value={item.id}>
+                                    {item.name}
                                 </option>
                             ))}
                         </select>
-                    )}
-                </div>
+                        <ChevronDown size={18} className="costing-vendor-item-select-icon" />
+                    </div>
 
-                <div style={{ fontSize: "13px", color: "#6b7280" }}>
-                    Showing <strong>{filteredQuotes.length}</strong> of {quotes.length} quotes
+                    <button
+                        type="button"
+                        className="costing-vendor-add-btn"
+                        onClick={() => onOpenAddModal(selectedItemId !== "all" ? selectedItemId : undefined)}
+                    >
+                        <Plus size={16} /> Add Quote
+                    </button>
                 </div>
             </div>
 
-            {/* Vendor Quotes Comparison Table */}
-            {filteredQuotes.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "64px 20px", color: "#6b7280", background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb" }}>
-                    <Tag size={36} style={{ color: "#9ca3af", margin: "0 auto 12px auto" }} />
-                    <h4 style={{ margin: "0 0 6px 0", fontSize: "16px", color: "#1f2d3d", fontWeight: 600 }}>No vendor quotes found</h4>
-                    <p style={{ fontSize: "13px", color: "#6b7280", maxWidth: "420px", margin: "0 auto 16px auto" }}>
-                        {search || categoryFilter !== "All"
-                            ? "No vendor quotes match the selected filter criteria."
-                            : "Add vendor quotations to compare rates, lead times, and track committed costs."}
-                    </p>
-                    <button
-                        onClick={onOpenAddModal}
-                        style={{ background: "#2563eb", color: "#fff", border: "none", padding: "8px 18px", borderRadius: "8px", fontWeight: 500, cursor: "pointer", fontSize: "14px" }}
-                    >
-                        <Plus size={16} style={{ display: "inline", verticalAlign: "middle", marginRight: "6px" }} /> Add First Quote
-                    </button>
-                </div>
-            ) : (
-                <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.02)" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13px" }}>
-                        <thead>
-                            <tr style={{ background: "#f9fafb", color: "#4b5563", borderBottom: "1px solid #e5e7eb" }}>
-                                <th style={{ padding: "14px 16px", fontWeight: 600 }}>ITEM / SPEC</th>
-                                <th style={{ padding: "14px 16px", fontWeight: 600 }}>CATEGORY</th>
-                                <th style={{ padding: "14px 16px", fontWeight: 600 }}>VENDOR</th>
-                                <th style={{ padding: "14px 16px", fontWeight: 600 }}>QUOTED RATE</th>
-                                <th style={{ padding: "14px 16px", fontWeight: 600 }}>BASE COST</th>
-                                <th style={{ padding: "14px 16px", fontWeight: 600 }}>LEAD TIME</th>
-                                <th style={{ padding: "14px 16px", fontWeight: 600 }}>RATING</th>
-                                <th style={{ padding: "14px 16px", fontWeight: 600 }}>STATUS</th>
-                                <th style={{ padding: "14px 16px", fontWeight: 600, textAlign: "right" }}>ACTION</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredQuotes.map((q, i) => {
-                                const isBestPrice = minQuotePerItem.get(q.item_id) === q.quote;
-                                const isSelecting = selectingId === q.id;
+            {/* Table Area (Device Management_iOS / Frame 61) */}
+            <div className="costing-vendor-table-wrapper">
+                <div className="costing-vendor-table-scroll">
+                    {/* Table Header Frame 57 */}
+                    <div className="costing-vendor-table-header">
+                        <div className="costing-vendor-th costing-col-check" aria-hidden="true"></div>
+                        <div className="costing-vendor-th costing-col-vendor">VENDOR</div>
+                        <div className="costing-vendor-th costing-col-quote">QUOTE</div>
+                        <div className="costing-vendor-th costing-col-lead">LEAD TIME</div>
+                        <div className="costing-vendor-th costing-col-rating">RATING</div>
+                        <div className="costing-vendor-th costing-col-status">STATUS</div>
+                        <div className="costing-vendor-th costing-col-action">ACTION</div>
+                    </div>
 
-                                return (
-                                    <tr
-                                        key={q.id || i}
-                                        style={{
-                                            borderBottom: i === filteredQuotes.length - 1 ? "none" : "1px solid #f3f4f6",
-                                            background: q.selected ? "#faf5ff" : "#fff",
-                                            transition: "background 0.15s"
-                                        }}
-                                    >
-                                        {/* Item */}
-                                        <td style={{ padding: "14px 16px" }}>
-                                            <div style={{ fontWeight: 600, color: "#111827" }}>{q.itemName || "Custom Item"}</div>
-                                            <div style={{ fontSize: "11px", color: "#6b7280", marginTop: "2px" }}>
-                                                Code: <span style={{ fontFamily: "monospace", color: "#4b5563" }}>{q.itemCode || "-"}</span>
-                                            </div>
-                                        </td>
+                    {/* Rows */}
+                    {displayQuotes.length === 0 ? (
+                        <div className="costing-vendor-empty-card">
+                            <Tag size={36} style={{ color: "#94A3B8" }} />
+                            <h4 className="costing-vendor-empty-title">
+                                {selectedItem ? `No quotes for ${selectedItem.name}` : "No vendor quotes found"}
+                            </h4>
+                            <p className="costing-vendor-empty-desc">
+                                Add vendor quotations to compare rates, lead times, and track committed costs.
+                            </p>
+                            <button
+                                type="button"
+                                className="costing-new-item-btn"
+                                onClick={() => onOpenAddModal(selectedItemId !== "all" ? selectedItemId : undefined)}
+                            >
+                                <Plus size={16} /> Add First Quote
+                            </button>
+                        </div>
+                    ) : (
+                        displayQuotes.map((q, idx) => {
+                            const isSelecting = selectingId === q.id;
+                            const ratingVal = typeof q.rating === "number" && !isNaN(q.rating) ? q.rating.toFixed(1) : "—";
+                            const leadText = q.lead_time_days ? `${q.lead_time_days} days` : "—";
 
-                                        {/* Category */}
-                                        <td style={{ padding: "14px 16px" }}>
-                                            <span style={{ background: "#f3f4f6", color: "#374151", padding: "3px 8px", borderRadius: "6px", fontSize: "12px", fontWeight: 500 }}>
-                                                {q.categoryName || "-"}
-                                            </span>
-                                        </td>
+                            return (
+                                <div key={q.id || idx}>
+                                    <div className={`costing-vendor-row ${q.selected ? "is-selected" : ""}`}>
+                                        {/* Col 1: Checkbox */}
+                                        <div className="costing-vendor-td costing-col-check">
+                                            <button
+                                                type="button"
+                                                role="checkbox"
+                                                aria-checked={q.selected}
+                                                aria-label={`Select ${q.vendor_name}`}
+                                                className={`costing-vendor-checkbox-btn ${q.selected ? "is-checked" : ""}`}
+                                                onClick={() => handleSelectQuote(q.id, !q.selected)}
+                                                disabled={isSelecting}
+                                            >
+                                                {q.selected && <Check size={14} strokeWidth={3} />}
+                                            </button>
+                                        </div>
 
-                                        {/* Vendor */}
-                                        <td style={{ padding: "14px 16px" }}>
-                                            <div style={{ fontWeight: 600, color: "#1f2d3d" }}>{q.vendor_name}</div>
-                                            {q.selected && (
-                                                <div style={{ fontSize: "11px", color: "#059669", display: "flex", alignItems: "center", gap: "4px", marginTop: "2px" }}>
-                                                    <CheckCircle2 size={12} /> Preferred Supplier
-                                                </div>
-                                            )}
-                                        </td>
-
-                                        {/* Quoted Rate */}
-                                        <td style={{ padding: "14px 16px" }}>
-                                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                                                <span style={{ fontWeight: 700, fontSize: "14px", color: "#111827" }}>{formatMoney(q.quote)}</span>
-                                                {isBestPrice && (
-                                                    <span style={{ background: "#dcfce7", color: "#15803d", fontSize: "10px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px" }}>
-                                                        BEST PRICE
+                                        {/* Col 2: Vendor */}
+                                        <div className="costing-vendor-td costing-col-vendor">
+                                            <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                                                <span className="costing-vendor-name" title={q.vendor_name}>
+                                                    {q.vendor_name}
+                                                </span>
+                                                {selectedItemId === "all" && q.itemName && (
+                                                    <span className="costing-vendor-item-hint">
+                                                        {q.itemName}
                                                     </span>
                                                 )}
                                             </div>
-                                        </td>
+                                        </div>
 
-                                        {/* Base Cost */}
-                                        <td style={{ padding: "14px 16px", color: "#6b7280" }}>
-                                            {formatMoney(q.baseCost || 0)}
-                                        </td>
+                                        {/* Col 3: Quote */}
+                                        <div className="costing-vendor-td costing-col-quote">
+                                            <span className="costing-vendor-quote">{formatFullCurrency(q.quote)}</span>
+                                        </div>
 
-                                        {/* Lead Time */}
-                                        <td style={{ padding: "14px 16px", color: "#4b5563" }}>
-                                            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                                                <Clock size={13} color="#9ca3af" />
-                                                <span>{q.lead_time_days ? `${q.lead_time_days} days` : "Immediate"}</span>
+                                        {/* Col 4: Lead Time */}
+                                        <div className="costing-vendor-td costing-col-lead">
+                                            <span className="costing-vendor-lead-time">{leadText}</span>
+                                        </div>
+
+                                        {/* Col 5: Rating */}
+                                        <div className="costing-vendor-td costing-col-rating">
+                                            <div className="costing-vendor-rating">
+                                                <Star className="costing-vendor-star-icon" size={16} />
+                                                <span>{ratingVal}</span>
                                             </div>
-                                        </td>
+                                        </div>
 
-                                        {/* Rating */}
-                                        <td style={{ padding: "14px 16px" }}>
-                                            {q.rating ? (
-                                                <div style={{ display: "flex", alignItems: "center", gap: "4px", color: "#d97706", fontWeight: 600, fontSize: "12px" }}>
-                                                    <Star size={13} fill="#f59e0b" color="#f59e0b" />
-                                                    <span>{q.rating.toFixed(1)}</span>
+                                        {/* Col 6: Status */}
+                                        <div className="costing-vendor-td costing-col-status">
+                                            <span className={`costing-vendor-status-badge ${q.selected ? "is-selected" : "is-quoted"}`}>
+                                                {q.selected ? "SELECTED" : "QUOTED"}
+                                            </span>
+                                        </div>
+
+                                        {/* Col 7: Action */}
+                                        <div className="costing-vendor-td costing-col-action">
+                                            {q.selected ? (
+                                                <div className="costing-selected-action-pill">
+                                                    <Check size={14} strokeWidth={2.5} /> Active
                                                 </div>
                                             ) : (
-                                                <span style={{ color: "#9ca3af", fontSize: "12px" }}>—</span>
-                                            )}
-                                        </td>
-
-                                        {/* Status */}
-                                        <td style={{ padding: "14px 16px" }}>
-                                            {q.selected ? (
-                                                <span style={{ background: "#ecfdf5", color: "#059669", border: "1px solid #a7f3d0", padding: "4px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                                                    <Check size={11} /> Selected
-                                                </span>
-                                            ) : (
-                                                <span style={{ background: "#f3f4f6", color: "#6b7280", padding: "4px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 500 }}>
-                                                    Alternative
-                                                </span>
-                                            )}
-                                        </td>
-
-                                        {/* Action */}
-                                        <td style={{ padding: "14px 16px", textAlign: "right" }}>
-                                            {q.selected ? (
-                                                <span style={{ fontSize: "12px", color: "#059669", fontWeight: 600 }}>Active</span>
-                                            ) : (
                                                 <button
-                                                    onClick={() => handleSelectQuote(q.id)}
+                                                    type="button"
+                                                    className="costing-select-vendor-btn"
                                                     disabled={isSelecting}
-                                                    style={{
-                                                        background: "#fff",
-                                                        border: "1px solid #d1d5db",
-                                                        padding: "5px 10px",
-                                                        borderRadius: "6px",
-                                                        fontSize: "12px",
-                                                        fontWeight: 500,
-                                                        color: "#374151",
-                                                        cursor: "pointer",
-                                                        transition: "all 0.15s"
-                                                    }}
-                                                    onMouseEnter={(e) => {
-                                                        e.currentTarget.style.borderColor = "#2563eb";
-                                                        e.currentTarget.style.color = "#2563eb";
-                                                    }}
-                                                    onMouseLeave={(e) => {
-                                                        e.currentTarget.style.borderColor = "#d1d5db";
-                                                        e.currentTarget.style.color = "#374151";
-                                                    }}
+                                                    onClick={() => handleSelectQuote(q.id, true)}
                                                 >
-                                                    {isSelecting ? "Selecting..." : "Select Vendor"}
+                                                    {isSelecting ? "..." : "Select"}
                                                 </button>
                                             )}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                                        </div>
+                                    </div>
+                                    {idx < displayQuotes.length - 1 && (
+                                        <div className="costing-vendor-row-divider" />
+                                    )}
+                                </div>
+                            );
+                        })
+                    )}
                 </div>
-            )}
+            </div>
         </div>
     );
 }
@@ -1014,14 +962,18 @@ function VarianceAnalysis({ data, formatMoney }: { data: CostingAnalysisResponse
 
 function AddVendorQuoteModal({
     items,
+    initialItemId,
     onClose,
     onSuccess
 }: {
     items: CostingAnalysisResponse["items"];
+    initialItemId?: string;
     onClose: () => void;
     onSuccess: () => void;
 }) {
-    const [selectedItemId, setSelectedItemId] = useState(items[0]?.id || "");
+    const [selectedItemId, setSelectedItemId] = useState(
+        (initialItemId && items.some(i => i.id === initialItemId)) ? initialItemId : (items[0]?.id || "")
+    );
     const [vendorName, setVendorName] = useState("");
     const [quotePrice, setQuotePrice] = useState("");
     const [leadTimeDays, setLeadTimeDays] = useState("7");

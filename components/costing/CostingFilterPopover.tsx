@@ -13,11 +13,14 @@ interface CostingFilterPopoverProps {
   statusFilter?: string;
   currentStatus?: string;
   onStatusChange?: (status: string) => void;
-  onApply?: (filters: { status: string; category?: string }) => void;
+  onApply?: (filters: { status: string; category?: string; project?: string }) => void;
   statusOptions?: FilterOption[];
   categoryFilter?: string;
   categoryOptions?: FilterOption[];
   onCategoryChange?: (categoryId: string) => void;
+  projectFilter?: string;
+  projectOptions?: FilterOption[];
+  onProjectChange?: (projectId: string) => void;
   onReset?: () => void;
   title?: string;
   showLabel?: boolean;
@@ -39,6 +42,9 @@ export default function CostingFilterPopover({
   categoryFilter = "all",
   onCategoryChange,
   categoryOptions = [],
+  projectFilter = "all",
+  onProjectChange,
+  projectOptions = [],
   onReset,
   title = "Filter Records",
   showLabel = false,
@@ -52,7 +58,8 @@ export default function CostingFilterPopover({
 
   const activeCount =
     (effectiveStatus && effectiveStatus !== "all" ? 1 : 0) +
-    (categoryFilter && categoryFilter !== "all" ? 1 : 0);
+    (categoryFilter && categoryFilter !== "all" ? 1 : 0) +
+    (projectFilter && projectFilter !== "all" ? 1 : 0);
 
   const updatePosition = () => {
     if (buttonRef.current) {
@@ -112,7 +119,8 @@ export default function CostingFilterPopover({
     e.stopPropagation();
     if (onStatusChange) onStatusChange("all");
     if (onCategoryChange) onCategoryChange("all");
-    if (onApply) onApply({ status: "all", category: "all" });
+    if (onProjectChange) onProjectChange("all");
+    if (onApply) onApply({ status: "all", category: "all", project: "all" });
     if (onReset) onReset();
     setIsOpen(false);
   };
@@ -271,6 +279,49 @@ export default function CostingFilterPopover({
               </div>
             )}
 
+            {/* Project Filter if options provided */}
+            {onProjectChange && projectOptions.length > 0 && (
+              <div style={{ marginBottom: "12px" }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    color: "#64748b",
+                    marginBottom: "6px",
+                  }}
+                >
+                  Project
+                </label>
+                <select
+                  value={projectFilter}
+                  onChange={(e) => {
+                    onProjectChange(e.target.value);
+                    if (onApply) onApply({ status: effectiveStatus, category: categoryFilter, project: e.target.value });
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "6px 8px",
+                    borderRadius: "6px",
+                    border: "1px solid #d1d5db",
+                    fontSize: "12.5px",
+                    color: "#1e293b",
+                    outline: "none",
+                    background: "#ffffff",
+                  }}
+                >
+                  <option value="all">All Projects</option>
+                  {projectOptions.map((p: FilterOption) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {/* Category Filter if options provided */}
             {onCategoryChange && categoryOptions.length > 0 && (
               <div style={{ marginBottom: "12px" }}>
@@ -289,7 +340,10 @@ export default function CostingFilterPopover({
                 </label>
                 <select
                   value={categoryFilter}
-                  onChange={(e) => onCategoryChange(e.target.value)}
+                  onChange={(e) => {
+                    onCategoryChange(e.target.value);
+                    if (onApply) onApply({ status: effectiveStatus, category: e.target.value, project: projectFilter });
+                  }}
                   style={{
                     width: "100%",
                     padding: "6px 8px",

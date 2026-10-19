@@ -3,14 +3,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, ChevronDown } from "lucide-react";
+import { Plus, ChevronDown, ChevronLeft, ChevronRight, ArrowRight, X, Calendar } from "lucide-react";
 import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
 import { getApiErrorMessage, parseApiResponse } from "@/lib/api/auth";
+import "./proposals-redesign.css";
 
 interface ProposalListItem {
     id: string;
     proposalCode: string;
+    projectId?: string | null;
     projectName: string;
     clientName: string;
     status: string;
@@ -19,9 +21,12 @@ interface ProposalListItem {
     expiryDate: string | null;
     viewCount: number;
     currency: string;
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 interface ProposalSummary {
+    total: number;
     totalSent: number;
     winRate: number;
     averageValue: number;
@@ -39,7 +44,7 @@ interface PagedResponse<T> {
 }
 
 function formatIndianCurrency(val: number): string {
-    if (val === null || val === undefined || isNaN(val)) return "-";
+    if (val === null || val === undefined || isNaN(val)) return "—";
     if (val >= 10000000) {
         const cr = val / 10000000;
         const formatted = cr % 1 === 0 ? cr.toString() : cr.toFixed(1).replace(/\.0$/, "");
@@ -113,7 +118,7 @@ export default function ProposalsPage() {
             const result = parseApiResponse<PagedResponse<ProposalListItem>>(payload);
             setProposals(result.items || []);
             setTotal(result.total ?? 0);
-        } catch (err) {
+        } catch {
             setError("Failed to load proposals");
         } finally {
             setLoading(false);
@@ -130,7 +135,7 @@ export default function ProposalsPage() {
                 setSummary(result);
             }
         } catch (err) {
-            console.error("Failed to load proposal summary");
+            console.error("Failed to load proposal summary", err);
         }
     }, []);
 
@@ -142,7 +147,7 @@ export default function ProposalsPage() {
         fetchSummary();
     }, [fetchSummary]);
 
-    const formatDate = (dateStr: string | null) => {
+    const formatDate = (dateStr: string | null | undefined) => {
         if (!dateStr) return "-";
         const d = new Date(dateStr);
         if (isNaN(d.getTime())) return "-";
@@ -255,7 +260,7 @@ export default function ProposalsPage() {
                 body: JSON.stringify({ internalNotes: note }),
             });
             showToast(`Reminder sent to ${proposal.clientName} for ${proposal.proposalCode}!`);
-        } catch (err) {
+        } catch {
             showToast(`Reminder logged for ${proposal.clientName}`);
         }
     };
@@ -282,7 +287,7 @@ export default function ProposalsPage() {
     return (
         <main className="fig-dashboard">
             <div className="fig-dashboard-glow" />
-            <DashboardRail />
+            <DashboardRail current="/proposals" />
             <div className="fig-dashboard-main">
                 <ProposalsHeader
                     onNewClick={() => {
@@ -295,16 +300,23 @@ export default function ProposalsPage() {
                     }}
                 />
 
-                <div className="fig-dashboard-container">
+                <div className="fig-dashboard-container proposals-main-container">
                     {toastMessage && (
                         <div className="proposals-toast" role="status">
                             <span>{toastMessage}</span>
                         </div>
                     )}
 
-                    {error && <p className="error-banner" role="alert">{error}</p>}
+                    {error && (
+                        <div className="proposals-error-banner" role="alert">
+                            <span>{error}</span>
+                            <button type="button" onClick={() => fetchProposals(page, pageSize, searchQuery)}>
+                                Retry
+                            </button>
+                        </div>
+                    )}
 
-                    {/* 1 & 2: Sub-Header Row */}
+                    {/* 1 & 2: Sub-Header Row (Frame 2147225066) */}
                     <div className="proposals-sub-header">
                         <div className="proposals-title-group">
                             <h2>Proposals</h2>
@@ -328,252 +340,278 @@ export default function ProposalsPage() {
                                     setShowNewModal(true);
                                 }}
                             >
-                                <Plus size={16} />
+                                <Plus size={20} color="#FFFFFF" />
                                 <span>New Proposal</span>
                             </button>
                         </div>
                     </div>
 
-                    {/* KPI Summary Cards */}
-                    {summary && (
-                        <div className="proposals-summary">
-                            <div className="summary-card">
-                                <span className="summary-label">Total Sent</span>
-                                <p className="summary-value">{summary.totalSent}</p>
-                                <span className="summary-period">This quarter</span>
-                            </div>
-                            <div className="summary-card">
-                                <span className="summary-label">Win Rate</span>
-                                <p className="summary-value">{summary.winRate}%</p>
-                                <span className="summary-period">
-                                    {summary.decidedCount > 0 ? `${summary.decidedCount} decided` : "0 decided"}
-                                </span>
-                            </div>
-                            <div className="summary-card">
-                                <span className="summary-label">Avg. Value</span>
-                                <p className="summary-value">{formatIndianCurrency(summary.averageValue)}</p>
-                                <span className="summary-period">Per proposal</span>
-                            </div>
-                            <div className="summary-card">
-                                <span className="summary-label">Pending Response</span>
-                                <p className="summary-value">{summary.pendingResponse}</p>
-                                <span className="summary-period">
-                                    {summary.expiringSoon > 0 ? `${summary.expiringSoon} expiring soon` : "0 expiring soon"}
-                                </span>
-                            </div>
+                    {/* KPI Summary Cards (Frame 2147225138) */}
+                    <div className="proposals-summary-row">
+                        <div className="proposals-kpi-card">
+                            <span className="proposals-kpi-label">Total Sent</span>
+                            <p className="proposals-kpi-value">{summary ? summary.totalSent : (loading ? "—" : 0)}</p>
+                            <span className="proposals-kpi-period">This quarter</span>
                         </div>
-                    )}
-
-                    {/* Proposals Table */}
-                    <div className="proposals-table-container">
-                        <table className="proposals-table">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>PROJECT</th>
-                                    <th>CLIENT</th>
-                                    <th>STATUS</th>
-                                    <th>VALUE</th>
-                                    <th>SENT</th>
-                                    <th>EXPIRY</th>
-                                    <th>VIEWS</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {loading ? (
-                                    <tr>
-                                        <td colSpan={9} style={{ textAlign: "center", padding: "32px", color: "#64748b" }}>
-                                            Loading proposals...
-                                        </td>
-                                    </tr>
-                                ) : proposals.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={9} style={{ textAlign: "center", padding: "32px", color: "#64748b" }}>
-                                            No proposals found. Click &quot;+ New Proposal&quot; to create one.
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    proposals.map((proposal) => (
-                                        <tr key={proposal.id}>
-                                            <td className="proposal-id">{proposal.proposalCode}</td>
-                                            <td className="proposal-project-name">{proposal.projectName}</td>
-                                            <td className="proposal-client-name">{proposal.clientName}</td>
-                                            <td>
-                                                <span className={`status-badge ${getStatusClass(proposal.status)}`}>
-                                                    {proposal.status?.toUpperCase() || "DRAFT"}
-                                                </span>
-                                            </td>
-                                            <td className="proposal-value">{formatIndianCurrency(proposal.proposedValue)}</td>
-                                            <td>{proposal.status?.toLowerCase() === "draft" ? "-" : formatDate(proposal.sentAt)}</td>
-                                            <td>{proposal.expiryDate ? formatDate(proposal.expiryDate) : "-"}</td>
-                                            {/* 4. Views Column */}
-                                            <td>
-                                                {proposal.viewCount > 0 ? (
-                                                    <div className="proposal-views-active">
-                                                        <img
-                                                            src="/assets/proposals/view-indicator.svg"
-                                                            alt=""
-                                                            width={14}
-                                                            height={14}
-                                                        />
-                                                        <span>{proposal.viewCount}</span>
-                                                    </div>
-                                                ) : (
-                                                    <span className="proposal-views-empty">Not opened</span>
-                                                )}
-                                            </td>
-                                            {/* 5. Actions & Three Dots Menu */}
-                                            <td>
-                                                <div className="proposals-actions-cell">
-                                                    {proposal.status?.toLowerCase() === "draft" && (
-                                                        <button
-                                                            type="button"
-                                                            className="btn-send-draft"
-                                                            onClick={() => handleSendProposal(proposal.id)}
-                                                            title="Send to client"
-                                                        >
-                                                            Send →
-                                                        </button>
-                                                    )}
-                                                    <button
-                                                        type="button"
-                                                        className="btn-preview"
-                                                        onClick={() => {
-                                                            setSelectedProposal(proposal);
-                                                            setShowPreviewModal(true);
-                                                        }}
-                                                    >
-                                                        Preview
-                                                    </button>
-                                                    <div className="actions-menu-wrapper">
-                                                        <button
-                                                            type="button"
-                                                            className="btn-row-more"
-                                                            aria-label="More actions"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setOpenMenuId(openMenuId === proposal.id ? null : proposal.id);
-                                                            }}
-                                                        >
-                                                            •••
-                                                        </button>
-                                                        {openMenuId === proposal.id && (
-                                                            <div
-                                                                className="proposals-dropdown-menu"
-                                                                onClick={(e) => e.stopPropagation()}
-                                                            >
-                                                                <button
-                                                                    type="button"
-                                                                    className="proposals-dropdown-item"
-                                                                    onClick={() => {
-                                                                        setOpenMenuId(null);
-                                                                        setSelectedProposal(proposal);
-                                                                        setShowPreviewModal(true);
-                                                                    }}
-                                                                >
-                                                                    <img src="/assets/proposals/preview.svg" alt="" width={20} height={20} />
-                                                                    <span>Preview</span>
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    className="proposals-dropdown-item"
-                                                                    onClick={() => handleDuplicateProposal(proposal)}
-                                                                >
-                                                                    <img src="/assets/proposals/duplicate.svg" alt="" width={20} height={20} />
-                                                                    <span>Duplicate</span>
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    className="proposals-dropdown-item"
-                                                                    onClick={() => handleDownloadPdf(proposal)}
-                                                                >
-                                                                    <img src="/assets/proposals/download-pdf.svg" alt="" width={20} height={20} />
-                                                                    <span>Download PDF</span>
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    className="proposals-dropdown-item"
-                                                                    onClick={() => handleSendReminder(proposal)}
-                                                                >
-                                                                    <img src="/assets/proposals/send-reminder.svg" alt="" width={20} height={20} />
-                                                                    <span>Send Reminder</span>
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    className="proposals-dropdown-item"
-                                                                    onClick={() => handleUpdateStatus(proposal.id, "won")}
-                                                                >
-                                                                    <img src="/assets/proposals/mark-won.svg" alt="" width={20} height={20} />
-                                                                    <span>Mark as Won</span>
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    className="proposals-dropdown-item"
-                                                                    onClick={() => handleUpdateStatus(proposal.id, "lost")}
-                                                                >
-                                                                    <img src="/assets/proposals/mark-lost.svg" alt="" width={20} height={20} />
-                                                                    <span>Mark as Lost</span>
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
+                        <div className="proposals-kpi-card">
+                            <span className="proposals-kpi-label">Win Rate</span>
+                            <p className="proposals-kpi-value">{summary ? `${summary.winRate}%` : (loading ? "—" : "0%")}</p>
+                            <span className="proposals-kpi-period">
+                                {summary && summary.decidedCount > 0
+                                    ? `${summary.decidedCount} of ${summary.total || total} decided`
+                                    : "0 decided"}
+                            </span>
+                        </div>
+                        <div className="proposals-kpi-card">
+                            <span className="proposals-kpi-label">Avg. Value</span>
+                            <p className="proposals-kpi-value">
+                                {summary ? formatIndianCurrency(summary.averageValue) : (loading ? "—" : "₹0")}
+                            </p>
+                            <span className="proposals-kpi-period">Per proposal</span>
+                        </div>
+                        <div className="proposals-kpi-card">
+                            <span className="proposals-kpi-label">Pending Response</span>
+                            <p className="proposals-kpi-value">{summary ? summary.pendingResponse : (loading ? "—" : 0)}</p>
+                            <span className="proposals-kpi-period">
+                                {summary && summary.expiringSoon > 0
+                                    ? `${summary.expiringSoon} expiring soon`
+                                    : "0 expiring soon"}
+                            </span>
+                        </div>
                     </div>
 
-                    {/* 6 & 7: Pagination Row */}
-                    <div className="proposals-pagination">
-                        <span className="proposals-total-arrivals">Total Arrivals: {total}</span>
-                        <div className="pagination-controls">
-                            <button
-                                type="button"
-                                disabled={page <= 1}
-                                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                                aria-label="Previous page"
-                            >
-                                &lt;
-                            </button>
-                            {Array.from(
-                                { length: Math.max(1, Math.ceil(total / pageSize)) },
-                                (_, index) => index + 1
-                            ).map((p) => (
-                                <button
-                                    key={p}
-                                    type="button"
-                                    className={page === p ? "active" : ""}
-                                    onClick={() => setPage(p)}
-                                >
-                                    {p}
-                                </button>
-                            ))}
-                            <button
-                                type="button"
-                                disabled={page >= Math.ceil(total / pageSize) || total === 0}
-                                onClick={() => setPage((p) => p + 1)}
-                                aria-label="Next page"
-                            >
-                                &gt;
-                            </button>
+                    {/* Proposals Table (Frame 2147225139) */}
+                    <div className="proposals-table-container">
+                        <div className="proposals-table-wrapper">
+                            <table className="proposals-table">
+                                <thead>
+                                    <tr>
+                                        <th className="col-th-id">ID</th>
+                                        <th className="col-th-project">PROJECT</th>
+                                        <th className="col-th-client">CLIENT</th>
+                                        <th className="col-th-status">STATUS</th>
+                                        <th className="col-th-value">VALUE</th>
+                                        <th className="col-th-sent">SENT</th>
+                                        <th className="col-th-expiry">EXPIRY</th>
+                                        <th className="col-th-views">VIEWS</th>
+                                        <th className="col-th-date">DATE</th>
+                                        <th className="col-th-actions" aria-label="Actions"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {loading ? (
+                                        <tr>
+                                            <td colSpan={10} className="proposals-table-loading">
+                                                Loading proposals...
+                                            </td>
+                                        </tr>
+                                    ) : proposals.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={10} className="proposals-table-empty">
+                                                <h3>No proposals found</h3>
+                                                <p>Get started by creating your first proposal or selecting a template.</p>
+                                                <button
+                                                    type="button"
+                                                    className="btn-new-proposal"
+                                                    style={{ margin: "0 auto", display: "inline-flex" }}
+                                                    onClick={() => setShowNewModal(true)}
+                                                >
+                                                    <Plus size={18} />
+                                                    <span>New Proposal</span>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        proposals.map((proposal) => {
+                                            const isDraft = proposal.status?.toLowerCase() === "draft";
+                                            return (
+                                                <tr key={proposal.id}>
+                                                    <td className="cell-id">{proposal.proposalCode || `PROP-${proposal.id.slice(0, 4)}`}</td>
+                                                    <td className="cell-project">
+                                                        <span className="cell-project-text" title={proposal.projectName}>
+                                                            {proposal.projectName}
+                                                        </span>
+                                                    </td>
+                                                    <td className="cell-client">{proposal.clientName}</td>
+                                                    <td className="cell-status">
+                                                        <span className={`status-badge ${getStatusClass(proposal.status)}`}>
+                                                            {proposal.status?.toUpperCase() || "DRAFT"}
+                                                        </span>
+                                                    </td>
+                                                    <td className="cell-value">{formatIndianCurrency(proposal.proposedValue)}</td>
+                                                    <td className="cell-sent">{isDraft ? "-" : formatDate(proposal.sentAt)}</td>
+                                                    <td className="cell-expiry">{proposal.expiryDate ? formatDate(proposal.expiryDate) : "-"}</td>
+                                                    <td className="cell-views">
+                                                        {proposal.viewCount > 0 ? (
+                                                            <div className="proposal-views-active">
+                                                                <div className="view-indicator-dot">
+                                                                    <div className="view-indicator-inner" />
+                                                                </div>
+                                                                <span className="view-count-number">{proposal.viewCount}</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="proposal-views-empty">Not opened</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="cell-date">
+                                                        {formatDate(proposal.createdAt || proposal.sentAt)}
+                                                    </td>
+                                                    <td className="cell-actions">
+                                                        <div className="proposals-actions-cell">
+                                                            {isDraft && (
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn-send-draft"
+                                                                    onClick={() => handleSendProposal(proposal.id)}
+                                                                    title="Send proposal to client"
+                                                                >
+                                                                    <span>Send</span>
+                                                                    <ArrowRight size={14} />
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                type="button"
+                                                                className="btn-preview"
+                                                                onClick={() => {
+                                                                    setSelectedProposal(proposal);
+                                                                    setShowPreviewModal(true);
+                                                                }}
+                                                            >
+                                                                Preview
+                                                            </button>
+                                                            <div className="actions-menu-wrapper">
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn-row-more"
+                                                                    aria-label="More actions"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setOpenMenuId(openMenuId === proposal.id ? null : proposal.id);
+                                                                    }}
+                                                                >
+                                                                    •••
+                                                                </button>
+                                                                {openMenuId === proposal.id && (
+                                                                    <div
+                                                                        className="proposals-dropdown-menu"
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                    >
+                                                                        <button
+                                                                            type="button"
+                                                                            className="proposals-dropdown-item"
+                                                                            onClick={() => {
+                                                                                setOpenMenuId(null);
+                                                                                setSelectedProposal(proposal);
+                                                                                setShowPreviewModal(true);
+                                                                            }}
+                                                                        >
+                                                                            <img src="/assets/proposals/preview.svg" alt="" width={20} height={20} />
+                                                                            <span>Preview</span>
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            className="proposals-dropdown-item"
+                                                                            onClick={() => handleDuplicateProposal(proposal)}
+                                                                        >
+                                                                            <img src="/assets/proposals/duplicate.svg" alt="" width={20} height={20} />
+                                                                            <span>Duplicate</span>
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            className="proposals-dropdown-item"
+                                                                            onClick={() => handleDownloadPdf(proposal)}
+                                                                        >
+                                                                            <img src="/assets/proposals/download-pdf.svg" alt="" width={20} height={20} />
+                                                                            <span>Download PDF</span>
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            className="proposals-dropdown-item"
+                                                                            onClick={() => handleSendReminder(proposal)}
+                                                                        >
+                                                                            <img src="/assets/proposals/send-reminder.svg" alt="" width={20} height={20} />
+                                                                            <span>Send Reminder</span>
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            className="proposals-dropdown-item"
+                                                                            onClick={() => handleUpdateStatus(proposal.id, "won")}
+                                                                        >
+                                                                            <img src="/assets/proposals/mark-won.svg" alt="" width={20} height={20} />
+                                                                            <span>Mark as Won</span>
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            className="proposals-dropdown-item"
+                                                                            onClick={() => handleUpdateStatus(proposal.id, "lost")}
+                                                                        >
+                                                                            <img src="/assets/proposals/mark-lost.svg" alt="" width={20} height={20} />
+                                                                            <span>Mark as Lost</span>
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
-                        <div className="page-size-control">
-                            <span>Show per Page:</span>
-                            <select
-                                value={pageSize}
-                                onChange={(e) => {
-                                    setPageSize(Number(e.target.value));
-                                    setPage(1);
-                                }}
-                            >
-                                <option value={10}>10</option>
-                                <option value={20}>20</option>
-                                <option value={50}>50</option>
-                            </select>
+
+                        {/* 6 & 7: Pagination Row (Frame 2147225166) */}
+                        <div className="proposals-pagination">
+                            <span className="proposals-total-arrivals">Total Arrivals: {total}</span>
+                            <div className="pagination-controls">
+                                <button
+                                    type="button"
+                                    disabled={page <= 1}
+                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                    aria-label="Previous page"
+                                >
+                                    <ChevronLeft size={16} />
+                                </button>
+                                {Array.from(
+                                    { length: Math.max(1, Math.ceil(total / pageSize)) },
+                                    (_, index) => index + 1
+                                ).map((p) => (
+                                    <button
+                                        key={p}
+                                        type="button"
+                                        className={page === p ? "active" : ""}
+                                        onClick={() => setPage(p)}
+                                    >
+                                        {p}
+                                    </button>
+                                ))}
+                                <button
+                                    type="button"
+                                    disabled={page >= Math.ceil(total / pageSize) || total === 0}
+                                    onClick={() => setPage((p) => p + 1)}
+                                    aria-label="Next page"
+                                >
+                                    <ChevronRight size={16} />
+                                </button>
+                            </div>
+                            <div className="page-size-control">
+                                <span className="page-size-label">Show per Page:</span>
+                                <div className="page-size-select-box">
+                                    <select
+                                        value={pageSize}
+                                        onChange={(e) => {
+                                            setPageSize(Number(e.target.value));
+                                            setPage(1);
+                                        }}
+                                    >
+                                        <option value={10}>10</option>
+                                        <option value={20}>20</option>
+                                        <option value={50}>50</option>
+                                    </select>
+                                    <ChevronDown size={14} />
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -662,23 +700,32 @@ function ProposalTemplatesModal({
     }, []);
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
-                <button className="modal-close" onClick={onClose}>
-                    ×
-                </button>
-                <div className="modal-body">
-                    <h2>Proposal Templates</h2>
-                    <p className="modal-subtitle">
-                        Select a pre-configured template to kickstart a new proposal
-                    </p>
+        <div className="proposal-modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
+            <div className="proposal-modal-card" style={{ maxWidth: "780px" }} onClick={(e) => e.stopPropagation()}>
+                <div className="proposal-modal-header">
+                    <div className="proposal-modal-title-group">
+                        <h2 className="proposal-modal-title">Proposal Templates</h2>
+                        <p className="proposal-modal-subtitle">
+                            Select a pre-configured template to kickstart a new proposal
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        className="proposal-modal-close-btn"
+                        onClick={onClose}
+                        aria-label="Close modal"
+                    >
+                        <X size={20} />
+                    </button>
+                </div>
 
+                <div className="proposal-modal-inner-card" style={{ maxHeight: "70vh", overflowY: "auto", width: "100%" }}>
                     {loading ? (
-                        <p style={{ padding: "32px 0", textAlign: "center", color: "#64748b" }}>
+                        <p style={{ padding: "32px 0", textAlign: "center", color: "#64748b", margin: 0, width: "100%" }}>
                             Loading templates...
                         </p>
                     ) : (
-                        <div className="templates-grid">
+                        <div className="templates-grid" style={{ width: "100%" }}>
                             {templates.map((tmpl) => (
                                 <div key={tmpl.id} className="template-card">
                                     <div>
@@ -706,10 +753,17 @@ function ProposalTemplatesModal({
                         </div>
                     )}
                 </div>
+
+                <div className="proposal-modal-footer" style={{ justifyContent: "flex-end" }}>
+                    <button type="button" className="proposal-btn-cancel" onClick={onClose}>
+                        Close
+                    </button>
+                </div>
             </div>
         </div>
     );
 }
+
 
 function NewProposalModal({
     initialTemplate,
@@ -1019,98 +1073,131 @@ function NewProposalModal({
     };
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                <button className="modal-close" onClick={onClose}>
-                    ×
-                </button>
-
+        <div className="proposal-modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
+            <div className="proposal-modal-card" onClick={(e) => e.stopPropagation()}>
                 {step === "select" && (
-                    <div className="modal-body">
-                        <h2>New Proposal</h2>
-                        <p className="modal-subtitle">How would you like to start?</p>
-
-                        <div className="proposal-options">
+                    <>
+                        {/* Modal Header (Frame 2147225093) */}
+                        <div className="proposal-modal-header">
+                            <div className="proposal-modal-title-group">
+                                <h2 className="proposal-modal-title">New Proposal</h2>
+                                <p className="proposal-modal-subtitle">How would you like to start?</p>
+                            </div>
                             <button
                                 type="button"
-                                className={`option-card ${selectedType === "scratch" ? "selected" : ""}`}
-                                onClick={() => setSelectedType("scratch")}
-                                onDoubleClick={() => {
-                                    setSourceType("scratch");
-                                    setStep("details");
-                                }}
+                                className="proposal-modal-close-btn"
+                                onClick={onClose}
+                                aria-label="Close modal"
                             >
-                                <img
-                                    src="/assets/proposal-from-scratch.svg"
-                                    alt=""
-                                    className="option-icon"
-                                />
-                                <h3>From Scratch</h3>
-                                <p>Build a new proposal with a blank</p>
-                            </button>
-
-                            <button
-                                type="button"
-                                className={`option-card ${selectedType === "boq" ? "selected" : ""}`}
-                                onClick={() => setSelectedType("boq")}
-                                onDoubleClick={() => {
-                                    setSourceType("boq");
-                                    setStep("details");
-                                }}
-                            >
-                                <img
-                                    src="/assets/proposal-from-boq.svg"
-                                    alt=""
-                                    className="option-icon"
-                                />
-                                <h3>From BOQ</h3>
-                                <p>Proposal from an approved BOQ</p>
-                            </button>
-
-                            <button
-                                type="button"
-                                className={`option-card ${selectedType === "duplicate" ? "selected" : ""}`}
-                                onClick={() => setSelectedType("duplicate")}
-                                onDoubleClick={() => {
-                                    setSourceType("duplicate");
-                                    setStep("details");
-                                }}
-                            >
-                                <img
-                                    src="/assets/proposal-duplicate.svg"
-                                    alt=""
-                                    className="option-icon"
-                                />
-                                <h3>Duplicate Existing</h3>
-                                <p>Copy a previous proposal and modify it</p>
-                            </button>
-
-                            <button
-                                type="button"
-                                className={`option-card ${selectedType === "template" ? "selected" : ""}`}
-                                onClick={() => setSelectedType("template")}
-                                onDoubleClick={() => {
-                                    setSourceType("template");
-                                    setStep("details");
-                                }}
-                            >
-                                <img
-                                    src="/assets/proposal-from-template.svg"
-                                    alt=""
-                                    className="option-icon"
-                                />
-                                <h3>From Template</h3>
-                                <p>Use a saved proposal template</p>
+                                <X size={20} />
                             </button>
                         </div>
 
-                        <div className="modal-footer modal-footer-between">
-                            <button type="button" className="secondary-button" onClick={onClose}>
+                        {/* White inner container (Frame 2147225091) */}
+                        <div className="proposal-modal-inner-card">
+                            <div className="proposal-options-grid">
+                                <button
+                                    type="button"
+                                    className={`proposal-option-card ${selectedType === "scratch" ? "selected" : ""}`}
+                                    onClick={() => setSelectedType("scratch")}
+                                    onDoubleClick={() => {
+                                        setSourceType("scratch");
+                                        setStep("details");
+                                    }}
+                                >
+                                    <div className="proposal-option-icon">
+                                        <img
+                                            src="/assets/proposal-from-scratch.svg"
+                                            alt=""
+                                            width={20}
+                                            height={20}
+                                        />
+                                    </div>
+                                    <div className="proposal-option-text">
+                                        <h3 className="proposal-option-title">From Scratch</h3>
+                                        <p className="proposal-option-desc">Build a new proposal with a blank</p>
+                                    </div>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className={`proposal-option-card ${selectedType === "boq" ? "selected" : ""}`}
+                                    onClick={() => setSelectedType("boq")}
+                                    onDoubleClick={() => {
+                                        setSourceType("boq");
+                                        setStep("details");
+                                    }}
+                                >
+                                    <div className="proposal-option-icon">
+                                        <img
+                                            src="/assets/proposal-from-boq.svg"
+                                            alt=""
+                                            width={20}
+                                            height={20}
+                                        />
+                                    </div>
+                                    <div className="proposal-option-text">
+                                        <h3 className="proposal-option-title">From BOQ</h3>
+                                        <p className="proposal-option-desc">Proposal from an approved BOQ</p>
+                                    </div>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className={`proposal-option-card ${selectedType === "duplicate" ? "selected" : ""}`}
+                                    onClick={() => setSelectedType("duplicate")}
+                                    onDoubleClick={() => {
+                                        setSourceType("duplicate");
+                                        setStep("details");
+                                    }}
+                                >
+                                    <div className="proposal-option-icon">
+                                        <img
+                                            src="/assets/proposal-duplicate.svg"
+                                            alt=""
+                                            width={20}
+                                            height={20}
+                                        />
+                                    </div>
+                                    <div className="proposal-option-text">
+                                        <h3 className="proposal-option-title">Duplicate Existing</h3>
+                                        <p className="proposal-option-desc">Copy a previous proposal and modify it</p>
+                                    </div>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className={`proposal-option-card ${selectedType === "template" ? "selected" : ""}`}
+                                    onClick={() => setSelectedType("template")}
+                                    onDoubleClick={() => {
+                                        setSourceType("template");
+                                        setStep("details");
+                                    }}
+                                >
+                                    <div className="proposal-option-icon">
+                                        <img
+                                            src="/assets/proposal-from-template.svg"
+                                            alt=""
+                                            width={20}
+                                            height={20}
+                                        />
+                                    </div>
+                                    <div className="proposal-option-text">
+                                        <h3 className="proposal-option-title">From Template</h3>
+                                        <p className="proposal-option-desc">Use a saved proposal template</p>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Step 1 Footer (Frame 2147225069) */}
+                        <div className="proposal-modal-footer">
+                            <button type="button" className="proposal-btn-cancel" onClick={onClose}>
                                 Cancel
                             </button>
                             <button
                                 type="button"
-                                className="primary-button"
+                                className="proposal-btn-continue"
                                 disabled={!selectedType}
                                 onClick={() => {
                                     if (selectedType) {
@@ -1122,262 +1209,361 @@ function NewProposalModal({
                                 Continue
                             </button>
                         </div>
-                    </div>
+                    </>
                 )}
 
                 {step === "details" && sourceType && (
-                    <form onSubmit={handleSubmit} className="modal-body">
-                        <h2>Proposal Details</h2>
-                        <p className="modal-subtitle">
-                            Starting from:{" "}
-                            {sourceType === "scratch"
-                                ? "From Scratch"
-                                : sourceType === "boq"
-                                ? "From BOQ"
-                                : sourceType === "duplicate"
-                                ? "Duplicate Existing"
-                                : "From Template"}
-                        </p>
-
-                        {error && <p className="error-banner">{error}</p>}
-
-                        {/* 1. Project Dropdown based on data */}
-                        <div className="form-group">
-                            <label>Project Name *</label>
-                            {!isCustomProject ? (
-                                <select
-                                    value={formData.projectId}
-                                    onChange={(e) => handleProjectChange(e.target.value)}
-                                    required={!formData.projectName}
-                                >
-                                    <option value="">Select a project</option>
-                                    {projects.map((p) => (
-                                        <option key={p.id} value={p.id}>
-                                            {p.name} {p.clientName ? `— ${p.clientName}` : ""}
-                                        </option>
-                                    ))}
-                                    <option value="__custom__">+ Enter Custom Project Name...</option>
-                                </select>
-                            ) : (
-                                <div style={{ display: "flex", gap: "8px" }}>
-                                    <input
-                                        type="text"
-                                        placeholder="ex. Oberoi Residence - Bandra"
-                                        value={formData.projectName}
-                                        onChange={(e) =>
-                                            setFormData({ ...formData, projectName: e.target.value })
-                                        }
-                                        required
-                                        autoFocus
-                                    />
-                                    <button
-                                        type="button"
-                                        className="secondary-button"
-                                        style={{ padding: "8px 14px", fontSize: "12px", whiteSpace: "nowrap" }}
-                                        onClick={() => {
-                                            setIsCustomProject(false);
-                                            if (projects.length > 0) {
-                                                handleProjectChange(projects[0].id);
-                                            }
-                                        }}
-                                    >
-                                        Choose from List
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Client Name */}
-                        <div className="form-group">
-                            <label>Client Name *</label>
-                            <input
-                                type="text"
-                                placeholder="ex. Nikhil Oberoi"
-                                value={formData.clientName}
-                                onChange={(e) =>
-                                    setFormData({ ...formData, clientName: e.target.value })
-                                }
-                                required
-                            />
-                        </div>
-
-                        {/* Conditional Secondary Selects for BOQ / Duplicate / Template */}
-                        {sourceType === "boq" && (
-                            <div className="form-group">
-                                <label>Select BOQ *</label>
-                                <select
-                                    value={formData.sourceId}
-                                    onChange={(e) => {
-                                        const boqId = e.target.value;
-                                        const selectedBoq = boqs.find((b) => b.id === boqId);
-                                        if (selectedBoq) {
-                                            const matchingProj = projects.find(
-                                                (p) => p.id === selectedBoq.projectId || p.name === selectedBoq.projectName
-                                            );
-                                            setFormData((prev) => ({
-                                                ...prev,
-                                                sourceId: selectedBoq.id,
-                                                projectId: matchingProj ? matchingProj.id : prev.projectId,
-                                                projectName: matchingProj ? matchingProj.name : (selectedBoq.projectName || prev.projectName),
-                                                clientName: matchingProj?.clientName || prev.clientName,
-                                                proposedValue: selectedBoq.subtotal ? String(selectedBoq.subtotal) : prev.proposedValue,
-                                            }));
-                                        } else {
-                                            setFormData((prev) => ({ ...prev, sourceId: "" }));
-                                        }
-                                    }}
-                                    required
-                                >
-                                    <option value="">Select BOQ</option>
-                                    {boqs.map((b) => (
-                                        <option key={b.id} value={b.id}>
-                                            {b.name} {b.subtotal ? `(${formatIndianCurrency(b.subtotal)})` : ""}
-                                        </option>
-                                    ))}
-                                </select>
+                    <>
+                        {/* Modal Header (Frame 2147225093) */}
+                        <div className="proposal-modal-header">
+                            <div className="proposal-modal-title-group">
+                                <h2 className="proposal-modal-title">Proposal Details</h2>
+                                <p className="proposal-modal-subtitle">
+                                    Starting from:{" "}
+                                    {sourceType === "scratch"
+                                        ? "From Scratch"
+                                        : sourceType === "boq"
+                                        ? "From BOQ"
+                                        : sourceType === "duplicate"
+                                        ? "Duplicate Existing"
+                                        : "From Template"}
+                                </p>
                             </div>
-                        )}
-
-                        {sourceType === "duplicate" && (
-                            <div className="form-group">
-                                <label>Duplicate From *</label>
-                                <select
-                                    value={formData.sourceId}
-                                    onChange={(e) => {
-                                        const propId = e.target.value;
-                                        const p = duplicateProposals.find((item) => item.id === propId);
-                                        if (p) {
-                                            const matchingProj = projects.find((proj) => proj.name === p.projectName);
-                                            setFormData((prev) => ({
-                                                ...prev,
-                                                sourceId: p.id,
-                                                projectId: matchingProj ? matchingProj.id : prev.projectId,
-                                                projectName: p.projectName || prev.projectName,
-                                                clientName: p.clientName || prev.clientName,
-                                                proposedValue: p.proposedValue ? String(p.proposedValue) : prev.proposedValue,
-                                                internalNotes: `Duplicated from ${p.reference}`,
-                                            }));
-                                        } else {
-                                            setFormData((prev) => ({ ...prev, sourceId: "" }));
-                                        }
-                                    }}
-                                    required
-                                >
-                                    <option value="">Select proposal to duplicate</option>
-                                    {duplicateProposals.map((p) => (
-                                        <option key={p.id} value={p.id}>
-                                            {p.reference} - {p.projectName} {p.clientName ? `(${p.clientName})` : ""}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        )}
-
-                        {sourceType === "template" && (
-                            <div className="form-group">
-                                <label>Select Template *</label>
-                                <select
-                                    value={formData.sourceId}
-                                    onChange={(e) => {
-                                        const tmplId = e.target.value;
-                                        const t = templates.find((item) => item.id === tmplId);
-                                        if (t) {
-                                            setFormData((prev) => ({
-                                                ...prev,
-                                                sourceId: t.id,
-                                                internalNotes: `Created from template: ${t.name}`,
-                                            }));
-                                        } else {
-                                            setFormData((prev) => ({ ...prev, sourceId: "" }));
-                                        }
-                                    }}
-                                    required
-                                >
-                                    <option value="">Select template</option>
-                                    {templates.map((t) => (
-                                        <option key={t.id} value={t.id}>
-                                            {t.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        )}
-
-                        <div className="form-row">
-                            <div className="form-group">
-                                <label>Proposed Value (₹) *</label>
-                                <input
-                                    type="number"
-                                    placeholder="ex. 4500000"
-                                    value={formData.proposedValue}
-                                    onChange={(e) =>
-                                        setFormData({ ...formData, proposedValue: e.target.value })
-                                    }
-                                    required
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label>Expiry Date</label>
-                                <input
-                                    type="date"
-                                    value={formData.expiryDate}
-                                    onChange={(e) =>
-                                        setFormData({ ...formData, expiryDate: e.target.value })
-                                    }
-                                />
-                            </div>
-                        </div>
-
-                        <div className="form-group">
-                            <label>Internal Notes</label>
-                            <textarea
-                                placeholder="Optional notes..."
-                                value={formData.internalNotes}
-                                onChange={(e) =>
-                                    setFormData({ ...formData, internalNotes: e.target.value })
-                                }
-                                rows={3}
-                            />
-                        </div>
-
-                        <div className="modal-footer">
                             <button
                                 type="button"
-                                className="secondary-button"
+                                className="proposal-modal-close-btn"
+                                onClick={onClose}
+                                aria-label="Close modal"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {/* Inner White Card (Frame 2147225027) */}
+                        <form id="proposal-create-form" onSubmit={handleSubmit} className="proposal-modal-inner-card">
+                            {error && <p className="proposals-error-banner" role="alert">{error}</p>}
+
+                            {/* 1. Project Dropdown based on data */}
+                            <div className="proposal-form-field">
+                                <div className="proposal-form-label-row">
+                                    <span className="proposal-form-label">Project</span>
+                                    <span className="proposal-form-required">*</span>
+                                </div>
+                                {!isCustomProject ? (
+                                    <div className="proposal-form-control-box">
+                                        <select
+                                            className="proposal-form-select"
+                                            value={formData.projectId}
+                                            onChange={(e) => handleProjectChange(e.target.value)}
+                                            required={!formData.projectName}
+                                        >
+                                            <option value="">Select project</option>
+                                            {projects.map((p) => (
+                                                <option key={p.id} value={p.id}>
+                                                    {p.name} {p.clientName ? `— ${p.clientName}` : ""}
+                                                </option>
+                                            ))}
+                                            <option value="__custom__">+ Enter Custom Project Name...</option>
+                                        </select>
+                                        <ChevronDown size={18} className="proposal-form-icon-right" />
+                                    </div>
+                                ) : (
+                                    <div style={{ display: "flex", gap: "8px", width: "100%" }}>
+                                        <div className="proposal-form-control-box" style={{ flex: 1 }}>
+                                            <input
+                                                type="text"
+                                                className="proposal-form-input"
+                                                placeholder="ex. Oberoi Residence - Bandra"
+                                                value={formData.projectName}
+                                                onChange={(e) =>
+                                                    setFormData({ ...formData, projectName: e.target.value })
+                                                }
+                                                required
+                                                autoFocus
+                                            />
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className="proposal-btn-cancel"
+                                            style={{ width: "auto", padding: "0 14px", fontSize: "13px", whiteSpace: "nowrap" }}
+                                            onClick={() => {
+                                                setIsCustomProject(false);
+                                                if (projects.length > 0) {
+                                                    handleProjectChange(projects[0].id);
+                                                }
+                                            }}
+                                        >
+                                            Choose from List
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 2. Client Name */}
+                            <div className="proposal-form-field">
+                                <div className="proposal-form-label-row">
+                                    <span className="proposal-form-label">Client Name</span>
+                                    <span className="proposal-form-required">*</span>
+                                </div>
+                                <div className="proposal-form-control-box">
+                                    <input
+                                        type="text"
+                                        className="proposal-form-input"
+                                        placeholder="ex. John Doe"
+                                        value={formData.clientName}
+                                        onChange={(e) =>
+                                            setFormData({ ...formData, clientName: e.target.value })
+                                        }
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Conditional Secondary Selects for BOQ / Duplicate / Template */}
+                            {sourceType === "boq" && (
+                                <div className="proposal-form-field">
+                                    <div className="proposal-form-label-row">
+                                        <span className="proposal-form-label">Select Approved BOQ</span>
+                                        <span className="proposal-form-required">*</span>
+                                    </div>
+                                    <div className="proposal-form-control-box">
+                                        <select
+                                            className="proposal-form-select"
+                                            value={formData.sourceId}
+                                            onChange={(e) => {
+                                                const boqId = e.target.value;
+                                                const selectedBoq = boqs.find((b) => b.id === boqId);
+                                                if (selectedBoq) {
+                                                    const matchingProj = projects.find(
+                                                        (p) => p.id === selectedBoq.projectId || p.name === selectedBoq.projectName
+                                                    );
+                                                    setFormData((prev) => ({
+                                                        ...prev,
+                                                        sourceId: selectedBoq.id,
+                                                        projectId: matchingProj ? matchingProj.id : prev.projectId,
+                                                        projectName: matchingProj ? matchingProj.name : (selectedBoq.projectName || prev.projectName),
+                                                        clientName: matchingProj?.clientName || prev.clientName,
+                                                        proposedValue: selectedBoq.subtotal ? String(selectedBoq.subtotal) : prev.proposedValue,
+                                                    }));
+                                                } else {
+                                                    setFormData((prev) => ({ ...prev, sourceId: "" }));
+                                                }
+                                            }}
+                                            required
+                                        >
+                                            <option value="">Select approved BOQ</option>
+                                            {boqs.map((b) => (
+                                                <option key={b.id} value={b.id}>
+                                                    {b.name} {b.subtotal ? `(${formatIndianCurrency(b.subtotal)})` : ""}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown size={18} className="proposal-form-icon-right" />
+                                    </div>
+                                </div>
+                            )}
+
+                            {sourceType === "duplicate" && (
+                                <div className="proposal-form-field">
+                                    <div className="proposal-form-label-row">
+                                        <span className="proposal-form-label">Duplicate From</span>
+                                        <span className="proposal-form-required">*</span>
+                                    </div>
+                                    <div className="proposal-form-control-box">
+                                        <select
+                                            className="proposal-form-select"
+                                            value={formData.sourceId}
+                                            onChange={(e) => {
+                                                const propId = e.target.value;
+                                                const p = duplicateProposals.find((item) => item.id === propId);
+                                                if (p) {
+                                                    const matchingProj = projects.find((proj) => proj.name === p.projectName);
+                                                    setFormData((prev) => ({
+                                                        ...prev,
+                                                        sourceId: p.id,
+                                                        projectId: matchingProj ? matchingProj.id : prev.projectId,
+                                                        projectName: p.projectName || prev.projectName,
+                                                        clientName: p.clientName || prev.clientName,
+                                                        proposedValue: p.proposedValue ? String(p.proposedValue) : prev.proposedValue,
+                                                        internalNotes: `Duplicated from ${p.reference}`,
+                                                    }));
+                                                } else {
+                                                    setFormData((prev) => ({ ...prev, sourceId: "" }));
+                                                }
+                                            }}
+                                            required
+                                        >
+                                            <option value="">Select proposal to duplicate</option>
+                                            {duplicateProposals.map((p) => (
+                                                <option key={p.id} value={p.id}>
+                                                    {p.reference} - {p.projectName} {p.clientName ? `(${p.clientName})` : ""}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown size={18} className="proposal-form-icon-right" />
+                                    </div>
+                                </div>
+                            )}
+
+                            {sourceType === "template" && (
+                                <div className="proposal-form-field">
+                                    <div className="proposal-form-label-row">
+                                        <span className="proposal-form-label">Select Template</span>
+                                        <span className="proposal-form-required">*</span>
+                                    </div>
+                                    <div className="proposal-form-control-box">
+                                        <select
+                                            className="proposal-form-select"
+                                            value={formData.sourceId}
+                                            onChange={(e) => {
+                                                const tmplId = e.target.value;
+                                                const t = templates.find((item) => item.id === tmplId);
+                                                if (t) {
+                                                    setFormData((prev) => ({
+                                                        ...prev,
+                                                        sourceId: t.id,
+                                                        internalNotes: `Created from template: ${t.name}`,
+                                                    }));
+                                                } else {
+                                                    setFormData((prev) => ({ ...prev, sourceId: "" }));
+                                                }
+                                            }}
+                                            required
+                                        >
+                                            <option value="">Select template</option>
+                                            {templates.map((t) => (
+                                                <option key={t.id} value={t.id}>
+                                                    {t.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown size={18} className="proposal-form-icon-right" />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* 2-Column Row: Proposed Value & Expiry Date */}
+                            <div className="proposal-form-row-2col">
+                                <div className="proposal-form-col">
+                                    <div className="proposal-form-label-row">
+                                        <span className="proposal-form-label">Proposed Value (₹)</span>
+                                        <span className="proposal-form-required">*</span>
+                                    </div>
+                                    <div className="proposal-form-control-box">
+                                        <input
+                                            type="number"
+                                            className="proposal-form-input"
+                                            placeholder="ex. 45,00,000"
+                                            value={formData.proposedValue}
+                                            onChange={(e) =>
+                                                setFormData({ ...formData, proposedValue: e.target.value })
+                                            }
+                                            required
+                                        />
+                                    </div>
+                                </div>
+                                <div className="proposal-form-col">
+                                    <div className="proposal-form-label-row">
+                                        <span className="proposal-form-label">Expiry Date</span>
+                                    </div>
+                                    <div className="proposal-form-control-box">
+                                        <input
+                                            type="date"
+                                            className="proposal-form-input"
+                                            placeholder="dd-mm-yyyy"
+                                            value={formData.expiryDate}
+                                            onChange={(e) =>
+                                                setFormData({ ...formData, expiryDate: e.target.value })
+                                            }
+                                        />
+                                        <Calendar size={18} className="proposal-form-icon-right" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Internal Notes */}
+                            <div className="proposal-form-field">
+                                <div className="proposal-form-label-row">
+                                    <span className="proposal-form-label">Internal Notes</span>
+                                </div>
+                                <div className="proposal-form-control-box-textarea">
+                                    <textarea
+                                        className="proposal-form-textarea"
+                                        placeholder="Optional notes..."
+                                        value={formData.internalNotes}
+                                        onChange={(e) =>
+                                            setFormData({ ...formData, internalNotes: e.target.value })
+                                        }
+                                        rows={3}
+                                    />
+                                </div>
+                            </div>
+                        </form>
+
+                        {/* Step 2 Footer (Frame 2147225095) sitting directly on outer translucent surface */}
+                        <div className="proposal-modal-footer-details">
+                            <button
+                                type="button"
+                                className="proposal-btn-back"
                                 onClick={() => setStep("select")}
                             >
                                 Back
                             </button>
-                            <button type="button" className="secondary-button" onClick={onClose}>
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                className="primary-button"
-                                disabled={isSubmitting || !formData.projectName || !formData.clientName}
-                            >
-                                {isSubmitting ? "Creating..." : "Create Proposal"}
-                            </button>
+                            <div className="proposal-footer-right-group">
+                                <button type="button" className="proposal-btn-cancel" onClick={onClose}>
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    form="proposal-create-form"
+                                    className="proposal-btn-create"
+                                    disabled={isSubmitting || !formData.projectName || !formData.clientName}
+                                >
+                                    {isSubmitting ? "Creating..." : "Create Proposal"}
+                                </button>
+                            </div>
                         </div>
-                    </form>
+                    </>
                 )}
 
                 {step === "success" && createdProposal && (
-                    <div className="modal-body success-state">
-                        <div className="success-icon">
-                            <img src="/assets/proposal-success-checkmark.svg" alt="Success" />
-                        </div>
-                        <h2>Proposal Created</h2>
-                        <p className="success-message">Your new proposal is ready</p>
-                        <p className="success-details">
-                            {createdProposal.reference} - {createdProposal.projectName} proposal for{" "}
-                            {createdProposal.clientName} has been saved as a Draft
-                        </p>
-
-                        <div className="modal-footer success-footer">
+                    <>
+                        <div className="proposal-modal-header">
+                            <div className="proposal-modal-title-group">
+                                <h2 className="proposal-modal-title">Proposal Created</h2>
+                                <p className="proposal-modal-subtitle">Your new proposal is ready</p>
+                            </div>
                             <button
                                 type="button"
-                                className="secondary-button"
+                                className="proposal-modal-close-btn"
+                                onClick={() => {
+                                    onClose();
+                                    onRefresh();
+                                }}
+                                aria-label="Close modal"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="proposal-modal-inner-card proposal-success-card">
+                            <div className="proposal-success-icon-badge">
+                                <img src="/assets/proposal-success-checkmark.svg" alt="Success" width={32} height={32} />
+                            </div>
+                            <h3 className="proposal-success-title">{createdProposal.reference}</h3>
+                            <p className="proposal-success-subtitle">
+                                {createdProposal.projectName} proposal for {createdProposal.clientName} has been saved as a Draft
+                            </p>
+                            <div className="proposal-success-detail-box">
+                                You can now review the proposal in preview mode or dispatch it directly to the client.
+                            </div>
+                        </div>
+
+                        <div className="proposal-modal-footer" style={{ marginTop: "16px", justifyContent: "flex-end" }}>
+                            <button
+                                type="button"
+                                className="proposal-btn-cancel"
+                                style={{ width: "80px" }}
                                 onClick={() => {
                                     onClose();
                                     onRefresh();
@@ -1387,7 +1573,8 @@ function NewProposalModal({
                             </button>
                             <button
                                 type="button"
-                                className="primary-button"
+                                className="proposal-btn-create"
+                                style={{ width: "auto" }}
                                 onClick={async () => {
                                     if (!createdProposal) return;
                                     setIsSubmitting(true);
@@ -1416,12 +1603,13 @@ function NewProposalModal({
                                 {isSubmitting ? "Sending..." : "Send to Client"}
                             </button>
                         </div>
-                    </div>
+                    </>
                 )}
             </div>
         </div>
     );
 }
+
 
 
 function ProposalPreviewModal({
@@ -1531,126 +1719,151 @@ function ProposalPreviewModal({
         : defaultScopeItems;
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
+        <div className="proposal-modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
             <div
-                className="modal-content"
-                style={{ maxWidth: "700px", padding: 0, overflow: "hidden", borderRadius: "14px" }}
+                className="proposal-modal-card proposal-preview-card"
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Modal Title Bar */}
-                <div className="preview-modal-header">
-                    <h2>{proposal ? `${proposal.proposalCode} - Proposal Preview` : "Proposal Preview"}</h2>
-                    <button className="modal-close" style={{ position: "static" }} onClick={onClose}>
-                        ×
+                {/* Modal Title Bar (Frame 2147225093) */}
+                <div className="proposal-modal-header">
+                    <div className="proposal-modal-title-group">
+                        <h2 className="proposal-modal-title">
+                            {proposal ? `${proposal.proposalCode} - Proposal Preview` : "Proposal Preview"}
+                        </h2>
+                    </div>
+                    <button
+                        type="button"
+                        className="proposal-modal-close-btn"
+                        onClick={onClose}
+                        aria-label="Close modal"
+                    >
+                        <X size={20} />
                     </button>
                 </div>
 
                 {loading ? (
-                    <div style={{ padding: "48px 32px", textAlign: "center", color: "#64748b" }}>
+                    <div style={{ padding: "48px 32px", textAlign: "center", color: "#64748B", width: "100%", fontFamily: "'Urbanist', sans-serif" }}>
                         Loading proposal...
                     </div>
                 ) : error ? (
-                    <div style={{ padding: "32px", color: "#dc2626" }}>{error}</div>
+                    <div style={{ padding: "32px", color: "#DC2626", width: "100%", fontFamily: "'Urbanist', sans-serif" }}>{error}</div>
                 ) : proposal ? (
                     <>
-                        <div className="preview-document-body">
-                            {/* Top row: Company details on left, Proposal ID & dates on right */}
-                            <div className="preview-doc-top">
-                                <div>
-                                    <h1 className="preview-company-name">{branding.companyName}</h1>
-                                    <p className="preview-company-meta">{branding.address}</p>
-                                    <p className="preview-company-meta">
-                                        {branding.email} {branding.phone}
+                        {/* Inner White Container (Frame 2147225096) */}
+                        <div className="proposal-modal-inner-card proposal-preview-inner-card">
+                            {/* Top row: Company details on left, Proposal ID & dates on right (Frame 2147225153) */}
+                            <div className="preview-company-row">
+                                <div className="preview-company-info">
+                                    <h1 className="preview-company-title">{branding.companyName || "Arvin Interiors"}</h1>
+                                    <p className="preview-company-details">
+                                        {[
+                                            branding.address || "42 Design House, Khar West, Mumbai 400052",
+                                            branding.email || "contact@arvininteriors.com",
+                                            branding.phone || "+91 98200 00001",
+                                        ].filter(Boolean).join(" ")}
                                     </p>
                                 </div>
-                                <div className="preview-doc-id-box">
-                                    <div className="preview-doc-code">{proposal.proposalCode}</div>
-                                    <div className="preview-doc-dates">
-                                        Issued:{" "}
-                                        {new Date(proposal.sentAt || proposal.createdAt).toLocaleDateString("en-GB", {
-                                            day: "numeric",
-                                            month: "short",
-                                            year: "numeric",
-                                        })}
-                                    </div>
-                                    <div className="preview-doc-dates">
-                                        Expiry:{" "}
-                                        {proposal.expiryDate
-                                            ? new Date(proposal.expiryDate).toLocaleDateString("en-GB", {
-                                                  day: "numeric",
-                                                  month: "short",
-                                                  year: "numeric",
-                                              })
-                                            : "—"}
+                                <div className="preview-proposal-code-box">
+                                    <div className="preview-proposal-code-title">{proposal.proposalCode}</div>
+                                    <div className="preview-proposal-dates">
+                                        <div className="preview-proposal-date-line">
+                                            Issued:{" "}
+                                            {new Date(proposal.sentAt || proposal.createdAt).toLocaleDateString("en-GB", {
+                                                day: "numeric",
+                                                month: "short",
+                                                year: "numeric",
+                                            })}
+                                        </div>
+                                        <div className="preview-proposal-date-line">
+                                            Expiry:{" "}
+                                            {proposal.expiryDate
+                                                ? new Date(proposal.expiryDate).toLocaleDateString("en-GB", {
+                                                      day: "numeric",
+                                                      month: "short",
+                                                      year: "numeric",
+                                                  })
+                                                : "—"}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Prepared for section */}
-                            <div className="preview-prepared-for">
-                                <div className="preview-prepared-label">Prepared for</div>
-                                <div className="preview-client-title">{proposal.clientName}</div>
-                                <div className="preview-project-subtitle">{proposal.projectName}</div>
+                            {/* Divider Line (Rectangle 78) */}
+                            <div className="preview-divider-line" />
+
+                            {/* Prepared for section (Frame 2147225154) */}
+                            <div className="preview-prepared-for-section">
+                                <div className="preview-prepared-for-label">Prepared for</div>
+                                <div className="preview-client-project-group">
+                                    <div className="preview-client-heading">{proposal.clientName}</div>
+                                    <div className="preview-project-subheading">{proposal.projectName}</div>
+                                </div>
                             </div>
 
-                            {/* Proposal Summary Box */}
-                            <div className="preview-summary-card">
-                                <div className="preview-summary-card-title">PROPOSAL SUMMARY</div>
-                                <div className="preview-summary-columns">
-                                    <div>
-                                        <div className="preview-col-label">SCOPE OF WORK</div>
-                                        <div className="preview-col-value">
+                            {/* Proposal Summary Box (Frame 12) */}
+                            <div className="preview-summary-box">
+                                <div className="preview-summary-box-title">PROPOSAL SUMMARY</div>
+                                <div className="preview-divider-line" />
+                                <div className="preview-summary-box-row">
+                                    <div className="preview-summary-box-col">
+                                        <div className="preview-summary-box-col-label">SCOPE OF WORK</div>
+                                        <div className="preview-summary-box-col-value">
                                             {proposal.sourceLabel || (proposal.sourceType === "boq" ? "Approved BOQ" : "Full Turnkey")}
                                         </div>
                                     </div>
-                                    <div>
-                                        <div className="preview-col-label">PROJECT DURATION</div>
-                                        <div className="preview-col-value">{calculateDuration()}</div>
+                                    <div className="preview-summary-vdivider" />
+                                    <div className="preview-summary-box-col">
+                                        <div className="preview-summary-box-col-label">PROJECT DURATION</div>
+                                        <div className="preview-summary-box-col-value">{calculateDuration()}</div>
                                     </div>
-                                    <div>
-                                        <div className="preview-col-label">PROPOSED VALUE</div>
-                                        <div className="preview-col-value">{formatIndianCurrency(proposal.proposedValue)}</div>
+                                    <div className="preview-summary-vdivider" />
+                                    <div className="preview-summary-box-col">
+                                        <div className="preview-summary-box-col-label">PROPOSED VALUE</div>
+                                        <div className="preview-summary-box-col-value">{formatIndianCurrency(proposal.proposedValue)}</div>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Scope Includes list */}
-                            <div className="preview-scope-section">
-                                <div className="preview-scope-heading">Scope Includes</div>
-                                <div className="preview-scope-list">
+                            {/* Scope Includes list (Frame 2147225155) */}
+                            <div className="preview-scope-block">
+                                <div className="preview-scope-title">Scope Includes</div>
+                                <div className="preview-scope-items-container">
                                     {scopeList.map((item: string, idx: number) => (
-                                        <div key={idx} className="preview-scope-item">
-                                            <span>—</span>
-                                            <span>{item}</span>
+                                        <div key={idx} className="preview-scope-line-item">
+                                            <div className="preview-scope-dash" />
+                                            <span className="preview-scope-text">{item}</span>
                                         </div>
                                     ))}
                                 </div>
                             </div>
 
-                            {/* Grand Total */}
-                            <div className="preview-grand-total-box">
-                                <div className="preview-grand-total-label">Grand Total (incl. GST)</div>
-                                <div className="preview-grand-total-amount">
+                            {/* Divider Line (Rectangle 79) */}
+                            <div className="preview-divider-line" />
+
+                            {/* Grand Total (Frame 2147224969) */}
+                            <div className="preview-total-block">
+                                <div className="preview-total-label">Grand Total (incl. GST)</div>
+                                <div className="preview-total-amount">
                                     {formatIndianCurrency(proposal.proposedValue)}
                                 </div>
                             </div>
                         </div>
 
                         {actionError && (
-                            <p className="error-banner" style={{ margin: "0 32px 16px" }} role="alert">
+                            <p className="proposals-error-banner" style={{ width: "100%" }} role="alert">
                                 {actionError}
                             </p>
                         )}
 
-                        {/* Footer: Cancel on left, Edit & Download PDF on right */}
-                        <div className="preview-modal-footer">
-                            <button type="button" className="secondary-button" onClick={onClose}>
+                        {/* Outer Footer (Frame 2147225095) sitting directly on outer translucent surface */}
+                        <div className="proposal-modal-footer-details">
+                            <button type="button" className="proposal-btn-cancel" onClick={onClose}>
                                 Cancel
                             </button>
-                            <div className="preview-footer-right">
+                            <div className="proposal-footer-right-group">
                                 <button
                                     type="button"
-                                    className="secondary-button"
+                                    className="proposal-btn-edit"
                                     disabled={actionLoading}
                                     onClick={async () => {
                                         const value = window.prompt("Proposed value (₹)", String(proposal.proposedValue));
@@ -1683,7 +1896,7 @@ function ProposalPreviewModal({
                                 </button>
                                 <button
                                     type="button"
-                                    className="primary-button"
+                                    className="proposal-btn-download-pdf"
                                     disabled={actionLoading}
                                     onClick={async () => {
                                         setActionLoading(true);

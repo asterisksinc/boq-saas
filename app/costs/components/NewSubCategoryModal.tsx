@@ -86,79 +86,52 @@ export default function NewSubCategoryModal({
 
     return (
         <div
-            style={{
-                position: "fixed",
-                inset: 0,
-                backgroundColor: "rgba(15, 23, 42, 0.45)",
-                backdropFilter: "blur(4px)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                zIndex: 9999,
-                padding: "20px"
-            }}
+            className="costing-modal-overlay-centered"
             onClick={(e) => {
                 if (e.target === e.currentTarget) onClose();
             }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="new-subcat-title"
         >
             <div
-                style={{
-                    background: "#ffffff",
-                    borderRadius: "16px",
-                    width: "100%",
-                    maxWidth: "520px",
-                    boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
-                    overflow: "hidden",
-                    display: "flex",
-                    flexDirection: "column",
-                    animation: "fadeIn 0.15s ease-out"
-                }}
+                className="costing-new-category-modal"
+                style={{ maxWidth: "520px" }}
+                onClick={(e) => e.stopPropagation()}
             >
-                {/* Header */}
-                <div
-                    style={{
-                        padding: "20px 24px",
-                        borderBottom: "1px solid #f1f5f9",
-                        display: "flex",
-                        alignItems: "flex-start",
-                        justifyContent: "space-between"
-                    }}
-                >
-                    <div>
-                        <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 700, color: "#0f172a" }}>
+                {/* Header (Frame 2147225093) */}
+                <div className="costing-modal-header">
+                    <div className="costing-modal-title-stack">
+                        <h2 id="new-subcat-title" className="costing-modal-title">
                             New Sub-Category
-                        </h3>
-                        <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "#64748b" }}>
+                        </h2>
+                        <div className="costing-modal-subtitle">
                             Create a sub-category under a parent category
-                        </p>
+                        </div>
                     </div>
                     <button
                         type="button"
                         onClick={onClose}
-                        style={{
-                            background: "transparent",
-                            border: "none",
-                            padding: "4px",
-                            cursor: "pointer",
-                            color: "#94a3b8",
-                            borderRadius: "6px"
-                        }}
+                        className="costing-modal-close-btn"
+                        aria-label="Close modal"
                     >
-                        <X size={18} />
+                        <X size={20} />
                     </button>
                 </div>
 
-                {/* Form Content */}
-                <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", padding: "24px", gap: "20px" }}>
+                {/* Form Content (Frame 2147225027) */}
+                <form onSubmit={handleSubmit} className="costing-modal-inner-card">
                     {error && (
                         <div
                             style={{
-                                background: "#fef2f2",
-                                border: "1px solid #fecaca",
-                                color: "#b91c1c",
+                                width: "100%",
+                                background: "#FEF2F2",
+                                border: "1px solid #FECACA",
+                                color: "#B91C1C",
                                 padding: "10px 14px",
                                 borderRadius: "8px",
-                                fontSize: "13px"
+                                fontSize: "13px",
+                                boxSizing: "border-box"
                             }}
                         >
                             {error}
@@ -166,50 +139,40 @@ export default function NewSubCategoryModal({
                     )}
 
                     {/* Sub-Category Title */}
-                    <div>
-                        <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#334155", marginBottom: "6px" }}>
-                            Sub-Category Title <span style={{ color: "#ef4444" }}>*</span>
-                        </label>
+                    <div className="costing-form-field">
+                        <div className="costing-form-label-row">
+                            <label className="costing-form-label" htmlFor="subcat-title-input">
+                                Sub-Category Title
+                            </label>
+                            <span className="costing-form-required">*</span>
+                        </div>
                         <input
+                            id="subcat-title-input"
                             type="text"
                             placeholder="Enter sub-category title"
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
-                            style={{
-                                width: "100%",
-                                padding: "10px 14px",
-                                borderRadius: "8px",
-                                border: "1px solid #cbd5e1",
-                                fontSize: "14px",
-                                outline: "none",
-                                boxSizing: "border-box"
-                            }}
+                            className="costing-form-input"
                             autoFocus
+                            required
                         />
                     </div>
 
                     {/* Parent Category */}
-                    <div>
-                        <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#334155", marginBottom: "6px" }}>
-                            Parent Category <span style={{ color: "#ef4444" }}>*</span>
-                        </label>
-                        <div style={{ position: "relative" }}>
+                    <div className="costing-form-field">
+                        <div className="costing-form-label-row">
+                            <label className="costing-form-label" htmlFor="subcat-parent-select">
+                                Parent Category
+                            </label>
+                            <span className="costing-form-required">*</span>
+                        </div>
+                        <div className="costing-form-select-wrap">
                             <select
+                                id="subcat-parent-select"
                                 value={parentId}
                                 onChange={(e) => setParentId(e.target.value)}
-                                style={{
-                                    width: "100%",
-                                    padding: "10px 14px",
-                                    paddingRight: "36px",
-                                    borderRadius: "8px",
-                                    border: "1px solid #cbd5e1",
-                                    fontSize: "14px",
-                                    outline: "none",
-                                    backgroundColor: "#fff",
-                                    appearance: "none",
-                                    cursor: "pointer",
-                                    boxSizing: "border-box"
-                                }}
+                                className={`costing-form-select ${!parentId ? "is-placeholder" : ""}`}
+                                required
                             >
                                 <option value="" disabled>Select parent category</option>
                                 {parentOptions.map((p) => (
@@ -218,93 +181,50 @@ export default function NewSubCategoryModal({
                                     </option>
                                 ))}
                             </select>
-                            <ChevronDown
-                                size={16}
-                                style={{
-                                    position: "absolute",
-                                    right: "12px",
-                                    top: "50%",
-                                    transform: "translateY(-50%)",
-                                    color: "#94a3b8",
-                                    pointerEvents: "none"
-                                }}
-                            />
+                            <div className="costing-form-select-arrow">
+                                <ChevronDown size={18} />
+                            </div>
                         </div>
                     </div>
 
                     {/* Sub-Category Code */}
-                    <div>
-                        <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#334155", marginBottom: "6px" }}>
-                            Sub-Category Code
-                        </label>
+                    <div className="costing-form-field">
+                        <div className="costing-form-label-row">
+                            <label className="costing-form-label" htmlFor="subcat-code-input">
+                                Sub-Category Code
+                            </label>
+                        </div>
                         <input
+                            id="subcat-code-input"
                             type="text"
                             placeholder="e.g. SUB-CAT-001 (auto-generated if empty)"
                             value={code}
                             onChange={(e) => setCode(e.target.value)}
-                            style={{
-                                width: "100%",
-                                padding: "10px 14px",
-                                borderRadius: "8px",
-                                border: "1px solid #cbd5e1",
-                                fontSize: "14px",
-                                outline: "none",
-                                boxSizing: "border-box"
-                            }}
+                            className="costing-form-input"
                         />
                     </div>
-
-                    {/* Action Buttons */}
-                    <div
-                        style={{
-                            display: "flex",
-                            justifyContent: "flex-end",
-                            gap: "12px",
-                            marginTop: "8px",
-                            paddingTop: "16px",
-                            borderTop: "1px solid #f1f5f9"
-                        }}
-                    >
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            disabled={loading}
-                            style={{
-                                padding: "10px 20px",
-                                borderRadius: "8px",
-                                border: "1px solid #cbd5e1",
-                                background: "#fff",
-                                color: "#475569",
-                                fontSize: "14px",
-                                fontWeight: 500,
-                                cursor: "pointer"
-                            }}
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            style={{
-                                padding: "10px 22px",
-                                borderRadius: "8px",
-                                border: "none",
-                                background: "#2563eb",
-                                color: "#fff",
-                                fontSize: "14px",
-                                fontWeight: 600,
-                                cursor: loading ? "not-allowed" : "pointer",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                                boxShadow: "0 1px 2px rgba(37,99,235,0.2)"
-                            }}
-                        >
-                            {loading ? <Loader2 size={16} className="animate-spin" /> : null}
-                            Create Sub-Category
-                        </button>
-                    </div>
                 </form>
+
+                {/* Footer Buttons (Frame 2147225069) */}
+                <div className="costing-modal-footer">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={loading}
+                        className="costing-modal-cancel-btn"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleSubmit}
+                        disabled={loading}
+                        className="costing-modal-submit-btn"
+                    >
+                        {loading ? <Loader2 size={16} className="animate-spin" /> : null}
+                        Create Sub-Category
+                    </button>
+                </div>
             </div>
         </div>
     );

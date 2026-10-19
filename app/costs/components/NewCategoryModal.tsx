@@ -148,537 +148,278 @@ export default function NewCategoryModal({
 
     return (
         <div
-            style={{
-                position: "fixed",
-                inset: 0,
-                backgroundColor: "rgba(15, 23, 42, 0.45)",
-                backdropFilter: "blur(4px)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                zIndex: 9999,
-                padding: "20px"
-            }}
+            className="costing-modal-overlay-centered"
             onClick={(e) => {
                 if (e.target === e.currentTarget) onClose();
             }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="costing-modal-title"
         >
             <div
-                style={{
-                    background: "#ffffff",
-                    borderRadius: "16px",
-                    width: "100%",
-                    maxWidth: "540px",
-                    boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
-                    overflow: "hidden",
-                    display: "flex",
-                    flexDirection: "column",
-                    animation: "fadeIn 0.15s ease-out"
-                }}
+                className="costing-new-category-modal"
+                onClick={(e) => e.stopPropagation()}
             >
-                {/* Header */}
-                <div
-                    style={{
-                        padding: "24px 28px 20px 28px",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "flex-start"
-                    }}
-                >
-                    <div>
-                        <h3
-                            style={{
-                                margin: 0,
-                                fontSize: "18px",
-                                fontWeight: 700,
-                                color: "#111827",
-                                letterSpacing: "-0.01em"
-                            }}
-                        >
+                {/* Header (Frame 2147225093) */}
+                <div className="costing-modal-header">
+                    <div className="costing-modal-title-stack">
+                        <h2 id="costing-modal-title" className="costing-modal-title">
                             {categoryToEdit ? "Edit Category" : "New Category"}
-                        </h3>
-                        <div
-                            style={{
-                                fontSize: "13px",
-                                color: "#6b7280",
-                                marginTop: "4px"
-                            }}
-                        >
+                        </h2>
+                        <div className="costing-modal-subtitle">
                             {categoryToEdit ? "Modify category details and pricing defaults" : "Starting from: From Scratch"}
                         </div>
                     </div>
                     <button
                         type="button"
                         onClick={onClose}
-                        style={{
-                            background: "transparent",
-                            border: "none",
-                            color: "#9ca3af",
-                            cursor: "pointer",
-                            padding: "4px",
-                            borderRadius: "6px",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center"
-                        }}
+                        className="costing-modal-close-btn"
+                        aria-label="Close modal"
                     >
                         <X size={20} />
                     </button>
                 </div>
 
-                {/* Body Form */}
-                <form onSubmit={handleSubmit} style={{ padding: "0 28px 24px 28px" }}>
+                {/* Inner White Card (Frame 2147225027) */}
+                <form onSubmit={handleSubmit} className="costing-modal-inner-card">
                     {error && (
                         <div
                             style={{
+                                width: "100%",
                                 padding: "12px 14px",
-                                background: "#fef2f2",
-                                border: "1px solid #fecaca",
+                                background: "#FEF2F2",
+                                border: "1px solid #FECACA",
                                 borderRadius: "8px",
-                                color: "#b91c1c",
+                                color: "#B91C1C",
                                 fontSize: "13px",
-                                marginBottom: "16px"
+                                boxSizing: "border-box"
                             }}
                         >
                             {error}
                         </div>
                     )}
 
-                    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                        {/* Category Title */}
-                        <div>
-                            <label
-                                style={{
-                                    display: "block",
-                                    fontSize: "13px",
-                                    fontWeight: 500,
-                                    color: "#374151",
-                                    marginBottom: "6px"
-                                }}
-                            >
-                                Category Title <span style={{ color: "#ef4444" }}>*</span>
+                    {/* 1. Category Title (Frame 16 + Frame 12) */}
+                    <div className="costing-form-field">
+                        <div className="costing-form-label-row">
+                            <label className="costing-form-label" htmlFor="new-cat-title">
+                                Category Title
                             </label>
-                            <input
-                                type="text"
-                                value={title}
-                                onChange={(e) => setTitle(e.target.value)}
-                                placeholder="Enter Title"
-                                style={{
-                                    width: "100%",
-                                    padding: "9px 12px",
-                                    borderRadius: "8px",
-                                    border: "1px solid #d1d5db",
-                                    fontSize: "14px",
-                                    outline: "none",
-                                    color: "#111827",
-                                    boxSizing: "border-box"
-                                }}
-                            />
+                            <span className="costing-form-required">*</span>
                         </div>
+                        <input
+                            id="new-cat-title"
+                            type="text"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            placeholder="Enter Title"
+                            className="costing-form-input"
+                            required
+                        />
+                    </div>
 
-                        {/* Parent Category */}
-                        <div>
-                            <label
-                                style={{
-                                    display: "block",
-                                    fontSize: "13px",
-                                    fontWeight: 500,
-                                    color: "#374151",
-                                    marginBottom: "6px"
-                                }}
-                            >
+                    {/* 2. Parent Category (Frame 16 + Frame 12) */}
+                    <div className="costing-form-field">
+                        <div className="costing-form-label-row">
+                            <label className="costing-form-label" htmlFor="new-cat-parent">
                                 Parent Category
                             </label>
-                            <div style={{ position: "relative" }}>
+                        </div>
+                        <div className="costing-form-select-wrap">
+                            <select
+                                id="new-cat-parent"
+                                value={parentId}
+                                onChange={(e) => setParentId(e.target.value)}
+                                className={`costing-form-select ${!parentId ? "is-placeholder" : ""}`}
+                            >
+                                <option value="">None (Root Category)</option>
+                                {parentOptions.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                        {p.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <div className="costing-form-select-arrow">
+                                <ChevronDown size={18} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 3. 2-Col: Default Unit & Default Tax */}
+                    <div className="costing-form-row-2col">
+                        <div className="costing-form-field">
+                            <div className="costing-form-label-row">
+                                <label className="costing-form-label" htmlFor="new-cat-unit">
+                                    Default Unit
+                                </label>
+                                <span className="costing-form-required">*</span>
+                            </div>
+                            <div className="costing-form-select-wrap">
                                 <select
-                                    value={parentId}
-                                    onChange={(e) => setParentId(e.target.value)}
-                                    style={{
-                                        width: "100%",
-                                        padding: "9px 12px",
-                                        paddingRight: "36px",
-                                        borderRadius: "8px",
-                                        border: "1px solid #d1d5db",
-                                        fontSize: "14px",
-                                        outline: "none",
-                                        color: parentId ? "#111827" : "#6b7280",
-                                        backgroundColor: "#fff",
-                                        appearance: "none",
-                                        cursor: "pointer",
-                                        boxSizing: "border-box"
-                                    }}
+                                    id="new-cat-unit"
+                                    value={defaultUnit}
+                                    onChange={(e) => setDefaultUnit(e.target.value)}
+                                    className={`costing-form-select ${!defaultUnit ? "is-placeholder" : ""}`}
+                                    required
                                 >
-                                    <option value="">ex. Master Bedroom</option>
-                                    <option value="">None (Root Category)</option>
-                                    {parentOptions.map((p) => (
-                                        <option key={p.id} value={p.id}>
-                                            {p.name}
+                                    <option value="" disabled>Select Unit</option>
+                                    {UNIT_OPTIONS.map((u) => (
+                                        <option key={u} value={u}>
+                                            {u}
                                         </option>
                                     ))}
                                 </select>
-                                <ChevronDown
-                                    size={16}
-                                    color="#9ca3af"
-                                    style={{
-                                        position: "absolute",
-                                        right: "12px",
-                                        top: "50%",
-                                        transform: "translateY(-50%)",
-                                        pointerEvents: "none"
-                                    }}
-                                />
-                            </div>
-                        </div>
-
-                        {/* 2-Col: Default Unit & Default Tax */}
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                            <div>
-                                <label
-                                    style={{
-                                        display: "block",
-                                        fontSize: "13px",
-                                        fontWeight: 500,
-                                        color: "#374151",
-                                        marginBottom: "6px"
-                                    }}
-                                >
-                                    Default Unit <span style={{ color: "#ef4444" }}>*</span>
-                                </label>
-                                <div style={{ position: "relative" }}>
-                                    <select
-                                        value={defaultUnit}
-                                        onChange={(e) => setDefaultUnit(e.target.value)}
-                                        style={{
-                                            width: "100%",
-                                            padding: "9px 12px",
-                                            paddingRight: "36px",
-                                            borderRadius: "8px",
-                                            border: "1px solid #d1d5db",
-                                            fontSize: "14px",
-                                            outline: "none",
-                                            color: defaultUnit ? "#111827" : "#9ca3af",
-                                            backgroundColor: "#fff",
-                                            appearance: "none",
-                                            cursor: "pointer",
-                                            boxSizing: "border-box"
-                                        }}
-                                    >
-                                        <option value="">Select Unit</option>
-                                        {UNIT_OPTIONS.map((u) => (
-                                            <option key={u} value={u}>
-                                                {u}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <ChevronDown
-                                        size={16}
-                                        color="#9ca3af"
-                                        style={{
-                                            position: "absolute",
-                                            right: "12px",
-                                            top: "50%",
-                                            transform: "translateY(-50%)",
-                                            pointerEvents: "none"
-                                        }}
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label
-                                    style={{
-                                        display: "block",
-                                        fontSize: "13px",
-                                        fontWeight: 500,
-                                        color: "#374151",
-                                        marginBottom: "6px"
-                                    }}
-                                >
-                                    Default Tax <span style={{ color: "#ef4444" }}>*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    value={defaultTax}
-                                    onChange={(e) => setDefaultTax(e.target.value)}
-                                    placeholder="18%"
-                                    style={{
-                                        width: "100%",
-                                        padding: "9px 12px",
-                                        borderRadius: "8px",
-                                        border: "1px solid #d1d5db",
-                                        fontSize: "14px",
-                                        outline: "none",
-                                        color: "#111827",
-                                        boxSizing: "border-box"
-                                    }}
-                                />
-                            </div>
-                        </div>
-
-                        {/* 2-Col: Default Markup & Default Wastage */}
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                            <div>
-                                <label
-                                    style={{
-                                        display: "block",
-                                        fontSize: "13px",
-                                        fontWeight: 500,
-                                        color: "#374151",
-                                        marginBottom: "6px"
-                                    }}
-                                >
-                                    Default Markup <span style={{ color: "#ef4444" }}>*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    value={defaultMarkup}
-                                    onChange={(e) => setDefaultMarkup(e.target.value)}
-                                    placeholder="ex. 15%"
-                                    style={{
-                                        width: "100%",
-                                        padding: "9px 12px",
-                                        borderRadius: "8px",
-                                        border: "1px solid #d1d5db",
-                                        fontSize: "14px",
-                                        outline: "none",
-                                        color: "#111827",
-                                        boxSizing: "border-box"
-                                    }}
-                                />
-                            </div>
-
-                            <div>
-                                <label
-                                    style={{
-                                        display: "block",
-                                        fontSize: "13px",
-                                        fontWeight: 500,
-                                        color: "#374151",
-                                        marginBottom: "6px"
-                                    }}
-                                >
-                                    Default Wastage <span style={{ color: "#ef4444" }}>*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    value={defaultWastage}
-                                    onChange={(e) => setDefaultWastage(e.target.value)}
-                                    placeholder="ex. 5%"
-                                    style={{
-                                        width: "100%",
-                                        padding: "9px 12px",
-                                        borderRadius: "8px",
-                                        border: "1px solid #d1d5db",
-                                        fontSize: "14px",
-                                        outline: "none",
-                                        color: "#111827",
-                                        boxSizing: "border-box"
-                                    }}
-                                />
-                            </div>
-                        </div>
-
-                        {/* 2-Col: Transport Included & Labour Included */}
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                            <div>
-                                <label
-                                    style={{
-                                        display: "block",
-                                        fontSize: "13px",
-                                        fontWeight: 500,
-                                        color: "#374151",
-                                        marginBottom: "6px"
-                                    }}
-                                >
-                                    Transport Included
-                                </label>
-                                <div style={{ position: "relative" }}>
-                                    <select
-                                        value={transportIncluded}
-                                        onChange={(e) => setTransportIncluded(e.target.value)}
-                                        style={{
-                                            width: "100%",
-                                            padding: "9px 12px",
-                                            paddingRight: "36px",
-                                            borderRadius: "8px",
-                                            border: "1px solid #d1d5db",
-                                            fontSize: "14px",
-                                            outline: "none",
-                                            color: transportIncluded ? "#111827" : "#9ca3af",
-                                            backgroundColor: "#fff",
-                                            appearance: "none",
-                                            cursor: "pointer",
-                                            boxSizing: "border-box"
-                                        }}
-                                    >
-                                        <option value="">Choose Input</option>
-                                        <option value="Yes">Yes</option>
-                                        <option value="No">No</option>
-                                    </select>
-                                    <ChevronDown
-                                        size={16}
-                                        color="#9ca3af"
-                                        style={{
-                                            position: "absolute",
-                                            right: "12px",
-                                            top: "50%",
-                                            transform: "translateY(-50%)",
-                                            pointerEvents: "none"
-                                        }}
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label
-                                    style={{
-                                        display: "block",
-                                        fontSize: "13px",
-                                        fontWeight: 500,
-                                        color: "#374151",
-                                        marginBottom: "6px"
-                                    }}
-                                >
-                                    Labour Included
-                                </label>
-                                <div style={{ position: "relative" }}>
-                                    <select
-                                        value={labourIncluded}
-                                        onChange={(e) => setLabourIncluded(e.target.value)}
-                                        style={{
-                                            width: "100%",
-                                            padding: "9px 12px",
-                                            paddingRight: "36px",
-                                            borderRadius: "8px",
-                                            border: "1px solid #d1d5db",
-                                            fontSize: "14px",
-                                            outline: "none",
-                                            color: labourIncluded ? "#111827" : "#9ca3af",
-                                            backgroundColor: "#fff",
-                                            appearance: "none",
-                                            cursor: "pointer",
-                                            boxSizing: "border-box"
-                                        }}
-                                    >
-                                        <option value="">Choose Input</option>
-                                        <option value="Yes">Yes</option>
-                                        <option value="No">No</option>
-                                    </select>
-                                    <ChevronDown
-                                        size={16}
-                                        color="#9ca3af"
-                                        style={{
-                                            position: "absolute",
-                                            right: "12px",
-                                            top: "50%",
-                                            transform: "translateY(-50%)",
-                                            pointerEvents: "none"
-                                        }}
-                                    />
+                                <div className="costing-form-select-arrow">
+                                    <ChevronDown size={18} />
                                 </div>
                             </div>
                         </div>
 
-                        {/* Description */}
-                        <div>
-                            <label
-                                style={{
-                                    display: "block",
-                                    fontSize: "13px",
-                                    fontWeight: 500,
-                                    color: "#374151",
-                                    marginBottom: "6px"
-                                }}
-                            >
-                                Description
-                            </label>
-                            <textarea
-                                rows={3}
-                                value={description}
-                                onChange={(e) => setDescription(e.target.value)}
-                                placeholder="Add notes..."
-                                style={{
-                                    width: "100%",
-                                    padding: "9px 12px",
-                                    borderRadius: "8px",
-                                    border: "1px solid #d1d5db",
-                                    fontSize: "14px",
-                                    outline: "none",
-                                    color: "#111827",
-                                    boxSizing: "border-box",
-                                    resize: "vertical"
-                                }}
+                        <div className="costing-form-field">
+                            <div className="costing-form-label-row">
+                                <label className="costing-form-label" htmlFor="new-cat-tax">
+                                    Default Tax
+                                </label>
+                                <span className="costing-form-required">*</span>
+                            </div>
+                            <input
+                                id="new-cat-tax"
+                                type="text"
+                                value={defaultTax}
+                                onChange={(e) => setDefaultTax(e.target.value)}
+                                placeholder="18%"
+                                className="costing-form-input"
+                                required
                             />
                         </div>
                     </div>
 
-                    {/* Footer */}
-                    <div
-                        style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            marginTop: "28px"
-                        }}
-                    >
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            style={{
-                                padding: "9px 20px",
-                                background: "#fff",
-                                border: "1px solid #e5e7eb",
-                                borderRadius: "8px",
-                                fontSize: "14px",
-                                fontWeight: 500,
-                                color: "#374151",
-                                cursor: "pointer"
-                            }}
-                        >
-                            Back
-                        </button>
+                    {/* 4. 2-Col: Default Markup & Default Wastage */}
+                    <div className="costing-form-row-2col">
+                        <div className="costing-form-field">
+                            <div className="costing-form-label-row">
+                                <label className="costing-form-label" htmlFor="new-cat-markup">
+                                    Default Markup
+                                </label>
+                                <span className="costing-form-required">*</span>
+                            </div>
+                            <input
+                                id="new-cat-markup"
+                                type="text"
+                                value={defaultMarkup}
+                                onChange={(e) => setDefaultMarkup(e.target.value)}
+                                placeholder="ex. 15%"
+                                className="costing-form-input"
+                                required
+                            />
+                        </div>
 
-                        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                style={{
-                                    padding: "9px 16px",
-                                    background: "transparent",
-                                    border: "none",
-                                    fontSize: "14px",
-                                    fontWeight: 500,
-                                    color: "#4b5563",
-                                    cursor: "pointer"
-                                }}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                style={{
-                                    padding: "9px 22px",
-                                    background: "#2563eb",
-                                    border: "none",
-                                    borderRadius: "8px",
-                                    fontSize: "14px",
-                                    fontWeight: 600,
-                                    color: "#fff",
-                                    cursor: loading ? "not-allowed" : "pointer",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "8px",
-                                    opacity: loading ? 0.7 : 1,
-                                    boxShadow: "0 1px 2px rgba(37, 99, 235, 0.2)"
-                                }}
-                            >
-                                {loading && <Loader2 size={16} className="animate-spin" />}
-                                {categoryToEdit ? "Save Changes" : "Create Category"}
-                            </button>
+                        <div className="costing-form-field">
+                            <div className="costing-form-label-row">
+                                <label className="costing-form-label" htmlFor="new-cat-wastage">
+                                    Default Wastage
+                                </label>
+                                <span className="costing-form-required">*</span>
+                            </div>
+                            <input
+                                id="new-cat-wastage"
+                                type="text"
+                                value={defaultWastage}
+                                onChange={(e) => setDefaultWastage(e.target.value)}
+                                placeholder="ex. 5%"
+                                className="costing-form-input"
+                                required
+                            />
                         </div>
                     </div>
+
+                    {/* 5. 2-Col: Transport Included & Labour Included */}
+                    <div className="costing-form-row-2col">
+                        <div className="costing-form-field">
+                            <div className="costing-form-label-row">
+                                <label className="costing-form-label" htmlFor="new-cat-transport">
+                                    Transport Included
+                                </label>
+                            </div>
+                            <div className="costing-form-select-wrap">
+                                <select
+                                    id="new-cat-transport"
+                                    value={transportIncluded}
+                                    onChange={(e) => setTransportIncluded(e.target.value)}
+                                    className={`costing-form-select ${!transportIncluded ? "is-placeholder" : ""}`}
+                                >
+                                    <option value="">Choose Input</option>
+                                    <option value="Yes">Yes</option>
+                                    <option value="No">No</option>
+                                </select>
+                                <div className="costing-form-select-arrow">
+                                    <ChevronDown size={18} />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="costing-form-field">
+                            <div className="costing-form-label-row">
+                                <label className="costing-form-label" htmlFor="new-cat-labour">
+                                    Labour Included
+                                </label>
+                            </div>
+                            <div className="costing-form-select-wrap">
+                                <select
+                                    id="new-cat-labour"
+                                    value={labourIncluded}
+                                    onChange={(e) => setLabourIncluded(e.target.value)}
+                                    className={`costing-form-select ${!labourIncluded ? "is-placeholder" : ""}`}
+                                >
+                                    <option value="">Choose Input</option>
+                                    <option value="Yes">Yes</option>
+                                    <option value="No">No</option>
+                                </select>
+                                <div className="costing-form-select-arrow">
+                                    <ChevronDown size={18} />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 6. Description (Frame 16 + Frame 12 Textarea) */}
+                    <div className="costing-form-field">
+                        <div className="costing-form-label-row">
+                            <label className="costing-form-label" htmlFor="new-cat-desc">
+                                Description
+                            </label>
+                        </div>
+                        <textarea
+                            id="new-cat-desc"
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            placeholder="Add notes..."
+                            className="costing-form-textarea"
+                        />
+                    </div>
                 </form>
+
+                {/* Footer Buttons (Frame 2147225069) */}
+                <div className="costing-modal-footer">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={loading}
+                        className="costing-modal-cancel-btn"
+                    >
+                        Cancel
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={handleSubmit}
+                        disabled={loading}
+                        className="costing-modal-submit-btn"
+                    >
+                        {loading && <Loader2 size={16} className="animate-spin" />}
+                        {categoryToEdit ? "Save Changes" : "Create Category"}
+                    </button>
+                </div>
             </div>
         </div>
     );

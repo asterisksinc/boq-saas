@@ -167,8 +167,12 @@ export async function getCostingAnalysis(params?: { projectId?: string }): Promi
 
 // ── Margins ─────────────────────────────────────────────────────────────────
 
-export async function getCostingMargins(): Promise<MarginAnalysisResponse> {
-    return fetchApi<MarginAnalysisResponse>("/api/v1/costing/margins");
+export async function getCostingMargins(params?: { categoryId?: string; projectId?: string }): Promise<MarginAnalysisResponse> {
+    const searchParams = new URLSearchParams();
+    if (params?.categoryId && params.categoryId !== "all") searchParams.set("categoryId", params.categoryId);
+    if (params?.projectId && params.projectId !== "all") searchParams.set("projectId", params.projectId);
+    const query = searchParams.toString();
+    return fetchApi<MarginAnalysisResponse>(`/api/v1/costing/margins${query ? `?${query}` : ""}`);
 }
 
 // ── Settings ────────────────────────────────────────────────────────────────
