@@ -55,6 +55,7 @@ import {
 } from "@/lib/api/auth";
 import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
+import "./activities-redesign.css";
 
 type ActivityStage = {
     id: string;
@@ -211,6 +212,7 @@ export default function ActivitiesPage() {
     const [editStage, setEditStage] = useState<ActivityStage | null>(null);
     const [stageForm, setStageForm] = useState<StageForm>(blankStage);
     const [stageError, setStageError] = useState("");
+    const [isSubmittingStage, setIsSubmittingStage] = useState(false);
 
     const [projects, setProjects] = useState<ProjectItem[]>([]);
     const [loadingProjects, setLoadingProjects] = useState(true);
@@ -335,6 +337,26 @@ export default function ActivitiesPage() {
         }
     }, []);
 
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape" && (createStage || editStage) && !isSubmittingStage) {
+                setCreateStage(false);
+                setEditStage(null);
+                setStageForm(blankStage);
+                setStageError("");
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [createStage, editStage, isSubmittingStage]);
+
+    useEffect(() => {
+        if (!notice) return;
+        const timer = setTimeout(() => {
+            setNotice(null);
+        }, 4000);
+        return () => clearTimeout(timer);
+    }, [notice]);
     const [filterOpen, setFilterOpen] = useState(false);
     const [filterOnlyOverdue, setFilterOnlyOverdue] = useState(false);
     const [filterOnlyPendingApproval, setFilterOnlyPendingApproval] = useState(false);
@@ -520,10 +542,10 @@ export default function ActivitiesPage() {
 
     const filteredStages = useMemo(() => {
         return stages.filter(s => {
-            if (stageQuery && !s.name.toLowerCase().includes(stageQuery.toLowerCase())) {
+            if (stageQuery && !s.name.toLowerCase().includes(stageQuery.trim().toLowerCase())) {
                 return false;
             }
-            if (stageFilter === "all") {
+            if (stageFilter === "active") {
                 return !s.terminalType;
             }
             if (stageFilter === "completed") {
@@ -881,18 +903,47 @@ export default function ActivitiesPage() {
     const handleStageSubmit = async (e: FormEvent) => {
         e.preventDefault();
         setStageError("");
+        const trimmedName = stageForm.name.trim();
+        if (!trimmedName) {
+            setStageError("Stage name is required.");
+            return;
+        }
+
+        // Check duplicate name within workspace (case-insensitive)
+        const isDuplicate = stages.some(
+            s => s.name.trim().toLowerCase() === trimmedName.toLowerCase() && s.id !== editStage?.id
+        );
+        if (isDuplicate) {
+            setStageError("A stage with this name already exists.");
+            return;
+        }
+
+        setIsSubmittingStage(true);
         try {
             if (editStage) {
-                await updateActivityStage(editStage.id, { name: stageForm.name, color: stageForm.color || null, terminalType: stageForm.terminalType || null });
+                await updateActivityStage(editStage.id, {
+                    name: trimmedName,
+                    color: stageForm.color || null,
+                    terminalType: stageForm.terminalType || null
+                });
             } else {
-                await createActivityStage({ name: stageForm.name, color: stageForm.color || null, terminalType: stageForm.terminalType || null });
+                await createActivityStage({
+                    name: trimmedName,
+                    color: stageForm.color || null,
+                    terminalType: stageForm.terminalType || null
+                });
             }
             setCreateStage(false);
             setEditStage(null);
             setStageForm(blankStage);
-            loadStages();
+            setStageError("");
+            await loadStages();
+            await loadStagesForForms();
+            setNotice(editStage ? "Stage updated successfully." : "Stage created successfully.");
         } catch (e: any) {
-            setStageError(e.message || "Could not save stage");
+            setStageError(e?.message || "Could not save stage. Please try again.");
+        } finally {
+            setIsSubmittingStage(false);
         }
     };
 
@@ -1350,66 +1401,66 @@ export default function ActivitiesPage() {
 
         return (
             <tr
+                className={isSelected ? "selected" : ""}
                 onClick={() => openTaskDetail(task)}
-                style={{ cursor: "pointer", background: isSelected ? "#f8fafc" : undefined }}
+                style={{ cursor: "pointer", background: isSelected ? "rgba(239, 246, 255, 0.8)" : undefined }}
             >
-                <td onClick={e => e.stopPropagation()} style={{ width: "40px" }}>
+                <td onClick={e => e.stopPropagation()} style={{ width: "40px", textAlign: "center" }}>
                     <input
                         type="checkbox"
-                        className="tasks-checkbox"
+                        className="activities-task-checkbox tasks-checkbox"
                         checked={isSelected}
                         onChange={() => toggleSelectTask(task.id)}
                         aria-label={`Select task ${task.name}`}
                     />
                 </td>
                 <td>
-                    <div className="task-content-cell">
-                        <span className="task-title">{task.name}</span>
-                        {task.description && <span className="task-desc">{task.description}</span>}
+                    <div className="activities-task-content-cell task-content-cell">
+                        <span className="activities-task-title task-title">{task.name}</span>
+                        {task.description && <span className="activities-task-desc task-desc">{task.description}</span>}
                     </div>
                 </td>
                 <td>
-                    <div className="task-project-cell">
-                        <span className="task-project-name">{projectName}</span>
-                        <span className="task-project-code">{projectCode}</span>
+                    <div className="activities-task-project-cell task-project-cell">
+                        <span className="activities-task-project-name task-project-name">{projectName}</span>
+                        <span className="activities-task-project-code task-project-code">{projectCode}</span>
                     </div>
                 </td>
                 <td>
-                    <span className="task-stage-pill" style={stageStyle}>
+                    <span className="activities-task-stage-pill task-stage-pill" style={stageStyle}>
                         {(stageName || "—").toUpperCase()}
                     </span>
                 </td>
                 <td>
-                    <div className="task-assignee-cell">
-                        <div className="task-assignee-avatar">{initials}</div>
-                        <span className="task-assignee-name">{assigneeName}</span>
+                    <div className="activities-task-assignee-cell task-assignee-cell">
+                        <div className="activities-task-assignee-avatar task-assignee-avatar">{initials}</div>
+                        <span className="activities-task-assignee-name task-assignee-name">{assigneeName}</span>
                     </div>
                 </td>
                 <td>
-                    <div className="task-due-cell">
-                        <span className="task-due-date">{formatTableDate(task.dueDate)}</span>
-                        <span className={`task-due-subtext ${dueInfo.className}`}>{dueInfo.text}</span>
+                    <div className="activities-task-due-cell task-due-cell">
+                        <span className="activities-task-due-date task-due-date">{formatTableDate(task.dueDate)}</span>
+                        <span className={`activities-task-due-subtext task-due-subtext ${dueInfo.className}`}>{dueInfo.text}</span>
                     </div>
                 </td>
                 <td>
-                    <span className={`task-priority-pill ${task.priority.toLowerCase()}`}>
+                    <span className={`activities-task-priority-pill task-priority-pill ${task.priority.toLowerCase()}`}>
                         {task.priority.toUpperCase()}
                     </span>
                 </td>
                 <td>
-                    <span className={`task-status-pill ${task.status.toLowerCase()}`}>
-                        {task.status.replace(/_/g, "-").toUpperCase()}
+                    <span className={`activities-task-status-pill task-status-pill ${task.status.toLowerCase().replace(/_/g, "-")}`}>
+                        {task.status.replace(/_/g, " ").toUpperCase()}
                     </span>
                 </td>
                 <td>
-                    <span className="task-updated-text">{formatTableDate(task.updatedAt || task.createdAt || "2026-08-05")}</span>
+                    <span className="activities-task-updated-text task-updated-text">{formatTableDate(task.updatedAt || task.createdAt || "2026-08-05")}</span>
                 </td>
-                <td onClick={e => e.stopPropagation()} style={{ width: "40px" }}>
-                    <div style={{ position: "relative" }}>
+                <td onClick={e => e.stopPropagation()} style={{ width: "40px", textAlign: "center" }}>
+                    <div style={{ position: "relative", display: "inline-block" }}>
                         <button
                             type="button"
-                            className="stage-action-btn"
-                            style={{ color: "#94a3b8" }}
+                            className="activities-task-action-btn stage-action-btn"
                             onClick={e => {
                                 e.stopPropagation();
                                 setTaskMenu(taskMenu === task.id ? null : task.id);
@@ -2152,34 +2203,136 @@ export default function ActivitiesPage() {
     const StageModal = () => {
         if (!createStage && !editStage) return null;
         return (
-            <div className="activity-modal-backdrop" onClick={() => { setCreateStage(false); setEditStage(null); setStageForm(blankStage); }}>
-                <div className="activity-modal" onClick={e => e.stopPropagation()}>
-                    <header>
-                        <h3>{editStage ? "Edit Stage" : "New Stage"}</h3>
-                        <button onClick={() => { setCreateStage(false); setEditStage(null); setStageForm(blankStage); }}><X size={20} /></button>
-                    </header>
-                    <form onSubmit={handleStageSubmit}>
-                        <div className="form-field">
-                            <label>Name <em>*</em></label>
-                            <input required value={stageForm.name} onChange={e => setStageForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Design Review" />
+            <div
+                className="activities-modal-backdrop"
+                onClick={() => {
+                    if (!isSubmittingStage) {
+                        setCreateStage(false);
+                        setEditStage(null);
+                        setStageForm(blankStage);
+                        setStageError("");
+                    }
+                }}
+            >
+                <div
+                    className="activities-stage-modal-container"
+                    onClick={e => e.stopPropagation()}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="stage-modal-title"
+                >
+                    <div className="activities-modal-header-row">
+                        <h3 id="stage-modal-title" className="activities-modal-title">
+                            {editStage ? "Edit Stage" : "New Stage"}
+                        </h3>
+                        <button
+                            type="button"
+                            className="activities-modal-close-btn"
+                            aria-label="Close dialog"
+                            onClick={() => {
+                                if (!isSubmittingStage) {
+                                    setCreateStage(false);
+                                    setEditStage(null);
+                                    setStageForm(blankStage);
+                                    setStageError("");
+                                }
+                            }}
+                            disabled={isSubmittingStage}
+                        >
+                            <X size={20} />
+                        </button>
+                    </div>
+
+                    <form onSubmit={handleStageSubmit} style={{ width: "100%", display: "flex", flexDirection: "column", gap: "16px" }}>
+                        <div className="activities-modal-inner-card">
+                            <div className="activities-modal-field">
+                                <div className="activities-modal-label-row">
+                                    <label className="activities-modal-label" htmlFor="stage-name-input">
+                                        Stage Name
+                                    </label>
+                                    <span className="activities-modal-req">*</span>
+                                </div>
+                                <input
+                                    id="stage-name-input"
+                                    type="text"
+                                    className={`activities-modal-input ${stageError ? "has-error" : ""}`}
+                                    placeholder="ex. Concept Design"
+                                    value={stageForm.name}
+                                    onChange={e => {
+                                        setStageForm(f => ({ ...f, name: e.target.value }));
+                                        if (stageError) setStageError("");
+                                    }}
+                                    autoFocus
+                                    disabled={isSubmittingStage}
+                                    maxLength={120}
+                                />
+                                {stageError && (
+                                    <p className="activities-modal-field-error" role="alert">
+                                        {stageError}
+                                    </p>
+                                )}
+                            </div>
+
+                            <details style={{ width: "100%", fontSize: "13px", color: "#64748B", cursor: "pointer" }}>
+                                <summary style={{ userSelect: "none", outline: "none", fontWeight: 500 }}>Advanced options</summary>
+                                <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "12px" }}>
+                                    <div className="activities-modal-field">
+                                        <label className="activities-modal-label">Stage Color</label>
+                                        <input
+                                            type="color"
+                                            value={stageForm.color}
+                                            onChange={e => setStageForm(f => ({ ...f, color: e.target.value }))}
+                                            style={{ width: "48px", height: "32px", border: "1px solid #E2E8F0", borderRadius: "6px", cursor: "pointer", padding: "2px" }}
+                                        />
+                                    </div>
+                                    <div className="activities-modal-field">
+                                        <label className="activities-modal-label">Terminal Type</label>
+                                        <select
+                                            className="activities-modal-input"
+                                            style={{ height: "40px", padding: "0 12px" }}
+                                            value={stageForm.terminalType}
+                                            onChange={e => setStageForm(f => ({ ...f, terminalType: e.target.value as "completed" | "lost" | "" }))}
+                                        >
+                                            <option value="">None (Standard Stage)</option>
+                                            <option value="completed">Completed (Workflow terminal)</option>
+                                            <option value="lost">Lost (Workflow terminal)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </details>
                         </div>
-                        <div className="form-field">
-                            <label>Color</label>
-                            <input type="color" value={stageForm.color} onChange={e => setStageForm(f => ({ ...f, color: e.target.value }))} />
+
+                        <div className="activities-modal-actions-row">
+                            <button
+                                type="button"
+                                className="activities-modal-cancel-btn"
+                                onClick={() => {
+                                    if (!isSubmittingStage) {
+                                        setCreateStage(false);
+                                        setEditStage(null);
+                                        setStageForm(blankStage);
+                                        setStageError("");
+                                    }
+                                }}
+                                disabled={isSubmittingStage}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                className="activities-modal-save-btn"
+                                disabled={isSubmittingStage || !stageForm.name.trim()}
+                            >
+                                {isSubmittingStage ? (
+                                    <>
+                                        <Loader2 size={16} className="animate-spin" />
+                                        <span>Saving...</span>
+                                    </>
+                                ) : (
+                                    <span>{editStage ? "Save Changes" : "Save Stage"}</span>
+                                )}
+                            </button>
                         </div>
-                        <div className="form-field">
-                            <label>Terminal Type</label>
-                            <select value={stageForm.terminalType} onChange={e => setStageForm(f => ({ ...f, terminalType: e.target.value as "completed" | "lost" | "" }))}>
-                                <option value="">None</option>
-                                <option value="completed">Completed</option>
-                                <option value="lost">Lost</option>
-                            </select>
-                        </div>
-                        {stageError && <p className="form-error">{stageError}</p>}
-                        <footer>
-                            <button type="button" onClick={() => { setCreateStage(false); setEditStage(null); setStageForm(blankStage); }}>Cancel</button>
-                            <button type="submit" className="primary">{editStage ? "Save Changes" : "Create Stage"}</button>
-                        </footer>
                     </form>
                 </div>
             </div>
@@ -2187,58 +2340,69 @@ export default function ActivitiesPage() {
     };
 
     const TaskModal = () => {
-        if (!createTask && !taskDetail) return null;
+        if (!createTask) return null;
         return (
             <div
-                className="activity-task-drawer-backdrop"
+                className="activities-task-drawer-backdrop activity-task-drawer-backdrop"
                 onClick={() => {
                     setCreateTask(false);
                     setTaskDetail(null);
                     setTaskForm(blankTask);
                     setTaskAttachments([]);
+                    setTaskError("");
                 }}
             >
                 <div
-                    className="activity-task-drawer"
+                    className="activities-task-drawer activity-task-drawer"
                     onClick={e => e.stopPropagation()}
                 >
-                    <div className="activity-task-drawer-header">
-                        <h3>{taskDetail ? "Edit Task" : "New Task"}</h3>
+                    <div className="activities-task-drawer-header activity-task-drawer-header">
+                        <h3 className="activities-task-drawer-title">{taskDetail ? "Edit Task" : "Add Task"}</h3>
                         <button
                             type="button"
-                            className="activity-task-drawer-close"
+                            className="activities-task-drawer-close activity-task-drawer-close"
                             onClick={() => {
                                 setCreateTask(false);
                                 setTaskDetail(null);
                                 setTaskForm(blankTask);
                                 setTaskAttachments([]);
+                                setTaskError("");
                             }}
+                            aria-label="Close drawer"
                         >
                             <X size={20} />
                         </button>
                     </div>
                     <form
+                        className="activities-task-drawer-form"
                         onSubmit={handleTaskSubmit}
-                        style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}
                     >
-                        <div className="activity-task-drawer-body">
-                            <div className="activity-task-field">
-                                <label>Task Name <em>*</em></label>
+                        <div className="activities-task-drawer-card activity-task-drawer-body">
+                            <div className="activities-task-field activity-task-field">
+                                <label className="activities-task-field-label">
+                                    <span>Task Name</span>
+                                    <span className="activities-task-asterisk">*</span>
+                                </label>
                                 <input
+                                    className="activities-task-input"
                                     required
                                     value={taskForm.name}
                                     onChange={e => setTaskForm(f => ({ ...f, name: e.target.value }))}
-                                    placeholder="e.g. Review floor plans"
+                                    placeholder="Enter Task Name"
                                 />
                             </div>
-                            <div className="activity-task-field">
-                                <label>Project <em>*</em></label>
+                            <div className="activities-task-field activity-task-field">
+                                <label className="activities-task-field-label">
+                                    <span>Project</span>
+                                    <span className="activities-task-asterisk">*</span>
+                                </label>
                                 <select
+                                    className="activities-task-select"
                                     required
                                     value={taskForm.projectId}
                                     onChange={e => setTaskForm(f => ({ ...f, projectId: e.target.value }))}
                                 >
-                                    <option value="">Select project</option>
+                                    <option value="">Select Project</option>
                                     {taskProjects.map(p => (
                                         <option key={p.id} value={p.id}>
                                             {p.projectCode ? `${p.projectCode} - ` : ""}{p.name}
@@ -2246,14 +2410,18 @@ export default function ActivitiesPage() {
                                     ))}
                                 </select>
                             </div>
-                            <div className="activity-task-field">
-                                <label>Stage <em>*</em></label>
+                            <div className="activities-task-field activity-task-field">
+                                <label className="activities-task-field-label">
+                                    <span>Stage</span>
+                                    <span className="activities-task-asterisk">*</span>
+                                </label>
                                 <select
+                                    className="activities-task-select"
                                     required
                                     value={taskForm.stageId}
                                     onChange={e => setTaskForm(f => ({ ...f, stageId: e.target.value }))}
                                 >
-                                    <option value="">Select stage</option>
+                                    <option value="">Select Stage</option>
                                     {taskStages.map(s => (
                                         <option key={s.id} value={s.id}>
                                             {s.name}
@@ -2261,23 +2429,29 @@ export default function ActivitiesPage() {
                                     ))}
                                 </select>
                             </div>
-                            <div className="activity-task-row">
-                                <div className="activity-task-field">
-                                    <label>Due Date</label>
+                            <div className="activities-task-two-col activity-task-row">
+                                <div className="activities-task-field activity-task-field">
+                                    <label className="activities-task-field-label">
+                                        <span>Due Date</span>
+                                    </label>
                                     <input
+                                        className="activities-task-input"
                                         type="date"
                                         value={taskForm.dueDate}
                                         onChange={e => setTaskForm(f => ({ ...f, dueDate: e.target.value }))}
                                         min={today()}
                                     />
                                 </div>
-                                <div className="activity-task-field">
-                                    <label>Owner</label>
+                                <div className="activities-task-field activity-task-field">
+                                    <label className="activities-task-field-label">
+                                        <span>Owner</span>
+                                    </label>
                                     <select
+                                        className="activities-task-select"
                                         value={taskForm.ownerId}
                                         onChange={e => setTaskForm(f => ({ ...f, ownerId: e.target.value }))}
                                     >
-                                        <option value="">Select owner</option>
+                                        <option value="">Select Owner</option>
                                         {teamMembers.map(m => (
                                             <option key={m.id} value={m.id}>
                                                 {m.name}{m.role ? ` (${m.role})` : ""}
@@ -2286,10 +2460,14 @@ export default function ActivitiesPage() {
                                     </select>
                                 </div>
                             </div>
-                            <div className="activity-task-row">
-                                <div className="activity-task-field">
-                                    <label>Priority</label>
+                            <div className="activities-task-two-col activity-task-row">
+                                <div className="activities-task-field activity-task-field">
+                                    <label className="activities-task-field-label">
+                                        <span>Priority</span>
+                                        <span className="activities-task-asterisk">*</span>
+                                    </label>
                                     <select
+                                        className="activities-task-select"
                                         value={taskForm.priority}
                                         onChange={e => setTaskForm(f => ({ ...f, priority: e.target.value as TaskForm["priority"] }))}
                                     >
@@ -2299,9 +2477,13 @@ export default function ActivitiesPage() {
                                         <option value="critical">Critical</option>
                                     </select>
                                 </div>
-                                <div className="activity-task-field">
-                                    <label>Status</label>
+                                <div className="activities-task-field activity-task-field">
+                                    <label className="activities-task-field-label">
+                                        <span>Status</span>
+                                        <span className="activities-task-asterisk">*</span>
+                                    </label>
                                     <select
+                                        className="activities-task-select"
                                         value={taskForm.status}
                                         onChange={e => setTaskForm(f => ({ ...f, status: e.target.value as TaskForm["status"] }))}
                                     >
@@ -2313,30 +2495,36 @@ export default function ActivitiesPage() {
                                     </select>
                                 </div>
                             </div>
-                            <div className="activity-task-field">
-                                <label>Description</label>
+                            <div className="activities-task-field activity-task-field">
+                                <label className="activities-task-field-label">
+                                    <span>Description</span>
+                                </label>
                                 <textarea
+                                    className="activities-task-textarea"
                                     rows={3}
                                     value={taskForm.description}
                                     onChange={e => setTaskForm(f => ({ ...f, description: e.target.value }))}
-                                    placeholder="Add details..."
+                                    placeholder="ex. lorem ipsum dolor sit amet, consectetur adipiscing elit..."
                                 />
                             </div>
-                            <div className="activity-task-field">
-                                <label>Attach Files</label>
+                            <div className="activities-task-field activity-task-field">
+                                <label className="activities-task-field-label">
+                                    <span>Attach Files</span>
+                                </label>
                                 <div
-                                    className={`activity-task-dropzone ${isDragging ? "dragging" : ""}`}
+                                    className={`activities-task-dropzone activity-task-dropzone ${isDragging ? "dragging" : ""}`}
                                     onDragOver={handleDragOver}
                                     onDragLeave={handleDragLeave}
                                     onDrop={handleDrop}
                                     onClick={() => fileInputRef.current?.click()}
                                 >
-                                    <svg width="62" height="62" viewBox="0 0 62 62" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <rect x="0.5" y="0.5" width="61" height="61" rx="7.5" fill="#2563EB" fillOpacity="0.1"/>
-                                        <rect x="0.5" y="0.5" width="61" height="61" rx="7.5" stroke="#2563EB"/>
-                                        <path d="M31 31.5858L35.2426 35.8284L33.8284 37.2426L32 35.415V41H30V35.413L28.1716 37.2426L26.7574 35.8284L31 31.5858ZM31 21C34.5934 21 37.5544 23.7076 37.9541 27.1939C40.2858 27.8315 42 29.9656 42 32.5C42 35.3688 39.8036 37.7246 37.0006 37.9776L37.0009 35.973C38.8686 35.7381 40 34.2755 40 32.5C40 30.6974 38.6416 29.2198 36.8778 29.0238L35.9765 28.9237L35.8643 28.0241C35.5398 25.4206 33.3283 23.4142 30.7071 23.4142C27.9457 23.4142 25.7071 25.6528 25.7071 28.4142V29.4142H24.7071C22.4979 29.4142 20.7071 31.205 20.7071 33.4142C20.7071 35.6234 22.4979 37.4142 24.7071 37.4142H27V39.4142H24.7071C21.3934 39.4142 18.7071 36.7279 18.7071 33.4142C18.7071 30.3475 21.0118 27.8184 24.0041 27.4619C24.8946 23.8291 28.1633 21 31 21Z" fill="#2563EB"/>
-                                    </svg>
-                                    <span className="activity-task-dropzone-text">Drag & Drop Your File Here</span>
+                                    <div className="activities-task-dropzone-icon-box">
+                                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M12 16V8M12 8L9 11M12 8L15 11" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M20 16.7428C21.2215 15.734 22 14.2079 22 12.5C22 9.46243 19.5376 7 16.5 7C16.2815 7 16.0771 7.01272 15.875 7.03714C14.9818 4.67389 12.6845 3 10 3C6.13401 3 3 6.13401 3 10C3 11.2332 3.31846 12.3919 3.87612 13.3986C2.71536 14.2811 2 15.6983 2 17.2857C2 20.0471 4.23858 22.2857 7 22.2857H17C19.2091 22.2857 21 20.4949 21 18.2857" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                        </svg>
+                                    </div>
+                                    <span className="activities-task-dropzone-text activity-task-dropzone-text">Drag & Drop Your File Here</span>
                                     <input
                                         type="file"
                                         ref={fileInputRef}
@@ -2346,9 +2534,9 @@ export default function ActivitiesPage() {
                                     />
                                 </div>
                                 {taskAttachments.length > 0 && (
-                                    <div className="activity-task-attachments">
+                                    <div className="activities-task-attachments-list activity-task-attachments">
                                         {taskAttachments.map((file, idx) => (
-                                            <div key={idx} className="activity-task-file-chip">
+                                            <div key={idx} className="activities-task-file-chip activity-task-file-chip">
                                                 <span>{file.name} ({(file.size / 1024).toFixed(0)} KB)</span>
                                                 <button
                                                     type="button"
@@ -2367,22 +2555,23 @@ export default function ActivitiesPage() {
                             </div>
                             {taskError && <p className="form-error" style={{ color: "#ef4444", fontSize: 13, marginTop: 4 }}>{taskError}</p>}
                         </div>
-                        <div className="activity-task-drawer-footer">
+                        <div className="activities-task-drawer-footer activity-task-drawer-footer">
                             <button
                                 type="button"
-                                className="activity-task-btn-cancel"
+                                className="activities-task-btn-cancel activity-task-btn-cancel"
                                 onClick={() => {
                                     setCreateTask(false);
                                     setTaskDetail(null);
                                     setTaskForm(blankTask);
                                     setTaskAttachments([]);
+                                    setTaskError("");
                                 }}
                             >
                                 Cancel
                             </button>
                             <button
                                 type="submit"
-                                className="activity-task-btn-submit"
+                                className="activities-task-btn-submit activity-task-btn-submit"
                             >
                                 {taskDetail ? "Save Changes" : "Create Task"}
                             </button>
@@ -2601,24 +2790,30 @@ export default function ActivitiesPage() {
 
                 <section className="activities-content">
                     <div className="activities-controls-row">
-                        <div className="activities-tabs-pill">
+                        <div className="activities-tabs-pill" role="tablist" aria-label="Activities Views">
                             <button
                                 type="button"
-                                className={activeTab === "stages" ? "active" : ""}
+                                role="tab"
+                                aria-selected={activeTab === "stages"}
+                                className={`activities-tab-item ${activeTab === "stages" ? "active" : ""}`}
                                 onClick={() => setActiveTab("stages")}
                             >
                                 Stages
                             </button>
                             <button
                                 type="button"
-                                className={activeTab === "tasks" ? "active" : ""}
+                                role="tab"
+                                aria-selected={activeTab === "tasks"}
+                                className={`activities-tab-item ${activeTab === "tasks" ? "active" : ""}`}
                                 onClick={() => setActiveTab("tasks")}
                             >
                                 Tasks
                             </button>
                             <button
                                 type="button"
-                                className={activeTab === "approvals" ? "active" : ""}
+                                role="tab"
+                                aria-selected={activeTab === "approvals"}
+                                className={`activities-tab-item ${activeTab === "approvals" ? "active" : ""}`}
                                 onClick={() => setActiveTab("approvals")}
                             >
                                 Approvals
@@ -2628,99 +2823,23 @@ export default function ActivitiesPage() {
                         <div className="activities-controls-right">
                             {activeTab === "stages" && (
                                 <>
-                                    <div className="activities-search-box">
-                                        <Search size={16} />
-                                        <input
-                                            placeholder="Search stage by name..."
-                                            value={stageQuery}
-                                            onChange={e => setStageQuery(e.target.value)}
-                                        />
-                                    </div>
-                                    <button
-                                        type="button"
-                                        className={`activities-filter-btn ${filterOpen ? "active" : ""}`}
-                                        onClick={e => {
-                                            e.stopPropagation();
-                                            setFilterOpen(o => !o);
-                                        }}
-                                        title="Filter stages and projects"
-                                        aria-label="Filter"
-                                    >
-                                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M4.16667 5.83464C4.16667 5.14428 4.72631 4.58464 5.41667 4.58464C6.10702 4.58464 6.66667 5.14428 6.66667 5.83464C6.66667 6.52499 6.10702 7.08464 5.41667 7.08464C4.72631 7.08464 4.16667 6.52499 4.16667 5.83464Z" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M4.16667 14.168C4.16667 13.4776 4.72631 12.918 5.41667 12.918C6.10702 12.918 6.66667 13.4776 6.66667 14.168C6.66667 14.8583 6.10702 15.418 5.41667 15.418C4.72631 15.418 4.16667 14.8583 4.16667 14.168Z" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M13.3333 5.83464C13.3333 5.14428 13.893 4.58464 14.5833 4.58464C15.2737 4.58464 15.8333 5.14428 15.8333 5.83464C15.8333 6.52499 15.2737 7.08464 14.5833 7.08464C13.893 7.08464 13.3333 6.52499 13.3333 5.83464Z" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M13.3333 14.168C13.3333 13.4776 13.893 12.918 14.5833 12.918C15.2737 12.918 15.8333 13.4776 15.8333 14.168C15.8333 14.8583 15.2737 15.418 14.5833 15.418C13.893 15.418 13.3333 14.8583 13.3333 14.168Z" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M6.66667 5.83464H13.3333" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M1.66667 5.83464H4.16667" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M15.8333 5.83464H18.3333" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M6.66667 14.168H13.3333" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M1.66667 14.168H4.16667" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M15.8333 14.168H18.3333" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M8.75 10C8.75 9.30964 9.30964 8.75 10 8.75C10.6904 8.75 11.25 9.30964 11.25 10C11.25 10.6904 10.6904 11.25 10 11.25C9.30964 11.25 8.75 10.6904 8.75 10Z" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M1.66667 10H8.75" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M11.25 10H18.3333" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                        </svg>
-                                    </button>
-
-                                    {filterOpen && (
-                                        <div className="activities-filter-dropdown" onClick={e => e.stopPropagation()}>
-                                            <h5>Stage Status</h5>
-                                            <select value={stageFilter} onChange={e => setStageFilter(e.target.value)}>
-                                                <option value="all">All Stages</option>
-                                                <option value="completed">Terminal: Completed</option>
-                                                <option value="lost">Terminal: Lost</option>
-                                            </select>
-                                            <hr style={{ border: 0, borderTop: "1px solid #f1f5f9", margin: "4px 0" }} />
-                                            <h5>Project Alerts</h5>
-                                            <label>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={filterOnlyOverdue}
-                                                    onChange={e => setFilterOnlyOverdue(e.target.checked)}
-                                                />
-                                                <span>Has overdue tasks</span>
-                                            </label>
-                                            <label>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={filterOnlyPendingApproval}
-                                                    onChange={e => setFilterOnlyPendingApproval(e.target.checked)}
-                                                />
-                                                <span>Has pending approvals</span>
-                                            </label>
+                                    <div className="activities-stage-search">
+                                        <div className="activities-search-icon-box">
+                                            <Search size={16} />
                                         </div>
-                                    )}
-
-                                    <button
-                                        type="button"
-                                        className="activities-primary-btn"
-                                        onClick={() => setCreateStage(true)}
-                                    >
-                                        <Plus size={16} />
-                                        <span>New Stage</span>
-                                    </button>
-                                </>
-                            )}
-
-                            {activeTab === "tasks" && (
-                                <>
-                                    <div className="activities-search-box">
-                                        <Search size={16} />
                                         <input
                                             type="text"
-                                            placeholder="Search task by name..."
-                                            value={taskQuery}
-                                            onChange={e => {
-                                                setTaskQuery(e.target.value);
-                                                setTaskPage(1);
-                                            }}
+                                            className="activities-stage-search-input"
+                                            placeholder="Search stage by name…"
+                                            value={stageQuery}
+                                            onChange={e => setStageQuery(e.target.value)}
+                                            aria-label="Search stage by name"
                                         />
-                                        {taskQuery && (
+                                        {stageQuery && (
                                             <button
                                                 type="button"
-                                                onClick={() => setTaskQuery("")}
-                                                style={{ background: "transparent", border: 0, padding: 0, cursor: "pointer", color: "#94a3b8" }}
+                                                className="activities-search-clear"
+                                                onClick={() => setStageQuery("")}
                                                 aria-label="Clear search"
                                             >
                                                 <X size={14} />
@@ -2731,34 +2850,162 @@ export default function ActivitiesPage() {
                                     <div style={{ position: "relative" }}>
                                         <button
                                             type="button"
-                                            className="activities-filter-btn"
+                                            className={`activities-stage-filter-btn ${filterOpen || filterOnlyOverdue || filterOnlyPendingApproval || stageFilter !== "all" ? "active" : ""}`}
+                                            onClick={e => {
+                                                e.stopPropagation();
+                                                setFilterOpen(o => !o);
+                                            }}
+                                            title="Filter stages and projects"
+                                            aria-label="Filter stages"
+                                        >
+                                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                <path d="M4.16667 5.83464C4.16667 5.14428 4.72631 4.58464 5.41667 4.58464C6.10702 4.58464 6.66667 5.14428 6.66667 5.83464C6.66667 6.52499 6.10702 7.08464 5.41667 7.08464C4.72631 7.08464 4.16667 6.52499 4.16667 5.83464Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M4.16667 14.168C4.16667 13.4776 4.72631 12.918 5.41667 12.918C6.10702 12.918 6.66667 13.4776 6.66667 14.168C6.66667 14.8583 6.10702 15.418 5.41667 15.418C4.72631 15.418 4.16667 14.8583 4.16667 14.168Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M13.3333 5.83464C13.3333 5.14428 13.893 4.58464 14.5833 4.58464C15.2737 4.58464 15.8333 5.14428 15.8333 5.83464C15.8333 6.52499 15.2737 7.08464 14.5833 7.08464C13.893 7.08464 13.3333 6.52499 13.3333 5.83464Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M13.3333 14.168C13.3333 13.4776 13.893 12.918 14.5833 12.918C15.2737 12.918 15.8333 13.4776 15.8333 14.168C15.8333 14.8583 15.2737 15.418 14.5833 15.418C13.893 15.418 13.3333 14.8583 13.3333 14.168Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M6.66667 5.83464H13.3333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M1.66667 5.83464H4.16667" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M15.8333 5.83464H18.3333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M6.66667 14.168H13.3333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M1.66667 14.168H4.16667" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M15.8333 14.168H18.3333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M8.75 10C8.75 9.30964 9.30964 8.75 10 8.75C10.6904 8.75 11.25 9.30964 11.25 10C11.25 10.6904 10.6904 11.25 10 11.25C9.30964 11.25 8.75 10.6904 8.75 10Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M1.66667 10H8.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M11.25 10H18.3333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                            </svg>
+                                            {(filterOnlyOverdue || filterOnlyPendingApproval || stageFilter !== "all") && (
+                                                <span className="activities-filter-badge-dot" />
+                                            )}
+                                        </button>
+
+                                        {filterOpen && (
+                                            <div className="activities-stage-filter-popover" onClick={e => e.stopPropagation()}>
+                                                <h5 className="activities-filter-section-title">Stage Status</h5>
+                                                <select
+                                                    className="activities-filter-select"
+                                                    value={stageFilter}
+                                                    onChange={e => setStageFilter(e.target.value)}
+                                                >
+                                                    <option value="all">All Stages</option>
+                                                    <option value="active">Active Stages Only</option>
+                                                    <option value="completed">Terminal: Completed</option>
+                                                    <option value="lost">Terminal: Lost</option>
+                                                </select>
+                                                <hr style={{ border: 0, borderTop: "1px solid #E2E8F0", margin: "4px 0" }} />
+                                                <h5 className="activities-filter-section-title">Project Alerts</h5>
+                                                <label className="activities-filter-checkbox-label">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={filterOnlyOverdue}
+                                                        onChange={e => setFilterOnlyOverdue(e.target.checked)}
+                                                    />
+                                                    <span>Has overdue tasks</span>
+                                                </label>
+                                                <label className="activities-filter-checkbox-label">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={filterOnlyPendingApproval}
+                                                        onChange={e => setFilterOnlyPendingApproval(e.target.checked)}
+                                                    />
+                                                    <span>Has pending approvals</span>
+                                                </label>
+                                                {(filterOnlyOverdue || filterOnlyPendingApproval || stageFilter !== "all") && (
+                                                    <button
+                                                        type="button"
+                                                        className="activities-filter-reset-btn"
+                                                        onClick={() => {
+                                                            setFilterOnlyOverdue(false);
+                                                            setFilterOnlyPendingApproval(false);
+                                                            setStageFilter("all");
+                                                        }}
+                                                    >
+                                                        Reset filters
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        className="activities-new-stage-btn"
+                                        onClick={() => {
+                                            setStageError("");
+                                            setStageForm(blankStage);
+                                            setEditStage(null);
+                                            setCreateStage(true);
+                                        }}
+                                    >
+                                        <Plus size={16} />
+                                        <span>New Stage</span>
+                                    </button>
+                                </>
+                            )}
+
+                            {activeTab === "tasks" && (
+                                <>
+                                    <div className="activities-stage-search activities-task-search">
+                                        <div className="activities-search-icon-box">
+                                            <Search size={16} />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            placeholder="Search task by name..."
+                                            value={taskQuery}
+                                            onChange={e => {
+                                                setTaskQuery(e.target.value);
+                                                setTaskPage(1);
+                                            }}
+                                            aria-label="Search task by name"
+                                        />
+                                        {taskQuery && (
+                                            <button
+                                                type="button"
+                                                className="activities-search-clear"
+                                                onClick={() => setTaskQuery("")}
+                                                aria-label="Clear search"
+                                            >
+                                                <X size={14} />
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    <div style={{ position: "relative" }}>
+                                        <button
+                                            type="button"
+                                            className={`activities-stage-filter-btn ${taskFilterOpen || taskFilter !== "all" || taskPriorityFilter !== "all" ? "active" : ""}`}
                                             onClick={e => {
                                                 e.stopPropagation();
                                                 setTaskFilterOpen(prev => !prev);
                                             }}
+                                            title="Filter tasks"
                                             aria-label="Filter tasks"
                                         >
                                             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                <path d="M4.16667 5.83464C4.16667 5.14428 4.72631 4.58464 5.41667 4.58464C6.10702 4.58464 6.66667 5.14428 6.66667 5.83464C6.66667 6.52499 6.10702 7.08464 5.41667 7.08464C4.72631 7.08464 4.16667 6.52499 4.16667 5.83464Z" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                                <path d="M4.16667 14.168C4.16667 13.4776 4.72631 12.918 5.41667 12.918C6.10702 12.918 6.66667 13.4776 6.66667 14.168C6.66667 14.8583 6.10702 15.418 5.41667 15.418C4.72631 15.418 4.16667 14.8583 4.16667 14.168Z" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                                <path d="M13.3333 5.83464C13.3333 5.14428 13.893 4.58464 14.5833 4.58464C15.2737 4.58464 15.8333 5.14428 15.8333 5.83464C15.8333 6.52499 15.2737 7.08464 14.5833 7.08464C13.893 7.08464 13.3333 6.52499 13.3333 5.83464Z" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                                <path d="M13.3333 14.168C13.3333 13.4776 13.893 12.918 14.5833 12.918C15.2737 12.918 15.8333 13.4776 15.8333 14.168C15.8333 14.8583 15.2737 15.418 14.5833 15.418C13.893 15.418 13.3333 14.8583 13.3333 14.168Z" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                                <path d="M6.66667 5.83464H13.3333" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                                <path d="M1.66667 5.83464H4.16667" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                                <path d="M15.8333 5.83464H18.3333" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                                <path d="M6.66667 14.168H13.3333" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                                <path d="M1.66667 14.168H4.16667" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                                <path d="M15.8333 14.168H18.3333" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                                <path d="M8.75 10C8.75 9.30964 9.30964 8.75 10 8.75C10.6904 8.75 11.25 9.30964 11.25 10C11.25 10.6904 10.6904 11.25 10 11.25C9.30964 11.25 8.75 10.6904 8.75 10Z" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                                <path d="M1.66667 10H8.75" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                                <path d="M11.25 10H18.3333" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M4.16667 5.83464C4.16667 5.14428 4.72631 4.58464 5.41667 4.58464C6.10702 4.58464 6.66667 5.14428 6.66667 5.83464C6.66667 6.52499 6.10702 7.08464 5.41667 7.08464C4.72631 7.08464 4.16667 6.52499 4.16667 5.83464Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M4.16667 14.168C4.16667 13.4776 4.72631 12.918 5.41667 12.918C6.10702 12.918 6.66667 13.4776 6.66667 14.168C6.66667 14.8583 6.10702 15.418 5.41667 15.418C4.72631 15.418 4.16667 14.8583 4.16667 14.168Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M13.3333 5.83464C13.3333 5.14428 13.893 4.58464 14.5833 4.58464C15.2737 4.58464 15.8333 5.14428 15.8333 5.83464C15.8333 6.52499 15.2737 7.08464 14.5833 7.08464C13.893 7.08464 13.3333 6.52499 13.3333 5.83464Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M13.3333 14.168C13.3333 13.4776 13.893 12.918 14.5833 12.918C15.2737 12.918 15.8333 13.4776 15.8333 14.168C15.8333 14.8583 15.2737 15.418 14.5833 15.418C13.893 15.418 13.3333 14.8583 13.3333 14.168Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M6.66667 5.83464H13.3333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M1.66667 5.83464H4.16667" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M15.8333 5.83464H18.3333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M6.66667 14.168H13.3333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M1.66667 14.168H4.16667" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M15.8333 14.168H18.3333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M8.75 10C8.75 9.30964 9.30964 8.75 10 8.75C10.6904 8.75 11.25 9.30964 11.25 10C11.25 10.6904 10.6904 11.25 10 11.25C9.30964 11.25 8.75 10.6904 8.75 10Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M1.66667 10H8.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M11.25 10H18.3333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                                             </svg>
+                                            {(taskFilter !== "all" || taskPriorityFilter !== "all") && (
+                                                <span className="activities-filter-badge-dot" />
+                                            )}
                                         </button>
 
                                         {taskFilterOpen && (
-                                            <div className="activities-filter-dropdown" onClick={e => e.stopPropagation()}>
-                                                <h5>Task Status</h5>
+                                            <div className="activities-stage-filter-popover" onClick={e => e.stopPropagation()}>
+                                                <h5 className="activities-filter-section-title">Task Status</h5>
                                                 <select
+                                                    className="activities-filter-select"
                                                     value={taskFilter}
                                                     onChange={e => {
                                                         setTaskFilter(e.target.value);
@@ -2772,9 +3019,10 @@ export default function ActivitiesPage() {
                                                     <option value="completed">Completed</option>
                                                     <option value="cancelled">Cancelled</option>
                                                 </select>
-                                                <hr style={{ border: 0, borderTop: "1px solid #f1f5f9", margin: "4px 0" }} />
-                                                <h5>Priority</h5>
+                                                <hr style={{ border: 0, borderTop: "1px solid #E2E8F0", margin: "4px 0" }} />
+                                                <h5 className="activities-filter-section-title">Priority</h5>
                                                 <select
+                                                    className="activities-filter-select"
                                                     value={taskPriorityFilter}
                                                     onChange={e => {
                                                         setTaskPriorityFilter(e.target.value);
@@ -2787,14 +3035,32 @@ export default function ActivitiesPage() {
                                                     <option value="high">High</option>
                                                     <option value="critical">Critical</option>
                                                 </select>
+                                                {(taskFilter !== "all" || taskPriorityFilter !== "all") && (
+                                                    <button
+                                                        type="button"
+                                                        className="activities-filter-reset-btn"
+                                                        onClick={() => {
+                                                            setTaskFilter("all");
+                                                            setTaskPriorityFilter("all");
+                                                        }}
+                                                    >
+                                                        Reset filters
+                                                    </button>
+                                                )}
                                             </div>
                                         )}
                                     </div>
 
                                     <button
                                         type="button"
-                                        className="activities-primary-btn"
-                                        onClick={() => setCreateTask(true)}
+                                        className="activities-new-stage-btn activities-new-task-btn"
+                                        onClick={() => {
+                                            setTaskDetail(null);
+                                            setTaskForm(blankTask);
+                                            setTaskAttachments([]);
+                                            setTaskError("");
+                                            setCreateTask(true);
+                                        }}
                                     >
                                         <Plus size={16} />
                                         <span>New Task</span>
@@ -2891,347 +3157,377 @@ export default function ActivitiesPage() {
                     </div>
 
                     {activeTab === "stages" && (
-                        <section className="activities-panel" style={{ background: "transparent", border: 0, padding: 0, boxShadow: "none" }}>
+                        <section className="activities-panel" style={{ background: "transparent", border: 0, padding: 0, boxShadow: "none", width: "100%" }}>
                             {loadingStages || loadingProjects ? (
-                                <LoadingSkeleton />
-                            ) : filteredStages.length ? (
-                                <div className="stages-board">
-                                    {filteredStages.map(stage => {
-                                        const stageProjects = getProjectsForStage(stage);
-                                        return (
-                                            <div key={stage.id} className="stage-column">
-                                                <div className="stage-column-header">
-                                                    <div className="stage-column-info">
-                                                        <h3 className="stage-column-title">
-                                                            {stage.name} <span className="stage-column-count">({stageProjects.length})</span>
-                                                        </h3>
-                                                    </div>
-                                                    <div className="stage-column-actions">
-                                                        <button
-                                                            type="button"
-                                                            className="stage-action-btn"
-                                                            title={`Add task to ${stage.name}`}
-                                                            onClick={() => {
-                                                                const firstProj = stageProjects[0];
-                                                                setTaskForm({ ...blankTask, stageId: stage.id, projectId: firstProj?.id || "" });
-                                                                setCreateTask(true);
-                                                            }}
-                                                        >
-                                                            <Plus size={16} />
-                                                        </button>
-                                                        <div style={{ position: "relative" }}>
-                                                            <button
-                                                                type="button"
-                                                                className="stage-action-btn"
-                                                                title="Stage options"
-                                                                onClick={e => {
-                                                                    e.stopPropagation();
-                                                                    setStageMenu(stageMenu === stage.id ? null : stage.id);
-                                                                }}
-                                                            >
-                                                                <MoreVertical size={16} />
-                                                            </button>
-                                                            {stageMenu === stage.id && (
-                                                                <div
-                                                                    className="activity-menu"
-                                                                    style={{
-                                                                        position: "absolute",
-                                                                        top: "calc(100% + 4px)",
-                                                                        right: 0,
-                                                                        zIndex: 40,
-                                                                    }}
-                                                                    onClick={e => e.stopPropagation()}
-                                                                >
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            setEditStage(stage);
-                                                                            setStageForm({ name: stage.name, color: stage.color || "#2563eb", terminalType: stage.terminalType || "" });
-                                                                            setStageMenu(null);
-                                                                        }}
-                                                                    >
-                                                                        <Edit3 size={14} /> Edit Stage
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        className="danger"
-                                                                        onClick={() => {
-                                                                            deleteStage(stage.id);
-                                                                            setStageMenu(null);
-                                                                        }}
-                                                                    >
-                                                                        <Trash2 size={14} /> Delete Stage
-                                                                    </button>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <div className="stage-column-cards">
-                                                    {stageProjects.length === 0 ? (
-                                                        <div className="stage-column-empty">
-                                                            No projects in this stage
-                                                        </div>
-                                                    ) : (
-                                                        stageProjects.map(proj => {
-                                                            const overdueCount = tasks.filter(t => t.projectId === proj.id && t.stageId === stage.id && isOverdue(t.dueDate, t.status, "task")).length;
-
-                                                            const pendingCount = approvals.filter(a => a.projectId === proj.id && a.stageId === stage.id && ["draft", "sent", "in_review"].includes(a.status)).length;
-
-                                                            const dueText = formatCardDate(proj.targetCompletionDate);
-                                                            const budgetVal = proj.approvedBudget ?? proj.projectValue;
-                                                            const assigneeName = proj.designerName || "Unassigned";
-                                                            const initials = getInitials(assigneeName);
-
-                                                            return (
-                                                                <div
-                                                                    key={proj.id}
-                                                                    className="stage-project-card"
-                                                                    onClick={() => router.push(`/projects`)}
-                                                                >
-                                                                    <div className="stage-project-card-header">
-                                                                        <span className="stage-project-code">{proj.projectCode || "—"}</span>
-                                                                        <span className="stage-project-due">
-                                                                            <Calendar size={13} />
-                                                                            Due {dueText}
-                                                                        </span>
-                                                                    </div>
-
-                                                                    <div className="stage-project-card-main">
-                                                                        <h4 className="stage-project-name">{proj.name}</h4>
-                                                                        <span className="stage-project-amount">{budgetVal != null ? money(budgetVal) : "—"}</span>
-                                                                    </div>
-
-                                                                    <div className="stage-project-client">{proj.clientName || "—"}</div>
-
-                                                                    {(overdueCount > 0 || pendingCount > 0) && (
-                                                                        <div className="stage-project-badges">
-                                                                            {overdueCount > 0 && (
-                                                                                <span className="stage-project-badge overdue">
-                                                                                    {overdueCount} overdue task{overdueCount !== 1 ? "s" : ""}
-                                                                                </span>
-                                                                            )}
-                                                                            {pendingCount > 0 && (
-                                                                                <span className="stage-project-badge pending">
-                                                                                    {pendingCount} pending approval{pendingCount !== 1 ? "s" : ""}
-                                                                                </span>
-                                                                            )}
-                                                                        </div>
-                                                                    )}
-
-                                                                    <div className="stage-project-card-footer" onClick={e => e.stopPropagation()}>
-                                                                        <div className="stage-project-assignee-group">
-                                                                            <div className="stage-project-avatar">{initials}</div>
-                                                                            <span className="stage-project-assignee-name">{assigneeName}</span>
-                                                                        </div>
-
-                                                                        <div style={{ position: "relative" }}>
-                                                                            <button
-                                                                                type="button"
-                                                                                className="stage-project-menu-btn"
-                                                                                onClick={e => {
-                                                                                    e.stopPropagation();
-                                                                                    setCardMenu(cardMenu === proj.id ? null : proj.id);
-                                                                                }}
-                                                                                aria-label="Project actions"
-                                                                            >
-                                                                                <MoreHorizontal size={16} />
-                                                                            </button>
-
-                                                                            {cardMenu === proj.id && (
-                                                                                <div
-                                                                                    className="card-action-menu"
-                                                                                    style={{
-                                                                                        position: "absolute",
-                                                                                        bottom: "calc(100% + 4px)",
-                                                                                        right: 0,
-                                                                                        background: "#fff",
-                                                                                        border: "1px solid #e2e8f0",
-                                                                                        borderRadius: "8px",
-                                                                                        boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
-                                                                                        zIndex: 50,
-                                                                                        minWidth: "160px",
-                                                                                        padding: "4px",
-                                                                                        display: "flex",
-                                                                                        flexDirection: "column",
-                                                                                        gap: "2px",
-                                                                                    }}
-                                                                                    onClick={e => e.stopPropagation()}
-                                                                                >
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        style={{
-                                                                                            display: "flex",
-                                                                                            alignItems: "center",
-                                                                                            gap: "8px",
-                                                                                            padding: "8px 12px",
-                                                                                            border: 0,
-                                                                                            background: "transparent",
-                                                                                            fontSize: "12.5px",
-                                                                                            color: "#1e293b",
-                                                                                            borderRadius: "4px",
-                                                                                            cursor: "pointer",
-                                                                                            textAlign: "left",
-                                                                                        }}
-                                                                                        onClick={() => {
-                                                                                            setCardMenu(null);
-                                                                                            router.push(`/projects`);
-                                                                                        }}
-                                                                                    >
-                                                                                        View Project
-                                                                                    </button>
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        style={{
-                                                                                            display: "flex",
-                                                                                            alignItems: "center",
-                                                                                            gap: "8px",
-                                                                                            padding: "8px 12px",
-                                                                                            border: 0,
-                                                                                            background: "transparent",
-                                                                                            fontSize: "12.5px",
-                                                                                            color: "#1e293b",
-                                                                                            borderRadius: "4px",
-                                                                                            cursor: "pointer",
-                                                                                            textAlign: "left",
-                                                                                        }}
-                                                                                        onClick={() => {
-                                                                                            setCardMenu(null);
-                                                                                            setTaskForm({ ...blankTask, projectId: proj.id, stageId: stage.id });
-                                                                                            setCreateTask(true);
-                                                                                        }}
-                                                                                    >
-                                                                                        Add Task
-                                                                                    </button>
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        style={{
-                                                                                            display: "flex",
-                                                                                            alignItems: "center",
-                                                                                            gap: "8px",
-                                                                                            padding: "8px 12px",
-                                                                                            border: 0,
-                                                                                            background: "transparent",
-                                                                                            fontSize: "12.5px",
-                                                                                            color: "#1e293b",
-                                                                                            borderRadius: "4px",
-                                                                                            cursor: "pointer",
-                                                                                            textAlign: "left",
-                                                                                        }}
-                                                                                        onClick={() => {
-                                                                                            setCardMenu(null);
-                                                                                            setApprovalForm({ ...blankApproval, projectId: proj.id, stageId: stage.id });
-                                                                                            setCreateApproval(true);
-                                                                                        }}
-                                                                                    >
-                                                                                        Add Approval
-                                                                                    </button>
-                                                                                    <hr style={{ border: 0, borderTop: "1px solid #f1f5f9", margin: "2px 0" }} />
-                                                                                    <div style={{ padding: "4px 8px", fontSize: "11px", color: "#94a3b8", fontWeight: 600 }}>MOVE TO STAGE</div>
-                                                                                    {stages.filter(s => s.id !== stage.id).map(targetStage => (
-                                                                                        <button
-                                                                                            key={targetStage.id}
-                                                                                            type="button"
-                                                                                            style={{
-                                                                                                display: "flex",
-                                                                                                alignItems: "center",
-                                                                                                gap: "8px",
-                                                                                                padding: "6px 12px",
-                                                                                                border: 0,
-                                                                                                background: "transparent",
-                                                                                                fontSize: "12px",
-                                                                                                color: "#475569",
-                                                                                                borderRadius: "4px",
-                                                                                                cursor: "pointer",
-                                                                                                textAlign: "left",
-                                                                                            }}
-                                                                                            onClick={() => {
-                                                                                                setCardMenu(null);
-                                                                                                void moveProjectToStage(proj, targetStage);
-                                                                                            }}
-                                                                                        >
-                                                                                            → {targetStage.name}
-                                                                                        </button>
-                                                                                    ))}
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })
-                                                    )}
-                                                </div>
+                                <div className="activities-stages-outer-frame">
+                                    <div className="activities-stages-board">
+                                        {[1, 2, 3, 4].map(idx => (
+                                            <div key={idx} className="activities-stage-column">
+                                                <div className="activities-skeleton-card" />
+                                                <div className="activities-skeleton-column" />
                                             </div>
-                                        );
-                                    })}
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : stages.length === 0 ? (
+                                <div className="activities-empty-state-card">
+                                    <LayoutList size={48} color="#94A3B8" />
+                                    <h3 className="activities-empty-state-title">No stages yet</h3>
+                                    <p className="activities-empty-state-text">
+                                        Create stages to organize projects and track your team's workflow.
+                                    </p>
+                                    <button
+                                        type="button"
+                                        className="activities-new-stage-btn"
+                                        onClick={() => {
+                                            setStageError("");
+                                            setStageForm(blankStage);
+                                            setEditStage(null);
+                                            setCreateStage(true);
+                                        }}
+                                    >
+                                        <Plus size={16} />
+                                        <span>Create your first stage</span>
+                                    </button>
+                                </div>
+                            ) : filteredStages.length === 0 ? (
+                                <div className="activities-empty-state-card">
+                                    <Search size={48} color="#94A3B8" />
+                                    <h3 className="activities-empty-state-title">No stages match your search</h3>
+                                    <p className="activities-empty-state-text">
+                                        No stages found matching "{stageQuery}". Try adjusting your query or resetting filters.
+                                    </p>
+                                    <button
+                                        type="button"
+                                        className="activities-modal-cancel-btn"
+                                        style={{ marginTop: "8px" }}
+                                        onClick={() => {
+                                            setStageQuery("");
+                                            setStageFilter("all");
+                                            setFilterOnlyOverdue(false);
+                                            setFilterOnlyPendingApproval(false);
+                                        }}
+                                    >
+                                        Clear search & filters
+                                    </button>
                                 </div>
                             ) : (
-                                <EmptyState
-                                    icon={<LayoutList size={48} />}
-                                    title="No stages yet"
-                                    detail="Create stages to define your activity workflow."
-                                    action={<button className="primary" onClick={() => setCreateStage(true)}><Plus size={18} />Create Stage</button>}
-                                />
+                                <div className="activities-stages-outer-frame">
+                                    <div className="activities-stages-board">
+                                        {filteredStages.map(stage => {
+                                            const stageProjects = getProjectsForStage(stage);
+                                            const countText = `${stageProjects.length} ${stageProjects.length === 1 ? "Project" : "Projects"}`;
+
+                                            return (
+                                                <div key={stage.id} className="activities-stage-column">
+                                                    {/* Stage Summary Card (Figma Frame 93 / Frame 2147225077) */}
+                                                    <div className="activities-stage-summary-card">
+                                                        <div className="activities-stage-summary-meta">
+                                                            <h3 className="activities-stage-summary-title" title={stage.name}>
+                                                                {stage.name}
+                                                            </h3>
+                                                            <span className="activities-stage-summary-count">
+                                                                {countText}
+                                                            </span>
+                                                        </div>
+                                                        <div className="activities-stage-summary-actions">
+                                                            <button
+                                                                type="button"
+                                                                className="activities-stage-icon-btn"
+                                                                title={`Add task to ${stage.name}`}
+                                                                aria-label={`Add task to ${stage.name}`}
+                                                                onClick={() => {
+                                                                    const firstProj = stageProjects[0];
+                                                                    setTaskForm({ ...blankTask, stageId: stage.id, projectId: firstProj?.id || "" });
+                                                                    setCreateTask(true);
+                                                                }}
+                                                            >
+                                                                <Plus size={16} />
+                                                            </button>
+                                                            <div style={{ position: "relative" }}>
+                                                                <button
+                                                                    type="button"
+                                                                    className="activities-stage-icon-btn"
+                                                                    title="Stage options"
+                                                                    aria-label="Stage options"
+                                                                    onClick={e => {
+                                                                        e.stopPropagation();
+                                                                        setStageMenu(stageMenu === stage.id ? null : stage.id);
+                                                                    }}
+                                                                >
+                                                                    <MoreVertical size={16} />
+                                                                </button>
+                                                                {stageMenu === stage.id && (
+                                                                    <div
+                                                                        className="activities-stage-menu"
+                                                                        onClick={e => e.stopPropagation()}
+                                                                    >
+                                                                        <button
+                                                                            type="button"
+                                                                            className="activities-menu-item"
+                                                                            onClick={() => {
+                                                                                setEditStage(stage);
+                                                                                setStageForm({
+                                                                                    name: stage.name,
+                                                                                    color: stage.color || "#2563eb",
+                                                                                    terminalType: stage.terminalType || ""
+                                                                                });
+                                                                                setStageError("");
+                                                                                setStageMenu(null);
+                                                                                setCreateStage(true);
+                                                                            }}
+                                                                        >
+                                                                            <Edit3 size={14} /> Edit Stage
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            className="activities-menu-item danger"
+                                                                            onClick={() => {
+                                                                                setStageMenu(null);
+                                                                                void deleteStage(stage.id);
+                                                                            }}
+                                                                        >
+                                                                            <Trash2 size={14} /> Delete Stage
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Stage Column Body (Figma Frame 93 / Frame 2147225083) */}
+                                                    <div className="activities-stage-column-body">
+                                                        {stageProjects.length === 0 ? (
+                                                            <div className="activities-stage-column-empty">
+                                                                No projects in this stage
+                                                            </div>
+                                                        ) : (
+                                                            stageProjects.map(proj => {
+                                                                const overdueCount = tasks.filter(
+                                                                    t => t.projectId === proj.id && t.stageId === stage.id && isOverdue(t.dueDate, t.status, "task")
+                                                                ).length;
+
+                                                                const pendingCount = approvals.filter(
+                                                                    a => a.projectId === proj.id && a.stageId === stage.id && ["draft", "sent", "in_review"].includes(a.status)
+                                                                ).length;
+
+                                                                const dueText = formatCardDate(proj.targetCompletionDate);
+                                                                const budgetVal = proj.approvedBudget ?? proj.projectValue;
+                                                                const assigneeName = proj.designerName || "Unassigned";
+                                                                const initials = getInitials(assigneeName);
+
+                                                                return (
+                                                                    <div
+                                                                        key={proj.id}
+                                                                        className="activities-project-card"
+                                                                        onClick={() => router.push(`/projects`)}
+                                                                    >
+                                                                        {/* Top Row: Code + Due Date (Figma Frame 2147225457) */}
+                                                                        <div className="activities-card-top-row">
+                                                                            <span className="activities-card-project-code">
+                                                                                {proj.projectCode || "—"}
+                                                                            </span>
+                                                                            <span className="activities-card-due-date">
+                                                                                <Calendar size={13} />
+                                                                                Due {dueText}
+                                                                            </span>
+                                                                        </div>
+
+                                                                        {/* Mid Row: Titles on Left, Amount on Right (Figma Frame 2147225459) */}
+                                                                        <div className="activities-card-mid-row">
+                                                                            <div className="activities-card-titles-col">
+                                                                                <h4 className="activities-card-project-name" title={proj.name}>
+                                                                                    {proj.name}
+                                                                                </h4>
+                                                                                <span className="activities-card-client-name" title={proj.clientName || ""}>
+                                                                                    {proj.clientName || "—"}
+                                                                                </span>
+                                                                            </div>
+                                                                            <span className="activities-card-amount">
+                                                                                {budgetVal != null ? money(budgetVal) : "—"}
+                                                                            </span>
+                                                                        </div>
+
+                                                                        {/* Badges row if any (Figma Frame 2147225076) */}
+                                                                        {(overdueCount > 0 || pendingCount > 0) && (
+                                                                            <div className="activities-card-badges-row">
+                                                                                {overdueCount > 0 && (
+                                                                                    <span className="activities-card-badge overdue">
+                                                                                        {overdueCount} overdue task{overdueCount !== 1 ? "s" : ""}
+                                                                                    </span>
+                                                                                )}
+                                                                                {pendingCount > 0 && (
+                                                                                    <span className="activities-card-badge pending">
+                                                                                        {pendingCount} pending approval{pendingCount !== 1 ? "s" : ""}
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                        )}
+
+                                                                        {/* Divider (Figma Rectangle 40) */}
+                                                                        <hr className="activities-card-divider" />
+
+                                                                        {/* Footer: Assignee + Menu (Figma Frame 2147225074) */}
+                                                                        <div className="activities-card-footer" onClick={e => e.stopPropagation()}>
+                                                                            <div className="activities-card-assignee-group">
+                                                                                <div className="activities-card-avatar">
+                                                                                    {initials}
+                                                                                </div>
+                                                                                <span className="activities-card-assignee-name" title={assigneeName}>
+                                                                                    {assigneeName}
+                                                                                </span>
+                                                                            </div>
+
+                                                                            <div style={{ position: "relative" }}>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="activities-card-menu-btn"
+                                                                                    onClick={e => {
+                                                                                        e.stopPropagation();
+                                                                                        setCardMenu(cardMenu === proj.id ? null : proj.id);
+                                                                                    }}
+                                                                                    aria-label="Project actions"
+                                                                                >
+                                                                                    <MoreHorizontal size={16} />
+                                                                                </button>
+
+                                                                                {cardMenu === proj.id && (
+                                                                                    <div
+                                                                                        className="activities-action-menu"
+                                                                                        onClick={e => e.stopPropagation()}
+                                                                                    >
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            className="activities-menu-item"
+                                                                                            onClick={() => {
+                                                                                                setCardMenu(null);
+                                                                                                router.push(`/projects`);
+                                                                                            }}
+                                                                                        >
+                                                                                            View Project
+                                                                                        </button>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            className="activities-menu-item"
+                                                                                            onClick={() => {
+                                                                                                setCardMenu(null);
+                                                                                                setTaskForm({ ...blankTask, projectId: proj.id, stageId: stage.id });
+                                                                                                setCreateTask(true);
+                                                                                            }}
+                                                                                        >
+                                                                                            Add Task
+                                                                                        </button>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            className="activities-menu-item"
+                                                                                            onClick={() => {
+                                                                                                setCardMenu(null);
+                                                                                                setApprovalForm({ ...blankApproval, projectId: proj.id, stageId: stage.id });
+                                                                                                setCreateApproval(true);
+                                                                                            }}
+                                                                                        >
+                                                                                            Add Approval
+                                                                                        </button>
+                                                                                        <hr style={{ border: 0, borderTop: "1px solid #E2E8F0", margin: "2px 0" }} />
+                                                                                        <div className="activities-menu-header">
+                                                                                            MOVE TO STAGE
+                                                                                        </div>
+                                                                                        {stages.filter(s => s.id !== stage.id).map(targetStage => (
+                                                                                            <button
+                                                                                                key={targetStage.id}
+                                                                                                type="button"
+                                                                                                className="activities-menu-item"
+                                                                                                onClick={() => {
+                                                                                                    setCardMenu(null);
+                                                                                                    void moveProjectToStage(proj, targetStage);
+                                                                                                }}
+                                                                                            >
+                                                                                                → {targetStage.name}
+                                                                                            </button>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
                             )}
                         </section>
                     )}
 
                     {activeTab === "tasks" && (
-                        <section className="activities-panel" style={{ background: "transparent", border: 0, padding: 0, boxShadow: "none" }}>
-                            {/* 4 Dynamic KPI Cards */}
-                            <div className="tasks-kpi-grid">
-                                <div className="tasks-kpi-card">
-                                    <span className="tasks-kpi-title">Total Tasks</span>
-                                    <span className="tasks-kpi-value">{kpiStats.total}</span>
-                                    <span className="tasks-kpi-trend positive">+2 Added Yesterday</span>
+                        <section className="activities-panel activities-tasks-view" style={{ background: "transparent", border: 0, padding: 0, boxShadow: "none" }}>
+                            {/* 4 Dynamic KPI Cards (Figma Frame 2147225138) */}
+                            <div className="activities-tasks-kpi-grid tasks-kpi-grid">
+                                <div className="activities-tasks-kpi-card tasks-kpi-card">
+                                    <span className="activities-tasks-kpi-title tasks-kpi-title">Total Tasks</span>
+                                    <span className="activities-tasks-kpi-value tasks-kpi-value">{kpiStats.total}</span>
+                                    <div className="activities-tasks-kpi-trend positive tasks-kpi-trend">
+                                        <span>+2 Added Yesterday</span>
+                                    </div>
                                 </div>
-                                <div className="tasks-kpi-card">
-                                    <span className="tasks-kpi-title">Overdue</span>
-                                    <span className="tasks-kpi-value">{kpiStats.overdue}</span>
-                                    <span className="tasks-kpi-trend negative">↑ 24% vs last month</span>
+                                <div className="activities-tasks-kpi-card tasks-kpi-card">
+                                    <span className="activities-tasks-kpi-title tasks-kpi-title">Overdue</span>
+                                    <span className="activities-tasks-kpi-value tasks-kpi-value">{kpiStats.overdue}</span>
+                                    <div className="activities-tasks-kpi-trend negative tasks-kpi-trend">
+                                        <TrendingUp size={14} />
+                                        <span>24% vs last month</span>
+                                    </div>
                                 </div>
-                                <div className="tasks-kpi-card">
-                                    <span className="tasks-kpi-title">In-Progress</span>
-                                    <span className="tasks-kpi-value">{kpiStats.inProgress}</span>
-                                    <span className="tasks-kpi-trend positive">↑ 13% vs yesterday</span>
+                                <div className="activities-tasks-kpi-card tasks-kpi-card">
+                                    <span className="activities-tasks-kpi-title tasks-kpi-title">In-Progress</span>
+                                    <span className="activities-tasks-kpi-value tasks-kpi-value">{kpiStats.inProgress}</span>
+                                    <div className="activities-tasks-kpi-trend positive tasks-kpi-trend">
+                                        <TrendingUp size={14} />
+                                        <span>13% vs yesterday</span>
+                                    </div>
                                 </div>
-                                <div className="tasks-kpi-card">
-                                    <span className="tasks-kpi-title">Completed</span>
-                                    <span className="tasks-kpi-value">{kpiStats.completed}</span>
-                                    <span className="tasks-kpi-trend negative">↓ 1 vs last month</span>
+                                <div className="activities-tasks-kpi-card tasks-kpi-card">
+                                    <span className="activities-tasks-kpi-title tasks-kpi-title">Completed</span>
+                                    <span className="activities-tasks-kpi-value tasks-kpi-value">{kpiStats.completed}</span>
+                                    <div className="activities-tasks-kpi-trend negative tasks-kpi-trend">
+                                        <TrendingDown size={14} />
+                                        <span>1 vs last month</span>
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Tasks Table Card */}
-                            <div className="tasks-table-card">
+                            {/* Tasks Table Frame (Figma Frame 2147225072) */}
+                            <div className="activities-tasks-table-frame tasks-table-card">
                                 {loadingTasks && tasks.length === 0 ? (
                                     <LoadingSkeleton />
                                 ) : (
                                     <>
-                                        <div className="tasks-table-wrap">
-                                            <table className="tasks-table">
+                                        <div className="activities-tasks-table-wrap tasks-table-wrap">
+                                            <table className="activities-tasks-table tasks-table">
                                                 <thead>
                                                     <tr>
-                                                        <th style={{ width: "40px" }}>
+                                                        <th style={{ width: "40px", textAlign: "center" }}>
                                                             <input
                                                                 type="checkbox"
-                                                                className="tasks-checkbox"
+                                                                className="activities-task-checkbox tasks-checkbox"
                                                                 checked={paginatedTasks.length > 0 && paginatedTasks.every(t => selectedTaskIds.includes(t.id))}
                                                                 onChange={toggleSelectAll}
                                                                 aria-label="Select all tasks"
                                                             />
                                                         </th>
-                                                        <th>TASK</th>
-                                                        <th>PROJECT</th>
-                                                        <th>STAGE</th>
-                                                        <th>ASSIGNED TO</th>
-                                                        <th>DUE DATE</th>
-                                                        <th>PRIORITY</th>
-                                                        <th>STATUS</th>
-                                                        <th>UPDATED</th>
-                                                        <th style={{ width: "40px" }} />
+                                                        <th style={{ width: "234px" }}>TASK</th>
+                                                        <th style={{ width: "175px" }}>PROJECT</th>
+                                                        <th style={{ width: "115px" }}>STAGE</th>
+                                                        <th style={{ width: "175px" }}>ASSIGNED TO</th>
+                                                        <th style={{ width: "148px" }}>DUE DATE</th>
+                                                        <th style={{ width: "84px" }}>PRIORITY</th>
+                                                        <th style={{ width: "122px" }}>STATUS</th>
+                                                        <th style={{ width: "130px" }}>UPDATED</th>
+                                                        <th style={{ width: "40px", textAlign: "center" }} />
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -3248,24 +3544,26 @@ export default function ActivitiesPage() {
                                             </table>
                                         </div>
 
-                                        {/* Table Footer with dynamic count and pagination */}
-                                        <div className="tasks-table-footer">
-                                            <div>Total Tasks: {filteredTasks.length}</div>
-                                            <div className="tasks-pagination">
+                                        {/* Table Footer with dynamic count and pagination (Figma Frame 2147225166) */}
+                                        <div className="activities-tasks-pagination-bar tasks-table-footer">
+                                            <div className="activities-tasks-total-text">
+                                                Total Tasks: {filteredTasks.length}
+                                            </div>
+                                            <div className="activities-tasks-pages-wrap tasks-pagination">
                                                 <button
                                                     type="button"
-                                                    className="tasks-page-btn"
+                                                    className="activities-tasks-page-btn tasks-page-btn"
                                                     disabled={taskPage <= 1}
                                                     onClick={() => setTaskPage(p => Math.max(1, p - 1))}
                                                     aria-label="Previous page"
                                                 >
-                                                    &lt;
+                                                    <ChevronLeft size={16} />
                                                 </button>
                                                 {Array.from({ length: totalTaskPages }, (_, i) => i + 1).slice(0, 5).map(pageNum => (
                                                     <button
                                                         key={pageNum}
                                                         type="button"
-                                                        className={`tasks-page-btn ${pageNum === taskPage ? "active" : ""}`}
+                                                        className={`activities-tasks-page-btn tasks-page-btn ${pageNum === taskPage ? "active" : ""}`}
                                                         onClick={() => setTaskPage(pageNum)}
                                                     >
                                                         {pageNum}
@@ -3273,17 +3571,18 @@ export default function ActivitiesPage() {
                                                 ))}
                                                 <button
                                                     type="button"
-                                                    className="tasks-page-btn"
+                                                    className="activities-tasks-page-btn tasks-page-btn"
                                                     disabled={taskPage >= totalTaskPages}
                                                     onClick={() => setTaskPage(p => Math.min(totalTaskPages, p + 1))}
                                                     aria-label="Next page"
                                                 >
-                                                    &gt;
+                                                    <ChevronRight size={16} />
                                                 </button>
                                             </div>
-                                            <div className="tasks-page-size">
-                                                <span>Show per Page:</span>
+                                            <div className="activities-tasks-page-size-wrap tasks-page-size">
+                                                <span className="activities-tasks-page-size-label">Show per Page:</span>
                                                 <select
+                                                    className="activities-tasks-page-size-select"
                                                     value={taskPageSize}
                                                     onChange={e => {
                                                         setTaskPageSize(Number(e.target.value));
@@ -3422,7 +3721,19 @@ export default function ActivitiesPage() {
                     {StageModal()}
                     {TaskModal()}
                     {ApprovalModal()}
-                    {notice && <div className="notice-banner">{notice}<button onClick={() => setNotice(null)}><X size={14} /></button></div>}
+                    {notice && (
+                        <div className="activities-toast" role="status">
+                            <span>{notice}</span>
+                            <button
+                                type="button"
+                                className="activities-toast-close"
+                                onClick={() => setNotice(null)}
+                                aria-label="Dismiss notice"
+                            >
+                                <X size={14} />
+                            </button>
+                        </div>
+                    )}
                 </section>
             </div>
         </main>

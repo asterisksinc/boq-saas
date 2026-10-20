@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
 import { FolderFileIcon } from "./FolderFileIcon";
 import { getApiErrorMessage } from "@/lib/api/auth";
 
@@ -10,6 +10,7 @@ interface DeleteModalProps {
     description: string;
     label: string;
     info?: string;
+    type?: "folder" | "file";
     onClose: () => void;
     onDelete: () => Promise<void>;
 }
@@ -19,6 +20,7 @@ export default function DeleteModal({
     description,
     label,
     info,
+    type = "folder",
     onClose,
     onDelete,
 }: DeleteModalProps) {
@@ -40,40 +42,53 @@ export default function DeleteModal({
     }
 
     return (
-        <div className="document-modal-backdrop" onClick={onClose}>
+        <div className="doc-modal-backdrop" onClick={onClose}>
             <div
-                className="document-modal delete-modal"
+                className="doc-delete-modal"
                 onClick={(e) => e.stopPropagation()}
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="delete-dialog-title"
             >
-                <div className="delete-icon">
-                    <Trash2 size={24} />
-                </div>
-                <h2 id="delete-dialog-title">{title}</h2>
-                <p>{description}</p>
-                {error && <p className="documents-error" role="alert">{error}</p>}
-                <div className="delete-target">
-                    <FolderFileIcon />
-                    <div className="delete-target-info">
-                        <strong>{label}</strong>
-                        {info && <small>{info}</small>}
+                <div className="doc-delete-inner">
+                    <div className="doc-delete-icon">
+                        <Trash2 size={28} />
                     </div>
+
+                    <div className="doc-delete-text">
+                        <h2 id="delete-dialog-title" className="doc-delete-title">{title}</h2>
+                        <p className="doc-delete-desc">{description}</p>
+                    </div>
+
+                    {error && (
+                        <div className="doc-error-banner" style={{ width: "100%", margin: 0 }}>
+                            <span>{error}</span>
+                        </div>
+                    )}
+
+                    <div className="doc-delete-target">
+                        <FolderFileIcon type={type} fileName={label} />
+                        <div className="doc-delete-target-info">
+                            <strong>{label}</strong>
+                            {info && <small>{info}</small>}
+                        </div>
+                    </div>
+
+                    <label className="doc-delete-check">
+                        <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(event) => setChecked(event.target.checked)}
+                            disabled={busy}
+                        />
+                        <span>I understand this action cannot be undone</span>
+                    </label>
                 </div>
-                <label className="delete-check">
-                    <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(event) => setChecked(event.target.checked)}
-                        disabled={busy}
-                    />
-                    <span>I understand this action cannot be undone</span>
-                </label>
-                <div className="delete-modal-actions">
+
+                <div className="doc-delete-actions">
                     <button
                         type="button"
-                        className="delete-cancel-btn"
+                        className="doc-delete-cancel-btn"
                         onClick={onClose}
                         disabled={busy}
                     >
@@ -81,11 +96,18 @@ export default function DeleteModal({
                     </button>
                     <button
                         type="button"
-                        className="delete-confirm-btn"
+                        className="doc-delete-confirm-btn"
                         disabled={!checked || busy}
                         onClick={() => void confirm()}
                     >
-                        {busy ? "Deleting..." : "Yes, Delete!"}
+                        {busy ? (
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                <Loader2 size={16} className="animate-spin" />
+                                Deleting...
+                            </span>
+                        ) : (
+                            "Yes, Delete!"
+                        )}
                     </button>
                 </div>
             </div>

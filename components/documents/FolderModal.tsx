@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { getApiErrorMessage, parseApiResponse } from "@/lib/api/auth";
 
 interface FolderModalProps {
     onClose: () => void;
-    onCreated: () => void;
+    onCreated: (folderName: string) => void;
     parentId: string | null;
 }
 
@@ -46,7 +46,7 @@ export default function FolderModal({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ name: trimmed, parentId }),
             });
-            onCreated();
+            onCreated(trimmed);
         } catch (submitError) {
             setError(getApiErrorMessage(submitError));
         } finally {
@@ -55,45 +55,75 @@ export default function FolderModal({
     }
 
     return (
-        <div className="document-modal-backdrop" onClick={onClose}>
+        <div className="doc-modal-backdrop" onClick={onClose}>
             <form
-                className="document-modal small"
+                className="doc-modal small"
                 onSubmit={submit}
                 onClick={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="folder-modal-title"
             >
-                <button
-                    type="button"
-                    className="document-modal-close"
-                    onClick={onClose}
-                    aria-label="Close dialog"
-                >
-                    <X size={18} />
-                </button>
-                <h2>New Folder</h2>
-                {error && <p className="documents-error" role="alert">{error}</p>}
-                <label>
-                    Folder Name{" "}
-                    <input
-                        required
-                        autoFocus
-                        value={name}
-                        onChange={(event) => setName(event.target.value)}
-                        placeholder="ex. Projects"
+                <div className="doc-modal-header">
+                    <h2 id="folder-modal-title" className="doc-modal-title">New Folder</h2>
+                    <button
+                        type="button"
+                        className="doc-modal-close"
+                        onClick={onClose}
+                        aria-label="Close dialog"
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <div className="doc-modal-inner">
+                    {error && (
+                        <div className="doc-error-banner" style={{ width: "100%", margin: 0 }}>
+                            <span>{error}</span>
+                        </div>
+                    )}
+
+                    <div className="doc-form-group">
+                        <label htmlFor="folder-name-input" className="doc-field-label">
+                            Folder Name <span className="doc-field-required">*</span>
+                        </label>
+                        <input
+                            id="folder-name-input"
+                            className="doc-field-input"
+                            required
+                            autoFocus
+                            value={name}
+                            onChange={(event) => setName(event.target.value)}
+                            placeholder="ex. Projects"
+                            disabled={loading}
+                        />
+                    </div>
+                </div>
+
+                <div className="doc-modal-actions">
+                    <button
+                        type="button"
+                        className="doc-modal-btn-cancel"
+                        onClick={onClose}
                         disabled={loading}
-                    />
-                </label>
-                <footer>
-                    <button type="button" onClick={onClose} disabled={loading}>
+                    >
                         Cancel
                     </button>
                     <button
                         type="submit"
-                        className="documents-primary"
+                        className="doc-modal-btn-primary"
                         disabled={loading || !name.trim()}
                     >
-                        {loading ? "Creating..." : "Create Folder"}
+                        {loading ? (
+                            <>
+                                <Loader2 size={16} className="animate-spin" />
+                                <span>Creating...</span>
+                            </>
+                        ) : (
+                            "Create Folder"
+                        )}
                     </button>
-                </footer>
+                </div>
             </form>
         </div>
     );
