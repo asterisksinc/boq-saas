@@ -19,7 +19,7 @@ export default function SettingsOverview({
 }: SettingsOverviewProps) {
     return (
         <div className="settings-overview-layout">
-            {/* 1. Profile Header with working Edit Profile & dynamic progress bar */}
+            {/* 1. Profile Summary Card (Frame 93) */}
             <SettingsProfileHeader
                 displayName={viewModel.profile.name}
                 email={viewModel.profile.email}
@@ -30,20 +30,20 @@ export default function SettingsOverview({
                 onProfileUpdated={onProfileUpdated}
             />
 
-            {/* 2. KPI / Usage Cards: Projects, BOQs, Storage with star badge */}
+            {/* 2. Workspace Statistics Cards (Frame 2147225138) */}
             <SettingsUsageCards
                 projects={viewModel.usage.projects}
                 boqs={viewModel.usage.boqs}
                 storage={viewModel.usage.storage}
             />
 
-            {/* 3. Configuration Health: 7 interactive, real-data cards */}
+            {/* 3. Configuration Health Section (Frame 2147225140) */}
             <SettingsConfigurationHealth
                 healthCards={viewModel.healthCards}
                 onSelectTab={onSelectTab}
             />
 
-            {/* 4. Recent Changes: Real audit logs */}
+            {/* 4. Recent Changes Section (Frame 2147225141) */}
             <SettingsRecentChanges
                 recentChanges={viewModel.recentChanges}
             />

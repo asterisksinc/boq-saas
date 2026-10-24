@@ -39,10 +39,11 @@ export const PricingPreview: React.FC<PricingPreviewProps> = ({
     return (
         <aside className="boq-pricing-preview-card" aria-label="Pricing Preview">
             <h3 className="boq-preview-header">PRICING PREVIEW</h3>
+            <div className="boq-preview-divider-372" />
 
-            <div className="boq-preview-input-group">
-                <label htmlFor="pricing-base-cost" className="boq-form-label">
-                    Base Cost (₹) <span className="boq-required">*</span>
+            <div className="boq-preview-field-372 boq-preview-input-group">
+                <label htmlFor="pricing-base-cost" className="boq-pricing-label boq-form-label">
+                    Base Cost (₹) <span className="boq-required" style={{ color: "#EF4444" }}>*</span>
                 </label>
                 <input
                     id="pricing-base-cost"
@@ -50,36 +51,40 @@ export const PricingPreview: React.FC<PricingPreviewProps> = ({
                     min="0"
                     step="any"
                     value={baseCost === null ? "" : baseCost}
+                    placeholder="1,00,000"
                     onChange={handleInputChange}
-                    className="boq-form-input boq-preview-input"
+                    className="boq-preview-input-372 boq-form-input boq-preview-input"
                 />
             </div>
 
-            <div className="boq-preview-breakdown">
-                <div className="boq-preview-row">
-                    <span className="boq-preview-key">Markup</span>
-                    <span className="boq-preview-val">
-                        {preview.markupAmount !== null ? `₹${formatIndianNumber(preview.markupAmount)}` : "-"}
+            <div className="boq-preview-breakdown-list boq-preview-breakdown">
+                <div className="boq-preview-row-372 boq-preview-row">
+                    <span className="boq-preview-key-372 boq-preview-key">Markup</span>
+                    <span className="boq-preview-val-372 boq-preview-val">
+                        {preview.markupAmount !== null ? `₹ ${formatIndianNumber(preview.markupAmount)}` : "-"}
                     </span>
                 </div>
+                <div className="boq-preview-divider-372" />
 
-                <div className="boq-preview-row">
-                    <span className="boq-preview-key">{taxLabel}</span>
-                    <span className="boq-preview-val">
-                        {preview.taxAmount !== null ? `₹${formatIndianNumber(preview.taxAmount)}` : "-"}
+                <div className="boq-preview-row-372 boq-preview-row">
+                    <span className="boq-preview-key-372 boq-preview-key">{taxLabel}</span>
+                    <span className="boq-preview-val-372 boq-preview-val">
+                        {preview.taxAmount !== null ? `₹ ${formatIndianNumber(preview.taxAmount)}` : "-"}
                     </span>
                 </div>
+                <div className="boq-preview-divider-372" />
 
-                <div className="boq-preview-row">
-                    <span className="boq-preview-key">Final Price</span>
-                    <span className="boq-preview-val boq-preview-final">
-                        {preview.finalPrice !== null ? `₹${formatIndianNumber(preview.finalPrice)}` : "-"}
+                <div className="boq-preview-row-372 boq-preview-row">
+                    <span className="boq-preview-key-372 boq-preview-key">Final Price</span>
+                    <span className="boq-preview-val-final-372 boq-preview-val boq-preview-final">
+                        {preview.finalPrice !== null ? `₹ ${formatIndianNumber(preview.finalPrice)}` : "-"}
                     </span>
                 </div>
+                <div className="boq-preview-divider-372" />
 
-                <div className="boq-preview-row boq-preview-row-last">
-                    <span className="boq-preview-key">Gross Margin</span>
-                    <span className="boq-preview-val">
+                <div className="boq-preview-row-372 boq-preview-row boq-preview-row-last">
+                    <span className="boq-preview-key-372 boq-preview-key">Gross Margin</span>
+                    <span className="boq-preview-val-372 boq-preview-val">
                         {preview.grossMarginPercent !== null ? `${preview.grossMarginPercent}%` : "-"}
                     </span>
                 </div>

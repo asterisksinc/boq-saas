@@ -172,7 +172,7 @@ export default function BrandAssetUploader({
                             title={`Remove ${label}`}
                             aria-label={`Remove ${label}`}
                         >
-                            <X size={13} strokeWidth={2.5} />
+                            <X size={16} strokeWidth={2.5} />
                         </button>
 
                         <div className={`brand-asset-image-wrap ${assetType === "favicon" ? "is-favicon" : ""}`}>

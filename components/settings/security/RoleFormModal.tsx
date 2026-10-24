@@ -68,9 +68,9 @@ export default function RoleFormModal({
 
     return (
         <div className="security-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="role-modal-title">
-            <div className="security-modal-box">
+            <div className="security-modal-box" data-testid="role-form-modal">
                 <div className="security-modal-header">
-                    <div>
+                    <div className="security-modal-header-text">
                         <h3 id="role-modal-title" className="security-modal-title">
                             {isEditing ? "Edit Role" : "Add Role"}
                         </h3>
@@ -87,30 +87,32 @@ export default function RoleFormModal({
                         aria-label="Close modal"
                         disabled={submitting}
                     >
-                        <X size={18} />
+                        <X size={24} />
                     </button>
                 </div>
 
                 {errorMessage && (
-                    <div className="notice-banner error" role="alert" style={{ marginBottom: 16 }}>
+                    <div className="notice-banner error" role="alert" style={{ width: "100%", margin: 0 }}>
                         <span>{errorMessage}</span>
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit}>
-                    <div className="security-modal-field full-width" style={{ marginBottom: 20 }}>
-                        <label className="security-modal-label">
-                            Role Name <span className="req">*</span>
-                        </label>
-                        <input
-                            type="text"
-                            className="security-modal-input"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            placeholder="e.g. Marketing Manager"
-                            disabled={submitting}
-                            autoFocus
-                        />
+                <form onSubmit={handleSubmit} className="security-modal-form-wrapper">
+                    <div className="security-modal-inner-card">
+                        <div className="security-modal-field full-width">
+                            <label className="security-modal-label">
+                                Role Name <span className="req">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                className="security-modal-input"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                placeholder="e.g. Marketing Manager"
+                                disabled={submitting}
+                                autoFocus
+                            />
+                        </div>
                     </div>
 
                     <div className="security-modal-footer">
@@ -129,7 +131,7 @@ export default function RoleFormModal({
                         >
                             {submitting ? (
                                 <>
-                                    <Loader2 size={15} className="spin" />
+                                    <Loader2 size={16} className="spin" />
                                     <span>Saving...</span>
                                 </>
                             ) : (

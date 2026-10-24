@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { X, Loader2 } from "lucide-react";
+import { X, Loader2, ChevronDown } from "lucide-react";
 import {
     WorkspaceUserItem,
     WorkspaceRoleItem,
@@ -123,9 +123,9 @@ export default function UserFormModal({
 
     return (
         <div className="security-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="user-modal-title">
-            <div className="security-modal-box">
+            <div className="security-modal-box" data-testid="add-user-modal">
                 <div className="security-modal-header">
-                    <div>
+                    <div className="security-modal-header-text">
                         <h3 id="user-modal-title" className="security-modal-title">
                             {isEditing ? "Edit User" : "Add User"}
                         </h3>
@@ -142,91 +142,101 @@ export default function UserFormModal({
                         aria-label="Close modal"
                         disabled={submitting}
                     >
-                        <X size={18} />
+                        <X size={24} />
                     </button>
                 </div>
 
                 {errorMessage && (
-                    <div className="notice-banner error" role="alert" style={{ marginBottom: 16 }}>
+                    <div className="notice-banner error" role="alert" style={{ width: "100%", margin: 0 }}>
                         <span>{errorMessage}</span>
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit}>
-                    <div className="security-modal-form-grid">
-                        <div className="security-modal-field">
-                            <label className="security-modal-label">
-                                First Name <span className="req">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                className="security-modal-input"
-                                value={firstName}
-                                onChange={(e) => setFirstName(e.target.value)}
-                                placeholder="e.g. Robert"
-                                disabled={submitting}
-                                autoFocus
-                            />
+                <form onSubmit={handleSubmit} className="security-modal-form-wrapper">
+                    <div className="security-modal-inner-card">
+                        {/* Row 1: First Name & Last Name */}
+                        <div className="security-modal-row">
+                            <div className="security-modal-field">
+                                <label className="security-modal-label">
+                                    First Name <span className="req">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    className="security-modal-input"
+                                    value={firstName}
+                                    onChange={(e) => setFirstName(e.target.value)}
+                                    placeholder="e.g. Robert"
+                                    disabled={submitting}
+                                    autoFocus
+                                />
+                            </div>
+
+                            <div className="security-modal-field">
+                                <label className="security-modal-label">
+                                    Last Name <span className="req">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    className="security-modal-input"
+                                    value={lastName}
+                                    onChange={(e) => setLastName(e.target.value)}
+                                    placeholder="e.g. Fox"
+                                    disabled={submitting}
+                                />
+                            </div>
                         </div>
 
-                        <div className="security-modal-field">
-                            <label className="security-modal-label">
-                                Last Name <span className="req">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                className="security-modal-input"
-                                value={lastName}
-                                onChange={(e) => setLastName(e.target.value)}
-                                placeholder="e.g. Fox"
-                                disabled={submitting}
-                            />
+                        {/* Row 2: Email & Phone */}
+                        <div className="security-modal-row">
+                            <div className="security-modal-field">
+                                <label className="security-modal-label">
+                                    Email <span className="req">*</span>
+                                </label>
+                                <input
+                                    type="email"
+                                    className="security-modal-input"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    placeholder="bill.sanders@example.com"
+                                    disabled={submitting}
+                                />
+                            </div>
+
+                            <div className="security-modal-field">
+                                <label className="security-modal-label">
+                                    Phone <span className="req">*</span>
+                                </label>
+                                <input
+                                    type="tel"
+                                    className="security-modal-input"
+                                    value={phone}
+                                    onChange={(e) => setPhone(e.target.value)}
+                                    placeholder="(406) 555-0120"
+                                    disabled={submitting}
+                                />
+                            </div>
                         </div>
 
-                        <div className="security-modal-field">
-                            <label className="security-modal-label">
-                                Email <span className="req">*</span>
-                            </label>
-                            <input
-                                type="email"
-                                className="security-modal-input"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                placeholder="bill.sanders@example.com"
-                                disabled={submitting}
-                            />
-                        </div>
-
-                        <div className="security-modal-field">
-                            <label className="security-modal-label">
-                                Phone <span className="req">*</span>
-                            </label>
-                            <input
-                                type="tel"
-                                className="security-modal-input"
-                                value={phone}
-                                onChange={(e) => setPhone(e.target.value)}
-                                placeholder="(406) 555-0120"
-                                disabled={submitting}
-                            />
-                        </div>
-
+                        {/* Row 3: Role Field */}
                         <div className="security-modal-field full-width">
                             <label className="security-modal-label">
                                 Role <span className="req">*</span>
                             </label>
-                            <select
-                                className="security-modal-select"
-                                value={role}
-                                onChange={(e) => setRole(e.target.value)}
-                                disabled={submitting}
-                            >
-                                {availableRoles.map((r) => (
-                                    <option key={r.id} value={r.name}>
-                                        {r.name}
-                                    </option>
-                                ))}
-                            </select>
+                            <div className="security-modal-select-wrap">
+                                <select
+                                    className="security-modal-select"
+                                    value={role}
+                                    onChange={(e) => setRole(e.target.value)}
+                                    disabled={submitting}
+                                >
+                                    {availableRoles.map((r) => (
+                                        <option key={r.id} value={r.name}>
+                                            {r.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <ChevronDown size={20} className="security-modal-select-icon" aria-hidden="true" />
+                            </div>
                         </div>
                     </div>
 
@@ -246,7 +256,7 @@ export default function UserFormModal({
                         >
                             {submitting ? (
                                 <>
-                                    <Loader2 size={15} className="spin" />
+                                    <Loader2 size={16} className="spin" />
                                     <span>Saving...</span>
                                 </>
                             ) : (

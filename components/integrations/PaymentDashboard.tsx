@@ -1,91 +1,151 @@
 "use client";
 
-import { useEffect, useState } from 'react';
-import { integrationsApi } from '@/lib/api/integrations';
+import { useEffect, useState, useCallback } from 'react';
+import { ArrowUp, ArrowDown, Minus } from 'lucide-react';
+import { integrationsApi, PaymentSummaryData, PaymentAnalyticsData } from '@/lib/api/integrations';
 import PaymentBarChart from './PaymentBarChart';
+import PaymentStatusDonut from './PaymentStatusDonut';
 import TransactionsTable from './TransactionsTable';
 
 export default function PaymentDashboard({ integrationId }: { integrationId: string }) {
-    const [summary, setSummary] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
+    const [summary, setSummary] = useState<PaymentSummaryData | null>(null);
+    const [analytics, setAnalytics] = useState<PaymentAnalyticsData | null>(null);
+    const [period, setPeriod] = useState<string>('week');
+    const [loadingSummary, setLoadingSummary] = useState(true);
+    const [loadingAnalytics, setLoadingAnalytics] = useState(true);
 
-    useEffect(() => {
-        const load = async () => {
-            try {
-                const res = await integrationsApi.paymentSummary(integrationId);
-                setSummary(res);
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
-        };
-        load();
+    const loadSummary = useCallback(async () => {
+        try {
+            setLoadingSummary(true);
+            const res = await integrationsApi.paymentSummary(integrationId);
+            setSummary(res);
+        } catch (err) {
+            console.error('Failed to load payment summary', err);
+        } finally {
+            setLoadingSummary(false);
+        }
     }, [integrationId]);
 
-    if (loading) {
+    const loadAnalytics = useCallback(async (selectedPeriod: string) => {
+        try {
+            setLoadingAnalytics(true);
+            const res = await integrationsApi.paymentAnalytics(integrationId, selectedPeriod);
+            setAnalytics(res);
+        } catch (err) {
+            console.error('Failed to load payment analytics', err);
+        } finally {
+            setLoadingAnalytics(false);
+        }
+    }, [integrationId]);
+
+    useEffect(() => {
+        loadSummary();
+    }, [loadSummary]);
+
+    useEffect(() => {
+        loadAnalytics(period);
+    }, [loadAnalytics, period]);
+
+    const currency = summary?.currency || analytics?.currency || 'INR';
+
+    const fmt = new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
+
+    const renderDelta = (
+        change: number | undefined | null,
+        variant: 'green' | 'amber' | 'blue' | 'red'
+    ) => {
+        if (change == null) return null;
+
+        const rounded = Math.round(Math.abs(change));
+        const isZero = rounded === 0;
+        const isPositive = change > 0;
+
+        let colorClass = `trend-${variant}`;
+        if (variant === 'green' && !isPositive && !isZero) colorClass = 'trend-red';
+
         return (
-            <div>
-                <div className="intg-summary-grid">
-                    {[0, 1, 2, 3].map(i => <div key={i} className="intg-skeleton intg-skeleton-kpi" />)}
-                </div>
-                <div className="intg-skeleton intg-skeleton-chart" style={{ height: '400px', marginTop: '24px' }} />
+            <div className="razorpay-kpi-trend">
+                <span className={`razorpay-kpi-delta ${colorClass}`}>
+                    {isZero ? (
+                        <Minus size={14} />
+                    ) : isPositive ? (
+                        <ArrowUp size={14} />
+                    ) : (
+                        <ArrowDown size={14} />
+                    )}
+                    <span>{rounded}%</span>
+                </span>
+                <span className="razorpay-kpi-trend-sub">vs last month</span>
             </div>
         );
-    }
-
-    const fmt = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
+    };
 
     return (
-        <div className="intg-payment-dashboard">
-            <div className="intg-summary-grid">
-                <div className="intg-kpi-card intg-payment-kpi">
-                    <span className="intg-kpi-label">ACCOUNT RECEIVED</span>
-                    <strong className="intg-kpi-value text-green">{fmt.format(summary?.accountReceived || 0)}</strong>
-                    <span className="intg-kpi-sub">Total amount received</span>
+        <div className="razorpay-integration-page__content">
+            {/* KPI Summary Cards Row (Frame 2147225138) */}
+            <div className="razorpay-kpi-grid">
+                {/* Card 1: Account Received */}
+                <div className="razorpay-kpi-card">
+                    <span className="razorpay-kpi-label">Account Received</span>
+                    <strong className="razorpay-kpi-value">
+                        {loadingSummary ? '...' : fmt.format(summary?.accountReceived ?? 0)}
+                    </strong>
+                    {!loadingSummary && renderDelta(summary?.accountReceivedChange, 'green')}
                 </div>
-                <div className="intg-kpi-card intg-payment-kpi">
-                    <span className="intg-kpi-label">AMOUNT DUE</span>
-                    <strong className="intg-kpi-value text-orange">{fmt.format(summary?.amountDue || 0)}</strong>
-                    <span className="intg-kpi-sub">Total amount due</span>
+
+                {/* Card 2: Amount Due */}
+                <div className="razorpay-kpi-card">
+                    <span className="razorpay-kpi-label">Amount Due</span>
+                    <strong className="razorpay-kpi-value">
+                        {loadingSummary ? '...' : fmt.format(summary?.amountDue ?? 0)}
+                    </strong>
+                    {!loadingSummary && renderDelta(summary?.amountDueChange, 'amber')}
                 </div>
-                <div className="intg-kpi-card intg-payment-kpi">
-                    <span className="intg-kpi-label">TOTAL PENDING</span>
-                    <strong className="intg-kpi-value text-blue">{fmt.format(summary?.totalPending || 0)}</strong>
-                    <span className="intg-kpi-sub">Pending verification</span>
+
+                {/* Card 3: Total Pending */}
+                <div className="razorpay-kpi-card">
+                    <span className="razorpay-kpi-label">Total Pending</span>
+                    <strong className="razorpay-kpi-value">
+                        {loadingSummary ? '...' : fmt.format(summary?.totalPending ?? 0)}
+                    </strong>
+                    {!loadingSummary && renderDelta(summary?.totalPendingChange, 'blue')}
                 </div>
-                <div className="intg-kpi-card intg-payment-kpi">
-                    <span className="intg-kpi-label">FAILED PAYMENTS</span>
-                    <strong className="intg-kpi-value text-red">{fmt.format(summary?.failedPayments || 0)}</strong>
-                    <span className="intg-kpi-sub">Failed transactions</span>
+
+                {/* Card 4: Failed Payments */}
+                <div className="razorpay-kpi-card">
+                    <span className="razorpay-kpi-label">Failed Payments</span>
+                    <strong className="razorpay-kpi-value">
+                        {loadingSummary ? '...' : fmt.format(summary?.failedPayments ?? 0)}
+                    </strong>
+                    {!loadingSummary && renderDelta(summary?.failedPaymentsChange, 'red')}
                 </div>
             </div>
 
-            <div className="intg-charts-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px', marginTop: '24px' }}>
-                <PaymentBarChart integrationId={integrationId} />
-                <div className="intg-chart-container">
-                    <h3>Payment by Status</h3>
-                    <div className="intg-donut-wrapper" style={{ position: 'relative', width: '200px', height: '200px', margin: '2rem auto' }}>
-                        <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
-                            <circle cx="50" cy="50" r="40" fill="transparent" stroke="#f3f4f6" strokeWidth="20" />
-                            <circle cx="50" cy="50" r="40" fill="transparent" stroke="#10b981" strokeWidth="20" strokeDasharray="180 251" strokeDashoffset="0" />
-                            <circle cx="50" cy="50" r="40" fill="transparent" stroke="#f59e0b" strokeWidth="20" strokeDasharray="50 251" strokeDashoffset="-180" />
-                            <circle cx="50" cy="50" r="40" fill="transparent" stroke="#ef4444" strokeWidth="20" strokeDasharray="21 251" strokeDashoffset="-230" />
-                        </svg>
-                        <div className="intg-donut-center" style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-                            <span style={{ fontSize: '1.25rem', fontWeight: 600 }}>245</span>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--body)' }}>Transactions</span>
-                        </div>
-                    </div>
-                    <div className="intg-chart-legend" style={{ flexDirection: 'column', alignItems: 'flex-start', paddingLeft: '20px' }}>
-                        <span className="intg-legend-item"><span className="intg-legend-color intg-bg-green" /> Successful (180)</span>
-                        <span className="intg-legend-item"><span className="intg-legend-color intg-bg-orange" /> Pending (50)</span>
-                        <span className="intg-legend-item"><span className="intg-legend-color intg-bg-red" /> Failed (15)</span>
-                    </div>
-                </div>
+            {/* Analytics Row: Payment Overview + Payment by Status (Frame 2147224997) */}
+            <div className="razorpay-analytics-row">
+                <PaymentBarChart
+                    period={period}
+                    onPeriodChange={setPeriod}
+                    overview={analytics?.paymentOverview}
+                    currency={currency}
+                    loading={loadingAnalytics}
+                />
+                <PaymentStatusDonut
+                    breakdown={analytics?.statusBreakdown}
+                    loading={loadingAnalytics}
+                />
             </div>
 
-            <TransactionsTable integrationId={integrationId} currency={summary?.currency || 'INR'} />
+            {/* Recent Transactions Table Panel (Frame 2147225140) */}
+            <TransactionsTable
+                integrationId={integrationId}
+                currency={currency}
+            />
         </div>
     );
 }

@@ -21,22 +21,29 @@ export default function AdditionalSettingsLayout({
 
     // Sync activeSection with URL search params
     useEffect(() => {
-        if (typeof window !== "undefined") {
-            const params = new URLSearchParams(window.location.search);
-            const sectionParam = params.get("section") as AdditionalSubSection | null;
-            if (
-                sectionParam &&
-                ["data-export", "data-retention", "delete-account"].includes(sectionParam)
-            ) {
-                setActiveSection(sectionParam);
+        const syncFromUrl = () => {
+            if (typeof window !== "undefined") {
+                const params = new URLSearchParams(window.location.search);
+                const sectionParam = params.get("section") as AdditionalSubSection | null;
+                if (
+                    sectionParam &&
+                    ["data-export", "data-retention", "delete-account"].includes(sectionParam)
+                ) {
+                    setActiveSection(sectionParam);
+                }
             }
-        }
+        };
+
+        syncFromUrl();
+        window.addEventListener("popstate", syncFromUrl);
+        return () => window.removeEventListener("popstate", syncFromUrl);
     }, []);
 
     const handleSelectSection = (section: AdditionalSubSection) => {
         setActiveSection(section);
         if (typeof window !== "undefined") {
             const url = new URL(window.location.href);
+            url.searchParams.set("tab", "additional");
             url.searchParams.set("section", section);
             window.history.replaceState({}, "", url.toString());
         }
@@ -70,27 +77,25 @@ export default function AdditionalSettingsLayout({
                 onSelectSection={handleSelectSection}
             />
 
-            <div style={{ flex: 1, minWidth: 0 }}>
-                {activeSection === "data-export" && (
-                    <DataExportCard showNotice={showNotice} />
-                )}
+            {activeSection === "data-export" && (
+                <DataExportCard showNotice={showNotice} />
+            )}
 
-                {activeSection === "data-retention" && (
-                    <DataRetentionSection
-                        retention={retention}
-                        loading={loading}
-                        onUpdateRetention={setRetention}
-                        showNotice={showNotice}
-                    />
-                )}
+            {activeSection === "data-retention" && (
+                <DataRetentionSection
+                    retention={retention}
+                    loading={loading}
+                    onUpdateRetention={setRetention}
+                    showNotice={showNotice}
+                />
+            )}
 
-                {activeSection === "delete-account" && (
-                    <DeleteAccountSection
-                        showNotice={showNotice}
-                        onNavigateToExport={() => handleSelectSection("data-export")}
-                    />
-                )}
-            </div>
+            {activeSection === "delete-account" && (
+                <DeleteAccountSection
+                    showNotice={showNotice}
+                    onNavigateToExport={() => handleSelectSection("data-export")}
+                />
+            )}
         </div>
     );
 }

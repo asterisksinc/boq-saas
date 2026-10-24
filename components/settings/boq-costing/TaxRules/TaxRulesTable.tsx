@@ -127,14 +127,14 @@ export default function TaxRulesTable({
     };
 
     return (
-        <div className="boq-content-card">
-            {/* Header: Tax Rules + Add Tax Rule */}
+        <div className="boq-tax-panel">
+            {/* Header: Frame 2147225545 (Tax Rules + Add Tax Rule) */}
             <div className="boq-card-header">
                 <h2 className="boq-card-title">Tax Rules</h2>
                 <button
                     type="button"
                     onClick={handleOpenAdd}
-                    className="boq-btn-primary"
+                    className="boq-btn-add-tax"
                     disabled={!canEdit}
                 >
                     <Plus size={16} aria-hidden="true" />
@@ -150,7 +150,7 @@ export default function TaxRulesTable({
                     <button
                         type="button"
                         onClick={handleOpenAdd}
-                        className="boq-btn-primary"
+                        className="boq-btn-add-tax"
                         disabled={!canEdit}
                         style={{ marginTop: "14px" }}
                     >
@@ -159,17 +159,17 @@ export default function TaxRulesTable({
                     </button>
                 </div>
             ) : (
-                /* Table matching Screenshot 4 */
+                /* Table matching Frame 57 & Frame 61 */
                 <div className="boq-table-wrapper" ref={menuRef}>
                     <table className="boq-table" aria-label="Tax rules list">
                         <thead>
-                            <tr>
-                                <th scope="col" style={{ width: "24%" }}>RULE NAME</th>
-                                <th scope="col" style={{ width: "16%" }}>CODE</th>
-                                <th scope="col" style={{ width: "16%" }}>RATE</th>
-                                <th scope="col" style={{ width: "18%" }}>INCLUSIVE</th>
-                                <th scope="col" style={{ width: "16%" }}>STATUS</th>
-                                <th scope="col" style={{ width: "10%", textAlign: "right" }} aria-label="Actions" />
+                            <tr className="boq-table-header-row">
+                                <th scope="col" className="boq-tax-th-name">RULE NAME</th>
+                                <th scope="col" className="boq-tax-th-code">CODE</th>
+                                <th scope="col" className="boq-tax-th-rate">RATE</th>
+                                <th scope="col" className="boq-tax-th-inclusive">INCLUSIVE</th>
+                                <th scope="col" className="boq-tax-th-status">STATUS</th>
+                                <th scope="col" className="boq-tax-th-actions" aria-label="Actions" />
                             </tr>
                         </thead>
                         <tbody>
@@ -179,19 +179,19 @@ export default function TaxRulesTable({
 
                                 return (
                                     <tr key={rule.id} className="boq-table-row">
-                                        <td className="boq-table-cell-name">
+                                        <td className="boq-table-cell boq-tax-td-name">
                                             <span>{rule.name}</span>
                                         </td>
-                                        <td className="boq-table-cell-code">
+                                        <td className="boq-table-cell boq-tax-td-code">
                                             <span>{rule.code}</span>
                                         </td>
-                                        <td className="boq-table-cell-rate">
+                                        <td className="boq-table-cell boq-tax-td-rate">
                                             <span>{rule.rate}%</span>
                                         </td>
-                                        <td className="boq-table-cell-inclusive">
+                                        <td className="boq-table-cell boq-tax-td-inclusive">
                                             <span>{rule.inclusive ? "Inclusive" : "Exclusive"}</span>
                                         </td>
-                                        <td className="boq-table-cell-active">
+                                        <td className="boq-table-cell boq-tax-td-status">
                                             <button
                                                 type="button"
                                                 role="switch"
@@ -208,7 +208,7 @@ export default function TaxRulesTable({
                                                 </span>
                                             </button>
                                         </td>
-                                        <td className="boq-table-cell-actions" style={{ textAlign: "right", position: "relative" }}>
+                                        <td className="boq-table-cell boq-tax-td-actions">
                                             <button
                                                 type="button"
                                                 className="boq-actions-btn"

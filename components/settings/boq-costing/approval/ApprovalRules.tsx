@@ -53,7 +53,6 @@ export const ApprovalRules: React.FC<ApprovalRulesProps> = ({
 
     const handleMinValueFocus = () => {
         setIsFocusedMinValue(true);
-        // Show raw number or clean value while typing
         setMinValueDisplay(minValue === 0 ? "" : String(minValue));
     };
 
@@ -95,9 +94,9 @@ export const ApprovalRules: React.FC<ApprovalRulesProps> = ({
     };
 
     return (
-        <form onSubmit={handleSave} className="boq-approval-container">
-            {/* Card 1: Requirement Toggles */}
-            <div className="boq-approval-toggles-card">
+        <form onSubmit={handleSave} className="boq-approval-col boq-approval-container">
+            {/* Card 1: Requirement Toggles (1060px x 125px) */}
+            <div className="boq-approval-card-toggles boq-approval-toggles-card">
                 <ApprovalSettingRow
                     id="approval-internal-required"
                     label="Internal Approval Required"
@@ -105,7 +104,7 @@ export const ApprovalRules: React.FC<ApprovalRulesProps> = ({
                     canEdit={canEdit}
                     onChange={setInternalApproval}
                 />
-                <div className="boq-toggle-divider" />
+                <div className="boq-approval-divider-1020 boq-toggle-divider" />
                 <ApprovalSettingRow
                     id="approval-client-required"
                     label="Client Approval Required"
@@ -115,12 +114,12 @@ export const ApprovalRules: React.FC<ApprovalRulesProps> = ({
                 />
             </div>
 
-            {/* Card 2: Numeric Thresholds */}
-            <div className="boq-approval-thresholds-card">
-                <div className="boq-threshold-grid">
-                    <div className="boq-form-group">
-                        <label htmlFor="approval-min-value-input" className="boq-form-label">
-                            Min Value for Approval (₹) <span className="boq-required">*</span>
+            {/* Card 2: Numeric Thresholds (1060px x 206px) */}
+            <div className="boq-approval-card-thresholds boq-approval-thresholds-card">
+                <div className="boq-approval-row-1020">
+                    <div className="boq-approval-field-500 boq-form-group">
+                        <label htmlFor="approval-min-value-input" className="boq-pricing-label boq-form-label">
+                            Min Value for Approval (₹) <span className="boq-required" style={{ color: "#EF4444" }}>*</span>
                         </label>
                         <input
                             id="approval-min-value-input"
@@ -132,14 +131,14 @@ export const ApprovalRules: React.FC<ApprovalRulesProps> = ({
                             onFocus={handleMinValueFocus}
                             onBlur={handleMinValueBlur}
                             disabled={!canEdit}
-                            className="boq-form-input"
+                            className="boq-approval-input-500 boq-form-input"
                             required
                         />
                     </div>
 
-                    <div className="boq-form-group">
-                        <label htmlFor="approval-discount-threshold-input" className="boq-form-label">
-                            Discount Approval Threshold (%) <span className="boq-required">*</span>
+                    <div className="boq-approval-field-500 boq-form-group">
+                        <label htmlFor="approval-discount-threshold-input" className="boq-pricing-label boq-form-label">
+                            Discount Approval Threshold (%) <span className="boq-required" style={{ color: "#EF4444" }}>*</span>
                         </label>
                         <input
                             id="approval-discount-threshold-input"
@@ -151,14 +150,16 @@ export const ApprovalRules: React.FC<ApprovalRulesProps> = ({
                             placeholder="5"
                             onChange={(e) => setDiscountThreshold(e.target.value === "" ? 0 : Number(e.target.value))}
                             disabled={!canEdit}
-                            className="boq-form-input"
+                            className="boq-approval-input-500 boq-form-input"
                             required
                         />
                     </div>
+                </div>
 
-                    <div className="boq-form-group">
-                        <label htmlFor="approval-margin-threshold-input" className="boq-form-label">
-                            Margin Approval Threshold (%) <span className="boq-required">*</span>
+                <div className="boq-approval-row-1020">
+                    <div className="boq-approval-field-500 boq-form-group">
+                        <label htmlFor="approval-margin-threshold-input" className="boq-pricing-label boq-form-label">
+                            Margin Approval Threshold (%) <span className="boq-required" style={{ color: "#EF4444" }}>*</span>
                         </label>
                         <input
                             id="approval-margin-threshold-input"
@@ -170,33 +171,31 @@ export const ApprovalRules: React.FC<ApprovalRulesProps> = ({
                             placeholder="20"
                             onChange={(e) => setMarginThreshold(e.target.value === "" ? 0 : Number(e.target.value))}
                             disabled={!canEdit}
-                            className="boq-form-input"
+                            className="boq-approval-input-500 boq-form-input"
                             required
                         />
                     </div>
 
-                    <div>{/* Empty column cell for clean 2-column grid alignment */}</div>
+                    <div className="boq-approval-field-500" style={{ visibility: "hidden" }} aria-hidden="true" />
                 </div>
             </div>
 
-            {/* Save Changes Button */}
+            {/* Save Changes Button (Buttons Frame: 119px x 46px, radius 6px, #2563EB) */}
             {canEdit && (
-                <div className="boq-settings-actions-footer">
-                    <button
-                        type="submit"
-                        disabled={saving}
-                        className="boq-btn-primary boq-save-btn"
-                    >
-                        {saving ? (
-                            <>
-                                <Loader2 size={16} className="boq-spinner" aria-hidden="true" />
-                                <span>Saving...</span>
-                            </>
-                        ) : (
-                            <span>Save Changes</span>
-                        )}
-                    </button>
-                </div>
+                <button
+                    type="submit"
+                    disabled={saving}
+                    className="boq-btn-save-changes boq-btn-primary boq-save-btn"
+                >
+                    {saving ? (
+                        <>
+                            <Loader2 size={16} className="boq-spinner animate-spin" aria-hidden="true" />
+                            <span>Saving...</span>
+                        </>
+                    ) : (
+                        <span>Save Changes</span>
+                    )}
+                </button>
             )}
         </form>
     );

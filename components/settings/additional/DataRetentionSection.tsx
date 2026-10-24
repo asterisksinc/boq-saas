@@ -43,29 +43,31 @@ export default function DataRetentionSection({
     };
 
     return (
-        <div className="additional-main-container" data-testid="data-retention-section">
+        <div className="additional-main-container is-data-retention" data-testid="data-retention-section">
+            {/* Header Frame 2147225606 */}
             <div className="additional-section-header">
                 <div className="additional-section-header-left">
                     <h2 className="additional-section-title">Data Retention</h2>
                 </div>
             </div>
 
+            {/* Divider Rectangle 34624165 */}
             <div className="additional-card-divider" />
 
             {loading ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                <div className="additional-retention-list">
                     <div
                         className="skeleton"
-                        style={{ height: "76px", borderRadius: "10px", width: "100%" }}
+                        style={{ height: "82px", borderRadius: "6px", width: "100%" }}
                     />
                     <div
                         className="skeleton"
-                        style={{ height: "76px", borderRadius: "10px", width: "100%" }}
+                        style={{ height: "82px", borderRadius: "6px", width: "100%" }}
                     />
                 </div>
             ) : (
-                <div style={{ display: "flex", flexDirection: "column" }}>
-                    {/* Card 1: Recycle Bin Retention */}
+                <div className="additional-retention-list">
+                    {/* Card 1: Recycle Bin Retention (Frame 95) */}
                     <div className="additional-inner-card" data-testid="retention-recycle-bin">
                         <div className="additional-card-info">
                             <h3 className="additional-card-info-title">Recycle Bin Retention</h3>
@@ -76,7 +78,7 @@ export default function DataRetentionSection({
                         <div className="additional-retention-value">{recycleDays} days</div>
                     </div>
 
-                    {/* Card 2: Auto-delete Draft BOQs */}
+                    {/* Card 2: Auto-delete Draft BOQs (Frame 2147225610) */}
                     <div className="additional-inner-card" data-testid="retention-auto-delete">
                         <div className="additional-card-info">
                             <h3 className="additional-card-info-title">Auto-delete Draft BOQs</h3>
@@ -101,8 +103,8 @@ export default function DataRetentionSection({
                                     className="spin"
                                     style={{
                                         position: "absolute",
-                                        top: "6px",
-                                        left: autoDelete ? "8px" : "24px",
+                                        top: "5px",
+                                        left: autoDelete ? "8px" : "22px",
                                         color: autoDelete ? "#ffffff" : "#64748b",
                                     }}
                                 />

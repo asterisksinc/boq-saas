@@ -28,6 +28,11 @@ import {
     TrendingUp,
     TrendingDown,
     ChevronLeft,
+    ChevronUp,
+    ChevronsUpDown,
+    CheckSquare,
+    CheckCircle,
+    AlertTriangle,
     Paperclip,
 } from "lucide-react";
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -43,6 +48,7 @@ import {
     createActivityTask,
     getActivityTask,
     updateActivityTask,
+    deleteActivityTask,
     listActivityTaskComments,
     createActivityTaskComment,
     listActivityApprovals,
@@ -222,6 +228,11 @@ export default function ActivitiesPage() {
     const [taskQuery, setTaskQuery] = useState("");
     const [taskFilter, setTaskFilter] = useState("all");
     const [taskPriorityFilter, setTaskPriorityFilter] = useState("all");
+    const [taskProjectFilter, setTaskProjectFilter] = useState("all");
+    const [taskStageFilter, setTaskStageFilter] = useState("all");
+    const [taskAssigneeFilter, setTaskAssigneeFilter] = useState("all");
+    const [taskSortField, setTaskSortField] = useState<string>("updatedAt");
+    const [taskSortDirection, setTaskSortDirection] = useState<"asc" | "desc">("desc");
     const [taskFilterOpen, setTaskFilterOpen] = useState(false);
     const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
     const [taskPage, setTaskPage] = useState(1);
@@ -246,6 +257,10 @@ export default function ActivitiesPage() {
     const [loadingApprovals, setLoadingApprovals] = useState(true);
     const [approvalQuery, setApprovalQuery] = useState("");
     const [approvalFilter, setApprovalFilter] = useState("all");
+    const [approvalProjectFilter, setApprovalProjectFilter] = useState("all");
+    const [approvalStageFilter, setApprovalStageFilter] = useState("all");
+    const [approvalSortField, setApprovalSortField] = useState<"name" | "project" | "dueDate" | "status" | "requestedAt">("name");
+    const [approvalSortDirection, setApprovalSortDirection] = useState<"asc" | "desc">("asc");
     const [approvalFilterOpen, setApprovalFilterOpen] = useState(false);
     const [approvalPage, setApprovalPage] = useState(1);
     const [approvalPageSize, setApprovalPageSize] = useState(10);
@@ -256,6 +271,7 @@ export default function ActivitiesPage() {
     const [approvalProjects, setApprovalProjects] = useState<Array<{ id: string; name: string; projectCode: string | null }>>([]);
     const [approvalStages, setApprovalStages] = useState<ActivityStage[]>([]);
     const [approvalError, setApprovalError] = useState("");
+    const [isSubmittingApproval, setIsSubmittingApproval] = useState(false);
     const [approvalComments, setApprovalComments] = useState<ActivityComment[]>([]);
     const [approvalCommentText, setApprovalCommentText] = useState("");
     const [sendingApprovalComment, setSendingApprovalComment] = useState(false);
@@ -284,9 +300,15 @@ export default function ActivitiesPage() {
     };
 
     const approverOptions = useMemo(() => {
-        return [
-            ...teamMembers.map(m => ({ id: m.id, name: m.name, role: m.role || "Team" })),
-        ];
+        const list = teamMembers.map(m => ({ id: m.id, name: m.name, role: m.role || "Team" }));
+        if (list.length === 0) {
+            list.push(
+                { id: "appr-1", name: "Anand Rathi", role: "Principal Architect" },
+                { id: "appr-2", name: "Priya Sharma", role: "Lead PM" },
+                { id: "appr-3", name: "Rajesh Kumar", role: "Site Supervisor" },
+            );
+        }
+        return list;
     }, [teamMembers]);
 
     const handleApprovalFileSelect = (files: FileList | null) => {
@@ -339,16 +361,43 @@ export default function ActivitiesPage() {
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape" && (createStage || editStage) && !isSubmittingStage) {
-                setCreateStage(false);
-                setEditStage(null);
-                setStageForm(blankStage);
-                setStageError("");
+            if (e.key === "Escape") {
+                if (taskDetail && !createTask) {
+                    setTaskDetail(null);
+                    return;
+                }
+                if (approvalDetail && !createApproval) {
+                    setApprovalDetail(null);
+                    return;
+                }
+                if ((createStage || editStage) && !isSubmittingStage) {
+                    setCreateStage(false);
+                    setEditStage(null);
+                    setStageForm(blankStage);
+                    setStageError("");
+                    return;
+                }
+                if (createTask) {
+                    setCreateTask(false);
+                    setTaskDetail(null);
+                    setTaskForm(blankTask);
+                    setTaskAttachments([]);
+                    setTaskError("");
+                    return;
+                }
+                if (createApproval && !isSubmittingApproval) {
+                    setCreateApproval(false);
+                    setApprovalDetail(null);
+                    setApprovalForm(blankApproval);
+                    setApprovalAttachments([]);
+                    setApprovalError("");
+                    return;
+                }
             }
         };
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [createStage, editStage, isSubmittingStage]);
+    }, [taskDetail, approvalDetail, createStage, editStage, isSubmittingStage, isSubmittingApproval, createTask, createApproval]);
 
     useEffect(() => {
         if (!notice) return;
@@ -445,10 +494,13 @@ export default function ActivitiesPage() {
         description: a.description || null,
         approverId: a.approverId || a.approver_id || null,
         approverName: a.approverName || a.approver_name || null,
+        approverRole: a.approverRole || a.approver_role || null,
         dueDate: a.dueDate || a.due_date || "",
         status: a.status || "draft",
         attachments: a.attachments || [],
         requestedBy: a.requestedBy || a.requested_by || "",
+        requesterName: a.requesterName || a.requester_name || null,
+        customDueSubtext: a.customDueSubtext || a.custom_due_subtext || null,
         requestedAt: a.requestedAt || a.requested_at || "",
         decidedAt: a.decidedAt || a.decided_at || null,
         createdAt: a.createdAt || a.created_at || "",
@@ -650,21 +702,21 @@ export default function ActivitiesPage() {
     const getStagePillStyle = (stageName?: string) => {
         const lower = (stageName || "").toLowerCase();
         if (lower.includes("design")) {
-            return { background: "#eff6ff", color: "#2563eb" };
+            return { background: "rgba(37, 99, 235, 0.12)", color: "#2563EB" };
         }
         if (lower.includes("execution") || lower.includes("build")) {
-            return { background: "#f5f3ff", color: "#9333ea" };
+            return { background: "rgba(144, 22, 163, 0.12)", color: "#9016A3" };
         }
         if (lower.includes("initiat") || lower.includes("plan")) {
-            return { background: "#f0fdf4", color: "#16a34a" };
+            return { background: "rgba(22, 163, 74, 0.12)", color: "#16A34A" };
         }
         if (lower.includes("estimat") || lower.includes("budget")) {
-            return { background: "#fefce8", color: "#ca8a04" };
+            return { background: "rgba(250, 176, 0, 0.12)", color: "#D97706" };
         }
         if (lower.includes("approv") || lower.includes("review")) {
-            return { background: "#fff7ed", color: "#ea580c" };
+            return { background: "rgba(234, 88, 12, 0.12)", color: "#EA580C" };
         }
-        return { background: "#f1f5f9", color: "#475569" };
+        return { background: "rgba(37, 99, 235, 0.12)", color: "#2563EB" };
     };
 
     const getProjectName = (projectId?: string | null): string => {
@@ -699,8 +751,8 @@ export default function ActivitiesPage() {
         return "—";
     }, [teamMembers]);
 
-    const getAssigneeInitials = (name: string): string => {
-        if (!name) return "RS";
+    const getAssigneeInitials = (name?: string | null): string => {
+        if (!name || name === "-" || name === "—" || name === "Unassigned") return "—";
         const parts = name.trim().split(/\s+/);
         if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
         return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
@@ -735,38 +787,133 @@ export default function ActivitiesPage() {
 
     const kpiStats = useMemo(() => {
         const total = tasks.length;
-        const overdue = tasks.filter(t => {
-            if ((t as any).customDueSubtext?.toLowerCase().includes("overdue")) return true;
-            return isOverdue(t.dueDate, t.status, "task");
-        }).length;
+        const overdue = tasks.filter(t => isOverdue(t.dueDate, t.status, "task")).length;
         const inProgress = tasks.filter(t => t.status === "in_progress").length;
         const completed = tasks.filter(t => t.status === "completed").length;
-        return { total, overdue, inProgress, completed };
+
+        const yesterdayDate = new Date();
+        yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+        const yesterdayStr = yesterdayDate.toISOString().slice(0, 10);
+        const addedYesterday = tasks.filter(t => t.createdAt && t.createdAt.slice(0, 10) === yesterdayStr).length;
+
+        return { total, overdue, inProgress, completed, addedYesterday };
     }, [tasks]);
+
+    const taskAssigneeOptions = useMemo(() => {
+        const map = new Map<string, string>();
+        tasks.forEach(t => {
+            const name = getAssigneeName(t);
+            const id = t.assignedTo || t.ownerId;
+            if (id && name && name !== "Unassigned") {
+                map.set(id, name);
+            }
+        });
+        return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+    }, [tasks, getAssigneeName]);
+
+    const hasActiveTaskFilters = taskFilter !== "all" || taskPriorityFilter !== "all" || taskProjectFilter !== "all" || taskStageFilter !== "all" || taskAssigneeFilter !== "all";
+
+    const resetTaskFilters = useCallback(() => {
+        setTaskFilter("all");
+        setTaskPriorityFilter("all");
+        setTaskProjectFilter("all");
+        setTaskStageFilter("all");
+        setTaskAssigneeFilter("all");
+        setTaskQuery("");
+        setTaskPage(1);
+    }, []);
 
     const filteredTasks = useMemo(() => {
         return tasks.filter(t => {
             if (taskQuery.trim()) {
                 const q = taskQuery.toLowerCase();
                 const nameMatch = t.name.toLowerCase().includes(q);
-                const descMatch = t.description?.toLowerCase().includes(q);
-                const projMatch = (t.project?.name || "").toLowerCase().includes(q) || (t.project?.projectCode || "").toLowerCase().includes(q);
-                const stageMatch = (t.stage?.name || "").toLowerCase().includes(q);
+                const descMatch = (t.description || "").toLowerCase().includes(q);
+                const projName = (t.project?.name || getProjectName(t.projectId)).toLowerCase();
+                const projCode = (t.project?.projectCode || getProjectCode(t.projectId)).toLowerCase();
+                const projMatch = projName.includes(q) || projCode.includes(q);
+                const stageMatch = (t.stage?.name || getStageName(t.stageId)).toLowerCase().includes(q);
                 const assigneeName = getAssigneeName(t).toLowerCase();
                 const assigneeMatch = assigneeName.includes(q);
                 if (!nameMatch && !descMatch && !projMatch && !stageMatch && !assigneeMatch) return false;
             }
             if (taskFilter !== "all" && t.status !== taskFilter) return false;
             if (taskPriorityFilter !== "all" && t.priority !== taskPriorityFilter) return false;
+            if (taskProjectFilter !== "all" && t.projectId !== taskProjectFilter) return false;
+            if (taskStageFilter !== "all" && t.stageId !== taskStageFilter) return false;
+            if (taskAssigneeFilter !== "all") {
+                if (taskAssigneeFilter === "unassigned") {
+                    if (t.assignedTo || t.ownerId) return false;
+                } else {
+                    if (t.assignedTo !== taskAssigneeFilter && t.ownerId !== taskAssigneeFilter) return false;
+                }
+            }
             return true;
         });
-    }, [tasks, taskQuery, taskFilter, taskPriorityFilter, getAssigneeName]);
+    }, [tasks, taskQuery, taskFilter, taskPriorityFilter, taskProjectFilter, taskStageFilter, taskAssigneeFilter, getAssigneeName, getProjectName, getProjectCode, getStageName]);
 
-    const totalTaskPages = Math.max(1, Math.ceil(filteredTasks.length / taskPageSize));
+    const sortedTasks = useMemo(() => {
+        if (!taskSortField) return filteredTasks;
+        return [...filteredTasks].sort((a, b) => {
+            let valA: string | number = "";
+            let valB: string | number = "";
+            switch (taskSortField) {
+                case "name":
+                    valA = a.name.toLowerCase();
+                    valB = b.name.toLowerCase();
+                    break;
+                case "project":
+                    valA = (a.project?.name || getProjectName(a.projectId)).toLowerCase();
+                    valB = (b.project?.name || getProjectName(b.projectId)).toLowerCase();
+                    break;
+                case "stage":
+                    valA = (a.stage?.name || getStageName(a.stageId)).toLowerCase();
+                    valB = (b.stage?.name || getStageName(b.stageId)).toLowerCase();
+                    break;
+                case "assignee":
+                    valA = getAssigneeName(a).toLowerCase();
+                    valB = getAssigneeName(b).toLowerCase();
+                    break;
+                case "dueDate":
+                    valA = a.dueDate || "9999-99-99";
+                    valB = b.dueDate || "9999-99-99";
+                    break;
+                case "priority": {
+                    const pWeights: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+                    valA = pWeights[a.priority] || 0;
+                    valB = pWeights[b.priority] || 0;
+                    break;
+                }
+                case "status":
+                    valA = a.status;
+                    valB = b.status;
+                    break;
+                case "updatedAt":
+                    valA = a.updatedAt || a.createdAt || "";
+                    valB = b.updatedAt || b.createdAt || "";
+                    break;
+            }
+            if (valA < valB) return taskSortDirection === "asc" ? -1 : 1;
+            if (valA > valB) return taskSortDirection === "asc" ? 1 : -1;
+            return 0;
+        });
+    }, [filteredTasks, taskSortField, taskSortDirection, getAssigneeName, getProjectName, getStageName]);
+
+    const totalTaskPages = Math.max(1, Math.ceil(sortedTasks.length / taskPageSize));
     const paginatedTasks = useMemo(() => {
         const start = (taskPage - 1) * taskPageSize;
-        return filteredTasks.slice(start, start + taskPageSize);
-    }, [filteredTasks, taskPage, taskPageSize]);
+        return sortedTasks.slice(start, start + taskPageSize);
+    }, [sortedTasks, taskPage, taskPageSize]);
+
+    const handleSort = (field: string) => {
+        if (taskSortField === field) {
+            setTaskSortDirection(prev => prev === "asc" ? "desc" : "asc");
+        } else {
+            setTaskSortField(field);
+            setTaskSortDirection("asc");
+        }
+        setTaskPage(1);
+    };
 
     const toggleSelectAll = useCallback(() => {
         const pageIds = paginatedTasks.map(t => t.id);
@@ -786,7 +933,20 @@ export default function ActivitiesPage() {
 
     const getApprovalDueSubtext = (approval: ActivityApproval) => {
         if (approval.status === "approved") {
-            return { text: approval.customDueSubtext || "Approved", className: "approved", isOverdue: false };
+            const dateStr = approval.decidedAt || approval.updatedAt;
+            return {
+                text: dateStr ? `Approved on ${formatTableDate(dateStr)}` : "Approved",
+                className: "approved",
+                isOverdue: false
+            };
+        }
+        if (approval.status === "rejected") {
+            const dateStr = approval.decidedAt || approval.updatedAt;
+            return {
+                text: dateStr ? `Rejected on ${formatTableDate(dateStr)}` : "Rejected",
+                className: "rejected",
+                isOverdue: false
+            };
         }
         if (approval.customDueSubtext) {
             const isOv = approval.customDueSubtext.toLowerCase().includes("overdue");
@@ -811,6 +971,24 @@ export default function ActivitiesPage() {
         }
     };
 
+    const hasActiveApprovalFilters = approvalFilter !== "all" || approvalProjectFilter !== "all" || approvalStageFilter !== "all" || Boolean(approvalQuery.trim());
+    const resetApprovalFilters = () => {
+        setApprovalFilter("all");
+        setApprovalProjectFilter("all");
+        setApprovalStageFilter("all");
+        setApprovalQuery("");
+        setApprovalPage(1);
+    };
+
+    const toggleApprovalSort = (field: "name" | "project" | "dueDate" | "status" | "requestedAt") => {
+        if (approvalSortField === field) {
+            setApprovalSortDirection(prev => (prev === "asc" ? "desc" : "asc"));
+        } else {
+            setApprovalSortField(field);
+            setApprovalSortDirection("asc");
+        }
+    };
+
     const approvalKpiStats = useMemo(() => {
         const total = approvals.length;
         const overdue = approvals.filter(a => {
@@ -826,23 +1004,50 @@ export default function ActivitiesPage() {
         if (approvalQuery.trim()) {
             const q = approvalQuery.toLowerCase();
             const nameMatch = a.name.toLowerCase().includes(q);
-            const projName = a.project?.name || getProjectName(a.projectId);
-            const projMatch = projName.toLowerCase().includes(q);
+            const projName = (a.project?.name || getProjectName(a.projectId)).toLowerCase();
+            const projCode = (a.project?.projectCode || getProjectCode(a.projectId)).toLowerCase();
             const approverMatch = (a.approverName || "").toLowerCase().includes(q);
             const reqMatch = (a.requesterName || "").toLowerCase().includes(q);
-            const stageName = a.stage?.name || getStageName(a.stageId);
-            const stageMatch = stageName.toLowerCase().includes(q);
-            if (!nameMatch && !projMatch && !approverMatch && !reqMatch && !stageMatch) return false;
+            const stageName = (a.stage?.name || getStageName(a.stageId)).toLowerCase();
+            if (!nameMatch && !projName.includes(q) && !projCode.includes(q) && !approverMatch && !reqMatch && !stageName.includes(q)) return false;
         }
         if (approvalFilter !== "all" && a.status !== approvalFilter) return false;
+        if (approvalProjectFilter !== "all" && a.projectId !== approvalProjectFilter) return false;
+        if (approvalStageFilter !== "all" && a.stageId !== approvalStageFilter) return false;
         return true;
-    }), [approvals, approvalQuery, approvalFilter, projects, stages]);
+    }), [approvals, approvalQuery, approvalFilter, approvalProjectFilter, approvalStageFilter, projects, stages]);
 
-    const totalApprovalPages = Math.max(1, Math.ceil(filteredApprovals.length / approvalPageSize));
+    const sortedApprovals = useMemo(() => {
+        const list = [...filteredApprovals];
+        list.sort((a, b) => {
+            let cmp = 0;
+            if (approvalSortField === "name") {
+                cmp = a.name.localeCompare(b.name);
+            } else if (approvalSortField === "project") {
+                const pA = a.project?.name || getProjectName(a.projectId);
+                const pB = b.project?.name || getProjectName(b.projectId);
+                cmp = pA.localeCompare(pB);
+            } else if (approvalSortField === "dueDate") {
+                const dA = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+                const dB = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+                cmp = dA - dB;
+            } else if (approvalSortField === "status") {
+                cmp = a.status.localeCompare(b.status);
+            } else if (approvalSortField === "requestedAt") {
+                const rA = a.requestedAt || a.createdAt ? new Date(a.requestedAt || a.createdAt).getTime() : 0;
+                const rB = b.requestedAt || b.createdAt ? new Date(b.requestedAt || b.createdAt).getTime() : 0;
+                cmp = rA - rB;
+            }
+            return approvalSortDirection === "asc" ? cmp : -cmp;
+        });
+        return list;
+    }, [filteredApprovals, approvalSortField, approvalSortDirection, projects]);
+
+    const totalApprovalPages = Math.max(1, Math.ceil(sortedApprovals.length / approvalPageSize));
     const paginatedApprovals = useMemo(() => {
         const start = (approvalPage - 1) * approvalPageSize;
-        return filteredApprovals.slice(start, start + approvalPageSize);
-    }, [filteredApprovals, approvalPage, approvalPageSize]);
+        return sortedApprovals.slice(start, start + approvalPageSize);
+    }, [sortedApprovals, approvalPage, approvalPageSize]);
 
     const getProjectsForStage = useCallback((stage: ActivityStage): ProjectItem[] => {
         return projects.filter(p => {
@@ -1096,6 +1301,7 @@ export default function ActivitiesPage() {
             return;
         }
 
+        setIsSubmittingApproval(true);
         const sanitizedPayload: any = {
             name: approvalForm.name.trim(),
             projectId: approvalForm.projectId,
@@ -1186,6 +1392,8 @@ export default function ActivitiesPage() {
             setNotice(approvalDetail ? "Approval updated successfully." : "Approval requested successfully.");
         } catch (e: any) {
             setApprovalError(e.message || "Could not save approval");
+        } finally {
+            setIsSubmittingApproval(false);
         }
     };
 
@@ -1205,14 +1413,58 @@ export default function ActivitiesPage() {
             setTasks(prev => prev.filter(t => t.id !== id));
             setSelectedTaskIds(prev => prev.filter(x => x !== id));
             if (isUuid(id)) {
-                await fetch(`/api/v1/activities/tasks/${id}`, {
-                    method: "DELETE",
-                    credentials: "include",
-                });
+                await deleteActivityTask(id);
             }
             setNotice("Task deleted.");
         } catch {
             setNotice("Could not delete task");
+            loadTasks();
+        }
+    };
+
+    const handleUpdateTaskStatus = async (taskId: string, newStatus: "not_started" | "in_progress" | "completed" | "blocked") => {
+        try {
+            setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus, updatedAt: new Date().toISOString() } : t));
+            if (isUuid(taskId)) {
+                await updateActivityTask(taskId, { status: newStatus });
+            }
+            setNotice(`Task status updated to ${newStatus.replace("_", " ")}.`);
+        } catch {
+            setNotice("Could not update task status");
+            loadTasks();
+        }
+    };
+
+    const handleBulkComplete = async () => {
+        if (!selectedTaskIds.length) return;
+        const idsToUpdate = [...selectedTaskIds];
+        setTasks(prev => prev.map(t => idsToUpdate.includes(t.id) ? { ...t, status: "completed", updatedAt: new Date().toISOString() } : t));
+        setSelectedTaskIds([]);
+        try {
+            await Promise.all(
+                idsToUpdate.filter(id => isUuid(id)).map(id => updateActivityTask(id, { status: "completed" }))
+            );
+            setNotice(`${idsToUpdate.length} task(s) marked as completed.`);
+        } catch {
+            setNotice("Some tasks could not be updated");
+            loadTasks();
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        if (!selectedTaskIds.length) return;
+        if (!confirm(`Are you sure you want to delete ${selectedTaskIds.length} selected task(s)?`)) return;
+        const idsToDelete = [...selectedTaskIds];
+        setTasks(prev => prev.filter(t => !idsToDelete.includes(t.id)));
+        setSelectedTaskIds([]);
+        try {
+            await Promise.all(
+                idsToDelete.filter(id => isUuid(id)).map(id => deleteActivityTask(id))
+            );
+            setNotice(`${idsToDelete.length} task(s) deleted.`);
+        } catch {
+            setNotice("Some tasks could not be deleted");
+            loadTasks();
         }
     };
 
@@ -1405,7 +1657,7 @@ export default function ActivitiesPage() {
                 onClick={() => openTaskDetail(task)}
                 style={{ cursor: "pointer", background: isSelected ? "rgba(239, 246, 255, 0.8)" : undefined }}
             >
-                <td onClick={e => e.stopPropagation()} style={{ width: "40px", textAlign: "center" }}>
+                <td className="col-checkbox" onClick={e => e.stopPropagation()}>
                     <input
                         type="checkbox"
                         className="activities-task-checkbox tasks-checkbox"
@@ -1414,49 +1666,51 @@ export default function ActivitiesPage() {
                         aria-label={`Select task ${task.name}`}
                     />
                 </td>
-                <td>
+                <td className="col-task">
                     <div className="activities-task-content-cell task-content-cell">
-                        <span className="activities-task-title task-title">{task.name}</span>
-                        {task.description && <span className="activities-task-desc task-desc">{task.description}</span>}
+                        <span className="activities-task-title task-title" title={task.name}>{task.name}</span>
+                        {task.description && <span className="activities-task-desc task-desc" title={task.description}>{task.description}</span>}
                     </div>
                 </td>
-                <td>
+                <td className="col-project">
                     <div className="activities-task-project-cell task-project-cell">
-                        <span className="activities-task-project-name task-project-name">{projectName}</span>
+                        <span className="activities-task-project-name task-project-name" title={projectName}>{projectName}</span>
                         <span className="activities-task-project-code task-project-code">{projectCode}</span>
                     </div>
                 </td>
-                <td>
+                <td className="col-stage">
                     <span className="activities-task-stage-pill task-stage-pill" style={stageStyle}>
                         {(stageName || "—").toUpperCase()}
                     </span>
                 </td>
-                <td>
+                <td className="col-assignee">
                     <div className="activities-task-assignee-cell task-assignee-cell">
-                        <div className="activities-task-assignee-avatar task-assignee-avatar">{initials}</div>
-                        <span className="activities-task-assignee-name task-assignee-name">{assigneeName}</span>
+                        <div className={`activities-task-assignee-avatar task-assignee-avatar ${!initials ? "unassigned" : ""}`}>
+                            {initials || "—"}
+                        </div>
+                        <span className="activities-task-assignee-name task-assignee-name" title={assigneeName}>{assigneeName}</span>
                     </div>
                 </td>
-                <td>
+                <td className="col-duedate">
                     <div className="activities-task-due-cell task-due-cell">
                         <span className="activities-task-due-date task-due-date">{formatTableDate(task.dueDate)}</span>
                         <span className={`activities-task-due-subtext task-due-subtext ${dueInfo.className}`}>{dueInfo.text}</span>
                     </div>
                 </td>
-                <td>
+                <td className="col-priority">
                     <span className={`activities-task-priority-pill task-priority-pill ${task.priority.toLowerCase()}`}>
                         {task.priority.toUpperCase()}
                     </span>
                 </td>
-                <td>
+                <td className="col-status">
                     <span className={`activities-task-status-pill task-status-pill ${task.status.toLowerCase().replace(/_/g, "-")}`}>
                         {task.status.replace(/_/g, " ").toUpperCase()}
                     </span>
                 </td>
-                <td>
-                    <span className="activities-task-updated-text task-updated-text">{formatTableDate(task.updatedAt || task.createdAt || "2026-08-05")}</span>
+                <td className="col-updated">
+                    <span className="activities-task-updated-text task-updated-text">{formatTableDate(task.updatedAt || task.createdAt)}</span>
                 </td>
-                <td onClick={e => e.stopPropagation()} style={{ width: "40px", textAlign: "center" }}>
+                <td className="col-actions" onClick={e => e.stopPropagation()}>
                     <div style={{ position: "relative", display: "inline-block" }}>
                         <button
                             type="button"
@@ -1477,7 +1731,7 @@ export default function ActivitiesPage() {
                                     top: "calc(100% + 4px)",
                                     right: 0,
                                     zIndex: 40,
-                                    minWidth: "140px",
+                                    minWidth: "160px",
                                 }}
                                 onClick={e => e.stopPropagation()}
                             >
@@ -1490,6 +1744,28 @@ export default function ActivitiesPage() {
                                 >
                                     <Eye size={14} /> View Task
                                 </button>
+                                {task.status !== "completed" && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            void handleUpdateTaskStatus(task.id, "completed");
+                                            setTaskMenu(null);
+                                        }}
+                                    >
+                                        <CheckCircle size={14} /> Mark Completed
+                                    </button>
+                                )}
+                                {task.status !== "in_progress" && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            void handleUpdateTaskStatus(task.id, "in_progress");
+                                            setTaskMenu(null);
+                                        }}
+                                    >
+                                        <Clock size={14} /> Mark In-Progress
+                                    </button>
+                                )}
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -1537,56 +1813,65 @@ export default function ActivitiesPage() {
     };
 
     const ApprovalRow = ({ approval }: { approval: ActivityApproval }) => {
-        const projectName = approval.project?.name || getProjectName(approval.projectId);
-        const stageName = approval.stage?.name || getStageName(approval.stageId);
+        const projectName = approval.project?.name || getProjectName(approval.projectId) || "—";
+        const projectCode = approval.project?.projectCode || getProjectCode(approval.projectId) || "—";
+        const stageName = approval.stage?.name || getStageName(approval.stageId) || "—";
         const stageStyle = getStagePillStyle(stageName);
         const approverName = approval.approverName || "—";
-        const requesterName = approval.requesterName || "—";
+        const approverRole = approval.approverRole || "Client";
+        const requesterName = approval.requesterName || teamMembers.find(m => m.id === approval.requestedBy)?.name?.replace(" (You)", "") || "Ananya Rao";
+        const requesterInitials = getAssigneeInitials(requesterName);
         const dueInfo = getApprovalDueSubtext(approval);
 
         return (
             <tr onClick={() => openApprovalDetail(approval)} style={{ cursor: "pointer" }}>
-                <td>
-                    <div className="task-content-cell">
-                        <span className="task-title">{approval.name}</span>
+                <td className="col-approval-name">
+                    <div className="activities-approval-name-cell">
+                        <span className="activities-approval-name" title={approval.name}>{approval.name}</span>
                     </div>
                 </td>
-                <td>
-                    <div className="task-project-cell">
-                        <span className="task-project-name">{projectName}</span>
+                <td className="col-approval-project">
+                    <div className="activities-approval-project-cell">
+                        <span className="activities-approval-project-name" title={projectName}>{projectName}</span>
+                        <span className="activities-approval-project-code">{projectCode}</span>
                     </div>
                 </td>
-                <td>
-                    <span className="task-stage-pill" style={stageStyle}>
+                <td className="col-approval-stage">
+                    <span className="activities-approval-stage-pill" style={stageStyle}>
                         {(stageName || "—").toUpperCase()}
                     </span>
                 </td>
-                <td>
-                    <span className="task-title" style={{ fontWeight: 500 }}>{approverName}</span>
+                <td className="col-approval-approver">
+                    <div className="activities-approval-approver-cell">
+                        <span className="activities-approval-approver-name">{approverName}</span>
+                        <span className="activities-approval-approver-role">{approverRole}</span>
+                    </div>
                 </td>
-                <td>
-                    <span className={`approval-status-pill ${approval.status.toLowerCase()}`}>
+                <td className="col-approval-status">
+                    <span className={`activities-approval-status-pill ${approval.status.toLowerCase().replace(/_/g, "-")}`}>
                         {approval.status.replace(/_/g, " ").toUpperCase()}
                     </span>
                 </td>
-                <td>
-                    <div className="task-due-cell">
-                        <span className="task-due-date">{formatTableDate(approval.dueDate)}</span>
-                        <span className={`task-due-subtext ${dueInfo.className}`}>{dueInfo.text}</span>
+                <td className="col-approval-duedate">
+                    <div className="activities-approval-due-cell">
+                        <span className="activities-approval-due-date">{approval.dueDate ? formatTableDate(approval.dueDate) : "—"}</span>
+                        <span className={`activities-approval-due-subtext ${dueInfo.className}`}>{dueInfo.text}</span>
                     </div>
                 </td>
-                <td>
-                    <span className="task-title" style={{ fontWeight: 500 }}>{requesterName}</span>
+                <td className="col-approval-requester">
+                    <div className="activities-approval-requester-cell">
+                        <div className="activities-approval-requester-avatar">{requesterInitials}</div>
+                        <span className="activities-approval-requester-name" title={requesterName}>{requesterName}</span>
+                    </div>
                 </td>
-                <td>
-                    <span className="task-updated-text">{formatTableDate(approval.requestedAt || approval.createdAt || "2026-09-01")}</span>
+                <td className="col-approval-date">
+                    <span className="activities-approval-date">{formatTableDate(approval.requestedAt || approval.createdAt || "2026-09-01")}</span>
                 </td>
-                <td onClick={e => e.stopPropagation()} style={{ width: "40px" }}>
+                <td className="col-approval-actions" onClick={e => e.stopPropagation()}>
                     <div style={{ position: "relative" }}>
                         <button
                             type="button"
-                            className="stage-action-btn"
-                            style={{ color: "#94a3b8" }}
+                            className="activities-approval-action-btn"
                             onClick={e => {
                                 e.stopPropagation();
                                 setApprovalMenu(approvalMenu === approval.id ? null : approval.id);
@@ -1603,7 +1888,7 @@ export default function ActivitiesPage() {
                                     top: "calc(100% + 4px)",
                                     right: 0,
                                     zIndex: 40,
-                                    minWidth: "150px",
+                                    minWidth: "165px",
                                 }}
                                 onClick={e => e.stopPropagation()}
                             >
@@ -1616,6 +1901,57 @@ export default function ActivitiesPage() {
                                 >
                                     <Eye size={14} /> View Approval
                                 </button>
+                                {["in_review", "sent", "draft"].includes(approval.status) && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={async () => {
+                                                try {
+                                                    await decideActivityApproval(approval.id, { decision: "approved" });
+                                                    setNotice("Approval marked as approved.");
+                                                    loadApprovals();
+                                                } catch {
+                                                    setNotice("Failed to approve");
+                                                }
+                                                setApprovalMenu(null);
+                                            }}
+                                        >
+                                            <CheckCircle size={14} /> Approve
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={async () => {
+                                                const reason = prompt("Enter rejection reason (optional):");
+                                                try {
+                                                    await decideActivityApproval(approval.id, { decision: "rejected", comment: reason || undefined });
+                                                    setNotice("Approval rejected.");
+                                                    loadApprovals();
+                                                } catch {
+                                                    setNotice("Failed to reject");
+                                                }
+                                                setApprovalMenu(null);
+                                            }}
+                                        >
+                                            <X size={14} /> Reject
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={async () => {
+                                                const note = prompt("Enter changes required (optional):");
+                                                try {
+                                                    await decideActivityApproval(approval.id, { decision: "changes_required", comment: note || undefined });
+                                                    setNotice("Changes requested.");
+                                                    loadApprovals();
+                                                } catch {
+                                                    setNotice("Failed to request changes");
+                                                }
+                                                setApprovalMenu(null);
+                                            }}
+                                        >
+                                            <AlertCircle size={14} /> Request Changes
+                                        </button>
+                                    </>
+                                )}
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -1688,183 +2024,251 @@ export default function ActivitiesPage() {
         return (
             <div className="view-task-drawer-backdrop" onClick={() => setTaskDetail(null)}>
                 <div className="view-task-drawer" onClick={e => e.stopPropagation()}>
-                    {/* Header */}
+                    {/* Frame 2147225093: Heading Row */}
                     <div className="view-task-header">
                         <h3 className="view-task-header-title">View Task</h3>
-                        <button
-                            type="button"
-                            className="view-task-close-btn"
-                            onClick={() => setTaskDetail(null)}
-                            aria-label="Close drawer"
-                        >
-                            <X size={18} />
-                        </button>
+                        <div className="view-task-header-actions">
+                            <button
+                                type="button"
+                                className="view-task-edit-btn"
+                                onClick={() => {
+                                    setTaskForm({
+                                        name: taskDetail.name,
+                                        projectId: taskDetail.projectId,
+                                        stageId: taskDetail.stageId,
+                                        description: taskDetail.description || "",
+                                        ownerId: taskDetail.ownerId || "",
+                                        dueDate: taskDetail.dueDate || "",
+                                        priority: taskDetail.priority,
+                                        status: taskDetail.status,
+                                    });
+                                    const atts = Array.isArray(taskDetail.attachments)
+                                        ? taskDetail.attachments.map((a: any) => ({
+                                            name: String(a.name || "Attachment"),
+                                            size: Number(a.size || 0),
+                                            type: String(a.type || "application/octet-stream"),
+                                        }))
+                                        : [];
+                                    setTaskAttachments(atts);
+                                    setCreateTask(true);
+                                }}
+                                title="Edit Task"
+                                aria-label="Edit Task"
+                            >
+                                <Edit3 size={14} />
+                                <span>Edit</span>
+                            </button>
+                            <button
+                                type="button"
+                                className="view-task-close-btn"
+                                onClick={() => setTaskDetail(null)}
+                                aria-label="Close drawer"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
                     </div>
 
-                    {/* Scrollable Body */}
-                    <div className="view-task-body">
-                        {/* Title, Subtitle, and Badges */}
+                    {/* Frame 2147225027: Inner White Task Detail Card */}
+                    <div className="view-task-inner-card">
+                        {/* Frame 2147225501: Title, Subtitle, Badges Row */}
                         <div className="view-task-title-group">
-                            <h2 className="view-task-title">{taskDetail.name}</h2>
-                            <p className="view-task-subtitle">
-                                {taskDetail.description ? taskDetail.description.slice(0, 56) + (taskDetail.description.length > 56 ? "..." : "") : "Review and finalise floor plan layouts based"}
-                            </p>
+                            <div className="view-task-title-box">
+                                <h2 className="view-task-title">{taskDetail.name}</h2>
+                                {taskDetail.description && (
+                                    <p className="view-task-subtitle">
+                                        {taskDetail.description.length > 70
+                                            ? `${taskDetail.description.slice(0, 70)}...`
+                                            : taskDetail.description}
+                                    </p>
+                                )}
+                            </div>
                             <div className="view-task-badges-row">
-                                <span className={`task-status-pill ${taskDetail.status.toLowerCase()}`}>
-                                    {taskDetail.status.replace(/_/g, "-").toUpperCase()}
+                                <span className={`task-status-pill ${taskDetail.status.toLowerCase().replace(/_/g, "-")}`}>
+                                    {taskDetail.status.replace(/_/g, " ").toUpperCase()}
                                 </span>
                                 <span className={`task-priority-pill ${taskDetail.priority.toLowerCase()}`}>
                                     {taskDetail.priority.toUpperCase()}
                                 </span>
-                                <span className="divider">|</span>
+                                <span className="view-task-badge-sep" />
                                 <span className={`view-task-due-text ${dueInfo.className}`}>
                                     {dueInfo.text}
                                 </span>
                             </div>
                         </div>
 
-                        {/* Metadata Grid */}
-                        <div className="view-task-meta-grid">
-                            <div className="view-task-meta-row">
-                                <div className="view-task-meta-item">
-                                    <span className="view-task-meta-label">Project Name</span>
-                                    <span className="view-task-meta-value">{projectName}</span>
-                                </div>
-                                <div className="view-task-meta-item">
-                                    <span className="view-task-meta-label">Project ID</span>
-                                    <span className="view-task-meta-value">{projectCode}</span>
-                                </div>
-                            </div>
+                        {/* Rectangle 4472: Divider 1 */}
+                        <div className="view-task-divider" />
 
-                            <div className="view-task-meta-row">
-                                <div className="view-task-meta-item">
-                                    <span className="view-task-meta-label">Stage</span>
-                                    <div className="view-task-meta-value">
-                                        <span className="task-stage-pill" style={stageStyle}>
-                                            {(stageName || "DESIGN").toUpperCase()}
-                                        </span>
-                                    </div>
-                                </div>
-                                <div className="view-task-meta-item">
-                                    <span className="view-task-meta-label">Due Date</span>
-                                    <span className="view-task-meta-value">
-                                        <Calendar size={14} color="#64748b" />
-                                        {formatTableDate(taskDetail.dueDate)}
+                        {/* Frame 2147225504: Project Name & Project ID */}
+                        <div className="view-task-meta-row">
+                            <div className="view-task-meta-col">
+                                <span className="view-task-meta-label">Project Name</span>
+                                <span className="view-task-meta-value" title={projectName}>{projectName}</span>
+                            </div>
+                            <div className="view-task-meta-col">
+                                <span className="view-task-meta-label">Project ID</span>
+                                <span className="view-task-meta-value">{projectCode || "—"}</span>
+                            </div>
+                        </div>
+
+                        {/* Rectangle 4473: Divider 2 */}
+                        <div className="view-task-divider" />
+
+                        {/* Frame 2147225505: Stage & Due Date */}
+                        <div className="view-task-meta-row">
+                            <div className="view-task-meta-col">
+                                <span className="view-task-meta-label">Stage</span>
+                                <div className="view-task-meta-value">
+                                    <span className="task-stage-pill" style={stageStyle}>
+                                        {(stageName || "DESIGN").toUpperCase()}
                                     </span>
                                 </div>
                             </div>
-
-                            <div className="view-task-meta-row">
-                                <div className="view-task-meta-item">
-                                    <span className="view-task-meta-label">Assigned To</span>
-                                    <div className="view-task-meta-value">
-                                        <div className="task-assignee-avatar">{initials}</div>
-                                        <span>{assigneeName}</span>
-                                    </div>
-                                </div>
-                                <div className="view-task-meta-item">
-                                    <span className="view-task-meta-label">Owner</span>
-                                    <div className="view-task-meta-value">
-                                        <div className="task-assignee-avatar">{initials}</div>
-                                        <span>{assigneeName}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="view-task-meta-row">
-                                <div className="view-task-meta-item">
-                                    <span className="view-task-meta-label">Created On</span>
-                                    <span className="view-task-meta-value">{createdOnFormatted}</span>
-                                </div>
-                                <div className="view-task-meta-item">
-                                    <span className="view-task-meta-label">Last Updated</span>
-                                    <span className="view-task-meta-value">{updatedOnFormatted}</span>
+                            <div className="view-task-meta-col">
+                                <span className="view-task-meta-label">Due Date</span>
+                                <div className="view-task-meta-value">
+                                    <Calendar size={16} className="view-task-calendar-icon" />
+                                    <span>{taskDetail.dueDate ? formatTableDate(taskDetail.dueDate) : "—"}</span>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Description Section */}
-                        <div className="view-task-desc-section">
-                            <span className="view-task-section-label">Description</span>
-                            <p className="view-task-desc-content">
-                                {taskDetail.description || "Review the floor plan layouts shared by the architect and finalise the most suitable option based on client feedback. Ensure all dimensions and requirements are met."}
+                        {/* Rectangle 4474: Divider 3 */}
+                        <div className="view-task-divider" />
+
+                        {/* Frame 2147225506: Assigned To & Owner */}
+                        <div className="view-task-meta-row">
+                            <div className="view-task-meta-col">
+                                <span className="view-task-meta-label">Assigned To</span>
+                                <div className="view-task-meta-value">
+                                    <div className={`view-task-avatar ${!initials ? "unassigned" : ""}`}>
+                                        {initials || "—"}
+                                    </div>
+                                    <span title={assigneeName}>{assigneeName}</span>
+                                </div>
+                            </div>
+                            <div className="view-task-meta-col">
+                                <span className="view-task-meta-label">Owner</span>
+                                <div className="view-task-meta-value">
+                                    <div className="view-task-avatar">
+                                        {initials || "BO"}
+                                    </div>
+                                    <span title={assigneeName}>{assigneeName}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Rectangle 4475: Divider 4 */}
+                        <div className="view-task-divider" />
+
+                        {/* Frame 2147225508: Created On & Last Updated */}
+                        <div className="view-task-meta-row">
+                            <div className="view-task-meta-col">
+                                <span className="view-task-meta-label">Created On</span>
+                                <span className="view-task-meta-value">{createdOnFormatted}</span>
+                            </div>
+                            <div className="view-task-meta-col">
+                                <span className="view-task-meta-label">Last Updated</span>
+                                <span className="view-task-meta-value">{updatedOnFormatted}</span>
+                            </div>
+                        </div>
+
+                        {/* Rectangle 4476: Divider 5 */}
+                        <div className="view-task-divider" />
+
+                        {/* Frame 2147225502: Description */}
+                        <div className="view-task-desc-block">
+                            <span className="view-task-meta-label">Description</span>
+                            <p className="view-task-desc-text">
+                                {taskDetail.description || "No description provided for this task."}
                             </p>
                         </div>
 
-                        {/* Attachments Section */}
-                        <div className="view-task-attachments-section">
-                            <div className="view-task-section-header">
-                                <span className="view-task-section-title">Attachments</span>
-                                <span className="view-task-count-badge">{attachmentsToRender.length} Files</span>
+                        {/* Frame 2147225067: Attachments Card */}
+                        <div className="view-task-attachments-card">
+                            <div className="view-task-card-header">
+                                <span className="view-task-card-title">Attachments</span>
+                                <span className="view-task-count-pill">
+                                    {attachmentsToRender.length} File{attachmentsToRender.length === 1 ? "" : "s"}
+                                </span>
                             </div>
-                            <div className="view-task-attachments-list">
-                                {attachmentsToRender.map((file, idx) => (
-                                    <div key={idx} className="view-task-attachment-card">
-                                        <div className="view-task-attachment-left">
-                                            <div className={`view-task-file-icon ${file.type === "pdf" ? "pdf" : "sheet"}`}>
-                                                {file.type === "pdf" ? (
-                                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                                        <polyline points="14 2 14 8 20 8" />
-                                                        <line x1="16" y1="13" x2="8" y2="13" />
-                                                        <line x1="16" y1="17" x2="8" y2="17" />
-                                                        <polyline points="10 9 9 9 8 9" />
-                                                    </svg>
-                                                ) : (
-                                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                                        <polyline points="14 2 14 8 20 8" />
-                                                        <line x1="8" y1="13" x2="16" y2="13" />
-                                                        <line x1="8" y1="17" x2="16" y2="17" />
-                                                        <line x1="10" y1="9" x2="8" y2="9" />
-                                                    </svg>
-                                                )}
+                            {attachmentsToRender.length > 0 ? (
+                                <div className="view-task-files-list">
+                                    {attachmentsToRender.map((file, idx) => (
+                                        <div key={idx} className="view-task-file-item">
+                                            <div className="view-task-file-info-left">
+                                                <div className={`view-task-file-icon-box ${file.type === "pdf" ? "pdf" : "sheet"}`}>
+                                                    {file.type === "pdf" ? (
+                                                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                            <path d="M12.5 1.66699H4.16667C3.72464 1.66699 3.30072 1.84259 2.98816 2.15515C2.67559 2.46771 2.5 2.89163 2.5 3.33366V16.667C2.5 17.109 2.67559 17.5329 2.98816 17.8455C3.30072 18.1581 3.72464 18.3337 4.16667 18.3337H15.8333C16.2754 18.3337 16.6993 18.1581 17.0118 17.8455C17.3244 17.5329 17.5 17.109 17.5 16.667V6.66699L12.5 1.66699Z" stroke="#DC2626" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                            <path d="M11.6667 1.66699V6.66699H16.6667" stroke="#DC2626" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                        </svg>
+                                                    ) : (
+                                                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                            <path d="M11.6667 1.66699H4.16667C3.72464 1.66699 3.30072 1.84259 2.98816 2.15515C2.67559 2.46771 2.5 2.89163 2.5 3.33366V16.667C2.5 17.109 2.67559 17.5329 2.98816 17.8455C3.30072 18.1581 3.72464 18.3337 4.16667 18.3337H15.8333C16.2754 18.3337 16.6993 18.1581 17.0118 17.8455C17.3244 17.5329 17.5 17.109 17.5 16.667V7.50033L11.6667 1.66699Z" stroke="#1CB061" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                            <path d="M11.6667 1.66699V7.50033H17.5" stroke="#1CB061" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                            <path d="M6.66667 10.8337H13.3333" stroke="#1CB061" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                            <path d="M6.66667 14.167H13.3333" stroke="#1CB061" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                        </svg>
+                                                    )}
+                                                </div>
+                                                <div className="view-task-file-meta-col">
+                                                    <span className="view-task-file-name" title={file.name}>{file.name}</span>
+                                                    <div className="view-task-file-sub-row">
+                                                        <span>{file.sizeFormatted}</span>
+                                                        <span className="dot">•</span>
+                                                        <span>Updated on {file.dateFormatted}</span>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div className="view-task-file-meta">
-                                                <span className="view-task-file-name">{file.name}</span>
-                                                <span className="view-task-file-subtext">{file.sizeFormatted} · Updated on {file.dateFormatted}</span>
-                                            </div>
+                                            <button
+                                                type="button"
+                                                className="view-task-download-btn"
+                                                onClick={() => handleDownloadAttachment(file)}
+                                                title={`Download ${file.name}`}
+                                                aria-label={`Download ${file.name}`}
+                                            >
+                                                <DownloadSvg />
+                                            </button>
                                         </div>
-                                        <button
-                                            type="button"
-                                            className="view-task-download-btn"
-                                            onClick={() => handleDownloadAttachment(file)}
-                                            title={`Download ${file.name}`}
-                                            aria-label={`Download ${file.name}`}
-                                        >
-                                            <DownloadSvg />
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="view-task-empty-sub">
+                                    <span>No attachments uploaded for this task</span>
+                                </div>
+                            )}
                         </div>
 
-                        {/* Activity Card */}
+                        {/* Frame 2147225068: Activity Card */}
                         <div className="view-task-activity-card">
-                            <span className="view-task-activity-title">Activity</span>
+                            <span className="view-task-card-title">Activity</span>
                             <div className="view-task-activity-list">
-                                {taskComments.length > 0 ? (
-                                    taskComments.map(c => (
-                                        <div key={c.id} className="view-task-activity-item">
-                                            <div className="view-task-activity-avatar">
-                                                {c.authorId ? c.authorId.slice(0, 2).toUpperCase() : "MR"}
-                                            </div>
-                                            <div className="view-task-activity-details">
-                                                <span className="view-task-activity-action">
-                                                    <strong>{assigneeName}</strong> commented: &quot;{c.body}&quot;
-                                                </span>
-                                                <span className="view-task-activity-time">{formatTableDate(c.createdAt)} · {formatTimeOnly(c.createdAt)}</span>
-                                            </div>
+                                {taskComments.length > 0 && taskComments.map(c => (
+                                    <div key={c.id} className="view-task-activity-item">
+                                        <div className="view-task-activity-avatar">
+                                            {c.authorId ? c.authorId.slice(0, 2).toUpperCase() : "MR"}
                                         </div>
-                                    ))
-                                ) : null}
+                                        <div className="view-task-activity-details">
+                                            <span className="view-task-activity-action">
+                                                <strong>{assigneeName}</strong> commented: &quot;{c.body}&quot;
+                                            </span>
+                                            <span className="view-task-activity-time">
+                                                {formatTableDate(c.createdAt)} · {formatTimeOnly(c.createdAt)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
                                 <div className="view-task-activity-item">
                                     <div className="view-task-activity-avatar">MR</div>
                                     <div className="view-task-activity-details">
                                         <span className="view-task-activity-action">
                                             <strong>{assigneeName}</strong> updated the status to {taskDetail.status.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
                                         </span>
-                                        <span className="view-task-activity-time">{formatTableDate(taskDetail.updatedAt || "2026-08-05")} · {formatTimeOnly(taskDetail.updatedAt || "2026-08-05T16:15:00Z")}</span>
+                                        <span className="view-task-activity-time">
+                                            {formatTableDate(taskDetail.updatedAt || taskDetail.createdAt)} · {formatTimeOnly(taskDetail.updatedAt || taskDetail.createdAt)}
+                                        </span>
                                     </div>
                                 </div>
                                 <div className="view-task-activity-item">
@@ -1873,47 +2277,30 @@ export default function ActivitiesPage() {
                                         <span className="view-task-activity-action">
                                             <strong>{assigneeName}</strong> created this task
                                         </span>
-                                        <span className="view-task-activity-time">{formatTableDate(taskDetail.createdAt || "2026-08-05")} · {formatTimeOnly(taskDetail.createdAt || "2026-08-05T16:15:00Z")}</span>
+                                        <span className="view-task-activity-time">
+                                            {formatTableDate(taskDetail.createdAt)} · {formatTimeOnly(taskDetail.createdAt)}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Optional Comment Input for live interaction */}
-                            <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+                            {/* Live Comment Input */}
+                            <div className="view-task-comment-box">
                                 <input
                                     value={taskCommentText}
                                     onChange={e => setTaskCommentText(e.target.value)}
                                     placeholder="Add a comment..."
                                     onKeyDown={e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), sendTaskComment())}
-                                    style={{
-                                        flex: 1,
-                                        height: "36px",
-                                        padding: "0 12px",
-                                        borderRadius: "8px",
-                                        border: "1px solid #e2e8f0",
-                                        fontSize: "12.5px",
-                                        outline: "none",
-                                    }}
+                                    className="view-task-comment-input"
                                 />
                                 <button
                                     type="button"
                                     onClick={sendTaskComment}
                                     disabled={sendingTaskComment || !taskCommentText.trim()}
-                                    style={{
-                                        height: "36px",
-                                        padding: "0 14px",
-                                        borderRadius: "8px",
-                                        border: 0,
-                                        background: "#2563eb",
-                                        color: "#fff",
-                                        cursor: "pointer",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                    }}
+                                    className="view-task-comment-send-btn"
                                     aria-label="Send comment"
                                 >
-                                    <MessageSquare size={16} />
+                                    <MessageSquare size={15} />
                                 </button>
                             </div>
                         </div>
@@ -1924,7 +2311,7 @@ export default function ActivitiesPage() {
     };
 
     const ApprovalDetailDrawer = () => {
-        if (!approvalDetail) return null;
+        if (!approvalDetail || createApproval) return null;
 
         const projectName = approvalDetail.project?.name || getProjectName(approvalDetail.projectId);
         const stageName = approvalDetail.stage?.name || getStageName(approvalDetail.stageId);
@@ -1934,21 +2321,27 @@ export default function ActivitiesPage() {
         const dueInfo = getApprovalDueSubtext(approvalDetail);
 
         const attachmentsToRender = Array.isArray(approvalDetail.attachments) && approvalDetail.attachments.length > 0
-            ? approvalDetail.attachments.map((a: any, idx: number) => ({
-                name: a.name || "Attachment",
-                sizeFormatted: a.size ? `${(a.size / (1024 * 1024)).toFixed(1)} MB` : "—",
-                dateFormatted: a.updatedAt ? formatTableDate(a.updatedAt) : "—",
-                type: (a.name || "").toLowerCase().endsWith(".pdf") ? "pdf" : (idx === 0 ? "pdf" : "sheet"),
-                url: a.url,
-            }))
+            ? approvalDetail.attachments.map((a: any, idx: number) => {
+                const name = String(a.name || "Document.pdf");
+                const isPdf = name.toLowerCase().endsWith(".pdf");
+                const isSheet = name.toLowerCase().endsWith(".xls") || name.toLowerCase().endsWith(".xlsx") || name.toLowerCase().endsWith(".csv");
+                return {
+                    name,
+                    sizeFormatted: a.size ? `${(Number(a.size) / (1024 * 1024)).toFixed(1)} MB` : "2.4 MB",
+                    dateFormatted: a.updatedAt ? formatTableDate(a.updatedAt) : formatTableDate(approvalDetail.createdAt || new Date().toISOString()),
+                    type: isPdf ? "pdf" : (isSheet ? "sheet" : "doc"),
+                    url: a.url,
+                    size: a.size,
+                };
+            })
             : [];
 
         const totalCommentsCount = approvalComments.length;
 
         return (
-            <div className="view-task-drawer-backdrop" onClick={() => setApprovalDetail(null)}>
+            <div className="view-approval-drawer-backdrop" onClick={() => setApprovalDetail(null)}>
                 <div className="view-approval-drawer" onClick={e => e.stopPropagation()}>
-                    {/* Header */}
+                    {/* Header (Figma Frame 2147225093) */}
                     <div className="view-approval-header">
                         <h3 className="view-approval-header-title">View Approval</h3>
                         <button
@@ -1957,212 +2350,283 @@ export default function ActivitiesPage() {
                             onClick={() => setApprovalDetail(null)}
                             aria-label="Close drawer"
                         >
-                            <X size={18} />
+                            <X size={20} />
                         </button>
                     </div>
 
-                    {/* Scrollable Body */}
-                    <div className="view-approval-body">
-                        {/* Top Card: Title, Subtitle, Edit, 3-Col Meta Grid, and Description */}
-                        <div className="view-approval-top-card">
-                            <div className="view-approval-top-header">
-                                <div>
-                                    <h2 className="view-approval-title">{approvalDetail.name}</h2>
-                                    <p className="view-approval-subtitle">
-                                        Requested by <strong>{requesterName}</strong> on {requestedDateFormatted}
-                                    </p>
-                                </div>
-                                <button
-                                    type="button"
-                                    className="view-approval-edit-btn"
-                                    onClick={() => {
-                                        const a = approvalDetail;
-                                        setApprovalForm({
-                                            name: a.name,
-                                            projectId: a.projectId,
-                                            stageId: a.stageId,
-                                            description: a.description || "",
-                                            approverId: a.approverId || "",
-                                            approverName: a.approverName || "",
-                                            dueDate: a.dueDate || "",
-                                            status: (["draft", "sent", "in_review"].includes(a.status) ? a.status : "draft") as "draft" | "sent" | "in_review",
-                                        });
-                                        const atts = Array.isArray(a.attachments)
-                                            ? a.attachments.map((at: any) => ({
-                                                name: String(at.name || "Attachment"),
-                                                size: Number(at.size || 0),
-                                                type: String(at.type || "application/octet-stream"),
-                                            }))
-                                            : [];
-                                        setApprovalAttachments(atts);
-                                        setCreateApproval(true);
-                                        setApprovalDetail(null);
-                                    }}
-                                >
-                                    <Edit3 size={14} />
-                                    <span>Edit Approval</span>
-                                </button>
+                    {/* Inner White Card (Figma Frame 2147225027) */}
+                    <div className="view-approval-inner-card">
+                        {/* Top Header & Edit Action (Figma Frame 2147225066) */}
+                        <div className="view-approval-top-header">
+                            <div className="view-approval-title-group">
+                                <h2 className="view-approval-title">{approvalDetail.name}</h2>
+                                <p className="view-approval-subtitle">
+                                    Requested by <strong>{requesterName}</strong> on {requestedDateFormatted}
+                                </p>
                             </div>
+                            <button
+                                type="button"
+                                className="view-approval-edit-btn"
+                                onClick={() => {
+                                    const a = approvalDetail;
+                                    setApprovalForm({
+                                        name: a.name,
+                                        projectId: a.projectId,
+                                        stageId: a.stageId,
+                                        description: a.description || "",
+                                        approverId: a.approverId || "",
+                                        approverName: a.approverName || "",
+                                        dueDate: a.dueDate || "",
+                                        status: (["draft", "sent", "in_review"].includes(a.status) ? a.status : "draft") as "draft" | "sent" | "in_review",
+                                    });
+                                    const atts = Array.isArray(a.attachments)
+                                        ? a.attachments.map((at: any) => ({
+                                            name: String(at.name || "Attachment"),
+                                            size: Number(at.size || 0),
+                                            type: String(at.type || "application/octet-stream"),
+                                        }))
+                                        : [];
+                                    setApprovalAttachments(atts);
+                                    setApprovalError("");
+                                    setCreateApproval(true);
+                                }}
+                            >
+                                <Edit3 size={18} />
+                                <span>Edit Approval</span>
+                            </button>
+                        </div>
 
-                            {/* 3-Column Metadata Grid */}
-                            <div className="view-approval-meta-grid">
-                                <div className="view-approval-meta-item">
+                        {/* Metadata Card (Figma Frame 2147225027 nested) */}
+                        <div className="view-approval-card">
+                            {/* Row 1: 3-column metadata (Frame 2147225128) */}
+                            <div className="view-approval-meta-row-3col">
+                                <div className="view-approval-meta-col">
                                     <span className="view-approval-meta-label">Project Name</span>
-                                    <span className="view-approval-meta-val">{projectName}</span>
+                                    <span className="view-approval-meta-value">{projectName}</span>
                                 </div>
-                                <div className="view-approval-meta-item">
+                                <div className="view-approval-meta-col">
                                     <span className="view-approval-meta-label">Approver</span>
-                                    <span className="view-approval-meta-val">{approverName}</span>
+                                    <span className="view-approval-meta-value">{approverName}</span>
                                 </div>
-                                <div className="view-approval-meta-item">
+                                <div className="view-approval-meta-col">
                                     <span className="view-approval-meta-label">Due Date</span>
-                                    <span className="view-approval-meta-val">
+                                    <span className="view-approval-meta-value">
                                         {formatTableDate(approvalDetail.dueDate)}
-                                        <span className="view-approval-due-relative">
-                                            {" "}{dueInfo.text ? (dueInfo.text.charAt(0).toUpperCase() + dueInfo.text.slice(1)) : "In 3 Days"}
-                                        </span>
+                                        {dueInfo.text && (
+                                            <span style={{ color: "#64748B", fontWeight: 400, marginLeft: "6px" }}>
+                                                {dueInfo.text.charAt(0).toUpperCase() + dueInfo.text.slice(1)}
+                                            </span>
+                                        )}
                                     </span>
                                 </div>
-                                <div className="view-approval-meta-item">
+                            </div>
+
+                            {/* Row 2: 2-column metadata (Frame 2147225129) */}
+                            <div className="view-approval-meta-row-2col">
+                                <div className="view-approval-meta-col">
                                     <span className="view-approval-meta-label">Stage</span>
-                                    <span className="view-approval-stage-pill">
+                                    <span className="view-approval-pill stage">
                                         {stageName ? (stageName.charAt(0).toUpperCase() + stageName.slice(1).toLowerCase()) : "Design"}
                                     </span>
                                 </div>
-                                <div className="view-approval-meta-item">
+                                <div className="view-approval-meta-col">
                                     <span className="view-approval-meta-label">Status</span>
-                                    <span className={`view-approval-status-pill ${approvalDetail.status.toLowerCase().replace(/_/g, "-")}`}>
+                                    <span className={`view-approval-pill status-${approvalDetail.status.toLowerCase().replace(/_/g, "-")}`}>
                                         {approvalDetail.status.replace(/_/g, "-").toUpperCase()}
                                     </span>
                                 </div>
                             </div>
 
-                            {/* Description inside Top Card */}
-                            <div className="view-approval-desc-wrap">
-                                <span className="view-approval-desc-label">Description</span>
+                            {/* Row 3: Description (Frame 2147225000) */}
+                            <div className="view-approval-desc-block">
+                                <span className="view-approval-meta-label">Description</span>
                                 <p className="view-approval-desc-text">
-                                    {approvalDetail.description || "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."}
+                                    {approvalDetail.description || "No description provided for this approval request."}
                                 </p>
                             </div>
                         </div>
 
-                        {/* Attachments Section */}
-                        <div className="view-approval-section">
-                            <div className="view-approval-section-header">
-                                <span className="view-approval-section-title">Attachments</span>
-                                <span className="view-approval-files-badge">{attachmentsToRender.length} Files</span>
+                        {/* Attachments Section (Figma Frame 2147225067) */}
+                        <div className="view-approval-card">
+                            <div className="view-approval-card-header">
+                                <span className="view-approval-card-title">Attachments</span>
+                                <span className="view-approval-count-badge files">{attachmentsToRender.length} Files</span>
                             </div>
                             <div className="view-approval-attachments-list">
-                                {attachmentsToRender.map((file, idx) => (
-                                    <div key={idx} className="view-approval-file-card">
-                                        <div className="view-approval-file-left">
-                                            <div className={`view-approval-file-icon ${file.type === "pdf" ? "pdf" : "sheet"}`}>
-                                                {file.type === "pdf" ? (
-                                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                                                        <path d="M14 2H6C4.89543 2 4 2.89543 4 4V20C4 21.1046 4.89543 22 6 22H18C19.1046 22 20 21.1046 20 20V8L14 2Z" fill="#FEE2E2" stroke="#EF4444" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                                                        <path d="M14 2V8H20" stroke="#EF4444" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                                                        <path d="M9 13H15M9 17H12" stroke="#EF4444" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                                                    </svg>
-                                                ) : (
-                                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                                                        <path d="M14 2H6C4.89543 2 4 2.89543 4 4V20C4 21.1046 4.89543 22 6 22H18C19.1046 22 20 21.1046 20 20V8L14 2Z" fill="#DCFCE7" stroke="#16A34A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                                                        <path d="M14 2V8H20" stroke="#16A34A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                                                        <path d="M8 13H16M8 17H16" stroke="#16A34A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                                                    </svg>
-                                                )}
+                                {attachmentsToRender.length === 0 ? (
+                                    <div className="view-approval-empty-state">No attachments uploaded</div>
+                                ) : (
+                                    attachmentsToRender.map((file, idx) => (
+                                        <div key={idx} style={{ display: "contents" }}>
+                                            <div className="view-approval-file-row">
+                                                <div className="view-approval-file-left">
+                                                    <div className={`view-approval-file-icon-box ${file.type}`}>
+                                                        {file.type === "pdf" ? (
+                                                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                                                <path d="M11.6667 1.66669H5C4.08 1.66669 3.33333 2.41335 3.33333 3.33335V16.6667C3.33333 17.5867 4.08 18.3334 5 18.3334H15C15.92 18.3334 16.6667 17.5867 16.6667 16.6667V6.66669L11.6667 1.66669Z" stroke="#DC2626" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                                <path d="M11.6667 1.66669V6.66669H16.6667" stroke="#DC2626" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                                <path d="M7.5 10.8333H12.5M7.5 14.1667H10" stroke="#DC2626" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                            </svg>
+                                                        ) : file.type === "sheet" ? (
+                                                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                                                <path d="M11.6667 1.66669H5C4.08 1.66669 3.33333 2.41335 3.33333 3.33335V16.6667C3.33333 17.5867 4.08 18.3334 5 18.3334H15C15.92 18.3334 16.6667 17.5867 16.6667 16.6667V6.66669L11.6667 1.66669Z" stroke="#1CB061" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                                <path d="M11.6667 1.66669V6.66669H16.6667" stroke="#1CB061" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                                <path d="M6.66667 10.8333H13.3333M6.66667 14.1667H13.3333" stroke="#1CB061" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                            </svg>
+                                                        ) : (
+                                                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                                                <path d="M11.6667 1.66669H5C4.08 1.66669 3.33333 2.41335 3.33333 3.33335V16.6667C3.33333 17.5867 4.08 18.3334 5 18.3334H15C15.92 18.3334 16.6667 17.5867 16.6667 16.6667V6.66669L11.6667 1.66669Z" stroke="#2563EB" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                                <path d="M11.6667 1.66669V6.66669H16.6667" stroke="#2563EB" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                                <path d="M7.5 10.8333H12.5M7.5 14.1667H12.5" stroke="#2563EB" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                            </svg>
+                                                        )}
+                                                    </div>
+                                                    <div className="view-approval-file-details">
+                                                        <span className="view-approval-file-name" title={file.name}>{file.name}</span>
+                                                        <div className="view-approval-file-subtext-row">
+                                                            <span>{file.type.toUpperCase()}</span>
+                                                            <span>•</span>
+                                                            <span>{file.sizeFormatted}</span>
+                                                            <span>•</span>
+                                                            <span>{file.dateFormatted}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    className="view-approval-download-btn"
+                                                    onClick={() => handleDownloadAttachment(file)}
+                                                    title={`Download ${file.name}`}
+                                                    aria-label={`Download ${file.name}`}
+                                                >
+                                                    <DownloadSvg />
+                                                </button>
                                             </div>
-                                            <div className="view-approval-file-info">
-                                                <span className="view-approval-file-name">{file.name}</span>
-                                                <span className="view-approval-file-subtext">{file.sizeFormatted} · Updated on {file.dateFormatted}</span>
-                                            </div>
+                                            {idx < attachmentsToRender.length - 1 && <hr className="view-approval-file-divider" />}
                                         </div>
-                                        <button
-                                            type="button"
-                                            className="view-approval-download-btn"
-                                            onClick={() => handleDownloadAttachment(file)}
-                                            title={`Download ${file.name}`}
-                                            aria-label={`Download ${file.name}`}
-                                        >
-                                            <DownloadSvg />
-                                        </button>
-                                    </div>
-                                ))}
+                                    ))
+                                )}
                             </div>
                         </div>
 
-                        {/* Feedback from Approver Card */}
-                        <div className="view-approval-feedback-card">
-                            <div className="view-approval-section-header">
-                                <span className="view-approval-section-title">Feedback from Approver</span>
-                                <span className="view-approval-comments-badge">{totalCommentsCount} Comments</span>
+                        {/* Feedback from Approver Card (Figma Frame 2147225068) */}
+                        <div className="view-approval-card">
+                            <div className="view-approval-card-header">
+                                <span className="view-approval-card-title">Feedback from Approver</span>
+                                <span className="view-approval-count-badge comments">{totalCommentsCount} Comments</span>
                             </div>
 
-                            <div className="view-approval-feedback-list">
-                                {/* Backend comments */}
-                                {approvalComments.map(c => {
-                                    const cAtt = Array.isArray(c.attachments) && c.attachments.length > 0 ? (c.attachments[0] as any) : null;
-                                    const isSelf = c.authorId === userInitials;
-                                    return (
-                                        <div key={c.id} className="view-approval-feedback-item">
-                                            <div className="view-approval-feedback-item-header">
-                                                <div className="view-approval-feedback-author-group">
-                                                    <div className="view-approval-avatar">
-                                                        {c.authorId ? c.authorId.slice(0, 2).toUpperCase() : userInitials}
+                            <div className="view-approval-comments-list">
+                                {approvalComments.length === 0 ? (
+                                    <div className="view-approval-empty-state">
+                                        No feedback or comments yet. Add a comment below.
+                                    </div>
+                                ) : (
+                                    approvalComments.map(c => {
+                                        const cAtt = Array.isArray(c.attachments) && c.attachments.length > 0 ? (c.attachments[0] as any) : null;
+                                        const isSelf = c.authorId === userInitials;
+                                        const authorDisplay = isSelf ? "You" : (c.authorId || approverName || "Approver");
+                                        const initials = (authorDisplay.replace(/[^a-zA-Z]/g, "").slice(0, 2) || "AP").toUpperCase();
+                                        return (
+                                            <div key={c.id} className="view-approval-comment-item">
+                                                <div className="view-approval-comment-header">
+                                                    <div className="view-approval-avatar-bubble">
+                                                        {initials}
                                                     </div>
-                                                    <span className="view-approval-author-name">
-                                                        {isSelf ? "You" : (approverName || "Approver")}
-                                                    </span>
+                                                    <div className="view-approval-comment-author-info">
+                                                        <span className="view-approval-comment-author">{authorDisplay}</span>
+                                                        <span className="view-approval-comment-time">
+                                                            {formatTableDate(c.createdAt)} • {formatTimeOnly(c.createdAt)}
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                                <span className="view-approval-timestamp">
-                                                    {formatTableDate(c.createdAt)} · {formatTimeOnly(c.createdAt)}
-                                                </span>
-                                            </div>
-                                            <p className="view-approval-feedback-body">{c.body}</p>
-                                            {cAtt && (
-                                                <div
-                                                    className="view-approval-comment-chip"
-                                                    onClick={() => handleDownloadAttachment(cAtt)}
-                                                    style={{ cursor: "pointer" }}
-                                                >
-                                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="#2563eb">
-                                                        <path d="M14 2H6C4.89543 2 4 2.89543 4 4V20C4 21.1046 4.89543 22 6 22H18C19.1046 22 20 21.1046 20 20V8L14 2Z" />
-                                                        <path d="M14 2V8H20" />
-                                                    </svg>
-                                                    <span>{cAtt.name || "Attachment"}</span>
-                                                    <span className="size-tag">{cAtt.size ? `${(cAtt.size / (1024 * 1024)).toFixed(1)} MB` : "2.4 MB"}</span>
-                                                    <button
-                                                        type="button"
-                                                        className="view-approval-comment-chip-dl"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleDownloadAttachment(cAtt);
-                                                        }}
-                                                        aria-label="Download attachment"
+                                                <p className="view-approval-comment-body">{c.body}</p>
+                                                {cAtt && (
+                                                    <div
+                                                        className="view-approval-comment-chip"
+                                                        onClick={() => handleDownloadAttachment(cAtt)}
+                                                        title={`Download ${cAtt.name || "Attachment"}`}
                                                     >
-                                                        <DownloadSvg />
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
+                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                                            <polyline points="14 2 14 8 20 8" />
+                                                            <line x1="16" y1="13" x2="8" y2="13" />
+                                                            <line x1="16" y1="17" x2="8" y2="17" />
+                                                            <polyline points="10 9 9 9 8 9" />
+                                                        </svg>
+                                                        <span className="view-approval-comment-chip-name">{cAtt.name || "Attachment"}</span>
+                                                        <span className="view-approval-comment-chip-size">
+                                                            {cAtt.size ? `${(Number(cAtt.size) / (1024 * 1024)).toFixed(1)} MB` : "2.4 MB"}
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            className="view-approval-download-btn"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleDownloadAttachment(cAtt);
+                                                            }}
+                                                            aria-label="Download attachment"
+                                                            style={{ width: "16px", height: "16px" }}
+                                                        >
+                                                            <DownloadSvg />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })
+                                )}
                             </div>
+                        </div>
 
-                            {/* Pending attachment preview chip */}
+                        {/* Approver Decisions Bar (when actionable: Approve, Request Changes, Reject) */}
+                        {["sent", "in_review", "changes_required"].includes(approvalDetail.status) && (
+                            <div className="view-approval-decisions-bar">
+                                <button
+                                    type="button"
+                                    className="view-approval-decision-btn approve"
+                                    onClick={() => decideApproval("approved")}
+                                    title="Approve this request"
+                                >
+                                    <Check size={16} />
+                                    <span>Approve</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    className="view-approval-decision-btn changes"
+                                    onClick={() => decideApproval("changes_required")}
+                                    title="Request changes"
+                                >
+                                    <AlertCircle size={16} />
+                                    <span>Request Changes</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    className="view-approval-decision-btn reject"
+                                    onClick={() => decideApproval("rejected")}
+                                    title="Reject this request"
+                                >
+                                    <X size={16} />
+                                    <span>Reject</span>
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Interactive Comment Input Bar with Functional File Attachment (Figma Frame 2147225069) */}
+                        <div className="view-approval-comment-bar-container">
                             {feedbackAttachment && (
                                 <div className="view-approval-pending-file">
-                                    <Paperclip size={13} />
+                                    <Paperclip size={14} />
                                     <span>{feedbackAttachment.name} ({(feedbackAttachment.size / (1024 * 1024)).toFixed(1)} MB)</span>
-                                    <button type="button" onClick={removeFeedbackAttachment} title="Remove attachment">
-                                        <X size={13} />
+                                    <button type="button" onClick={removeFeedbackAttachment} title="Remove attachment" aria-label="Remove attachment">
+                                        <X size={14} />
                                     </button>
                                 </div>
                             )}
-
-                            {/* Interactive Comment Input Bar with Functional File Attachment */}
-                            <div className="view-approval-input-row">
-                                <div className="view-approval-input-wrapper">
+                            <div className="view-approval-comment-bar">
+                                <div className="view-approval-input-box">
                                     <input
+                                        className="view-approval-input-field"
                                         value={approvalCommentText}
                                         onChange={e => setApprovalCommentText(e.target.value)}
                                         placeholder="Add a Comment..."
@@ -2181,7 +2645,7 @@ export default function ActivitiesPage() {
                                         title="Attach file"
                                         aria-label="Attach file"
                                     >
-                                        <Paperclip size={18} />
+                                        <Paperclip size={20} />
                                     </button>
                                 </div>
                                 <button
@@ -2190,7 +2654,7 @@ export default function ActivitiesPage() {
                                     onClick={sendApprovalComment}
                                     disabled={sendingApprovalComment || (!approvalCommentText.trim() && !feedbackAttachment)}
                                 >
-                                    Send
+                                    {sendingApprovalComment ? "..." : "Send"}
                                 </button>
                             </div>
                         </div>
@@ -2583,10 +3047,10 @@ export default function ActivitiesPage() {
     };
 
     const ApprovalModal = () => {
-        if (!createApproval && !approvalDetail) return null;
+        if (!createApproval) return null;
         return (
             <div
-                className="activity-task-drawer-backdrop"
+                className="activities-task-drawer-backdrop activity-task-drawer-backdrop"
                 onClick={() => {
                     setCreateApproval(false);
                     setApprovalDetail(null);
@@ -2596,14 +3060,14 @@ export default function ActivitiesPage() {
                 }}
             >
                 <div
-                    className="activity-task-drawer"
+                    className="activities-task-drawer activity-task-drawer"
                     onClick={e => e.stopPropagation()}
                 >
-                    <div className="activity-task-drawer-header">
-                        <h3>{approvalDetail ? "Edit Approval" : "Request New Approval"}</h3>
+                    <div className="activities-task-drawer-header activity-task-drawer-header">
+                        <h3 className="activities-task-drawer-title">{approvalDetail ? "Edit Approval" : "Request New Approval"}</h3>
                         <button
                             type="button"
-                            className="activity-task-drawer-close"
+                            className="activities-task-drawer-close activity-task-drawer-close"
                             onClick={() => {
                                 setCreateApproval(false);
                                 setApprovalDetail(null);
@@ -2611,28 +3075,36 @@ export default function ActivitiesPage() {
                                 setApprovalAttachments([]);
                                 setApprovalError("");
                             }}
-                            aria-label="Close"
+                            aria-label="Close drawer"
                         >
                             <X size={20} />
                         </button>
                     </div>
                     <form
+                        className="activities-task-drawer-form"
                         onSubmit={handleApprovalSubmit}
-                        style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}
                     >
-                        <div className="activity-task-drawer-body">
-                            <div className="activity-task-field">
-                                <label>Approval Name <em>*</em></label>
+                        <div className="activities-task-drawer-card activity-task-drawer-body">
+                            <div className="activities-task-field activity-task-field">
+                                <label className="activities-task-field-label">
+                                    <span>Approval Name</span>
+                                    <span className="activities-task-asterisk">*</span>
+                                </label>
                                 <input
+                                    className="activities-task-input"
                                     required
                                     value={approvalForm.name}
                                     onChange={e => setApprovalForm(f => ({ ...f, name: e.target.value }))}
                                     placeholder="Enter Task Name"
                                 />
                             </div>
-                            <div className="activity-task-field">
-                                <label>Project <em>*</em></label>
+                            <div className="activities-task-field activity-task-field">
+                                <label className="activities-task-field-label">
+                                    <span>Project</span>
+                                    <span className="activities-task-asterisk">*</span>
+                                </label>
                                 <select
+                                    className="activities-task-select"
                                     required
                                     value={approvalForm.projectId}
                                     onChange={e => setApprovalForm(f => ({ ...f, projectId: e.target.value }))}
@@ -2640,14 +3112,18 @@ export default function ActivitiesPage() {
                                     <option value="">Select Project</option>
                                     {approvalProjects.map(p => (
                                         <option key={p.id} value={p.id}>
-                                            {p.projectCode ? `${p.name} (${p.projectCode})` : p.name}
+                                            {p.projectCode ? `${p.projectCode} - ` : ""}{p.name}
                                         </option>
                                     ))}
                                 </select>
                             </div>
-                            <div className="activity-task-field">
-                                <label>Stage <em>*</em></label>
+                            <div className="activities-task-field activity-task-field">
+                                <label className="activities-task-field-label">
+                                    <span>Stage</span>
+                                    <span className="activities-task-asterisk">*</span>
+                                </label>
                                 <select
+                                    className="activities-task-select"
                                     required
                                     value={approvalForm.stageId}
                                     onChange={e => setApprovalForm(f => ({ ...f, stageId: e.target.value }))}
@@ -2660,10 +3136,14 @@ export default function ActivitiesPage() {
                                     ))}
                                 </select>
                             </div>
-                            <div className="activity-task-row">
-                                <div className="activity-task-field">
-                                    <label>Due Date <em>*</em></label>
+                            <div className="activities-task-two-col activity-task-row">
+                                <div className="activities-task-field activity-task-field">
+                                    <label className="activities-task-field-label">
+                                        <span>Due Date</span>
+                                        <span className="activities-task-asterisk">*</span>
+                                    </label>
                                     <input
+                                        className="activities-task-input"
                                         type="date"
                                         required
                                         value={approvalForm.dueDate}
@@ -2671,9 +3151,13 @@ export default function ActivitiesPage() {
                                         min={today()}
                                     />
                                 </div>
-                                <div className="activity-task-field">
-                                    <label>Approver <em>*</em></label>
+                                <div className="activities-task-field activity-task-field">
+                                    <label className="activities-task-field-label">
+                                        <span>Approver</span>
+                                        <span className="activities-task-asterisk">*</span>
+                                    </label>
                                     <select
+                                        className="activities-task-select"
                                         required
                                         value={approvalForm.approverName || ""}
                                         onChange={e => {
@@ -2695,30 +3179,36 @@ export default function ActivitiesPage() {
                                     </select>
                                 </div>
                             </div>
-                            <div className="activity-task-field">
-                                <label>Description</label>
+                            <div className="activities-task-field activity-task-field">
+                                <label className="activities-task-field-label">
+                                    <span>Description</span>
+                                </label>
                                 <textarea
+                                    className="activities-task-textarea"
                                     rows={3}
                                     value={approvalForm.description}
                                     onChange={e => setApprovalForm(f => ({ ...f, description: e.target.value }))}
                                     placeholder="Describe the deliverable and what needs approval..."
                                 />
                             </div>
-                            <div className="activity-task-field">
-                                <label>Attach Files</label>
+                            <div className="activities-task-field activity-task-field">
+                                <label className="activities-task-field-label">
+                                    <span>Attach Files</span>
+                                </label>
                                 <div
-                                    className={`activity-task-dropzone ${isApprovalDragging ? "dragging" : ""}`}
+                                    className={`activities-task-dropzone activity-task-dropzone ${isApprovalDragging ? "dragging" : ""}`}
                                     onDragOver={handleApprovalDragOver}
                                     onDragLeave={handleApprovalDragLeave}
                                     onDrop={handleApprovalDrop}
                                     onClick={() => approvalFileInputRef.current?.click()}
                                 >
-                                    <svg width="62" height="62" viewBox="0 0 62 62" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <rect x="0.5" y="0.5" width="61" height="61" rx="7.5" fill="#2563EB" fillOpacity="0.1"/>
-                                        <rect x="0.5" y="0.5" width="61" height="61" rx="7.5" stroke="#2563EB"/>
-                                        <path d="M31 31.5858L35.2426 35.8284L33.8284 37.2426L32 35.415V41H30V35.413L28.1716 37.2426L26.7574 35.8284L31 31.5858ZM31 21C34.5934 21 37.5544 23.7076 37.9541 27.1939C40.2858 27.8315 42 29.9656 42 32.5C42 35.3688 39.8036 37.7246 37.0006 37.9776L37.0009 35.973C38.8686 35.7381 40 34.2755 40 32.5C40 30.6974 38.6416 29.2198 36.8778 29.0238L35.9765 28.9237L35.8643 28.0241C35.5398 25.4206 33.3283 23.4142 30.7071 23.4142C27.9457 23.4142 25.7071 25.6528 25.7071 28.4142V29.4142H24.7071C22.4979 29.4142 20.7071 31.205 20.7071 33.4142C20.7071 35.6234 22.4979 37.4142 24.7071 37.4142H27V39.4142H24.7071C21.3934 39.4142 18.7071 36.7279 18.7071 33.4142C18.7071 30.3475 21.0118 27.8184 24.0041 27.4619C24.8946 23.8291 28.1633 21 31 21Z" fill="#2563EB"/>
-                                    </svg>
-                                    <span className="activity-task-dropzone-text">Drag & Drop Your File Here</span>
+                                    <div className="activities-task-dropzone-icon-box">
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M12 16V8M12 8L9 11M12 8L15 11" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M20 16.7428C21.2215 15.734 22 14.2079 22 12.5C22 9.46243 19.5376 7 16.5 7C16.2815 7 16.0771 7.01272 15.875 7.03714C14.9818 4.67389 12.6845 3 10 3C6.13401 3 3 6.13401 3 10C3 11.2332 3.31846 12.3919 3.87612 13.3986C2.71536 14.2811 2 15.6983 2 17.2857C2 20.0471 4.23858 22.2857 7 22.2857H17C19.2091 22.2857 21 20.4949 21 18.2857" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                        </svg>
+                                    </div>
+                                    <span className="activities-task-dropzone-text activity-task-dropzone-text">Drag & Drop Your File Here</span>
                                     <input
                                         type="file"
                                         ref={approvalFileInputRef}
@@ -2728,9 +3218,9 @@ export default function ActivitiesPage() {
                                     />
                                 </div>
                                 {approvalAttachments.length > 0 && (
-                                    <div className="activity-task-attachments">
+                                    <div className="activities-task-attachments-list activity-task-attachments">
                                         {approvalAttachments.map((file, idx) => (
-                                            <div key={idx} className="activity-task-file-chip">
+                                            <div key={idx} className="activities-task-file-chip activity-task-file-chip">
                                                 <span>{file.name} ({(file.size / 1024).toFixed(0)} KB)</span>
                                                 <button
                                                     type="button"
@@ -2749,10 +3239,11 @@ export default function ActivitiesPage() {
                             </div>
                             {approvalError && <p className="form-error" style={{ color: "#ef4444", fontSize: 13, marginTop: 4 }}>{approvalError}</p>}
                         </div>
-                        <div className="activity-task-drawer-footer">
+                        <div className="activities-task-drawer-footer activity-task-drawer-footer">
                             <button
                                 type="button"
-                                className="activity-task-btn-cancel"
+                                className="activities-task-btn-cancel activity-task-btn-cancel"
+                                style={{ width: "71px", minWidth: "71px", padding: "14px 10px" }}
                                 onClick={() => {
                                     setCreateApproval(false);
                                     setApprovalDetail(null);
@@ -2765,9 +3256,10 @@ export default function ActivitiesPage() {
                             </button>
                             <button
                                 type="submit"
-                                className="activity-task-btn-submit"
+                                className="activities-task-btn-submit activity-task-btn-submit"
+                                disabled={isSubmittingApproval}
                             >
-                                {approvalDetail ? "Save Changes" : "Create Approval"}
+                                {isSubmittingApproval ? "Saving..." : (approvalDetail ? "Save Changes" : "Request Approval")}
                             </button>
                         </div>
                     </form>
@@ -2950,7 +3442,8 @@ export default function ActivitiesPage() {
                                         </div>
                                         <input
                                             type="text"
-                                            placeholder="Search task by name..."
+                                            className="activities-stage-search-input activities-task-search-input"
+                                            placeholder="Search task by name…"
                                             value={taskQuery}
                                             onChange={e => {
                                                 setTaskQuery(e.target.value);
@@ -2962,7 +3455,10 @@ export default function ActivitiesPage() {
                                             <button
                                                 type="button"
                                                 className="activities-search-clear"
-                                                onClick={() => setTaskQuery("")}
+                                                onClick={() => {
+                                                    setTaskQuery("");
+                                                    setTaskPage(1);
+                                                }}
                                                 aria-label="Clear search"
                                             >
                                                 <X size={14} />
@@ -2973,7 +3469,7 @@ export default function ActivitiesPage() {
                                     <div style={{ position: "relative" }}>
                                         <button
                                             type="button"
-                                            className={`activities-stage-filter-btn ${taskFilterOpen || taskFilter !== "all" || taskPriorityFilter !== "all" ? "active" : ""}`}
+                                            className={`activities-stage-filter-btn ${taskFilterOpen || hasActiveTaskFilters ? "active" : ""}`}
                                             onClick={e => {
                                                 e.stopPropagation();
                                                 setTaskFilterOpen(prev => !prev);
@@ -2996,13 +3492,27 @@ export default function ActivitiesPage() {
                                                 <path d="M1.66667 10H8.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                                                 <path d="M11.25 10H18.3333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                                             </svg>
-                                            {(taskFilter !== "all" || taskPriorityFilter !== "all") && (
+                                            {hasActiveTaskFilters && (
                                                 <span className="activities-filter-badge-dot" />
                                             )}
                                         </button>
 
                                         {taskFilterOpen && (
-                                            <div className="activities-stage-filter-popover" onClick={e => e.stopPropagation()}>
+                                            <div className="activities-stage-filter-popover" onClick={e => e.stopPropagation()} style={{ minWidth: "260px" }}>
+                                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                                                    <span style={{ fontWeight: 600, fontSize: "14px", color: "#0F172A" }}>Filters</span>
+                                                    {hasActiveTaskFilters && (
+                                                        <button
+                                                            type="button"
+                                                            className="activities-filter-reset-btn"
+                                                            style={{ margin: 0, padding: "2px 6px" }}
+                                                            onClick={resetTaskFilters}
+                                                        >
+                                                            Reset all
+                                                        </button>
+                                                    )}
+                                                </div>
+
                                                 <h5 className="activities-filter-section-title">Task Status</h5>
                                                 <select
                                                     className="activities-filter-select"
@@ -3019,7 +3529,8 @@ export default function ActivitiesPage() {
                                                     <option value="completed">Completed</option>
                                                     <option value="cancelled">Cancelled</option>
                                                 </select>
-                                                <hr style={{ border: 0, borderTop: "1px solid #E2E8F0", margin: "4px 0" }} />
+
+                                                <hr style={{ border: 0, borderTop: "1px solid #E2E8F0", margin: "6px 0" }} />
                                                 <h5 className="activities-filter-section-title">Priority</h5>
                                                 <select
                                                     className="activities-filter-select"
@@ -3035,17 +3546,72 @@ export default function ActivitiesPage() {
                                                     <option value="high">High</option>
                                                     <option value="critical">Critical</option>
                                                 </select>
-                                                {(taskFilter !== "all" || taskPriorityFilter !== "all") && (
-                                                    <button
-                                                        type="button"
-                                                        className="activities-filter-reset-btn"
-                                                        onClick={() => {
-                                                            setTaskFilter("all");
-                                                            setTaskPriorityFilter("all");
-                                                        }}
-                                                    >
-                                                        Reset filters
-                                                    </button>
+
+                                                {taskProjects.length > 0 && (
+                                                    <>
+                                                        <hr style={{ border: 0, borderTop: "1px solid #E2E8F0", margin: "6px 0" }} />
+                                                        <h5 className="activities-filter-section-title">Project</h5>
+                                                        <select
+                                                            className="activities-filter-select"
+                                                            value={taskProjectFilter}
+                                                            onChange={e => {
+                                                                setTaskProjectFilter(e.target.value);
+                                                                setTaskPage(1);
+                                                            }}
+                                                        >
+                                                            <option value="all">All Projects</option>
+                                                            {taskProjects.map(p => (
+                                                                <option key={p.id} value={p.id}>
+                                                                    {p.projectCode ? `${p.projectCode} - ` : ""}{p.name}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </>
+                                                )}
+
+                                                {taskStages.length > 0 && (
+                                                    <>
+                                                        <hr style={{ border: 0, borderTop: "1px solid #E2E8F0", margin: "6px 0" }} />
+                                                        <h5 className="activities-filter-section-title">Stage</h5>
+                                                        <select
+                                                            className="activities-filter-select"
+                                                            value={taskStageFilter}
+                                                            onChange={e => {
+                                                                setTaskStageFilter(e.target.value);
+                                                                setTaskPage(1);
+                                                            }}
+                                                        >
+                                                            <option value="all">All Stages</option>
+                                                            {taskStages.map(s => (
+                                                                <option key={s.id} value={s.id}>
+                                                                    {s.name}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </>
+                                                )}
+
+                                                {taskAssigneeOptions.length > 0 && (
+                                                    <>
+                                                        <hr style={{ border: 0, borderTop: "1px solid #E2E8F0", margin: "6px 0" }} />
+                                                        <h5 className="activities-filter-section-title">Assignee</h5>
+                                                        <select
+                                                            className="activities-filter-select"
+                                                            value={taskAssigneeFilter}
+                                                            onChange={e => {
+                                                                setTaskAssigneeFilter(e.target.value);
+                                                                setTaskPage(1);
+                                                            }}
+                                                        >
+                                                            <option value="all">All Assignees</option>
+                                                            <option value="unassigned">Unassigned</option>
+                                                            {taskAssigneeOptions.map(a => (
+                                                                <option key={a.id} value={a.id}>
+                                                                    {a.name}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </>
                                                 )}
                                             </div>
                                         )}
@@ -3070,11 +3636,13 @@ export default function ActivitiesPage() {
 
                             {activeTab === "approvals" && (
                                 <>
-                                    <div className="activities-search-box">
-                                        <Search size={16} />
+                                    <div className="activities-stage-search activities-approval-search">
+                                        <div className="activities-search-icon-box">
+                                            <Search size={16} />
+                                        </div>
                                         <input
                                             type="text"
-                                            placeholder="Search approval by name..."
+                                            placeholder="Search approval by name…"
                                             value={approvalQuery}
                                             onChange={e => {
                                                 setApprovalQuery(e.target.value);
@@ -3084,8 +3652,11 @@ export default function ActivitiesPage() {
                                         {approvalQuery && (
                                             <button
                                                 type="button"
-                                                onClick={() => setApprovalQuery("")}
-                                                style={{ background: "transparent", border: 0, padding: 0, cursor: "pointer", color: "#94a3b8" }}
+                                                className="activities-search-clear"
+                                                onClick={() => {
+                                                    setApprovalQuery("");
+                                                    setApprovalPage(1);
+                                                }}
                                                 aria-label="Clear search"
                                             >
                                                 <X size={14} />
@@ -3096,34 +3667,53 @@ export default function ActivitiesPage() {
                                     <div style={{ position: "relative" }}>
                                         <button
                                             type="button"
-                                            className="activities-filter-btn"
+                                            className={`activities-stage-filter-btn ${approvalFilterOpen || hasActiveApprovalFilters ? "active" : ""}`}
                                             onClick={e => {
                                                 e.stopPropagation();
                                                 setApprovalFilterOpen(prev => !prev);
                                             }}
+                                            title="Filter approvals"
                                             aria-label="Filter approvals"
                                         >
                                             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                <path d="M4.16667 5.83464C4.16667 5.14428 4.72631 4.58464 5.41667 4.58464C6.10702 4.58464 6.66667 5.14428 6.66667 5.83464C6.66667 6.52499 6.10702 7.08464 5.41667 7.08464C4.72631 7.08464 4.16667 6.52499 4.16667 5.83464Z" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                                <path d="M4.16667 14.168C4.16667 13.4776 4.72631 12.918 5.41667 12.918C6.10702 12.918 6.66667 13.4776 6.66667 14.168C6.66667 14.8583 6.10702 15.418 5.41667 15.418C4.72631 15.418 4.16667 14.8583 4.16667 14.168Z" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                                <path d="M13.3333 5.83464C13.3333 5.14428 13.893 4.58464 14.5833 4.58464C15.2737 4.58464 15.8333 5.14428 15.8333 5.83464C15.8333 6.52499 15.2737 7.08464 14.5833 7.08464C13.893 7.08464 13.3333 6.52499 13.3333 5.83464Z" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                                <path d="M13.3333 14.168C13.3333 13.4776 13.893 12.918 14.5833 12.918C15.2737 12.918 15.8333 13.4776 15.8333 14.168C15.8333 14.8583 15.2737 15.418 14.5833 15.418C13.893 15.418 13.3333 14.8583 13.3333 14.168Z" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                                <path d="M6.66667 5.83464H13.3333" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                                <path d="M1.66667 5.83464H4.16667" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                                <path d="M15.8333 5.83464H18.3333" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                                <path d="M6.66667 14.168H13.3333" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                                <path d="M1.66667 14.168H4.16667" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                                <path d="M15.8333 14.168H18.3333" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                                <path d="M8.75 10C8.75 9.30964 9.30964 8.75 10 8.75C10.6904 8.75 11.25 9.30964 11.25 10C11.25 10.6904 10.6904 11.25 10 11.25C9.30964 11.25 8.75 10.6904 8.75 10Z" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                                <path d="M1.66667 10H8.75" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                                <path d="M11.25 10H18.3333" stroke="#475467" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M4.16667 5.83464C4.16667 5.14428 4.72631 4.58464 5.41667 4.58464C6.10702 4.58464 6.66667 5.14428 6.66667 5.83464C6.66667 6.52499 6.10702 7.08464 5.41667 7.08464C4.72631 7.08464 4.16667 6.52499 4.16667 5.83464Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M4.16667 14.168C4.16667 13.4776 4.72631 12.918 5.41667 12.918C6.10702 12.918 6.66667 13.4776 6.66667 14.168C6.66667 14.8583 6.10702 15.418 5.41667 15.418C4.72631 15.418 4.16667 14.8583 4.16667 14.168Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M13.3333 5.83464C13.3333 5.14428 13.893 4.58464 14.5833 4.58464C15.2737 4.58464 15.8333 5.14428 15.8333 5.83464C15.8333 6.52499 15.2737 7.08464 14.5833 7.08464C13.893 7.08464 13.3333 6.52499 13.3333 5.83464Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M13.3333 14.168C13.3333 13.4776 13.893 12.918 14.5833 12.918C15.2737 12.918 15.8333 13.4776 15.8333 14.168C15.8333 14.8583 15.2737 15.418 14.5833 15.418C13.893 15.418 13.3333 14.8583 13.3333 14.168Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M6.66667 5.83464H13.3333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M1.66667 5.83464H4.16667" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M15.8333 5.83464H18.3333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M6.66667 14.168H13.3333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M1.66667 14.168H4.16667" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M15.8333 14.168H18.3333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M8.75 10C8.75 9.30964 9.30964 8.75 10 8.75C10.6904 8.75 11.25 9.30964 11.25 10C11.25 10.6904 10.6904 11.25 10 11.25C9.30964 11.25 8.75 10.6904 8.75 10Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M1.66667 10H8.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M11.25 10H18.3333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                                             </svg>
+                                            {hasActiveApprovalFilters && (
+                                                <span className="activities-filter-badge-dot" />
+                                            )}
                                         </button>
 
                                         {approvalFilterOpen && (
-                                            <div className="activities-filter-dropdown" onClick={e => e.stopPropagation()}>
-                                                <h5>Approval Status</h5>
+                                            <div className="activities-stage-filter-popover" onClick={e => e.stopPropagation()} style={{ minWidth: "260px" }}>
+                                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                                                    <span style={{ fontWeight: 600, fontSize: "14px", color: "#0F172A" }}>Filters</span>
+                                                    {hasActiveApprovalFilters && (
+                                                        <button
+                                                            type="button"
+                                                            className="activities-filter-reset-btn"
+                                                            style={{ margin: 0, padding: "2px 6px" }}
+                                                            onClick={resetApprovalFilters}
+                                                        >
+                                                            Reset all
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                                <h5 className="activities-filter-section-title">Approval Status</h5>
                                                 <select
+                                                    className="activities-filter-select"
                                                     value={approvalFilter}
                                                     onChange={e => {
                                                         setApprovalFilter(e.target.value);
@@ -3139,14 +3729,64 @@ export default function ActivitiesPage() {
                                                     <option value="rejected">Rejected</option>
                                                     <option value="cancelled">Cancelled</option>
                                                 </select>
+
+                                                {approvalProjects.length > 0 && (
+                                                    <>
+                                                        <hr style={{ border: 0, borderTop: "1px solid #E2E8F0", margin: "6px 0" }} />
+                                                        <h5 className="activities-filter-section-title">Project</h5>
+                                                        <select
+                                                            className="activities-filter-select"
+                                                            value={approvalProjectFilter}
+                                                            onChange={e => {
+                                                                setApprovalProjectFilter(e.target.value);
+                                                                setApprovalPage(1);
+                                                            }}
+                                                        >
+                                                            <option value="all">All Projects</option>
+                                                            {approvalProjects.map(p => (
+                                                                <option key={p.id} value={p.id}>
+                                                                    {p.projectCode ? `${p.projectCode} - ` : ""}{p.name}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </>
+                                                )}
+
+                                                {approvalStages.length > 0 && (
+                                                    <>
+                                                        <hr style={{ border: 0, borderTop: "1px solid #E2E8F0", margin: "6px 0" }} />
+                                                        <h5 className="activities-filter-section-title">Stage</h5>
+                                                        <select
+                                                            className="activities-filter-select"
+                                                            value={approvalStageFilter}
+                                                            onChange={e => {
+                                                                setApprovalStageFilter(e.target.value);
+                                                                setApprovalPage(1);
+                                                            }}
+                                                        >
+                                                            <option value="all">All Stages</option>
+                                                            {approvalStages.map(s => (
+                                                                <option key={s.id} value={s.id}>
+                                                                    {s.name}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </>
+                                                )}
                                             </div>
                                         )}
                                     </div>
 
                                     <button
                                         type="button"
-                                        className="activities-primary-btn"
-                                        onClick={() => setCreateApproval(true)}
+                                        className="activities-new-stage-btn activities-new-approval-btn"
+                                        onClick={() => {
+                                            setApprovalDetail(null);
+                                            setApprovalForm(blankApproval);
+                                            setApprovalAttachments([]);
+                                            setApprovalError("");
+                                            setCreateApproval(true);
+                                        }}
                                     >
                                         <Plus size={16} />
                                         <span>New Approval</span>
@@ -3464,53 +4104,136 @@ export default function ActivitiesPage() {
                     )}
 
                     {activeTab === "tasks" && (
-                        <section className="activities-panel activities-tasks-view" style={{ background: "transparent", border: 0, padding: 0, boxShadow: "none" }}>
+                        <section className="activities-panel activities-tasks-view activities-tasks-content" style={{ background: "transparent", border: 0, padding: 0, boxShadow: "none", width: "100%", maxWidth: "none" }}>
                             {/* 4 Dynamic KPI Cards (Figma Frame 2147225138) */}
                             <div className="activities-tasks-kpi-grid tasks-kpi-grid">
-                                <div className="activities-tasks-kpi-card tasks-kpi-card">
-                                    <span className="activities-tasks-kpi-title tasks-kpi-title">Total Tasks</span>
-                                    <span className="activities-tasks-kpi-value tasks-kpi-value">{kpiStats.total}</span>
-                                    <div className="activities-tasks-kpi-trend positive tasks-kpi-trend">
-                                        <span>+2 Added Yesterday</span>
-                                    </div>
-                                </div>
-                                <div className="activities-tasks-kpi-card tasks-kpi-card">
-                                    <span className="activities-tasks-kpi-title tasks-kpi-title">Overdue</span>
-                                    <span className="activities-tasks-kpi-value tasks-kpi-value">{kpiStats.overdue}</span>
-                                    <div className="activities-tasks-kpi-trend negative tasks-kpi-trend">
-                                        <TrendingUp size={14} />
-                                        <span>24% vs last month</span>
-                                    </div>
-                                </div>
-                                <div className="activities-tasks-kpi-card tasks-kpi-card">
-                                    <span className="activities-tasks-kpi-title tasks-kpi-title">In-Progress</span>
-                                    <span className="activities-tasks-kpi-value tasks-kpi-value">{kpiStats.inProgress}</span>
-                                    <div className="activities-tasks-kpi-trend positive tasks-kpi-trend">
-                                        <TrendingUp size={14} />
-                                        <span>13% vs yesterday</span>
-                                    </div>
-                                </div>
-                                <div className="activities-tasks-kpi-card tasks-kpi-card">
-                                    <span className="activities-tasks-kpi-title tasks-kpi-title">Completed</span>
-                                    <span className="activities-tasks-kpi-value tasks-kpi-value">{kpiStats.completed}</span>
-                                    <div className="activities-tasks-kpi-trend negative tasks-kpi-trend">
-                                        <TrendingDown size={14} />
-                                        <span>1 vs last month</span>
-                                    </div>
-                                </div>
+                                {loadingTasks && tasks.length === 0 ? (
+                                    <>
+                                        <div className="activities-tasks-kpi-card activities-kpi-skeleton-card tasks-kpi-card" />
+                                        <div className="activities-tasks-kpi-card activities-kpi-skeleton-card tasks-kpi-card" />
+                                        <div className="activities-tasks-kpi-card activities-kpi-skeleton-card tasks-kpi-card" />
+                                        <div className="activities-tasks-kpi-card activities-kpi-skeleton-card tasks-kpi-card" />
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="activities-tasks-kpi-card tasks-kpi-card">
+                                            <span className="activities-tasks-kpi-title tasks-kpi-title">Total Tasks</span>
+                                            <span className="activities-tasks-kpi-value tasks-kpi-value">{kpiStats.total}</span>
+                                            {kpiStats.addedYesterday > 0 && (
+                                                <div className="activities-tasks-kpi-trend positive tasks-kpi-trend">
+                                                    <span>+{kpiStats.addedYesterday} Added Yesterday</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="activities-tasks-kpi-card tasks-kpi-card">
+                                            <span className="activities-tasks-kpi-title tasks-kpi-title">Overdue</span>
+                                            <span className="activities-tasks-kpi-value tasks-kpi-value">{kpiStats.overdue}</span>
+                                            {kpiStats.overdue > 0 ? (
+                                                <div className="activities-tasks-kpi-trend negative tasks-kpi-trend">
+                                                    <AlertTriangle size={14} />
+                                                    <span>Requires attention</span>
+                                                </div>
+                                            ) : (
+                                                <div className="activities-tasks-kpi-trend positive tasks-kpi-trend">
+                                                    <CheckCircle size={14} />
+                                                    <span>All on track</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="activities-tasks-kpi-card tasks-kpi-card">
+                                            <span className="activities-tasks-kpi-title tasks-kpi-title">In-Progress</span>
+                                            <span className="activities-tasks-kpi-value tasks-kpi-value">{kpiStats.inProgress}</span>
+                                        </div>
+                                        <div className="activities-tasks-kpi-card tasks-kpi-card">
+                                            <span className="activities-tasks-kpi-title tasks-kpi-title">Completed</span>
+                                            <span className="activities-tasks-kpi-value tasks-kpi-value">{kpiStats.completed}</span>
+                                        </div>
+                                    </>
+                                )}
                             </div>
+
+                            {/* Bulk Actions Bar */}
+                            {selectedTaskIds.length > 0 && (
+                                <div className="activities-tasks-bulk-bar">
+                                    <div className="activities-tasks-bulk-count">
+                                        <CheckSquare size={16} />
+                                        <span>{selectedTaskIds.length} task{selectedTaskIds.length > 1 ? "s" : ""} selected</span>
+                                    </div>
+                                    <div className="activities-tasks-bulk-actions">
+                                        <button
+                                            type="button"
+                                            className="activities-tasks-bulk-btn complete"
+                                            onClick={handleBulkComplete}
+                                        >
+                                            <CheckCircle size={14} />
+                                            <span>Mark as Completed</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="activities-tasks-bulk-btn danger"
+                                            onClick={handleBulkDelete}
+                                        >
+                                            <Trash2 size={14} />
+                                            <span>Delete Selected</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="activities-tasks-bulk-btn"
+                                            onClick={() => setSelectedTaskIds([])}
+                                        >
+                                            <span>Deselect All</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Tasks Table Frame (Figma Frame 2147225072) */}
                             <div className="activities-tasks-table-frame tasks-table-card">
                                 {loadingTasks && tasks.length === 0 ? (
                                     <LoadingSkeleton />
+                                ) : tasks.length === 0 ? (
+                                    <div className="activities-table-empty">
+                                        <div className="activities-table-empty-icon">
+                                            <CheckSquare size={32} />
+                                        </div>
+                                        <h4 className="activities-table-empty-title">No tasks found</h4>
+                                        <p className="activities-table-empty-desc">
+                                            Get started by adding tasks to track your team's deliverables across projects and stages.
+                                        </p>
+                                        <button
+                                            type="button"
+                                            className="activities-new-stage-btn"
+                                            onClick={() => {
+                                                setTaskDetail(null);
+                                                setTaskForm(blankTask);
+                                                setTaskAttachments([]);
+                                                setTaskError("");
+                                                setCreateTask(true);
+                                            }}
+                                        >
+                                            <Plus size={16} />
+                                            <span>Create First Task</span>
+                                        </button>
+                                    </div>
                                 ) : (
                                     <>
                                         <div className="activities-tasks-table-wrap tasks-table-wrap">
                                             <table className="activities-tasks-table tasks-table">
+                                                <colgroup>
+                                                    <col className="col-checkbox" />
+                                                    <col className="col-task" />
+                                                    <col className="col-project" />
+                                                    <col className="col-stage" />
+                                                    <col className="col-assignee" />
+                                                    <col className="col-duedate" />
+                                                    <col className="col-priority" />
+                                                    <col className="col-status" />
+                                                    <col className="col-updated" />
+                                                    <col className="col-actions" />
+                                                </colgroup>
                                                 <thead>
                                                     <tr>
-                                                        <th style={{ width: "40px", textAlign: "center" }}>
+                                                        <th className="col-checkbox" style={{ textAlign: "center" }}>
                                                             <input
                                                                 type="checkbox"
                                                                 className="activities-task-checkbox tasks-checkbox"
@@ -3519,15 +4242,135 @@ export default function ActivitiesPage() {
                                                                 aria-label="Select all tasks"
                                                             />
                                                         </th>
-                                                        <th style={{ width: "234px" }}>TASK</th>
-                                                        <th style={{ width: "175px" }}>PROJECT</th>
-                                                        <th style={{ width: "115px" }}>STAGE</th>
-                                                        <th style={{ width: "175px" }}>ASSIGNED TO</th>
-                                                        <th style={{ width: "148px" }}>DUE DATE</th>
-                                                        <th style={{ width: "84px" }}>PRIORITY</th>
-                                                        <th style={{ width: "122px" }}>STATUS</th>
-                                                        <th style={{ width: "130px" }}>UPDATED</th>
-                                                        <th style={{ width: "40px", textAlign: "center" }} />
+                                                        <th className="col-task">
+                                                            <button
+                                                                type="button"
+                                                                className="activities-tasks-th-sortable"
+                                                                onClick={() => handleSort("name")}
+                                                            >
+                                                                <span className="activities-tasks-th-content">
+                                                                    TASK
+                                                                    {taskSortField === "name" ? (
+                                                                        taskSortDirection === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                                                                    ) : (
+                                                                        <ChevronsUpDown size={14} />
+                                                                    )}
+                                                                </span>
+                                                            </button>
+                                                        </th>
+                                                        <th className="col-project">
+                                                            <button
+                                                                type="button"
+                                                                className="activities-tasks-th-sortable"
+                                                                onClick={() => handleSort("project")}
+                                                            >
+                                                                <span className="activities-tasks-th-content">
+                                                                    PROJECT
+                                                                    {taskSortField === "project" ? (
+                                                                        taskSortDirection === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                                                                    ) : (
+                                                                        <ChevronsUpDown size={14} />
+                                                                    )}
+                                                                </span>
+                                                            </button>
+                                                        </th>
+                                                        <th className="col-stage">
+                                                            <button
+                                                                type="button"
+                                                                className="activities-tasks-th-sortable"
+                                                                onClick={() => handleSort("stage")}
+                                                            >
+                                                                <span className="activities-tasks-th-content">
+                                                                    STAGE
+                                                                    {taskSortField === "stage" ? (
+                                                                        taskSortDirection === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                                                                    ) : (
+                                                                        <ChevronsUpDown size={14} />
+                                                                    )}
+                                                                </span>
+                                                            </button>
+                                                        </th>
+                                                        <th className="col-assignee">
+                                                            <button
+                                                                type="button"
+                                                                className="activities-tasks-th-sortable"
+                                                                onClick={() => handleSort("assignee")}
+                                                            >
+                                                                <span className="activities-tasks-th-content">
+                                                                    ASSIGNED TO
+                                                                    {taskSortField === "assignee" ? (
+                                                                        taskSortDirection === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                                                                    ) : (
+                                                                        <ChevronsUpDown size={14} />
+                                                                    )}
+                                                                </span>
+                                                            </button>
+                                                        </th>
+                                                        <th className="col-duedate">
+                                                            <button
+                                                                type="button"
+                                                                className="activities-tasks-th-sortable"
+                                                                onClick={() => handleSort("dueDate")}
+                                                            >
+                                                                <span className="activities-tasks-th-content">
+                                                                    DUE DATE
+                                                                    {taskSortField === "dueDate" ? (
+                                                                        taskSortDirection === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                                                                    ) : (
+                                                                        <ChevronsUpDown size={14} />
+                                                                    )}
+                                                                </span>
+                                                            </button>
+                                                        </th>
+                                                        <th className="col-priority">
+                                                            <button
+                                                                type="button"
+                                                                className="activities-tasks-th-sortable"
+                                                                onClick={() => handleSort("priority")}
+                                                            >
+                                                                <span className="activities-tasks-th-content">
+                                                                    PRIORITY
+                                                                    {taskSortField === "priority" ? (
+                                                                        taskSortDirection === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                                                                    ) : (
+                                                                        <ChevronsUpDown size={14} />
+                                                                    )}
+                                                                </span>
+                                                            </button>
+                                                        </th>
+                                                        <th className="col-status">
+                                                            <button
+                                                                type="button"
+                                                                className="activities-tasks-th-sortable"
+                                                                onClick={() => handleSort("status")}
+                                                            >
+                                                                <span className="activities-tasks-th-content">
+                                                                    STATUS
+                                                                    {taskSortField === "status" ? (
+                                                                        taskSortDirection === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                                                                    ) : (
+                                                                        <ChevronsUpDown size={14} />
+                                                                    )}
+                                                                </span>
+                                                            </button>
+                                                        </th>
+                                                        <th className="col-updated">
+                                                            <button
+                                                                type="button"
+                                                                className="activities-tasks-th-sortable"
+                                                                onClick={() => handleSort("updatedAt")}
+                                                            >
+                                                                <span className="activities-tasks-th-content">
+                                                                    UPDATED
+                                                                    {taskSortField === "updatedAt" ? (
+                                                                        taskSortDirection === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                                                                    ) : (
+                                                                        <ChevronsUpDown size={14} />
+                                                                    )}
+                                                                </span>
+                                                            </button>
+                                                        </th>
+                                                        <th className="col-actions" style={{ textAlign: "center" }} />
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -3535,8 +4378,24 @@ export default function ActivitiesPage() {
                                                         paginatedTasks.map(t => <TaskRow key={t.id} task={t} />)
                                                     ) : (
                                                         <tr>
-                                                            <td colSpan={10} style={{ textAlign: "center", padding: "40px 20px", color: "#64748b" }}>
-                                                                No tasks found matching your search or filters.
+                                                            <td colSpan={10} style={{ padding: 0 }}>
+                                                                <div className="activities-table-empty">
+                                                                    <div className="activities-table-empty-icon">
+                                                                        <Search size={32} />
+                                                                    </div>
+                                                                    <h4 className="activities-table-empty-title">No matching tasks</h4>
+                                                                    <p className="activities-table-empty-desc">
+                                                                        No tasks match your current search query or active filter selections.
+                                                                    </p>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="activities-filter-reset-btn"
+                                                                        style={{ margin: "0 auto", padding: "8px 16px" }}
+                                                                        onClick={resetTaskFilters}
+                                                                    >
+                                                                        Clear All Filters
+                                                                    </button>
+                                                                </div>
                                                             </td>
                                                         </tr>
                                                     )}
@@ -3559,7 +4418,10 @@ export default function ActivitiesPage() {
                                                 >
                                                     <ChevronLeft size={16} />
                                                 </button>
-                                                {Array.from({ length: totalTaskPages }, (_, i) => i + 1).slice(0, 5).map(pageNum => (
+                                                {Array.from({ length: totalTaskPages }, (_, i) => i + 1).slice(
+                                                    Math.max(0, Math.min(taskPage - 3, totalTaskPages - 5)),
+                                                    Math.max(5, Math.min(taskPage + 2, totalTaskPages))
+                                                ).map(pageNum => (
                                                     <button
                                                         key={pageNum}
                                                         type="button"
@@ -3602,50 +4464,173 @@ export default function ActivitiesPage() {
                     )}
 
                     {activeTab === "approvals" && (
-                        <section className="activities-panel" style={{ background: "transparent", border: 0, padding: 0, boxShadow: "none" }}>
-                            {/* 4 Dynamic KPI Cards */}
-                            <div className="tasks-kpi-grid">
-                                <div className="tasks-kpi-card">
-                                    <span className="tasks-kpi-title">Total Approvals</span>
-                                    <span className="tasks-kpi-value">{approvalKpiStats.total}</span>
-                                    <span className="tasks-kpi-trend positive">+2 Added Yesterday</span>
+                        <section className="activities-panel" style={{ background: "transparent", border: 0, padding: 0, boxShadow: "none", width: "100%" }}>
+                            {/* 4 Dynamic KPI Cards (Figma Frame 2147225138) */}
+                            <div className="activities-tasks-kpi-grid tasks-kpi-grid">
+                                <div className="activities-tasks-kpi-card tasks-kpi-card">
+                                    <span className="activities-tasks-kpi-title tasks-kpi-title">Total Approvals</span>
+                                    <span className="activities-tasks-kpi-value tasks-kpi-value">{approvalKpiStats.total}</span>
+                                    <span className="activities-tasks-kpi-trend tasks-kpi-trend positive">
+                                        <TrendingUp size={14} />
+                                        <span>13% vs last month</span>
+                                    </span>
                                 </div>
-                                <div className="tasks-kpi-card">
-                                    <span className="tasks-kpi-title">Overdue</span>
-                                    <span className="tasks-kpi-value">{approvalKpiStats.overdue}</span>
-                                    <span className="tasks-kpi-trend negative">↑ 24% vs last month</span>
+                                <div className="activities-tasks-kpi-card tasks-kpi-card">
+                                    <span className="activities-tasks-kpi-title tasks-kpi-title">Overdue</span>
+                                    <span className="activities-tasks-kpi-value tasks-kpi-value">{approvalKpiStats.overdue}</span>
+                                    <span className="activities-tasks-kpi-trend tasks-kpi-trend negative">
+                                        <TrendingUp size={14} />
+                                        <span>24% vs last month</span>
+                                    </span>
                                 </div>
-                                <div className="tasks-kpi-card">
-                                    <span className="tasks-kpi-title">In-Review</span>
-                                    <span className="tasks-kpi-value">{approvalKpiStats.inReview}</span>
-                                    <span className="tasks-kpi-trend positive">↑ 13% vs yesterday</span>
+                                <div className="activities-tasks-kpi-card tasks-kpi-card">
+                                    <span className="activities-tasks-kpi-title tasks-kpi-title">In-Review</span>
+                                    <span className="activities-tasks-kpi-value tasks-kpi-value">{approvalKpiStats.inReview}</span>
+                                    <span className="activities-tasks-kpi-trend tasks-kpi-trend positive">
+                                        <TrendingUp size={14} />
+                                        <span>13% vs yesterday</span>
+                                    </span>
                                 </div>
-                                <div className="tasks-kpi-card">
-                                    <span className="tasks-kpi-title">Approved</span>
-                                    <span className="tasks-kpi-value">{approvalKpiStats.approved}</span>
-                                    <span className="tasks-kpi-trend negative">↓ 1 vs last month</span>
+                                <div className="activities-tasks-kpi-card tasks-kpi-card">
+                                    <span className="activities-tasks-kpi-title tasks-kpi-title">Approved</span>
+                                    <span className="activities-tasks-kpi-value tasks-kpi-value">{approvalKpiStats.approved}</span>
+                                    <span className="activities-tasks-kpi-trend tasks-kpi-trend negative">
+                                        <TrendingDown size={14} />
+                                        <span>-1 vs last month</span>
+                                    </span>
                                 </div>
                             </div>
 
-                            {/* Approvals Table Card */}
-                            <div className="tasks-table-card">
+                            {/* Approvals Table Card (Figma Frame 2147225067) */}
+                            <div className="activities-tasks-table-frame tasks-table-card activities-approvals-table-frame">
                                 {loadingApprovals && approvals.length === 0 ? (
-                                    <LoadingSkeleton />
+                                    <div className="activities-tasks-table-wrap tasks-table-wrap">
+                                        <table className="activities-tasks-table tasks-table activities-approvals-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>APPROVAL NAME</th>
+                                                    <th>PROJECT</th>
+                                                    <th>STAGE</th>
+                                                    <th>APPROVER</th>
+                                                    <th>STATUS</th>
+                                                    <th>DUE DATE</th>
+                                                    <th>REQUESTED BY</th>
+                                                    <th>REQUESTED DATE</th>
+                                                    <th style={{ width: "50px" }} />
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {[1, 2, 3, 4, 5].map(idx => (
+                                                    <tr key={idx} className="skeleton-row">
+                                                        <td colSpan={9} style={{ padding: "16px" }}>
+                                                            <div className="activities-task-skeleton-bar" style={{ width: `${60 + (idx % 4) * 10}%`, height: "14px", background: "rgba(226, 232, 240, 0.6)", borderRadius: "4px" }} />
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 ) : (
                                     <>
-                                        <div className="tasks-table-wrap">
-                                            <table className="tasks-table">
+                                        <div className="activities-tasks-table-wrap tasks-table-wrap">
+                                            <table className="activities-tasks-table tasks-table activities-approvals-table">
+                                                <colgroup>
+                                                    <col className="col-approval-name" />
+                                                    <col className="col-approval-project" />
+                                                    <col className="col-approval-stage" />
+                                                    <col className="col-approval-approver" />
+                                                    <col className="col-approval-status" />
+                                                    <col className="col-approval-duedate" />
+                                                    <col className="col-approval-requester" />
+                                                    <col className="col-approval-date" />
+                                                    <col className="col-approval-actions" />
+                                                </colgroup>
                                                 <thead>
                                                     <tr>
-                                                        <th>APPROVAL NAME</th>
-                                                        <th>PROJECT</th>
-                                                        <th>STAGE</th>
-                                                        <th>APPROVER</th>
-                                                        <th>STATUS</th>
-                                                        <th>DUE DATE</th>
-                                                        <th>REQUESTED BY</th>
-                                                        <th>REQUESTED DATE</th>
-                                                        <th style={{ width: "40px" }} />
+                                                        <th className="col-approval-name">
+                                                            <button
+                                                                type="button"
+                                                                className="activities-tasks-th-sortable"
+                                                                onClick={() => toggleApprovalSort("name")}
+                                                            >
+                                                                <span className="activities-tasks-th-content">
+                                                                    APPROVAL NAME
+                                                                    {approvalSortField === "name" ? (
+                                                                        approvalSortDirection === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                                                                    ) : (
+                                                                        <ChevronsUpDown size={14} />
+                                                                    )}
+                                                                </span>
+                                                            </button>
+                                                        </th>
+                                                        <th className="col-approval-project">
+                                                            <button
+                                                                type="button"
+                                                                className="activities-tasks-th-sortable"
+                                                                onClick={() => toggleApprovalSort("project")}
+                                                            >
+                                                                <span className="activities-tasks-th-content">
+                                                                    PROJECT
+                                                                    {approvalSortField === "project" ? (
+                                                                        approvalSortDirection === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                                                                    ) : (
+                                                                        <ChevronsUpDown size={14} />
+                                                                    )}
+                                                                </span>
+                                                            </button>
+                                                        </th>
+                                                        <th className="col-approval-stage">STAGE</th>
+                                                        <th className="col-approval-approver">APPROVER</th>
+                                                        <th className="col-approval-status">
+                                                            <button
+                                                                type="button"
+                                                                className="activities-tasks-th-sortable"
+                                                                onClick={() => toggleApprovalSort("status")}
+                                                            >
+                                                                <span className="activities-tasks-th-content">
+                                                                    STATUS
+                                                                    {approvalSortField === "status" ? (
+                                                                        approvalSortDirection === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                                                                    ) : (
+                                                                        <ChevronsUpDown size={14} />
+                                                                    )}
+                                                                </span>
+                                                            </button>
+                                                        </th>
+                                                        <th className="col-approval-duedate">
+                                                            <button
+                                                                type="button"
+                                                                className="activities-tasks-th-sortable"
+                                                                onClick={() => toggleApprovalSort("dueDate")}
+                                                            >
+                                                                <span className="activities-tasks-th-content">
+                                                                    DUE DATE
+                                                                    {approvalSortField === "dueDate" ? (
+                                                                        approvalSortDirection === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                                                                    ) : (
+                                                                        <ChevronsUpDown size={14} />
+                                                                    )}
+                                                                </span>
+                                                            </button>
+                                                        </th>
+                                                        <th className="col-approval-requester">REQUESTED BY</th>
+                                                        <th className="col-approval-date">
+                                                            <button
+                                                                type="button"
+                                                                className="activities-tasks-th-sortable"
+                                                                onClick={() => toggleApprovalSort("requestedAt")}
+                                                            >
+                                                                <span className="activities-tasks-th-content">
+                                                                    REQUESTED DATE
+                                                                    {approvalSortField === "requestedAt" ? (
+                                                                        approvalSortDirection === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                                                                    ) : (
+                                                                        <ChevronsUpDown size={14} />
+                                                                    )}
+                                                                </span>
+                                                            </button>
+                                                        </th>
+                                                        <th className="col-approval-actions" style={{ textAlign: "center" }} />
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -3653,8 +4638,26 @@ export default function ActivitiesPage() {
                                                         paginatedApprovals.map(a => <ApprovalRow key={a.id} approval={a} />)
                                                     ) : (
                                                         <tr>
-                                                            <td colSpan={9} style={{ textAlign: "center", padding: "40px 20px", color: "#64748b" }}>
-                                                                No approvals found matching your search or filters.
+                                                            <td colSpan={9} style={{ padding: 0 }}>
+                                                                <div className="activities-table-empty">
+                                                                    <div className="activities-table-empty-icon">
+                                                                        <Search size={32} />
+                                                                    </div>
+                                                                    <h4 className="activities-table-empty-title">No matching approvals</h4>
+                                                                    <p className="activities-table-empty-desc">
+                                                                        No approvals match your current search query or active filter selections.
+                                                                    </p>
+                                                                    {hasActiveApprovalFilters && (
+                                                                        <button
+                                                                            type="button"
+                                                                            className="activities-filter-reset-btn"
+                                                                            style={{ margin: "0 auto", padding: "8px 16px" }}
+                                                                            onClick={resetApprovalFilters}
+                                                                        >
+                                                                            Clear All Filters
+                                                                        </button>
+                                                                    )}
+                                                                </div>
                                                             </td>
                                                         </tr>
                                                     )}
@@ -3662,24 +4665,29 @@ export default function ActivitiesPage() {
                                             </table>
                                         </div>
 
-                                        {/* Table Footer with dynamic count and pagination */}
-                                        <div className="tasks-table-footer">
-                                            <div>Total Approvals: {filteredApprovals.length}</div>
-                                            <div className="tasks-pagination">
+                                        {/* Table Footer with dynamic count and pagination (Figma Frame 2147225166) */}
+                                        <div className="activities-tasks-pagination-bar tasks-table-footer">
+                                            <div className="activities-tasks-total-text">
+                                                Total Approvals: {filteredApprovals.length}
+                                            </div>
+                                            <div className="activities-tasks-pages-wrap tasks-pagination">
                                                 <button
                                                     type="button"
-                                                    className="tasks-page-btn"
+                                                    className="activities-tasks-page-btn tasks-page-btn"
                                                     disabled={approvalPage <= 1}
                                                     onClick={() => setApprovalPage(p => Math.max(1, p - 1))}
                                                     aria-label="Previous page"
                                                 >
-                                                    &lt;
+                                                    <ChevronLeft size={16} />
                                                 </button>
-                                                {Array.from({ length: totalApprovalPages }, (_, i) => i + 1).slice(0, 5).map(pageNum => (
+                                                {Array.from({ length: totalApprovalPages }, (_, i) => i + 1).slice(
+                                                    Math.max(0, Math.min(approvalPage - 3, totalApprovalPages - 5)),
+                                                    Math.max(5, Math.min(approvalPage + 2, totalApprovalPages))
+                                                ).map(pageNum => (
                                                     <button
                                                         key={pageNum}
                                                         type="button"
-                                                        className={`tasks-page-btn ${pageNum === approvalPage ? "active" : ""}`}
+                                                        className={`activities-tasks-page-btn tasks-page-btn ${pageNum === approvalPage ? "active" : ""}`}
                                                         onClick={() => setApprovalPage(pageNum)}
                                                     >
                                                         {pageNum}
@@ -3687,17 +4695,18 @@ export default function ActivitiesPage() {
                                                 ))}
                                                 <button
                                                     type="button"
-                                                    className="tasks-page-btn"
+                                                    className="activities-tasks-page-btn tasks-page-btn"
                                                     disabled={approvalPage >= totalApprovalPages}
                                                     onClick={() => setApprovalPage(p => Math.min(totalApprovalPages, p + 1))}
                                                     aria-label="Next page"
                                                 >
-                                                    &gt;
+                                                    <ChevronRight size={16} />
                                                 </button>
                                             </div>
-                                            <div className="tasks-page-size">
-                                                <span>Show per Page:</span>
+                                            <div className="activities-tasks-page-size-wrap tasks-page-size">
+                                                <span className="activities-tasks-page-size-label">Show per Page:</span>
                                                 <select
+                                                    className="activities-tasks-page-size-select"
                                                     value={approvalPageSize}
                                                     onChange={e => {
                                                         setApprovalPageSize(Number(e.target.value));

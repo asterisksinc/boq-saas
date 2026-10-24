@@ -3,16 +3,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { integrationsApi, FormWithStats } from '@/lib/api/integrations';
-import Pagination from './Pagination';
 import FormEditModal from './FormEditModal';
 
 function formatRelative(iso: string | null): string {
-    if (!iso) return '-';
+    if (!iso) return '—';
     const ms = Date.now() - new Date(iso).getTime();
     if (ms < 60_000) return 'just now';
     if (ms < 3_600_000) return `${Math.floor(ms / 60_000)} min ago`;
     if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)}h ago`;
-    return `${Math.floor(ms / 86_400_000)} days ago`;
+    const days = Math.floor(ms / 86_400_000);
+    return days === 1 ? '1 day ago' : `${days} days ago`;
 }
 
 export default function FormLeadsTable({ integrationId }: { integrationId: string }) {
@@ -27,7 +27,7 @@ export default function FormLeadsTable({ integrationId }: { integrationId: strin
             const res = await integrationsApi.listIntegrationForms(integrationId);
             setForms(res.items || []);
         } catch (err) {
-            console.error(err);
+            console.error("Failed to load forms", err);
         } finally {
             setLoading(false);
         }
@@ -38,59 +38,93 @@ export default function FormLeadsTable({ integrationId }: { integrationId: strin
     }, [loadForms]);
 
     if (loading) {
-        return <div className="intg-skeleton intg-skeleton-chart" style={{ height: '300px' }} />;
+        return (
+            <div className="intg-table-card intg-kpi-skeleton" style={{ height: '384px' }} />
+        );
     }
 
     return (
-        <div className="intg-table-container">
-            <h3>Recent Lead Forms</h3>
-            <table className="intg-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>FORM NAME</th>
-                        <th>CAMPAIGN</th>
-                        <th>STATUS</th>
-                        <th>LEADS (THIS MONTH)</th>
-                        <th>LAST LEAD</th>
-                        <th>ACTIONS</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {forms.length === 0 && (
-                        <tr><td colSpan={7} className="intg-empty-state">No lead forms found.</td></tr>
-                    )}
-                    {forms.map(row => (
-                        <tr key={row.id}>
-                            <td>{row.id.substring(0, 10)}</td>
-                            <td className="font-medium">{row.name}</td>
-                            <td>{row.campaignName || '-'}</td>
-                            <td>
-                                <span className={`intg-status-chip intg-status-${row.status}`}>
-                                    {row.status.toUpperCase()}
-                                </span>
-                            </td>
-                            <td>{row.leadsThisMonth}</td>
-                            <td>{formatRelative(row.lastLeadAt)}</td>
-                            <td style={{ display: 'flex', gap: '8px' }}>
-                                <button 
-                                    className="intg-action-link"
-                                    onClick={() => setEditFormId(row.id)}
-                                >
-                                    Edit
-                                </button>
-                                <button 
-                                    className="intg-action-link"
-                                    onClick={() => router.push(`/integrations/${integrationId}/forms/${row.id}`)}
-                                >
-                                    View Leads
-                                </button>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+        <div className="intg-table-card">
+            {/* Table Heading */}
+            <h3 className="intg-table-heading">Recent Lead Forms</h3>
 
+            {/* Table Scrollable Container */}
+            <div className="intg-table-responsive">
+                <table className="intg-figma-table">
+                    {/* Header matching Figma Frame 57 (#E4ECFB background, 36px height) */}
+                    <thead>
+                        <tr className="intg-figma-header-row">
+                            <th className="intg-th intg-th-id">ID</th>
+                            <th className="intg-th intg-th-form-name intg-th-project">
+                                {/* Project / Form Name */}
+                                FORM NAME
+                            </th>
+                            <th className="intg-th intg-th-campaign">Campaign</th>
+                            <th className="intg-th intg-th-status">Status</th>
+                            <th className="intg-th intg-th-leads">Leads (This Month)</th>
+                            <th className="intg-th intg-th-last">Last Lead</th>
+                            <th className="intg-th intg-th-actions">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {forms.length === 0 ? (
+                            <tr>
+                                <td colSpan={7} className="intg-table-empty">
+                                    No lead forms found for this integration.
+                                </td>
+                            </tr>
+                        ) : (
+                            forms.map((row) => {
+                                const isPaused = row.status === 'paused';
+                                return (
+                                    <tr key={row.id} className="intg-figma-row">
+                                        <td className="intg-td intg-td-id">
+                                            {row.id.length > 12 ? row.id.substring(0, 10) : row.id}
+                                        </td>
+                                        <td className="intg-td intg-td-form-name intg-td-project">
+                                            {row.name}
+                                        </td>
+                                        <td className="intg-td intg-td-campaign">
+                                            {row.campaignName || '—'}
+                                        </td>
+                                        <td className="intg-td intg-td-status">
+                                            <span className={`intg-pill-status ${isPaused ? 'intg-pill-paused' : 'intg-pill-active'}`}>
+                                                {row.status.toUpperCase()}
+                                            </span>
+                                        </td>
+                                        <td className="intg-td intg-td-leads">
+                                            {row.leadsThisMonth}
+                                        </td>
+                                        <td className="intg-td intg-td-last">
+                                            {formatRelative(row.lastLeadAt)}
+                                        </td>
+                                        <td className="intg-td intg-td-actions">
+                                            <div className="intg-row-actions">
+                                                <button
+                                                    type="button"
+                                                    className="intg-link-action"
+                                                    onClick={() => router.push(`/integrations/${integrationId}/forms/${row.id}`)}
+                                                >
+                                                    View Leads
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="intg-link-action-muted"
+                                                    onClick={() => setEditFormId(row.id)}
+                                                >
+                                                    Edit
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })
+                        )}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Modal for editing form schema */}
             {editFormId && (
                 <FormEditModal
                     formId={editFormId}
@@ -103,4 +137,3 @@ export default function FormLeadsTable({ integrationId }: { integrationId: strin
         </div>
     );
 }
-

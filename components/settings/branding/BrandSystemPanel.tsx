@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, ChevronDown } from "lucide-react";
 import ColorPickerField from "./ColorPickerField";
 import BrandLivePreview from "./BrandLivePreview";
 import { BrandingSettings, ButtonStyle, DocumentSpacing } from "@/lib/settings/types";
@@ -127,6 +127,7 @@ export default function BrandSystemPanel({
                 {/* 1. Brand Colors Card */}
                 <div className="brand-system-card">
                     <h3 className="brand-system-card-title">Brand Colors</h3>
+                    <div className="brand-system-divider" />
                     <div className="brand-colors-grid">
                         <ColorPickerField
                             label="Primary"
@@ -158,14 +159,15 @@ export default function BrandSystemPanel({
                 {/* 2. Typography Card */}
                 <div className="brand-system-card">
                     <h3 className="brand-system-card-title">Typography</h3>
+                    <div className="brand-system-divider" />
                     <div className="brand-typography-field">
                         <label className="brand-field-label" htmlFor="brand-font-select">
                             Brand Font <span className="brand-field-required">*</span>
                         </label>
-                        <div className="org-select-wrap">
+                        <div className="brand-font-select-wrap">
                             <select
                                 id="brand-font-select"
-                                className="org-select"
+                                className="brand-font-select"
                                 value={localBranding.font || "Urbanist"}
                                 onChange={(e) => handleFontChange(e.target.value)}
                             >
@@ -175,6 +177,7 @@ export default function BrandSystemPanel({
                                     </option>
                                 ))}
                             </select>
+                            <ChevronDown size={20} className="brand-font-select-chevron" aria-hidden="true" />
                         </div>
                     </div>
                 </div>
@@ -182,50 +185,53 @@ export default function BrandSystemPanel({
                 {/* 3. Document Style Card */}
                 <div className="brand-system-card">
                     <h3 className="brand-system-card-title">Document Style</h3>
+                    <div className="brand-system-divider" />
 
-                    {/* Button Style */}
-                    <div className="brand-style-row">
-                        <span className="brand-style-row-label">Button Style</span>
-                        <div className="brand-style-pill-group" role="radiogroup" aria-label="Button Style">
-                            {BUTTON_STYLES.map((opt) => {
-                                const isSelected = (localBranding.buttonStyle || "rounded") === opt.key;
-                                return (
-                                    <button
-                                        key={opt.key}
-                                        type="button"
-                                        role="radio"
-                                        aria-checked={isSelected}
-                                        className={`brand-style-pill ${isSelected ? "is-active" : ""}`}
-                                        onClick={() => handleButtonStyleChange(opt.key)}
-                                    >
-                                        <span className={`brand-radio-indicator ${isSelected ? "is-checked" : ""}`} />
-                                        <span className="brand-style-pill-label">{opt.label}</span>
-                                    </button>
-                                );
-                            })}
+                    <div className="brand-document-style-rows">
+                        {/* Button Style */}
+                        <div className="brand-style-row">
+                            <span className="brand-style-row-label">Button Style</span>
+                            <div className="brand-style-pill-group" role="radiogroup" aria-label="Button Style">
+                                {BUTTON_STYLES.map((opt) => {
+                                    const isSelected = (localBranding.buttonStyle || "rounded") === opt.key;
+                                    return (
+                                        <button
+                                            key={opt.key}
+                                            type="button"
+                                            role="radio"
+                                            aria-checked={isSelected}
+                                            className={`brand-style-pill ${isSelected ? "is-active" : ""}`}
+                                            onClick={() => handleButtonStyleChange(opt.key)}
+                                        >
+                                            <span className={`brand-radio-indicator ${isSelected ? "is-checked" : ""}`} />
+                                            <span className="brand-style-pill-label">{opt.label}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </div>
-                    </div>
 
-                    {/* Document Spacing */}
-                    <div className="brand-style-row">
-                        <span className="brand-style-row-label">Document Spacing</span>
-                        <div className="brand-style-pill-group" role="radiogroup" aria-label="Document Spacing">
-                            {DOCUMENT_SPACINGS.map((opt) => {
-                                const isSelected = (localBranding.documentSpacing || "compact") === opt.key;
-                                return (
-                                    <button
-                                        key={opt.key}
-                                        type="button"
-                                        role="radio"
-                                        aria-checked={isSelected}
-                                        className={`brand-style-pill ${isSelected ? "is-active" : ""}`}
-                                        onClick={() => handleSpacingChange(opt.key)}
-                                    >
-                                        <span className={`brand-radio-indicator ${isSelected ? "is-checked" : ""}`} />
-                                        <span className="brand-style-pill-label">{opt.label}</span>
-                                    </button>
-                                );
-                            })}
+                        {/* Document Spacing */}
+                        <div className="brand-style-row">
+                            <span className="brand-style-row-label">Document Spacing</span>
+                            <div className="brand-style-pill-group" role="radiogroup" aria-label="Document Spacing">
+                                {DOCUMENT_SPACINGS.map((opt) => {
+                                    const isSelected = (localBranding.documentSpacing || "compact") === opt.key;
+                                    return (
+                                        <button
+                                            key={opt.key}
+                                            type="button"
+                                            role="radio"
+                                            aria-checked={isSelected}
+                                            className={`brand-style-pill ${isSelected ? "is-active" : ""}`}
+                                            onClick={() => handleSpacingChange(opt.key)}
+                                        >
+                                            <span className={`brand-radio-indicator ${isSelected ? "is-checked" : ""}`} />
+                                            <span className="brand-style-pill-label">{opt.label}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -237,7 +243,7 @@ export default function BrandSystemPanel({
                         className="btn-primary brand-save-btn"
                         disabled={saving}
                     >
-                        {saving ? <Loader2 size={16} className="spin" /> : <Save size={16} />}
+                        {saving ? <Loader2 size={16} className="spin" /> : null}
                         <span>Save Changes</span>
                     </button>
                 </div>

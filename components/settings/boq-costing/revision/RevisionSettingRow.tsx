@@ -20,12 +20,12 @@ export const RevisionSettingRow: React.FC<RevisionSettingRowProps> = ({
     onChange,
 }) => {
     return (
-        <div className="boq-setting-row-card">
-            <div className="boq-setting-info">
-                <label htmlFor={id} className="boq-setting-title">
+        <div className="boq-revision-card boq-setting-row-card">
+            <div className="boq-revision-text-group boq-setting-info">
+                <label htmlFor={id} className="boq-revision-title boq-setting-title">
                     {title}
                 </label>
-                <p className="boq-setting-description">{description}</p>
+                <p className="boq-revision-desc boq-setting-description">{description}</p>
             </div>
             <div className="boq-setting-control">
                 <button
@@ -35,10 +35,10 @@ export const RevisionSettingRow: React.FC<RevisionSettingRowProps> = ({
                     aria-checked={checked}
                     disabled={!canEdit}
                     onClick={() => onChange(!checked)}
-                    className={`boq-toggle-switch ${checked ? "is-active" : ""}`}
+                    className={`boq-figma-toggle boq-toggle-switch ${checked ? "is-active" : ""}`}
                     aria-label={`Toggle ${title}`}
                 >
-                    <span className="boq-toggle-knob" />
+                    <span className="boq-figma-toggle-knob boq-toggle-knob" />
                 </button>
             </div>
         </div>

@@ -26,12 +26,9 @@ export default function SettingsUsageCards({
             </div>
 
             {/* Card 3: Storage */}
-            <div className="settings-kpi-card settings-kpi-storage">
-                <div className="settings-kpi-storage-left">
-                    <span className="settings-kpi-label">Storage</span>
-                    <span className="settings-kpi-value">{storage}</span>
-                </div>
-               
+            <div className="settings-kpi-card">
+                <span className="settings-kpi-label">Storage</span>
+                <span className="settings-kpi-value">{storage}</span>
             </div>
         </div>
     );

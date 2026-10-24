@@ -22,20 +22,23 @@ export default function AdvancedSubNavigation({
     return (
         <aside className="advanced-subnav-panel" aria-label="Advanced settings menu">
             <div className="advanced-subnav-header">SELECT MENU</div>
-            <nav className="advanced-subnav-list">
+            <nav className="advanced-subnav-list" role="tablist">
                 {menuItems.map((item) => {
                     const isActive = activeSection === item.id;
                     return (
                         <button
                             key={item.id}
                             type="button"
+                            role="tab"
+                            aria-selected={isActive}
                             className={`advanced-subnav-item ${isActive ? "is-active" : ""}`}
                             onClick={() => onSelectSection(item.id)}
                             aria-current={isActive ? "page" : undefined}
+                            data-testid={`advanced-subnav-${item.id}`}
                         >
-                            <span>{item.label}</span>
+                            <span className="advanced-subnav-label">{item.label}</span>
                             {isActive && (
-                                <ChevronRight size={16} className="advanced-subnav-chevron" />
+                                <ChevronRight size={18} className="advanced-subnav-chevron" aria-hidden="true" />
                             )}
                         </button>
                     );

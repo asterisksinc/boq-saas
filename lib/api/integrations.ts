@@ -103,7 +103,7 @@ export type UpdateFormInput = {
 export type FormLead = { id: string; formId: string; payload: Record<string, unknown>; status: string; createdAt: string; };
 export type FormWithStats = { id: string; name: string; publicToken: string; campaignName: string | null; status: string; leadsThisMonth: number; lastLeadAt: string | null; };
 export type PaymentSummaryData = { accountReceived: number; amountDue: number; totalPending: number; failedPayments: number; currency: string; accountReceivedChange: number; amountDueChange: number; totalPendingChange: number; failedPaymentsChange: number; };
-export type PaymentAnalyticsData = { paymentOverview: { date: string; received: number; due: number; pending: number; }[]; statusBreakdown: { successful: number; pending: number; failed: number; total: number; }; currency: string; };
+export type PaymentAnalyticsData = { paymentOverview: { date: string; label?: string; received: number; due: number; pending: number; }[]; statusBreakdown: { successful: number; pending: number; failed: number; total: number; }; currency: string; period?: string; };
 export type Transaction = { id: string; paymentId: string; projectName: string; projectCode: string; boqRef: string; invoiceNumber: string; amount: number; currency: string; clientName: string; method: string; timestamp: string; status: string; };
 
 export const integrationsApi = {
@@ -145,10 +145,13 @@ export const integrationsApi = {
   // Payment Integrations
   paymentSummary: (integrationId: string) => request<PaymentSummaryData>(`/api/v1/integrations/${integrationId}/payment-summary`),
   paymentAnalytics: (integrationId: string, period?: string) => request<PaymentAnalyticsData>(`/api/v1/integrations/${integrationId}/payment-analytics${period ? `?period=${period}` : ''}`),
-  transactions: (integrationId: string, params?: { page?: number; pageSize?: number }) => {
+  transactions: (integrationId: string, params?: { page?: number; pageSize?: number; search?: string; status?: string; method?: string }) => {
     const sp = new URLSearchParams();
     if (params?.page) sp.set("page", String(params.page));
     if (params?.pageSize) sp.set("pageSize", String(params.pageSize));
+    if (params?.search) sp.set("search", params.search);
+    if (params?.status) sp.set("status", params.status);
+    if (params?.method) sp.set("method", params.method);
     const q = sp.toString();
     return request<{ items: Transaction[], page: number, pageSize: number, total: number, hasMore: boolean }>(`/api/v1/integrations/${integrationId}/transactions${q ? `?${q}` : ""}`);
   },

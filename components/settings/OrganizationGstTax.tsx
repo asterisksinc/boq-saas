@@ -230,13 +230,12 @@ export default function OrganizationGstTax({
 
     return (
         <form onSubmit={handleSubmit} className="org-profile-form" noValidate>
-            {/* CARD 1: Registered under GST & Registration details */}
+            {/* CARD 1: Registered under GST (Figma Frame 2147225145) */}
             <div className="org-content-card">
+                <h3 className="org-card-title">Registered under GST</h3>
+                <div className="org-card-divider" />
                 <div className="org-card-header-toggle">
-                    <div>
-                        <h3 className="org-card-title">Registered under GST</h3>
-                        <p className="org-card-subtitle">Organisation is a registered GST taxpayer</p>
-                    </div>
+                    <span className="org-card-subtitle">Organisation is a registered GST taxpayer</span>
                     <button
                         type="button"
                         role="switch"
@@ -251,8 +250,11 @@ export default function OrganizationGstTax({
                         <span className="org-toggle-thumb" />
                     </button>
                 </div>
+            </div>
 
-                <div className="org-form-grid" style={{ marginTop: "24px" }}>
+            {/* CARD 2: Tax Registration Details (Figma Frame 2147225144) */}
+            <div className="org-content-card">
+                <div className="org-form-grid">
                     {/* GSTIN * | State / Jurisdiction * */}
                     <div className="org-field">
                         <label htmlFor="gstin">
@@ -305,7 +307,7 @@ export default function OrganizationGstTax({
                         )}
                     </div>
 
-                    {/* Default Tax Regime * (Spans left column) */}
+                    {/* Default Tax Regime * */}
                     <div className="org-field">
                         <label htmlFor="taxRegime">
                             Default Tax Regime <span className="required">*</span>
@@ -333,10 +335,13 @@ export default function OrganizationGstTax({
                             <span className="org-field-error" role="alert">{formErrors.taxRegime}</span>
                         )}
                     </div>
+
+                    {/* Empty slot placeholder for 2-column grid alignment */}
+                    <div className="org-field org-field-empty" aria-hidden="true" />
                 </div>
             </div>
 
-            {/* CARD 2: Tax Rates (CGST, SGST, IGST, Cess) */}
+            {/* CARD 3: Tax Rates (CGST, SGST, IGST, Cess - Figma Frame 2147225146) */}
             <div className="org-content-card">
                 <div className="org-form-grid">
                     {/* Row 1: CGST Rate (%) * | SGST Rate (%) * */}
@@ -437,7 +442,7 @@ export default function OrganizationGstTax({
                 </div>
             </div>
 
-            {/* CARD 3: Tax Behavior (Exclusive display, Reverse Charge) */}
+            {/* CARD 4: Additional Tax Settings (Figma Frame 2147225147) */}
             <div className="org-content-card">
                 <div className="org-setting-row">
                     <div className="org-setting-text">
@@ -463,7 +468,7 @@ export default function OrganizationGstTax({
                     </button>
                 </div>
 
-                <div className="org-setting-divider" />
+                <div className="org-card-divider" />
 
                 <div className="org-setting-row">
                     <div className="org-setting-text">

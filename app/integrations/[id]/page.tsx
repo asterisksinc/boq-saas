@@ -4,16 +4,17 @@ import { use } from 'react';
 import DashboardRail from '@/components/DashboardRail';
 import DashboardHeader from '@/components/DashboardHeader';
 import IntegrationDetail from '@/components/integrations/IntegrationDetail';
+import '../integrations.css';
 
 export default function IntegrationDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
 
     return (
-        <main className="fig-dashboard boq-dashboard">
+        <main className="fig-dashboard">
             <div className="fig-dashboard-glow" />
             <DashboardRail current="/integrations" />
             <div className="fig-dashboard-main">
-                <DashboardHeader title="Integration Detail" />
+                <DashboardHeader title="Integrations" />
                 <IntegrationDetail id={id} />
             </div>
         </main>

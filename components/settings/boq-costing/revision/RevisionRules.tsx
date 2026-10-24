@@ -24,6 +24,11 @@ export const RevisionRules: React.FC<RevisionRulesProps> = ({
         lockApprovedVersions: initialRevision.lockApprovedVersions ?? true,
         reopenAfterApproval: initialRevision.reopenAfterApproval ?? true,
         compareVersions: initialRevision.compareVersions ?? true,
+        requireRevisionReason: initialRevision.requireRevisionReason ?? initialRevision.revisionReasonRequired ?? true,
+        autoArchiveOnApprove: initialRevision.autoArchiveOnApprove ?? initialRevision.autoRevisionNumbering ?? true,
+        lockAfterExport: initialRevision.lockAfterExport ?? initialRevision.lockApprovedVersions ?? true,
+        notifyOnNewRevision: initialRevision.notifyOnNewRevision ?? initialRevision.reopenAfterApproval ?? true,
+        trackUnitCostChanges: initialRevision.trackUnitCostChanges ?? initialRevision.compareVersions ?? true,
     });
     const [saving, setSaving] = useState(false);
 
@@ -34,12 +39,25 @@ export const RevisionRules: React.FC<RevisionRulesProps> = ({
             lockApprovedVersions: initialRevision.lockApprovedVersions ?? true,
             reopenAfterApproval: initialRevision.reopenAfterApproval ?? true,
             compareVersions: initialRevision.compareVersions ?? true,
+            requireRevisionReason: initialRevision.requireRevisionReason ?? initialRevision.revisionReasonRequired ?? true,
+            autoArchiveOnApprove: initialRevision.autoArchiveOnApprove ?? initialRevision.autoRevisionNumbering ?? true,
+            lockAfterExport: initialRevision.lockAfterExport ?? initialRevision.lockApprovedVersions ?? true,
+            notifyOnNewRevision: initialRevision.notifyOnNewRevision ?? initialRevision.reopenAfterApproval ?? true,
+            trackUnitCostChanges: initialRevision.trackUnitCostChanges ?? initialRevision.compareVersions ?? true,
         });
     }, [initialRevision]);
 
-    const handleToggle = async (key: keyof BoqRevisionSettings, val: boolean) => {
+    const handleToggle = async (
+        figmaKey: "requireRevisionReason" | "autoArchiveOnApprove" | "lockAfterExport" | "notifyOnNewRevision" | "trackUnitCostChanges",
+        legacyKey: "revisionReasonRequired" | "autoRevisionNumbering" | "lockApprovedVersions" | "reopenAfterApproval" | "compareVersions",
+        val: boolean
+    ) => {
         if (!canEdit) return;
-        const updated = { ...settings, [key]: val };
+        const updated: BoqRevisionSettings = {
+            ...settings,
+            [figmaKey]: val,
+            [legacyKey]: val,
+        };
         setSettings(updated);
         try {
             await onSaveRevision(updated);
@@ -67,72 +85,56 @@ export const RevisionRules: React.FC<RevisionRulesProps> = ({
     };
 
     return (
-        <form onSubmit={handleSave} className="boq-revision-container">
-            <div className="boq-revision-list">
-                <RevisionSettingRow
-                    id="rev-auto-numbering"
-                    title="Auto Revision Numbering"
-                    description="Automatically increment revision number on save"
-                    checked={settings.autoRevisionNumbering}
-                    canEdit={canEdit}
-                    onChange={(checked) => handleToggle("autoRevisionNumbering", checked)}
-                />
+        <form onSubmit={handleSave} className="boq-revision-panel boq-revision-container">
+            {/* 1. Require revision reason */}
+            <RevisionSettingRow
+                id="rev-reason-required"
+                title="Require revision reason"
+                description="Require user to enter a reason for each revision"
+                checked={settings.requireRevisionReason ?? settings.revisionReasonRequired}
+                canEdit={canEdit}
+                onChange={(checked) => handleToggle("requireRevisionReason", "revisionReasonRequired", checked)}
+            />
 
-                <RevisionSettingRow
-                    id="rev-reason-required"
-                    title="Revision Reason Required"
-                    description="User must provide a reason when saving a new revision"
-                    checked={settings.revisionReasonRequired}
-                    canEdit={canEdit}
-                    onChange={(checked) => handleToggle("revisionReasonRequired", checked)}
-                />
+            {/* 2. Auto-archive on approve */}
+            <RevisionSettingRow
+                id="rev-auto-archive"
+                title="Auto-archive on approve"
+                description="Automatically archive previous revisions when a new one is approved"
+                checked={settings.autoArchiveOnApprove ?? settings.autoRevisionNumbering}
+                canEdit={canEdit}
+                onChange={(checked) => handleToggle("autoArchiveOnApprove", "autoRevisionNumbering", checked)}
+            />
 
-                <RevisionSettingRow
-                    id="rev-lock-approved"
-                    title="Lock Approved Versions"
-                    description="Prevent editing once a version is approved"
-                    checked={settings.lockApprovedVersions}
-                    canEdit={canEdit}
-                    onChange={(checked) => handleToggle("lockApprovedVersions", checked)}
-                />
+            {/* 3. Lock after export */}
+            <RevisionSettingRow
+                id="rev-lock-export"
+                title="Lock after export"
+                description="Lock revision from further edits once exported"
+                checked={settings.lockAfterExport ?? settings.lockApprovedVersions}
+                canEdit={canEdit}
+                onChange={(checked) => handleToggle("lockAfterExport", "lockApprovedVersions", checked)}
+            />
 
-                <RevisionSettingRow
-                    id="rev-reopen-approved"
-                    title="Reopen After Approval"
-                    description="Requires admin permission to reopen"
-                    checked={settings.reopenAfterApproval}
-                    canEdit={canEdit}
-                    onChange={(checked) => handleToggle("reopenAfterApproval", checked)}
-                />
+            {/* 4. Notify on new revision */}
+            <RevisionSettingRow
+                id="rev-notify-new"
+                title="Notify on new revision"
+                description="Send notifications when a new revision is created"
+                checked={settings.notifyOnNewRevision ?? settings.reopenAfterApproval}
+                canEdit={canEdit}
+                onChange={(checked) => handleToggle("notifyOnNewRevision", "reopenAfterApproval", checked)}
+            />
 
-                <RevisionSettingRow
-                    id="rev-compare-versions"
-                    title="Compare Versions"
-                    description="Enable side-by-side version comparison"
-                    checked={settings.compareVersions}
-                    canEdit={canEdit}
-                    onChange={(checked) => handleToggle("compareVersions", checked)}
-                />
-            </div>
-
-            {canEdit && (
-                <div className="boq-settings-actions-footer">
-                    <button
-                        type="submit"
-                        disabled={saving}
-                        className="boq-btn-primary boq-save-btn"
-                    >
-                        {saving ? (
-                            <>
-                                <Loader2 size={16} className="boq-spinner" aria-hidden="true" />
-                                <span>Saving...</span>
-                            </>
-                        ) : (
-                            <span>Save Changes</span>
-                        )}
-                    </button>
-                </div>
-            )}
+            {/* 5. Track unit cost changes */}
+            <RevisionSettingRow
+                id="rev-track-costs"
+                title="Track unit cost changes"
+                description="Highlight and track changes to unit costs across revisions"
+                checked={settings.trackUnitCostChanges ?? settings.compareVersions}
+                canEdit={canEdit}
+                onChange={(checked) => handleToggle("trackUnitCostChanges", "compareVersions", checked)}
+            />
         </form>
     );
 };

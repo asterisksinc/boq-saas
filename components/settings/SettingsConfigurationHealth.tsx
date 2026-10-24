@@ -13,7 +13,7 @@ export default function SettingsConfigurationHealth({
     onSelectTab,
 }: SettingsConfigurationHealthProps) {
     return (
-        <section className="settings-section" aria-labelledby="config-health-heading">
+        <section className="settings-config-card" aria-labelledby="config-health-heading">
             <h2 id="config-health-heading" className="settings-section-heading">
                 Configuration Health
             </h2>

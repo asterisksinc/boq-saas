@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Trash2, Plus } from 'lucide-react';
 import { CustomFormField, FormFieldType } from '@/lib/integrations/types';
 
 interface Props {
@@ -10,11 +10,11 @@ interface Props {
     onCancel: () => void;
 }
 
-const fieldTypeOptions: { value: FormFieldType; label: string }[] = [
+const FIELD_TYPE_OPTIONS: { value: FormFieldType; label: string }[] = [
     { value: 'short_answer', label: 'Short Answer' },
     { value: 'long_answer', label: 'Long Answer' },
-    { value: 'dropdown', label: 'Drop Down' },
-    { value: 'checkbox', label: 'Check Box' },
+    { value: 'dropdown', label: 'Dropdown' },
+    { value: 'checkbox', label: 'Checkbox' },
     { value: 'link', label: 'Link' },
 ];
 
@@ -23,7 +23,9 @@ export default function FieldEditor({ initialData, onSave, onCancel }: Props) {
     const [type, setType] = useState<FormFieldType>(initialData?.type || 'short_answer');
     const [required, setRequired] = useState(initialData?.required ?? false);
     const [dropdownOptions, setDropdownOptions] = useState<string[]>(
-        (initialData?.config?.options as string[]) || ['']
+        Array.isArray(initialData?.config?.options) && (initialData.config.options as string[]).length > 0
+            ? (initialData.config.options as string[])
+            : ['']
     );
 
     // Validation
@@ -40,9 +42,21 @@ export default function FieldEditor({ initialData, onSave, onCancel }: Props) {
 
     const handleTypeChange = (newType: FormFieldType) => {
         setType(newType);
-        if (newType !== 'dropdown') {
-            setDropdownOptions(['']);
+        if (newType === 'dropdown' && dropdownOptions.length === 0) {
+            setDropdownOptions(['Option 1', 'Option 2']);
         }
+    };
+
+    const handleAddOption = () => {
+        setDropdownOptions(prev => [...prev, `Option ${prev.length + 1}`]);
+    };
+
+    const handleUpdateOption = (index: number, val: string) => {
+        setDropdownOptions(prev => prev.map((opt, i) => i === index ? val : opt));
+    };
+
+    const handleRemoveOption = (index: number) => {
+        setDropdownOptions(prev => prev.filter((_, i) => i !== index));
     };
 
     const handleSave = () => {
@@ -50,10 +64,11 @@ export default function FieldEditor({ initialData, onSave, onCancel }: Props) {
 
         const config: Record<string, unknown> = {};
         if (type === 'dropdown') {
-            config.options = dropdownOptions.map(o => o.trim());
+            config.options = dropdownOptions.map(o => o.trim()).filter(Boolean);
         }
+
         onSave({
-            id: initialData?.id || Math.random().toString(36).substring(2, 11),
+            id: initialData?.id || `field_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
             name: name.trim(),
             type,
             required,
@@ -63,89 +78,118 @@ export default function FieldEditor({ initialData, onSave, onCancel }: Props) {
     };
 
     return (
-        <div className="intg-inline-editor">
-            <div className="intg-form-group">
-                <label>Field Name <span className="text-red">*</span></label>
+        <div className="intg-field-editor-box" data-testid="field-editor">
+            {/* Field Name: Frame 16 + Frame 12 */}
+            <div className="intg-editor-form-group">
+                <label className="intg-custom-label">
+                    Field Name <span className="intg-custom-required">*</span>
+                </label>
                 <input 
                     type="text" 
-                    className="intg-input" 
+                    className="intg-editor-input" 
                     value={name} 
                     onChange={e => setName(e.target.value)}
-                    placeholder="e.g. Full Name"
+                    placeholder="Enter field name"
+                    autoFocus
                 />
-                {!nameValid && name.length > 0 && <span className="intg-error-text">Field name is required</span>}
+                {!nameValid && name.length > 0 && (
+                    <span className="intg-editor-error-text">Field name is required</span>
+                )}
             </div>
 
-            <div className="intg-form-group">
-                <label>Field Type <span className="text-red">*</span></label>
-                <select className="intg-input" value={type} onChange={e => handleTypeChange(e.target.value as FormFieldType)}>
-                    {fieldTypeOptions.map(opt => (
+            {/* Field Type: Frame 16 + Frame 12 */}
+            <div className="intg-editor-form-group">
+                <label className="intg-custom-label">
+                    Field Type <span className="intg-custom-required">*</span>
+                </label>
+                <select 
+                    className="intg-editor-select" 
+                    value={type} 
+                    onChange={e => handleTypeChange(e.target.value as FormFieldType)}
+                >
+                    {FIELD_TYPE_OPTIONS.map(opt => (
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                 </select>
             </div>
 
+            {/* If Dropdown, display options management */}
             {type === 'dropdown' && (
-                <div className="intg-form-group">
-                    <label>Fields</label>
-                    <div className="intg-dropdown-options">
+                <div className="intg-editor-form-group intg-dropdown-options-group">
+                    <label className="intg-custom-label">Options</label>
+                    <div className="intg-dropdown-options-list">
                         {dropdownOptions.map((opt, i) => (
                             <div key={i} className="intg-dropdown-option-row">
                                 <input
                                     type="text"
-                                    className="intg-input"
+                                    className="intg-editor-input intg-dropdown-option-input"
                                     value={opt}
-                                    onChange={e => {
-                                        const updated = [...dropdownOptions];
-                                        updated[i] = e.target.value;
-                                        setDropdownOptions(updated);
-                                    }}
+                                    onChange={e => handleUpdateOption(i, e.target.value)}
                                     placeholder={`Option ${i + 1}`}
                                 />
-                                <button
-                                    className="intg-field-action-btn intg-field-action-delete"
-                                    onClick={() => setDropdownOptions(dropdownOptions.filter((_, idx) => idx !== i))}
-                                    aria-label="Remove option"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
+                                {dropdownOptions.length > 1 && (
+                                    <button
+                                        type="button"
+                                        className="intg-dropdown-remove-btn"
+                                        onClick={() => handleRemoveOption(i)}
+                                        aria-label={`Remove option ${i + 1}`}
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                )}
                             </div>
                         ))}
-                        
-                        {type === 'dropdown' && hasEmptyOptions && dropdownOptions.length > 0 && (
-                            <div className="intg-error-text">Options cannot be empty</div>
-                        )}
-                        {type === 'dropdown' && hasDuplicateOptions && (
-                            <div className="intg-error-text">Options must be unique</div>
-                        )}
-                        {type === 'dropdown' && !hasEnoughOptions && (
-                            <div className="intg-error-text">At least 1 option is required</div>
-                        )}
-
-                        <button
-                            type="button"
-                            className="intg-add-option-btn"
-                            onClick={() => setDropdownOptions([...dropdownOptions, ''])}
-                        >
-                            + Add Option
-                        </button>
                     </div>
+
+                    {hasEmptyOptions && dropdownOptions.length > 0 && (
+                        <span className="intg-editor-error-text">Options cannot be empty</span>
+                    )}
+                    {hasDuplicateOptions && (
+                        <span className="intg-editor-error-text">Options must be unique</span>
+                    )}
+                    {!hasEnoughOptions && (
+                        <span className="intg-editor-error-text">At least 1 option is required</span>
+                    )}
+
+                    <button
+                        type="button"
+                        className="intg-editor-add-option-btn"
+                        onClick={handleAddOption}
+                    >
+                        <Plus size={14} /> Add Option
+                    </button>
                 </div>
             )}
 
-            <div className="intg-form-group-checkbox">
+            {/* Required Field Checkbox: Frame 249 */}
+            <label className="intg-editor-checkbox-label">
                 <input 
                     type="checkbox" 
-                    id="req-field" 
+                    className="intg-editor-checkbox"
                     checked={required} 
                     onChange={e => setRequired(e.target.checked)} 
                 />
-                <label htmlFor="req-field">Required Field</label>
-            </div>
+                <span className="intg-editor-checkbox-text">Required Field</span>
+            </label>
 
-            <div className="intg-inline-editor-actions">
-                <button className="intg-btn intg-btn-modal-cancel" onClick={onCancel}>Cancel</button>
-                <button className="intg-btn intg-btn-primary" onClick={handleSave} disabled={!isValid}>
+            {/* Divider: Rectangle 4477 */}
+            <div className="intg-editor-divider" />
+
+            {/* Actions: Frame 2147225510 */}
+            <div className="intg-editor-actions">
+                <button 
+                    type="button" 
+                    className="intg-editor-btn intg-editor-btn-cancel" 
+                    onClick={onCancel}
+                >
+                    Cancel
+                </button>
+                <button 
+                    type="button" 
+                    className="intg-editor-btn intg-editor-btn-add" 
+                    onClick={handleSave} 
+                    disabled={!isValid}
+                >
                     {initialData ? 'Save Changes' : 'Add Field'}
                 </button>
             </div>

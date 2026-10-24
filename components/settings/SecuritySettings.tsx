@@ -119,6 +119,7 @@ export default function SecuritySettings({ onSecurityUpdated }: SecuritySettings
                 <div className="security-card-header">
                     <h3>Password</h3>
                 </div>
+                <div className="security-card-divider" />
                 <div className="security-card-body">
                     <div className="security-row">
                         <span className="security-last-changed-text">{passwordDisplay}</span>
@@ -138,6 +139,7 @@ export default function SecuritySettings({ onSecurityUpdated }: SecuritySettings
                 <div className="security-card-header">
                     <h3>Two-Factor Authentication</h3>
                 </div>
+                <div className="security-card-divider" />
                 <div className="security-card-body">
                     <div className="security-row">
                         <span className="security-sub-title">Authenticator App configured</span>
@@ -163,6 +165,7 @@ export default function SecuritySettings({ onSecurityUpdated }: SecuritySettings
                 <div className="security-card-header">
                     <h3>Active Sessions</h3>
                 </div>
+                <div className="security-card-divider" />
                 <div className="security-card-body">
                     <div className="sessions-list">
                         {/* Current Session Item */}
@@ -174,6 +177,7 @@ export default function SecuritySettings({ onSecurityUpdated }: SecuritySettings
                                 </div>
                                 <span className="session-location-sub">{currentSession.location}</span>
                             </div>
+                            <div className="session-btn-placeholder" aria-hidden="true" />
                         </div>
 
                         {/* Other Sessions or Target Screenshot Item */}
@@ -225,6 +229,7 @@ export default function SecuritySettings({ onSecurityUpdated }: SecuritySettings
                 <div className="security-card-header">
                     <h3>Connected Providers</h3>
                 </div>
+                <div className="security-card-divider" />
                 <div className="security-card-body">
                     <div className="providers-list">
                         {/* Google Provider Card */}

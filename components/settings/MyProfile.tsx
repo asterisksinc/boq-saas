@@ -567,6 +567,9 @@ export default function MyProfile({ overview, onProfileUpdated }: MyProfileProps
                                             </select>
                                         </div>
                                     </div>
+
+                                    {/* Slot 10 placeholder for 2-column grid alignment */}
+                                    <div className="profile-field-group profile-field-empty" aria-hidden="true" />
                                 </div>
                             </div>
 

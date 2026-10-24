@@ -38,7 +38,7 @@ export default function DeleteUserDialog({
 
     return (
         <div className="security-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title">
-            <div className="security-modal-box" style={{ maxWidth: 440 }}>
+            <div className="security-modal-box" style={{ maxWidth: 480 }} data-testid="delete-user-modal">
                 <div className="security-modal-header">
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <div
@@ -65,21 +65,24 @@ export default function DeleteUserDialog({
                         className="security-modal-close-btn"
                         onClick={onClose}
                         disabled={deleting}
+                        aria-label="Close dialog"
                     >
-                        <X size={18} />
+                        <X size={24} />
                     </button>
                 </div>
 
                 {errorMessage && (
-                    <div className="notice-banner error" role="alert" style={{ marginBottom: 16 }}>
+                    <div className="notice-banner error" role="alert" style={{ width: "100%", margin: 0 }}>
                         <span>{errorMessage}</span>
                     </div>
                 )}
 
-                <p style={{ fontSize: "14px", color: "#475569", lineHeight: 1.5, margin: "0 0 20px 0" }}>
-                    Are you sure you want to remove <strong>{user.displayName}</strong> from the workspace? They will lose
-                    access to all workspace resources, projects, and permissions.
-                </p>
+                <div className="security-modal-inner-card">
+                    <p style={{ fontSize: "14px", fontFamily: "Urbanist, sans-serif", color: "#475569", lineHeight: 1.5, margin: 0 }}>
+                        Are you sure you want to remove <strong>{user.displayName}</strong> from the workspace? They will lose
+                        access to all workspace resources, projects, and permissions.
+                    </p>
+                </div>
 
                 <div className="security-modal-footer">
                     <button
@@ -98,7 +101,7 @@ export default function DeleteUserDialog({
                     >
                         {deleting ? (
                             <>
-                                <Loader2 size={15} className="spin" />
+                                <Loader2 size={16} className="spin" />
                                 <span>Deleting...</span>
                             </>
                         ) : (

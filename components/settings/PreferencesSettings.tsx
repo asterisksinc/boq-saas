@@ -41,13 +41,16 @@ const LANDING_PAGE_OPTIONS = [
     { value: "dashboard", label: "Dashboard" },
     { value: "projects", label: "Projects" },
     { value: "boqs", label: "BOQs" },
-    { value: "activities", label: "Activities" },
+    { value: "costing", label: "Costing" },
+    { value: "templates", label: "Templates" },
+    { value: "analytics", label: "Analytics" },
 ];
 
 const EMAIL_DIGEST_OPTIONS = [
-    { value: "weekly", label: "Weekly" },
     { value: "daily", label: "Daily" },
-    { value: "off", label: "Off" },
+    { value: "weekly", label: "Weekly" },
+    { value: "monthly", label: "Monthly" },
+    { value: "off", label: "None" },
 ];
 
 export default function PreferencesSettings({
@@ -148,12 +151,35 @@ export default function PreferencesSettings({
         handleSaveField({ emailDigest: val });
     };
 
+    const handleSaveAllPreferences = async () => {
+        setSaving(true);
+        setErrorMsg(null);
+        try {
+            await updateUserPreferences({
+                theme,
+                density,
+                landingPage,
+                projectView,
+                emailDigest,
+            });
+            setSuccessMsg("Changes saved successfully.");
+            setTimeout(() => setSuccessMsg(null), 3000);
+            if (onPreferencesUpdated) {
+                onPreferencesUpdated();
+            }
+        } catch (err: unknown) {
+            setErrorMsg(err instanceof Error ? err.message : "Failed to update preferences.");
+        } finally {
+            setSaving(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="preferences-cards-stack">
-                <div className="preferences-target-card skeleton-box" style={{ height: 130 }} />
-                <div className="preferences-target-card skeleton-box" style={{ height: 130 }} />
-                <div className="preferences-target-card skeleton-box" style={{ height: 110 }} />
+                <div className="preferences-target-card skeleton-box" style={{ height: 180 }} />
+                <div className="preferences-target-card skeleton-box" style={{ height: 180 }} />
+                <div className="preferences-target-card skeleton-box" style={{ height: 171 }} />
             </div>
         );
     }
@@ -176,30 +202,35 @@ export default function PreferencesSettings({
                 <div className="preferences-card-header">
                     <h3>Display</h3>
                 </div>
+                <div className="preferences-card-divider" />
                 <div className="preferences-card-body">
                     <div className="preferences-grid-2col">
                         {/* Theme Box */}
-                        <div className="pref-control-box">
+                        <div className="pref-display-card">
                             <span className="pref-box-label">Theme</span>
-                            <PreferenceSegmentedControl
-                                name="Theme"
-                                options={THEME_OPTIONS}
-                                value={theme}
-                                onChange={handleThemeChange}
-                                disabled={saving}
-                            />
+                            <div className="pref-control-box">
+                                <PreferenceSegmentedControl
+                                    name="Theme"
+                                    options={THEME_OPTIONS}
+                                    value={theme}
+                                    onChange={handleThemeChange}
+                                    disabled={saving}
+                                />
+                            </div>
                         </div>
 
                         {/* Density Box */}
-                        <div className="pref-control-box">
+                        <div className="pref-display-card">
                             <span className="pref-box-label">Density</span>
-                            <PreferenceSegmentedControl
-                                name="Density"
-                                options={DENSITY_OPTIONS}
-                                value={density}
-                                onChange={handleDensityChange}
-                                disabled={saving}
-                            />
+                            <div className="pref-control-box">
+                                <PreferenceSegmentedControl
+                                    name="Density"
+                                    options={DENSITY_OPTIONS}
+                                    value={density}
+                                    onChange={handleDensityChange}
+                                    disabled={saving}
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -210,6 +241,7 @@ export default function PreferencesSettings({
                 <div className="preferences-card-header">
                     <h3>Navigation</h3>
                 </div>
+                <div className="preferences-card-divider" />
                 <div className="preferences-card-body">
                     <div className="preferences-grid-2col">
                         {/* Default Landing Page */}
@@ -235,15 +267,17 @@ export default function PreferencesSettings({
                         </div>
 
                         {/* Default Project View */}
-                        <div className="pref-control-box pref-align-bottom">
+                        <div className="pref-display-card">
                             <span className="pref-box-label">Default Project View</span>
-                            <PreferenceSegmentedControl
-                                name="Default Project View"
-                                options={PROJECT_VIEW_OPTIONS}
-                                value={projectView}
-                                onChange={handleProjectViewChange}
-                                disabled={saving}
-                            />
+                            <div className="pref-control-box">
+                                <PreferenceSegmentedControl
+                                    name="Default Project View"
+                                    options={PROJECT_VIEW_OPTIONS}
+                                    value={projectView}
+                                    onChange={handleProjectViewChange}
+                                    disabled={saving}
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -254,8 +288,9 @@ export default function PreferencesSettings({
                 <div className="preferences-card-header">
                     <h3>Email</h3>
                 </div>
+                <div className="preferences-card-divider" />
                 <div className="preferences-card-body">
-                    <div className="pref-field-wrap" style={{ maxWidth: "100%" }}>
+                    <div className="pref-field-wrap" style={{ width: "100%", maxWidth: "100%" }}>
                         <label htmlFor="pref-email-digest" className="pref-field-label">
                             Email Digest <span className="profile-req">*</span>
                         </label>
@@ -277,6 +312,19 @@ export default function PreferencesSettings({
                     </div>
                 </div>
             </section>
+
+            {/* ── SAVE CHANGES BUTTON (Figma Frame 2147225530) ── */}
+            <div className="profile-save-container">
+                <button
+                    type="button"
+                    className="btn-profile-save"
+                    onClick={handleSaveAllPreferences}
+                    disabled={saving}
+                >
+                    {saving && <Loader2 size={16} className="spin" style={{ marginRight: 8 }} />}
+                    <span>Save Changes</span>
+                </button>
+            </div>
         </div>
     );
 }

@@ -237,7 +237,7 @@ export default function OrganizationLocations({
                                             <button
                                                 type="button"
                                                 onClick={() => handleSetDefault(loc)}
-                                                className="org-loc-btn-neutral"
+                                                className="org-loc-btn-neutral org-loc-btn-default"
                                                 disabled={!canEdit || isSettingThisDefault}
                                             >
                                                 {isSettingThisDefault && (

@@ -421,6 +421,12 @@ export async function updateActivityTask(taskId: string, input: Partial<{
     });
 }
 
+export async function deleteActivityTask(taskId: string) {
+    return request<{ deleted: boolean }>(`/api/v1/activities/tasks/${taskId}`, {
+        method: "DELETE",
+    });
+}
+
 export async function listActivityTaskComments(taskId: string) {
     return request<{ items: ActivityComment[] }>(`/api/v1/activities/tasks/${taskId}/comments`);
 }

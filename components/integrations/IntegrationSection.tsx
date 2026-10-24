@@ -10,8 +10,10 @@ interface Props {
 
 export default function IntegrationSection({ title, category, children }: Props) {
     return (
-        <section className="intg-section">
-            <h2 className="intg-section-title">{title}</h2>
+        <section className="intg-section" data-category={category} aria-labelledby={`intg-sec-${category}`}>
+            <h2 id={`intg-sec-${category}`} className="intg-section-title">
+                {title}
+            </h2>
             <div className="intg-section-cards" data-category={category}>
                 {children}
             </div>

@@ -116,6 +116,26 @@ export default function BrandAssetsPanel({
                     onDelete={handleDelete}
                     onError={(msg) => showNotice(msg, "error")}
                 />
+
+                {/* 6. Empty placeholder slot matching Figma Frame 2147225538 */}
+                <div
+                    className="brand-asset-card-wrapper brand-asset-placeholder"
+                    aria-hidden="true"
+                    style={{ opacity: 0, pointerEvents: "none" }}
+                >
+                    <div className="brand-asset-label-row">
+                        <span className="brand-asset-label">Favicon <span className="brand-asset-required">*</span></span>
+                    </div>
+                    <div className="brand-asset-dropzone is-empty">
+                        <div className="brand-asset-empty-content">
+                            <div className="brand-asset-upload-icon-badge">
+                                <span style={{ width: 20, height: 20 }} />
+                            </div>
+                            <span className="brand-asset-prompt-main">select your file or drag and drop</span>
+                            <span className="brand-asset-prompt-sub">png, pdf, jpg, docx accepted</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     );

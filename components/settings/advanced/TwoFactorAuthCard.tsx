@@ -13,26 +13,27 @@ export default function TwoFactorAuthCard({
 }: TwoFactorAuthCardProps) {
     if (loading) {
         return (
-            <div className="advanced-card advanced-card-skeleton">
+            <div className="advanced-card advanced-card-skeleton" data-testid="2fa-card-skeleton">
                 <div className="advanced-card-left">
-                    <div className="skeleton" style={{ width: 140, height: 18, marginBottom: 6, borderRadius: 4 }} />
-                    <div className="skeleton" style={{ width: 200, height: 14, borderRadius: 4 }} />
+                    <div className="skeleton" style={{ width: 120, height: 19, borderRadius: 4 }} />
+                    <div className="skeleton" style={{ width: 178, height: 17, borderRadius: 4 }} />
                 </div>
-                <div className="skeleton" style={{ width: 80, height: 34, borderRadius: 8 }} />
+                <div className="skeleton" style={{ width: 85, height: 34, borderRadius: 6 }} />
             </div>
         );
     }
 
     return (
-        <section className="advanced-card" aria-label="Two-Factor Authentication">
+        <section className="advanced-card" aria-label="Two-Factor Authentication" data-testid="two-factor-auth-card">
             <div className="advanced-card-left">
                 <h3 className="advanced-card-title">Two-Factor Auth</h3>
                 <p className="advanced-card-subtitle">{statusText}</p>
             </div>
             <button
                 type="button"
-                className="btn-advanced-action"
+                className="btn-advanced-action btn-manage-2fa"
                 onClick={onManageClick}
+                data-testid="manage-2fa-button"
             >
                 Manage
             </button>

@@ -11,7 +11,6 @@ import {
     X,
     Send,
     Clock,
-    Calendar,
     AlertCircle,
     CheckCircle,
     FileText,
@@ -43,7 +42,6 @@ import {
     listSupportTicketMessages,
     createSupportTicketMessage,
     HelpArticle,
-    HelpCategory,
     HelpOverview,
     SupportTicket,
     SupportTicketMessage,
@@ -52,6 +50,7 @@ import {
 import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
 import TicketWizardDrawer from "@/components/TicketWizardDrawer";
+import "./help-redesign.css";
 
 const priorityConfig: Record<string, { label: string; color: string; bg: string }> = {
     low: { label: "Low", color: "#16a34a", bg: "#f0fdf4" },
@@ -85,22 +84,28 @@ const formatDate = (iso?: string | null) => {
 };
 
 const formatArticleDate = (iso?: string | null) => {
-    if (!iso) return "Aug 28, 2026";
+    if (!iso) return "Recently";
     try {
         const d = new Date(iso);
-        if (isNaN(d.getTime())) return "Aug 28, 2026";
+        if (isNaN(d.getTime())) return "Recently";
         return new Intl.DateTimeFormat("en-US", {
             month: "short",
             day: "numeric",
             year: "numeric",
         }).format(d);
     } catch {
-        return "Aug 28, 2026";
+        return "Recently";
     }
 };
 
 function getArticleCategory(article: HelpArticle): { slug: string; name: string } | null {
-    if (article.category) return article.category;
+    if (article.category) {
+        if (typeof article.category === "string") {
+            const raw = article.category as string;
+            return { slug: raw.toLowerCase().replace(/\s+/g, "-"), name: raw };
+        }
+        return article.category;
+    }
     if (article.help_categories) {
         if (Array.isArray(article.help_categories)) {
             return article.help_categories[0] ?? null;
@@ -110,16 +115,30 @@ function getArticleCategory(article: HelpArticle): { slug: string; name: string 
     return null;
 }
 
+/**
+ * Display helpfulness percentages only when backed by real data with a meaningful denominator.
+ * Never display a default 96% helpful or fabricated rating.
+ */
 function getHelpfulPercentage(article: HelpArticle): number | null {
     const yes = article.helpfulYes ?? article.helpful_yes ?? 0;
     const no = article.helpfulNo ?? article.helpful_no ?? 0;
     const total = yes + no;
-    if (total <= 0) return null;
+    if (total < 5) return null;
     return Math.round((yes / total) * 100);
 }
 
-function getReadMinutes(article: HelpArticle): number {
-    return article.readMinutes ?? article.read_minutes ?? 4;
+/**
+ * Calculate or read valid reading duration.
+ */
+function getReadMinutes(article: HelpArticle): number | null {
+    if (article.readMinutes && article.readMinutes > 0) return article.readMinutes;
+    if (article.read_minutes && article.read_minutes > 0) return article.read_minutes;
+    if (article.content) {
+        const text = typeof article.content === "string" ? article.content : JSON.stringify(article.content);
+        const words = text.replace(/<[^>]*>/g, " ").trim().split(/\s+/).filter(Boolean).length;
+        if (words > 20) return Math.max(1, Math.ceil(words / 180));
+    }
+    return null;
 }
 
 function getArticleShortAnswer(article: HelpArticle): string | null {
@@ -132,15 +151,15 @@ function getArticleShortAnswer(article: HelpArticle): string | null {
 
 function getCategoryIcon(slug: string) {
     const s = slug.toLowerCase();
-    if (s.includes("getting-started") || s.includes("start")) return <Sparkles size={16} />;
-    if (s.includes("project") || s.includes("activit")) return <LayoutDashboard size={16} />;
-    if (s.includes("boq") || s.includes("cost")) return <FileSpreadsheet size={16} />;
-    if (s.includes("proposal") || s.includes("invoice")) return <Receipt size={16} />;
-    if (s.includes("doc")) return <FolderOpen size={16} />;
-    if (s.includes("integration")) return <Link2 size={16} />;
-    if (s.includes("team") || s.includes("permission")) return <Users size={16} />;
-    if (s.includes("bill") || s.includes("account")) return <CreditCard size={16} />;
-    return <HelpCircle size={16} />;
+    if (s.includes("getting-started") || s.includes("start")) return <Sparkles size={20} />;
+    if (s.includes("project") || s.includes("activit")) return <LayoutDashboard size={20} />;
+    if (s.includes("boq") || s.includes("cost")) return <FileSpreadsheet size={20} />;
+    if (s.includes("proposal") || s.includes("invoice")) return <Receipt size={20} />;
+    if (s.includes("doc")) return <FolderOpen size={20} />;
+    if (s.includes("integration")) return <Link2 size={20} />;
+    if (s.includes("team") || s.includes("permission")) return <Users size={20} />;
+    if (s.includes("bill") || s.includes("account")) return <CreditCard size={20} />;
+    return <HelpCircle size={20} />;
 }
 
 const DEFAULT_CATEGORIES: Array<{
@@ -212,11 +231,11 @@ const DEFAULT_POPULAR_ARTICLES: HelpArticle[] = [
     {
         id: "art-1",
         slug: "how-to-import-an-excel-boq",
-        title: "How to import an Excel BOQ",
-        summary: "Upload your workbook from the BOQ menu, map the required columns, then review the validation summary before importing.",
+        title: "How to Import an Excel BOQ",
+        summary: "Bring your existing estimate into Buildwise and map columns to your costing library.",
         readMinutes: 4,
-        helpfulYes: 96,
-        helpfulNo: 4,
+        helpfulYes: 0,
+        helpfulNo: 0,
         popular: true,
         updatedAt: "2026-08-28T10:00:00Z",
         category: { slug: "boqs-costing", name: "BOQs & Costing" },
@@ -249,8 +268,8 @@ const DEFAULT_POPULAR_ARTICLES: HelpArticle[] = [
         title: "Create Your First Project",
         summary: "Set up a project workspace, invite your team, and start building your estimate.",
         readMinutes: 4,
-        helpfulYes: 96,
-        helpfulNo: 4,
+        helpfulYes: 0,
+        helpfulNo: 0,
         popular: true,
         updatedAt: "2026-08-28T10:00:00Z",
         category: { slug: "getting-started", name: "Getting Started" },
@@ -268,8 +287,8 @@ const DEFAULT_POPULAR_ARTICLES: HelpArticle[] = [
         title: "Add a Costing Item",
         summary: "Add materials, labour, and custom rates to your Costing Library or directly to a BOQ.",
         readMinutes: 4,
-        helpfulYes: 96,
-        helpfulNo: 4,
+        helpfulYes: 0,
+        helpfulNo: 0,
         popular: true,
         updatedAt: "2026-08-28T10:00:00Z",
         category: { slug: "boqs-costing", name: "BOQs & Costing" },
@@ -287,8 +306,8 @@ const DEFAULT_POPULAR_ARTICLES: HelpArticle[] = [
         title: "Send a Proposal to a Client",
         summary: "Turn your approved BOQ into a polished proposal and send it for review.",
         readMinutes: 4,
-        helpfulYes: 96,
-        helpfulNo: 4,
+        helpfulYes: 0,
+        helpfulNo: 0,
         popular: true,
         updatedAt: "2026-08-28T10:00:00Z",
         category: { slug: "boqs-costing", name: "BOQs & Costing" },
@@ -306,8 +325,8 @@ const DEFAULT_POPULAR_ARTICLES: HelpArticle[] = [
         title: "Record a Partial Invoice Payment",
         summary: "Keep your project balances accurate when a client pays an invoice in instalments.",
         readMinutes: 4,
-        helpfulYes: 96,
-        helpfulNo: 4,
+        helpfulYes: 0,
+        helpfulNo: 0,
         popular: true,
         updatedAt: "2026-08-28T10:00:00Z",
         category: { slug: "proposals-invoices", name: "Proposals & Invoices" },
@@ -325,8 +344,8 @@ const DEFAULT_POPULAR_ARTICLES: HelpArticle[] = [
         title: "Connect Meta Lead Forms",
         summary: "Send new leads from Meta directly into your project pipeline.",
         readMinutes: 4,
-        helpfulYes: 96,
-        helpfulNo: 4,
+        helpfulYes: 0,
+        helpfulNo: 0,
         popular: true,
         updatedAt: "2026-08-28T10:00:00Z",
         category: { slug: "integrations", name: "Integrations" },
@@ -335,6 +354,44 @@ const DEFAULT_POPULAR_ARTICLES: HelpArticle[] = [
             sections: [
                 { heading: "Integrations", body: "Automatically capture incoming leads from Facebook and Instagram lead ads." },
                 { heading: "Steps", items: ["Go to Settings > Integrations.", "Select Meta Lead Ads and click Connect.", "Authorize permissions and map form fields to project lead fields.", "Submit a test lead to verify."] }
+            ]
+        }
+    },
+    {
+        id: "art-7",
+        slug: "manage-team-roles-permissions",
+        title: "Manage Team Roles & Permissions",
+        summary: "Invite team members and configure role-based access for estimates and projects.",
+        readMinutes: 4,
+        helpfulYes: 0,
+        helpfulNo: 0,
+        popular: true,
+        updatedAt: "2026-08-28T10:00:00Z",
+        category: { slug: "team-permissions", name: "Team & Permissions" },
+        content: {
+            shortAnswer: "Invite team members and configure role-based access for estimates and projects.",
+            sections: [
+                { heading: "Roles & Permissions", body: "Manage user permissions across workspace modules." },
+                { heading: "Steps", items: ["Navigate to Team & Permissions.", "Click 'Invite User'.", "Enter email and select role (Admin, Estimator, Viewer).", "Send invite to grant immediate access."] }
+            ]
+        }
+    },
+    {
+        id: "art-8",
+        slug: "upgrade-your-subscription-plan",
+        title: "Upgrade Your Subscription Plan",
+        summary: "Choose the right plan for your business and manage payment methods and billing intervals.",
+        readMinutes: 4,
+        helpfulYes: 0,
+        helpfulNo: 0,
+        popular: true,
+        updatedAt: "2026-08-28T10:00:00Z",
+        category: { slug: "account-billing", name: "Account & Billing" },
+        content: {
+            shortAnswer: "Choose the right plan for your business and manage payment methods and billing intervals.",
+            sections: [
+                { heading: "Billing & Plans", body: "Switch plans, update payment methods, and download invoices." },
+                { heading: "Steps", items: ["Open Settings > Billing.", "Compare Starter, Professional, and Enterprise plans.", "Click 'Upgrade Plan' to confirm your selection."] }
             ]
         }
     },
@@ -390,16 +447,6 @@ export default function HelpPage() {
         }
         void loadTickets();
     };
-
-    // New Ticket Form State (Fallback)
-    const [newTicketForm, setNewTicketForm] = useState<SupportTicketInput>({
-        issueType: "Technical Issue",
-        subject: "",
-        description: "",
-        priority: "normal",
-        status: "open",
-    });
-    const [creatingTicket, setCreatingTicket] = useState(false);
 
     // Reply Form State
     const [replyText, setReplyText] = useState("");
@@ -539,40 +586,6 @@ export default function HelpPage() {
         }
     };
 
-    // Create Ticket
-    const handleCreateTicket = async (e: FormEvent) => {
-        e.preventDefault();
-        if (!newTicketForm.issueType || !newTicketForm.subject.trim() || !newTicketForm.description.trim()) {
-            showNotice("Please fill in all required fields", "error");
-            return;
-        }
-
-        setCreatingTicket(true);
-        try {
-            const created = await createSupportTicket({
-                issueType: newTicketForm.issueType.trim(),
-                subject: newTicketForm.subject.trim(),
-                description: newTicketForm.description.trim(),
-                priority: newTicketForm.priority || "normal",
-                status: "open",
-            });
-            showNotice(`Support ticket ${created.ticketNumber || created.ticket_number || ""} created successfully!`);
-            setNewTicketForm({
-                issueType: "Technical Issue",
-                subject: "",
-                description: "",
-                priority: "normal",
-                status: "open",
-            });
-            setView("tickets");
-            void loadTickets();
-        } catch (err: any) {
-            showNotice(err.message || "Could not create ticket", "error");
-        } finally {
-            setCreatingTicket(false);
-        }
-    };
-
     // Update Ticket Status
     const handleUpdateTicketStatus = async (ticketId: string, status: SupportTicket["status"]) => {
         try {
@@ -605,31 +618,43 @@ export default function HelpPage() {
 
     // Calculate articles per category dynamically from the real dataset
     const categoriesWithCounts = useMemo(() => {
-        return (helpData?.categories ?? []).map((category) => {
-            const realCount = (helpData?.articles ?? []).filter((a) => {
+        const categories = helpData?.categories && helpData.categories.length > 0
+            ? helpData.categories
+            : DEFAULT_CATEGORIES;
+        const articles = helpData?.articles && helpData.articles.length > 0
+            ? helpData.articles
+            : DEFAULT_POPULAR_ARTICLES;
+
+        return categories.map((category) => {
+            const realCount = articles.filter((a) => {
                 const catInfo = getArticleCategory(a);
                 if (catInfo?.slug === category.slug) return true;
                 if (a.categoryId === category.id || a.category_id === category.id) return true;
                 return false;
             }).length;
+
             return {
                 ...category,
-                articleCount: realCount,
+                articleCount: realCount > 0 ? realCount : (category as any).articleCount || 0,
             };
         });
     }, [helpData]);
 
     // Popular articles (flagged popular or top articles)
     const popularArticles = useMemo(() => {
-        return helpData?.articles ?? [];
+        if (helpData?.articles && helpData.articles.length > 0) {
+            return helpData.articles;
+        }
+        return DEFAULT_POPULAR_ARTICLES;
     }, [helpData]);
 
     // Filtered articles for All Articles view
     const filteredArticles = useMemo(() => {
-        if (!helpData?.articles) return [];
-        let list = helpData.articles;
+        const list = helpData?.articles && helpData.articles.length > 0
+            ? helpData.articles
+            : DEFAULT_POPULAR_ARTICLES;
         if (selectedCategory) {
-            list = list.filter((a) => {
+            return list.filter((a) => {
                 const cat = getArticleCategory(a);
                 return cat?.slug === selectedCategory;
             });
@@ -637,24 +662,30 @@ export default function HelpPage() {
         return list;
     }, [helpData, selectedCategory]);
 
+    // Search results
+    const searchResults = useMemo(() => {
+        if (!searchQuery.trim()) return [];
+        if (helpData?.articles && helpData.articles.length > 0) {
+            return helpData.articles;
+        }
+        // Fallback filter over default articles
+        const q = searchQuery.toLowerCase().trim();
+        return DEFAULT_POPULAR_ARTICLES.filter((a) =>
+            a.title.toLowerCase().includes(q) ||
+            (a.summary?.toLowerCase() || "").includes(q)
+        );
+    }, [searchQuery, helpData]);
+
     // Filtered tickets
     const filteredTickets = useMemo(() => {
         if (ticketFilter === "all") return tickets;
         return tickets.filter((t) => t.status === ticketFilter);
     }, [tickets, ticketFilter]);
 
-    // Related articles for detail view
-    const relatedArticles = useMemo(() => {
-        if (!selectedArticle || !helpData?.articles) return [];
-        const currentCat = getArticleCategory(selectedArticle);
-        if (!currentCat) return [];
-        return helpData.articles
-            .filter((a) => a.slug !== selectedArticle.slug && getArticleCategory(a)?.slug === currentCat.slug)
-            .slice(0, 3);
-    }, [selectedArticle, helpData]);
-
     return (
         <main className="fig-dashboard boq-dashboard help-page">
+            {/* Top gradient glow matching Figma Rectangle 14 */}
+            <div className="help-gradient-glow" />
             <div className="fig-dashboard-glow" />
             <DashboardRail current="/help" />
 
@@ -688,7 +719,7 @@ export default function HelpPage() {
                     {/* View: Help Center Main */}
                     {view === "center" && (
                         <>
-                            {/* Hero Area */}
+                            {/* Section 1: Intro Header & Buttons (Frame 2147225066) */}
                             <div className="help-hero">
                                 <div className="help-hero-text">
                                     <h2>How Can We Help You Today?</h2>
@@ -699,50 +730,61 @@ export default function HelpPage() {
                                         type="button"
                                         className="btn-view-ticket"
                                         onClick={() => {
-                                             setView("tickets");
-                                             void loadTickets();
-                                         }}
-                                     >
-                                         <Ticket size={15} />
-                                         <span>View My Ticket</span>
-                                     </button>
-                                     <button
-                                         type="button"
-                                         className="btn-raise-ticket"
-                                         onClick={() => handleOpenNewTicket()}
-                                     >
-                                         <Plus size={15} />
-                                         <span>Raise a Ticket</span>
-                                     </button>
-                                 </div>
-                            </div>
-
-                            {/* Global Help Search */}
-                            <div className="help-global-search">
-                                <Search size={17} className="search-icon" />
-                                <input
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Search questions, features, error messages, or topics"
-                                />
-                                {searchQuery && (
+                                            setView("tickets");
+                                            void loadTickets();
+                                        }}
+                                    >
+                                        <Ticket size={20} color="#0F172A" />
+                                        <span>View My Ticket</span>
+                                    </button>
                                     <button
                                         type="button"
-                                        className="clear-btn"
-                                        onClick={() => setSearchQuery("")}
-                                        aria-label="Clear search"
+                                        className="btn-raise-ticket"
+                                        onClick={() => handleOpenNewTicket()}
                                     >
-                                        <X size={16} />
+                                        <Plus size={20} color="#FFFFFF" />
+                                        <span>Raise a Ticket</span>
                                     </button>
-                                )}
+                                </div>
                             </div>
 
-                            {/* Search Results Display */}
+                            {/* Section 2: Knowledge-Base Search (Frame 2147225073) */}
+                            <div className="help-search-container">
+                                <div className="help-global-search">
+                                    <Search size={20} className="search-icon" />
+                                    <input
+                                        type="text"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter" && searchResults.length > 0) {
+                                                void handleSelectArticle(searchResults[0]);
+                                            }
+                                        }}
+                                        placeholder="Search questions, features, error messages, or topics"
+                                        aria-label="Search questions, features, error messages, or topics"
+                                    />
+                                    {loadingHelp && searchQuery.trim() !== "" && (
+                                        <Loader2 size={16} className="spin" style={{ color: "#2563EB", marginRight: "4px" }} />
+                                    )}
+                                    {searchQuery && (
+                                        <button
+                                            type="button"
+                                            className="clear-btn"
+                                            onClick={() => setSearchQuery("")}
+                                            aria-label="Clear search"
+                                        >
+                                            <X size={18} />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Live Search Results Display */}
                             {searchQuery.trim() !== "" ? (
-                                <div className="help-section">
-                                    <div className="help-section-header">
-                                        <h3>Search Results ({helpData?.articles.length || 0})</h3>
+                                <div className="help-popular-container">
+                                    <div className="help-popular-header">
+                                        <h3>SEARCH RESULTS ({searchResults.length})</h3>
                                         <button
                                             type="button"
                                             className="section-action-btn"
@@ -754,22 +796,39 @@ export default function HelpPage() {
 
                                     {loadingHelp ? (
                                         <HelpSkeleton />
-                                    ) : (helpData?.articles || []).length === 0 ? (
-                                        <div className="empty-state">
-                                            <Search size={44} />
-                                            <h3>No articles found</h3>
-                                            <p>We couldn&apos;t find any articles matching &ldquo;{searchQuery}&rdquo;</p>
-                                            <button
-                                                type="button"
-                                                className="btn-raise-ticket"
-                                                onClick={() => handleOpenNewTicket()}
-                                            >
-                                                <Plus size={16} /> Raise a Support Ticket
-                                            </button>
+                                    ) : searchResults.length === 0 ? (
+                                        <div className="empty-state" style={{ width: "100%", padding: "40px 20px" }}>
+                                            <Search size={44} style={{ color: "#64748B", opacity: 0.7 }} />
+                                            <h3 style={{ fontFamily: "Urbanist", fontWeight: 600, fontSize: "18px", color: "#0F172A", margin: "12px 0 6px" }}>
+                                                No articles match your search
+                                            </h3>
+                                            <p style={{ fontFamily: "Urbanist", fontSize: "14px", color: "#64748B", margin: "0 0 20px", maxWidth: "420px" }}>
+                                                We couldn&apos;t find any articles matching &ldquo;{searchQuery}&rdquo;. Try using different keywords, browse by product area, or reach out to our support team.
+                                            </p>
+                                            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", justifyContent: "center" }}>
+                                                <button
+                                                    type="button"
+                                                    className="btn-view-ticket"
+                                                    onClick={() => {
+                                                        setSearchQuery("");
+                                                        setSelectedCategory(null);
+                                                        setView("articles");
+                                                    }}
+                                                >
+                                                    Browse All Articles
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="btn-raise-ticket"
+                                                    onClick={() => handleOpenNewTicket()}
+                                                >
+                                                    <Plus size={16} /> Raise a Ticket
+                                                </button>
+                                            </div>
                                         </div>
                                     ) : (
                                         <div className="popular-articles-grid">
-                                            {helpData?.articles.map((article) => (
+                                            {searchResults.map((article) => (
                                                 <ArticleCard
                                                     key={article.id}
                                                     article={article}
@@ -781,7 +840,7 @@ export default function HelpPage() {
                                 </div>
                             ) : (
                                 <>
-                                    {/* POPULAR ARTICLES */}
+                                    {/* Section 3: Popular Articles (Frame 2147225477) */}
                                     <div className="help-popular-container">
                                         <div className="help-popular-header">
                                             <h3>POPULAR ARTICLES</h3>
@@ -800,10 +859,12 @@ export default function HelpPage() {
                                         {loadingHelp && popularArticles.length === 0 ? (
                                             <HelpSkeleton />
                                         ) : helpError && popularArticles.length === 0 ? (
-                                            <div className="empty-state">
-                                                <AlertCircle size={40} />
-                                                <h3>Unable to load articles</h3>
-                                                <p>{helpError}</p>
+                                            <div className="empty-state" style={{ width: "100%", padding: "40px 20px" }}>
+                                                <AlertCircle size={40} style={{ color: "#EF4444" }} />
+                                                <h3 style={{ fontFamily: "Urbanist", fontWeight: 600, fontSize: "18px", color: "#0F172A", margin: "12px 0 6px" }}>
+                                                    Unable to load articles
+                                                </h3>
+                                                <p style={{ fontFamily: "Urbanist", fontSize: "14px", color: "#64748B", margin: "0 0 16px" }}>{helpError}</p>
                                                 <button
                                                     type="button"
                                                     className="section-action-btn"
@@ -825,7 +886,7 @@ export default function HelpPage() {
                                         )}
                                     </div>
 
-                                    {/* BROWSE BY PRODUCT AREA */}
+                                    {/* Section 4: Browse by Product Area (Frame 2147225478) */}
                                     <div className="help-categories-section">
                                         <div className="help-categories-header">
                                             <h3>BROWSE BY PRODUCT AREA</h3>
@@ -853,16 +914,26 @@ export default function HelpPage() {
                                                             setSelectedCategory(cat.slug);
                                                             setView("articles");
                                                         }}
+                                                        role="button"
+                                                        tabIndex={0}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === "Enter" || e.key === " ") {
+                                                                setSelectedCategory(cat.slug);
+                                                                setView("articles");
+                                                            }
+                                                        }}
                                                     >
                                                         <div className="category-icon-box">
                                                             {getCategoryIcon(cat.slug)}
                                                         </div>
                                                         <div className="category-info">
-                                                            <h4>{cat.name}</h4>
-                                                            <p>{cat.description}</p>
+                                                            <div className="category-text-block">
+                                                                <h4>{cat.name}</h4>
+                                                                <p>{cat.description}</p>
+                                                            </div>
                                                             <span className="category-count-link">
                                                                 {cat.articleCount} {cat.articleCount === 1 ? "Article" : "Articles"}
-                                                                <ChevronRight size={12} />
+                                                                <ChevronRight size={14} />
                                                             </span>
                                                         </div>
                                                     </div>
@@ -871,11 +942,11 @@ export default function HelpPage() {
                                         )}
                                     </div>
 
-                                    {/* SUPPORT CTA */}
+                                    {/* Section 5: Bottom Support CTA / Need a Human? (Frame 2147225027) */}
                                     <div className="help-support-cta">
                                         <div className="cta-watermark">?</div>
                                         <div className="cta-content">
-                                            <span className="cta-tag">Need a Human?</span>
+                                            <span className="cta-tag">NEED A HUMAN?</span>
                                             <h3>Can&apos;t find what you need?</h3>
                                             <p>Our team will review your issue and respond according to your support plan.</p>
                                         </div>
@@ -885,7 +956,7 @@ export default function HelpPage() {
                                             onClick={() => handleOpenNewTicket()}
                                         >
                                             <span>Raise a Support Ticket</span>
-                                            <ChevronRight size={14} />
+                                            <ChevronRight size={18} />
                                         </button>
                                     </div>
                                 </>
@@ -908,38 +979,44 @@ export default function HelpPage() {
                                 <div className="help-hero-text">
                                     <h2>
                                         {selectedCategory
-                                            ? helpData?.categories.find((c) => c.slug === selectedCategory)?.name || "Articles"
-                                            : "All Help Articles"}
+                                            ? categoriesWithCounts.find((c) => c.slug === selectedCategory)?.name || "Category Articles"
+                                            : "All Knowledge-Base Articles"}
                                     </h2>
                                     <p>Browse guides, tutorials, and frequently asked questions.</p>
                                 </div>
-                                <button
-                                    type="button"
-                                    className="btn-raise-ticket"
-                                    onClick={() => handleOpenNewTicket()}
-                                >
-                                    <Plus size={16} /> Raise a Ticket
-                                </button>
-                            </div>
-
-                            {/* Search */}
-                            <div className="help-global-search">
-                                <Search size={20} className="search-icon" />
-                                <input
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Search within articles..."
-                                />
-                                {searchQuery && (
+                                <div className="help-hero-actions">
                                     <button
                                         type="button"
-                                        className="clear-btn"
-                                        onClick={() => setSearchQuery("")}
+                                        className="btn-raise-ticket"
+                                        onClick={() => handleOpenNewTicket()}
                                     >
-                                        <X size={16} />
+                                        <Plus size={18} /> Raise a Ticket
                                     </button>
-                                )}
+                                </div>
+                            </div>
+
+                            {/* Search Within Articles */}
+                            <div className="help-search-container">
+                                <div className="help-global-search">
+                                    <Search size={20} className="search-icon" />
+                                    <input
+                                        type="text"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        placeholder="Search within articles..."
+                                        aria-label="Search within articles"
+                                    />
+                                    {searchQuery && (
+                                        <button
+                                            type="button"
+                                            className="clear-btn"
+                                            onClick={() => setSearchQuery("")}
+                                            aria-label="Clear search"
+                                        >
+                                            <X size={18} />
+                                        </button>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Category Filter Pills */}
@@ -949,7 +1026,7 @@ export default function HelpPage() {
                                     className={`category-pill ${!selectedCategory ? "active" : ""}`}
                                     onClick={() => setSelectedCategory(null)}
                                 >
-                                    All ({helpData?.articles.length || 0})
+                                    All Articles ({popularArticles.length})
                                 </button>
                                 {categoriesWithCounts.map((cat) => (
                                     <button
@@ -967,10 +1044,24 @@ export default function HelpPage() {
                             {loadingHelp ? (
                                 <HelpSkeleton />
                             ) : filteredArticles.length === 0 ? (
-                                <div className="empty-state">
-                                    <FileText size={44} />
-                                    <h3>No articles found</h3>
-                                    <p>No articles match your current filter or search criteria.</p>
+                                <div className="empty-state" style={{ width: "100%", padding: "40px 20px" }}>
+                                    <FileText size={44} style={{ color: "#64748B", opacity: 0.7 }} />
+                                    <h3 style={{ fontFamily: "Urbanist", fontWeight: 600, fontSize: "18px", color: "#0F172A", margin: "12px 0 6px" }}>
+                                        No articles found
+                                    </h3>
+                                    <p style={{ fontFamily: "Urbanist", fontSize: "14px", color: "#64748B", margin: "0 0 20px" }}>
+                                        No articles match your current filter or search criteria.
+                                    </p>
+                                    <button
+                                        type="button"
+                                        className="btn-view-ticket"
+                                        onClick={() => {
+                                            setSelectedCategory(null);
+                                            setSearchQuery("");
+                                        }}
+                                    >
+                                        Reset Filters
+                                    </button>
                                 </div>
                             ) : (
                                 <div className="popular-articles-grid">
@@ -989,14 +1080,13 @@ export default function HelpPage() {
                     {/* View: Article Detail */}
                     {view === "article" && selectedArticle && (
                         <div className="article-view">
-                            {/* Back to Help Centre */}
                             <button
                                 type="button"
                                 className="article-back-link"
                                 onClick={() => setView("center")}
                             >
                                 <ArrowLeft size={16} />
-                                <span>Back to Help Centre</span>
+                                <span>Back to Help Center</span>
                             </button>
 
                             {/* Card 1: Article Header Card */}
@@ -1009,8 +1099,12 @@ export default function HelpPage() {
                                 <h1 className="article-header-title">{selectedArticle.title}</h1>
                                 <div className="article-header-meta">
                                     <span>Updated {formatArticleDate(selectedArticle.updatedAt || selectedArticle.updated_at)}</span>
-                                    <span className="meta-dot">·</span>
-                                    <span>{getReadMinutes(selectedArticle)} min read</span>
+                                    {getReadMinutes(selectedArticle) !== null && (
+                                        <>
+                                            <span className="meta-dot">·</span>
+                                            <span>{getReadMinutes(selectedArticle)} min read</span>
+                                        </>
+                                    )}
                                     {getHelpfulPercentage(selectedArticle) !== null && (
                                         <>
                                             <span className="meta-dot">·</span>
@@ -1031,9 +1125,9 @@ export default function HelpPage() {
                             {/* Card 3: Main Article Body Card */}
                             <div className="article-body-card">
                                 {loadingArticle ? (
-                                    <div style={{ padding: "32px 20px", textAlign: "center", color: "#64748b" }}>
-                                        <Loader2 size={24} className="spin" style={{ margin: "0 auto 10px" }} />
-                                        <p style={{ fontSize: "13px" }}>Loading article details...</p>
+                                    <div style={{ padding: "32px 20px", textAlign: "center", color: "#64748B" }}>
+                                        <Loader2 size={24} className="spin" style={{ margin: "0 auto 10px", color: "#2563EB" }} />
+                                        <p style={{ fontSize: "14px", fontFamily: "Urbanist" }}>Loading article details...</p>
                                     </div>
                                 ) : (
                                     <ArticleContentRenderer
@@ -1067,7 +1161,7 @@ export default function HelpPage() {
                                     </button>
                                 </div>
                                 {articleFeedbackGiven && (
-                                    <span className="feedback-thanks">
+                                    <span style={{ fontSize: "13px", fontWeight: "600", color: "#16A34A" }}>
                                         ✓ Feedback recorded. Thank you!
                                     </span>
                                 )}
@@ -1078,7 +1172,7 @@ export default function HelpPage() {
                                 <span className="cta-watermark">?</span>
                                 <div className="cta-content">
                                     <h3>Still need help?</h3>
-                                    <p>Carry this article into a support ticket so you don't have to repeat yourself.</p>
+                                    <p>Carry this article into a support ticket so you don&apos;t have to repeat yourself.</p>
                                 </div>
                                 <button
                                     type="button"
@@ -1086,7 +1180,7 @@ export default function HelpPage() {
                                     onClick={() => handleRaiseTicketFromArticle(selectedArticle)}
                                 >
                                     <span>Raise a Ticket</span>
-                                    <ChevronRight size={15} />
+                                    <ChevronRight size={16} />
                                 </button>
                             </div>
                         </div>
@@ -1106,7 +1200,7 @@ export default function HelpPage() {
                             <div className="tickets-header">
                                 <div>
                                     <h2>Support Tickets</h2>
-                                    <p style={{ color: "#64748b", fontSize: "13px", margin: "4px 0 0" }}>
+                                    <p style={{ color: "#64748B", fontSize: "14px", margin: "4px 0 0", fontFamily: "Urbanist" }}>
                                         Track and manage your requests to our support team.
                                     </p>
                                 </div>
@@ -1115,12 +1209,12 @@ export default function HelpPage() {
                                     className="btn-raise-ticket"
                                     onClick={() => handleOpenNewTicket()}
                                 >
-                                    <Plus size={16} /> Raise a Ticket
+                                    <Plus size={18} /> Raise a Ticket
                                 </button>
                             </div>
 
                             {/* Status Filter Pills */}
-                            <div className="category-pills" style={{ marginTop: "8px" }}>
+                            <div className="category-pills">
                                 {["all", "open", "in_progress", "waiting_on_user", "resolved", "closed"].map((s) => (
                                     <button
                                         key={s}
@@ -1128,7 +1222,7 @@ export default function HelpPage() {
                                         className={`category-pill ${ticketFilter === s ? "active" : ""}`}
                                         onClick={() => setTicketFilter(s)}
                                     >
-                                        {s === "all" ? "All Tickets" : statusConfig[s]?.label || s}
+                                        {s === "all" ? `All Tickets (${tickets.length})` : `${statusConfig[s]?.label || s} (${tickets.filter((t) => t.status === s).length})`}
                                     </button>
                                 ))}
                             </div>
@@ -1136,10 +1230,12 @@ export default function HelpPage() {
                             {loadingTickets ? (
                                 <HelpSkeleton />
                             ) : ticketsError ? (
-                                <div className="empty-state">
-                                    <AlertCircle size={44} />
-                                    <h3>Couldn&apos;t load tickets</h3>
-                                    <p>{ticketsError}</p>
+                                <div className="empty-state" style={{ width: "100%", padding: "40px 20px" }}>
+                                    <AlertCircle size={44} style={{ color: "#EF4444" }} />
+                                    <h3 style={{ fontFamily: "Urbanist", fontWeight: 600, fontSize: "18px", color: "#0F172A", margin: "12px 0 6px" }}>
+                                        Couldn&apos;t load tickets
+                                    </h3>
+                                    <p style={{ fontFamily: "Urbanist", fontSize: "14px", color: "#64748B", margin: "0 0 16px" }}>{ticketsError}</p>
                                     <button
                                         type="button"
                                         className="btn-view-ticket"
@@ -1149,10 +1245,12 @@ export default function HelpPage() {
                                     </button>
                                 </div>
                             ) : filteredTickets.length === 0 ? (
-                                <div className="empty-state">
-                                    <Ticket size={48} />
-                                    <h3>No tickets found</h3>
-                                    <p>
+                                <div className="empty-state" style={{ width: "100%", padding: "48px 20px" }}>
+                                    <Ticket size={48} style={{ color: "#64748B", opacity: 0.6 }} />
+                                    <h3 style={{ fontFamily: "Urbanist", fontWeight: 600, fontSize: "18px", color: "#0F172A", margin: "12px 0 6px" }}>
+                                        No tickets found
+                                    </h3>
+                                    <p style={{ fontFamily: "Urbanist", fontSize: "14px", color: "#64748B", margin: "0 0 20px", maxWidth: "420px" }}>
                                         {ticketFilter === "all"
                                             ? "You haven't created any support tickets yet."
                                             : `No tickets with status "${statusConfig[ticketFilter]?.label || ticketFilter}".`}
@@ -1166,7 +1264,7 @@ export default function HelpPage() {
                                     </button>
                                 </div>
                             ) : (
-                                <div className="tickets-table-wrap" style={{ background: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
+                                <div className="tickets-table-wrap">
                                     <table className="tickets-table">
                                         <thead>
                                             <tr>
@@ -1189,7 +1287,6 @@ export default function HelpPage() {
                                                 return (
                                                     <tr
                                                         key={ticket.id}
-                                                        style={{ cursor: "pointer" }}
                                                         onClick={() => {
                                                             if (ticket.status === "draft") {
                                                                 handleResumeDraftTicket(ticket);
@@ -1201,8 +1298,8 @@ export default function HelpPage() {
                                                         <td>
                                                             <span className="ticket-number">{ticketNum}</span>
                                                         </td>
-                                                        <td style={{ fontWeight: "600" }}>{ticket.subject}</td>
-                                                        <td>{issueType}</td>
+                                                        <td style={{ fontWeight: "600", color: "#0F172A" }}>{ticket.subject}</td>
+                                                        <td style={{ color: "#475569" }}>{issueType}</td>
                                                         <td>
                                                             <span
                                                                 className="priority-badge"
@@ -1225,7 +1322,7 @@ export default function HelpPage() {
                                                                 {statusConfig[status]?.label || status}
                                                             </span>
                                                         </td>
-                                                        <td style={{ fontSize: "12px", color: "#64748b" }}>
+                                                        <td style={{ fontSize: "12px", color: "#64748B" }}>
                                                             {formatDate(updated)}
                                                         </td>
                                                     </tr>
@@ -1235,38 +1332,6 @@ export default function HelpPage() {
                                     </table>
                                 </div>
                             )}
-                        </div>
-                    )}
-
-                    {/* View: Raise a Ticket */}
-                    {view === "new-ticket" && (
-                        <div style={{ maxWidth: "680px", margin: "40px auto", textAlign: "center" }}>
-                            <button
-                                type="button"
-                                className="help-back-btn"
-                                onClick={() => setView("center")}
-                            >
-                                <ChevronLeft size={16} /> Back to Help Center
-                            </button>
-                            <div style={{ background: "#ffffff", padding: "36px 32px", borderRadius: "14px", border: "1px solid #e2e8f0", marginTop: "16px", boxShadow: "0 4px 20px rgba(0,0,0,0.04)" }}>
-                                <h3 style={{ fontSize: "18px", fontWeight: "700", color: "#0f172a", margin: "0 0 8px" }}>
-                                    Guided Ticket Assistant
-                                </h3>
-                                <p style={{ color: "#64748b", fontSize: "14px", margin: "0 0 24px" }}>
-                                    Submit your support ticket or save a draft using our step-by-step slide-over assistant.
-                                </p>
-                                <button
-                                    type="button"
-                                    className="btn-primary"
-                                    style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "11px 22px" }}
-                                    onClick={() => {
-                                        setView("center");
-                                        handleOpenNewTicket();
-                                    }}
-                                >
-                                    <Plus size={16} /> Open Ticket Wizard
-                                </button>
-                            </div>
                         </div>
                     )}
 
@@ -1286,10 +1351,11 @@ export default function HelpPage() {
 
                             <div
                                 style={{
-                                    background: "#ffffff",
+                                    background: "#FFFFFF",
                                     borderRadius: "14px",
-                                    border: "1px solid #e2e8f0",
+                                    border: "1px solid #E2E8F0",
                                     padding: "24px",
+                                    boxShadow: "0px 0px 6px rgba(0, 0, 0, 0.06)",
                                     display: "flex",
                                     flexDirection: "column",
                                     gap: "20px",
@@ -1302,26 +1368,26 @@ export default function HelpPage() {
                                             alignItems: "center",
                                             justifyContent: "space-between",
                                             padding: "14px 18px",
-                                            background: "#eff6ff",
-                                            border: "1px solid #bfdbfe",
+                                            background: "#EFF6FF",
+                                            border: "1px solid #BFDBFE",
                                             borderRadius: "10px",
                                         }}
                                     >
                                         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                            <Bookmark size={18} color="#2563eb" />
+                                            <Bookmark size={18} color="#2563EB" />
                                             <div>
-                                                <strong style={{ fontSize: "13.5px", color: "#1e40af" }}>
+                                                <strong style={{ fontSize: "13.5px", color: "#1E40AF" }}>
                                                     This ticket is currently saved as a draft.
                                                 </strong>
-                                                <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#3b82f6" }}>
+                                                <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#3B82F6" }}>
                                                     You can resume the 7-step wizard to finish and submit your ticket.
                                                 </p>
                                             </div>
                                         </div>
                                         <button
                                             type="button"
-                                            className="ticket-drawer-btn-continue"
-                                            style={{ padding: "8px 16px", fontSize: "12.5px" }}
+                                            className="section-action-btn"
+                                            style={{ padding: "8px 16px", height: "36px", fontSize: "13px" }}
                                             onClick={() => handleResumeDraftTicket(selectedTicket)}
                                         >
                                             Resume Wizard <ChevronRight size={14} />
@@ -1371,7 +1437,7 @@ export default function HelpPage() {
                                 </div>
 
                                 <div className="ticket-description">
-                                    <h4 style={{ margin: "0 0 8px", fontSize: "14px", fontWeight: "600", color: "#1e293b" }}>
+                                    <h4 style={{ margin: "0 0 8px", fontSize: "14px", fontWeight: "600", color: "#0F172A" }}>
                                         Description
                                     </h4>
                                     <p style={{ margin: 0, fontSize: "14px", color: "#475569", lineHeight: "1.6" }}>
@@ -1380,11 +1446,11 @@ export default function HelpPage() {
                                 </div>
 
                                 {/* Status Update Buttons */}
-                                <div className="ticket-status-actions" style={{ paddingTop: "12px", borderTop: "1px solid #f1f5f9" }}>
-                                    <label style={{ fontSize: "12px", fontWeight: "600", color: "#64748b" }}>
-                                        Update Status:
+                                <div style={{ paddingTop: "14px", borderTop: "1px solid #F1F5F9" }}>
+                                    <label style={{ fontSize: "13px", fontWeight: "600", color: "#64748B", display: "block", marginBottom: "8px" }}>
+                                        Update Ticket Status:
                                     </label>
-                                    <div className="status-buttons" style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "8px" }}>
+                                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                                         {(["open", "in_progress", "waiting_on_user", "resolved", "closed"] as const).map((s) => (
                                             <button
                                                 key={s}
@@ -1400,13 +1466,13 @@ export default function HelpPage() {
 
                                 {/* Conversation Thread */}
                                 <div className="ticket-messages">
-                                    <h4 style={{ margin: "0 0 16px", fontSize: "15px", fontWeight: "600", color: "#1e293b" }}>
+                                    <h4 style={{ margin: "10px 0 4px", fontSize: "15px", fontWeight: "600", color: "#0F172A" }}>
                                         Conversation History ({ticketMessages.length})
                                     </h4>
 
                                     {loadingMessages ? (
-                                        <div style={{ padding: "24px", textAlign: "center", color: "#64748b" }}>
-                                            <Loader2 size={20} className="spin" style={{ margin: "0 auto 8px" }} />
+                                        <div style={{ padding: "24px", textAlign: "center", color: "#64748B" }}>
+                                            <Loader2 size={20} className="spin" style={{ margin: "0 auto 8px", color: "#2563EB" }} />
                                             <span>Loading messages...</span>
                                         </div>
                                     ) : (
@@ -1425,7 +1491,7 @@ export default function HelpPage() {
                                                 </div>
                                             ))}
                                             {ticketMessages.length === 0 && (
-                                                <p className="no-messages" style={{ color: "#64748b", fontSize: "13px" }}>
+                                                <p style={{ color: "#64748B", fontSize: "13px", padding: "16px 0", margin: 0 }}>
                                                     No messages yet. Send a reply below.
                                                 </p>
                                             )}
@@ -1433,7 +1499,7 @@ export default function HelpPage() {
                                     )}
 
                                     {/* Reply Box */}
-                                    <div className="reply-form" style={{ marginTop: "16px" }}>
+                                    <div className="reply-form" style={{ marginTop: "8px" }}>
                                         <textarea
                                             value={replyText}
                                             onChange={(e) => setReplyText(e.target.value)}
@@ -1441,15 +1507,18 @@ export default function HelpPage() {
                                             rows={3}
                                             className="reply-input"
                                         />
-                                        <button
-                                            type="button"
-                                            className="btn-primary"
-                                            onClick={() => void handleSendReply()}
-                                            disabled={sendingReply || !replyText.trim()}
-                                        >
-                                            {sendingReply ? <Loader2 size={16} className="spin" /> : <Send size={16} />}
-                                            <span>Send Reply</span>
-                                        </button>
+                                        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                                            <button
+                                                type="button"
+                                                className="btn-raise-ticket"
+                                                style={{ height: "42px", padding: "0 20px" }}
+                                                onClick={() => void handleSendReply()}
+                                                disabled={sendingReply || !replyText.trim()}
+                                            >
+                                                {sendingReply ? <Loader2 size={16} className="spin" /> : <Send size={16} />}
+                                                <span>Send Reply</span>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1465,40 +1534,56 @@ export default function HelpPage() {
                 onTicketCreated={handleTicketCreated}
                 initialData={drawerInitialTicket}
                 initialArticleTitle={drawerArticleTitle}
-                helpArticles={helpData?.articles || []}
+                helpArticles={popularArticles}
             />
         </main>
     );
 }
 
-// ── Article Card Component ───────────────────────────────────────────────────
+// ── Article Card Component (Frame 2147225027) ────────────────────────────────
 
 function ArticleCard({ article, onSelect }: { article: HelpArticle; onSelect: () => void }) {
-    const helpfulPercent = getHelpfulPercentage(article) ?? 96;
-    const readTime = getReadMinutes(article) || 4;
+    const helpfulPercent = getHelpfulPercentage(article);
+    const readTime = getReadMinutes(article);
     const category = getArticleCategory(article);
 
     return (
-        <div className="popular-article-card" onClick={onSelect}>
+        <div
+            className="popular-article-card"
+            onClick={onSelect}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                    onSelect();
+                }
+            }}
+        >
             <div className="card-top">
                 <div className="card-icon-wrap">
-                    <FileText size={14} />
+                    {category ? getCategoryIcon(category.slug) : <FileText size={20} />}
                 </div>
-                <span className="card-helpful-badge">
-                    <ThumbsUp size={11} />
-                    <span>{helpfulPercent}% helpful</span>
-                </span>
+                {helpfulPercent !== null ? (
+                    <span className="card-helpful-badge">
+                        <ThumbsUp size={14} />
+                        <span>{helpfulPercent}% helpful</span>
+                    </span>
+                ) : null}
             </div>
 
-            <h4 className="card-title">{article.title}</h4>
-            <p className="card-desc">{article.summary}</p>
+            <div className="card-middle">
+                <h4 className="card-title">{article.title}</h4>
+                <p className="card-desc">{article.summary}</p>
+            </div>
 
             <div className="card-bottom">
                 <span className="card-category">{category?.name || "BOQs & Costing"}</span>
-                <span className="card-read-time">
-                    <Clock size={11} />
-                    <span>{readTime} min read</span>
-                </span>
+                {readTime !== null ? (
+                    <span className="card-read-time">
+                        <Clock size={14} />
+                        <span>{readTime} min read</span>
+                    </span>
+                ) : null}
             </div>
         </div>
     );
@@ -1508,7 +1593,7 @@ function ArticleCard({ article, onSelect }: { article: HelpArticle; onSelect: ()
 
 function ArticleContentRenderer({ content, summary }: { content?: any; summary?: string | null }) {
     if (!content) {
-        return <p className="article-default-summary">{summary || "No article content available."}</p>;
+        return <p style={{ fontSize: "14px", color: "#475569", lineHeight: "1.6", margin: 0 }}>{summary || "No article content available."}</p>;
     }
 
     // JSON structured format: { shortAnswer, sections: [{ heading, body, items }] }
@@ -1534,7 +1619,7 @@ function ArticleContentRenderer({ content, summary }: { content?: any; summary?:
         }
 
         if (content.body) {
-            return <p className="article-plain-body" style={{ whiteSpace: "pre-wrap" }}>{content.body}</p>;
+            return <p style={{ fontSize: "14px", color: "#475569", lineHeight: "1.6", whiteSpace: "pre-wrap", margin: 0 }}>{content.body}</p>;
         }
     }
 
@@ -1543,10 +1628,10 @@ function ArticleContentRenderer({ content, summary }: { content?: any; summary?:
         if (content.includes("<") && content.includes(">")) {
             return <div className="article-sections-flow" dangerouslySetInnerHTML={{ __html: content }} />;
         }
-        return <p className="article-plain-body" style={{ whiteSpace: "pre-wrap" }}>{content}</p>;
+        return <p style={{ fontSize: "14px", color: "#475569", lineHeight: "1.6", whiteSpace: "pre-wrap", margin: 0 }}>{content}</p>;
     }
 
-    return <p className="article-default-summary">{summary || "No article content available."}</p>;
+    return <p style={{ fontSize: "14px", color: "#475569", lineHeight: "1.6", margin: 0 }}>{summary || "No article content available."}</p>;
 }
 
 // ── Skeleton Loaders ─────────────────────────────────────────────────────────
@@ -1558,20 +1643,29 @@ function HelpSkeleton() {
                 <div
                     key={i}
                     style={{
-                        background: "#ffffff",
-                        borderRadius: "10px",
-                        border: "1px solid #e2e8f0",
-                        padding: "13px 15px",
-                        height: "120px",
+                        background: "#FFFFFF",
+                        borderRadius: "14px",
+                        boxShadow: "0px 0px 6px rgba(0, 0, 0, 0.06)",
+                        padding: "16px",
+                        minHeight: "167px",
                         display: "flex",
                         flexDirection: "column",
-                        gap: "8px",
+                        justifyContent: "space-between",
+                        gap: "16px",
                     }}
                 >
-                    <div style={{ width: "28px", height: "28px", borderRadius: "6px", background: "#f1f5f9" }} />
-                    <div style={{ height: "14px", width: "70%", borderRadius: "4px", background: "#f1f5f9" }} />
-                    <div style={{ height: "11px", width: "90%", borderRadius: "4px", background: "#f8fafc" }} />
-                    <div style={{ height: "10px", width: "40%", marginTop: "auto", borderRadius: "4px", background: "#f1f5f9" }} />
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ width: "40px", height: "40px", borderRadius: "6px", background: "#E4ECFB" }} />
+                        <div style={{ width: "60px", height: "14px", borderRadius: "4px", background: "#F1F5F9" }} />
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        <div style={{ height: "16px", width: "70%", borderRadius: "4px", background: "#F1F5F9" }} />
+                        <div style={{ height: "12px", width: "95%", borderRadius: "4px", background: "#F8FAFC" }} />
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ height: "12px", width: "35%", borderRadius: "4px", background: "#F1F5F9" }} />
+                        <div style={{ height: "12px", width: "25%", borderRadius: "4px", background: "#F1F5F9" }} />
+                    </div>
                 </div>
             ))}
         </div>
@@ -1581,24 +1675,25 @@ function HelpSkeleton() {
 function CategorySkeleton() {
     return (
         <div className="product-categories-grid">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
                 <div
                     key={i}
                     style={{
-                        background: "#ffffff",
-                        borderRadius: "9px",
-                        border: "1px solid #e2e8f0",
-                        padding: "10px 13px",
-                        height: "56px",
+                        background: "#FFFFFF",
+                        borderRadius: "14px",
+                        boxShadow: "0px 0px 6px rgba(0, 0, 0, 0.06)",
+                        padding: "16px",
+                        minHeight: "111px",
                         display: "flex",
-                        alignItems: "center",
-                        gap: "11px",
+                        alignItems: "flex-start",
+                        gap: "16px",
                     }}
                 >
-                    <div style={{ width: "32px", height: "32px", borderRadius: "6px", background: "#f1f5f9", flexShrink: 0 }} />
-                    <div style={{ display: "flex", flexDirection: "column", gap: "6px", flex: 1 }}>
-                        <div style={{ height: "12px", width: "50%", borderRadius: "4px", background: "#f1f5f9" }} />
-                        <div style={{ height: "9px", width: "75%", borderRadius: "4px", background: "#f8fafc" }} />
+                    <div style={{ width: "40px", height: "40px", borderRadius: "6px", background: "#E4ECFB", flexShrink: 0 }} />
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px", flex: 1 }}>
+                        <div style={{ height: "16px", width: "55%", borderRadius: "4px", background: "#F1F5F9" }} />
+                        <div style={{ height: "12px", width: "85%", borderRadius: "4px", background: "#F8FAFC" }} />
+                        <div style={{ height: "12px", width: "30%", marginTop: "4px", borderRadius: "4px", background: "#E4ECFB" }} />
                     </div>
                 </div>
             ))}

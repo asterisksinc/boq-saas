@@ -13,18 +13,18 @@ export default function PasswordSecurityCard({
 }: PasswordSecurityCardProps) {
     if (loading) {
         return (
-            <div className="advanced-card advanced-card-skeleton">
+            <div className="advanced-card advanced-card-skeleton" data-testid="password-card-skeleton">
                 <div className="advanced-card-left">
-                    <div className="skeleton" style={{ width: 100, height: 18, marginBottom: 6, borderRadius: 4 }} />
-                    <div className="skeleton" style={{ width: 180, height: 14, borderRadius: 4 }} />
+                    <div className="skeleton" style={{ width: 80, height: 19, borderRadius: 4 }} />
+                    <div className="skeleton" style={{ width: 164, height: 17, borderRadius: 4 }} />
                 </div>
-                <div className="skeleton" style={{ width: 80, height: 34, borderRadius: 8 }} />
+                <div className="skeleton" style={{ width: 82, height: 34, borderRadius: 6 }} />
             </div>
         );
     }
 
     return (
-        <section className="advanced-card" aria-label="Password Security">
+        <section className="advanced-card" aria-label="Password Security" data-testid="password-security-card">
             <div className="advanced-card-left">
                 <h3 className="advanced-card-title">Password</h3>
                 <p className="advanced-card-subtitle">{lastChangedText}</p>
@@ -33,6 +33,7 @@ export default function PasswordSecurityCard({
                 type="button"
                 className="btn-advanced-action"
                 onClick={onChangePassword}
+                data-testid="change-password-button"
             >
                 Change
             </button>

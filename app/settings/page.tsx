@@ -114,8 +114,13 @@ export default function SettingsPage() {
         if (typeof window !== "undefined") {
             const params = new URLSearchParams(window.location.search);
             const tabParam = params.get("tab") as SettingsTab | null;
+            const sectionParam = params.get("section");
             if (tabParam && ["overview", "profile", "organization", "branding", "boq-costing", "integrations", "notifications", "security", "advanced", "additional"].includes(tabParam)) {
                 handleSelectTab(tabParam);
+            } else if (!tabParam && sectionParam && ["password-2fa", "login-history", "active-sessions"].includes(sectionParam)) {
+                handleSelectTab("advanced");
+            } else if (!tabParam && sectionParam && ["data-export", "data-retention", "delete-account"].includes(sectionParam)) {
+                handleSelectTab("additional");
             }
         }
     }, [loadOverview]);

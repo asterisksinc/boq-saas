@@ -127,17 +127,17 @@ export default function UnitsTable({
     };
 
     return (
-        <div className="boq-content-card">
-            {/* Header: BOQ & Costing + Add Custom Unit */}
+        <div className="boq-content-card boq-units-panel">
+            {/* Header: BOQ & Costing + Add Custom Unit (Frame 2147225545) */}
             <div className="boq-card-header">
                 <h2 className="boq-card-title">BOQ & Costing</h2>
                 <button
                     type="button"
                     onClick={handleOpenAdd}
-                    className="boq-btn-primary"
+                    className="boq-btn-add-unit"
                     disabled={!canEdit}
                 >
-                    <Plus size={16} aria-hidden="true" />
+                    <Plus size={18} strokeWidth={2.5} aria-hidden="true" />
                     <span>Add Custom Unit</span>
                 </button>
             </div>
@@ -150,48 +150,48 @@ export default function UnitsTable({
                     <button
                         type="button"
                         onClick={handleOpenAdd}
-                        className="boq-btn-primary"
+                        className="boq-btn-add-unit"
                         disabled={!canEdit}
                         style={{ marginTop: "14px" }}
                     >
-                        <Plus size={16} aria-hidden="true" />
+                        <Plus size={18} strokeWidth={2.5} aria-hidden="true" />
                         <span>Add Custom Unit</span>
                     </button>
                 </div>
             ) : (
-                /* Table matching Screenshot 1 */
+                /* Table matching Frame 57 & Frame 61 */
                 <div className="boq-table-wrapper" ref={menuRef}>
                     <table className="boq-table" aria-label="Units list">
                         <thead>
-                            <tr>
-                                <th scope="col" style={{ width: "24%" }}>UNIT NAME</th>
-                                <th scope="col" style={{ width: "16%" }}>CODE</th>
-                                <th scope="col" style={{ width: "18%" }}>TYPE</th>
-                                <th scope="col" style={{ width: "16%" }}>DECIMALS</th>
-                                <th scope="col" style={{ width: "16%" }}>ACTIVE</th>
-                                <th scope="col" style={{ width: "10%", textAlign: "right" }} aria-label="Actions" />
+                            <tr className="boq-table-header-row">
+                                <th scope="col" className="boq-th-name">UNIT NAME</th>
+                                <th scope="col" className="boq-th-code">CODE</th>
+                                <th scope="col" className="boq-th-type">TYPE</th>
+                                <th scope="col" className="boq-th-decimals">DECIMALS</th>
+                                <th scope="col" className="boq-th-active">ACTIVE</th>
+                                <th scope="col" className="boq-th-actions" aria-label="Actions" />
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="boq-table-body">
                             {units.map((unit) => {
                                 const isMenuOpen = openMenuId === unit.id;
                                 const isToggling = togglingId === unit.id;
 
                                 return (
                                     <tr key={unit.id} className="boq-table-row">
-                                        <td className="boq-table-cell-name">
+                                        <td className="boq-table-cell boq-table-cell-name">
                                             <span>{unit.name}</span>
                                         </td>
-                                        <td className="boq-table-cell-code">
+                                        <td className="boq-table-cell boq-table-cell-code">
                                             <span>{unit.code}</span>
                                         </td>
-                                        <td className="boq-table-cell-type">
+                                        <td className="boq-table-cell boq-table-cell-type">
                                             <span>{unit.type}</span>
                                         </td>
-                                        <td className="boq-table-cell-decimals">
+                                        <td className="boq-table-cell boq-table-cell-decimals">
                                             <span>{unit.decimals}</span>
                                         </td>
-                                        <td className="boq-table-cell-active">
+                                        <td className="boq-table-cell boq-table-cell-active">
                                             <button
                                                 type="button"
                                                 role="switch"
@@ -208,7 +208,7 @@ export default function UnitsTable({
                                                 </span>
                                             </button>
                                         </td>
-                                        <td className="boq-table-cell-actions" style={{ textAlign: "right", position: "relative" }}>
+                                        <td className="boq-table-cell boq-table-cell-actions">
                                             <button
                                                 type="button"
                                                 className="boq-actions-btn"
@@ -217,7 +217,7 @@ export default function UnitsTable({
                                                 onClick={() => setOpenMenuId(isMenuOpen ? null : unit.id)}
                                                 disabled={!canEdit}
                                             >
-                                                <MoreHorizontal size={18} />
+                                                <MoreHorizontal size={20} />
                                             </button>
 
                                             {isMenuOpen && (

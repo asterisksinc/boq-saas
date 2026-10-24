@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Loader2, X } from "lucide-react";
 import {
     createOrganizationLocation,
@@ -111,18 +112,18 @@ export default function OrganizationLocationModal({
         }
     };
 
-    return (
-        <div className="org-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="loc-modal-title">
-            <div className="org-modal-container">
+    return createPortal(
+        <div className="boq-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="loc-modal-title">
+            <div className="boq-modal-container">
                 {/* Modal Header */}
-                <div className="org-modal-header">
-                    <h3 id="loc-modal-title" className="org-modal-title">
+                <div className="boq-modal-header">
+                    <h6 id="loc-modal-title" className="boq-modal-title">
                         {mode === "create" ? "Add Location" : "Edit Location"}
-                    </h3>
+                    </h6>
                     <button
                         type="button"
                         onClick={onClose}
-                        className="org-modal-close"
+                        className="boq-modal-close"
                         aria-label="Close modal"
                         disabled={submitting}
                     >
@@ -131,18 +132,16 @@ export default function OrganizationLocationModal({
                 </div>
 
                 {/* Modal Form */}
-                <form onSubmit={handleSubmit} noValidate>
-                    <div className="org-modal-body">
+                <form onSubmit={handleSubmit} noValidate className="boq-modal-form">
+                    <div className="boq-modal-inner-card">
                         {/* Row 1: Location Name * | City * */}
-                        <div className="org-modal-grid">
-                            <div className="org-field">
-                                <label htmlFor="locName">
-                                    Location Name <span className="required">*</span>
-                                </label>
+                        <div className="boq-modal-row-2col">
+                            <div className="boq-modal-field">
+                                <div className="boq-modal-label-row"><label htmlFor="locName" className="boq-modal-label">Location Name</label><span className="boq-modal-required">*</span></div>
                                 <input
                                     id="locName"
                                     type="text"
-                                    className={`org-input ${formErrors.name ? "has-error" : ""}`}
+                                    className={`boq-modal-input ${formErrors.name ? "has-error" : ""}`}
                                     value={name}
                                     onChange={(e) => {
                                         setName(e.target.value);
@@ -154,18 +153,16 @@ export default function OrganizationLocationModal({
                                     autoFocus
                                 />
                                 {formErrors.name && (
-                                    <span className="org-field-error" role="alert">{formErrors.name}</span>
+                                    <span className="boq-field-error" role="alert">{formErrors.name}</span>
                                 )}
                             </div>
 
-                            <div className="org-field">
-                                <label htmlFor="locCity">
-                                    City <span className="required">*</span>
-                                </label>
+                            <div className="boq-modal-field">
+                                <div className="boq-modal-label-row"><label htmlFor="locCity" className="boq-modal-label">City</label><span className="boq-modal-required">*</span></div>
                                 <input
                                     id="locCity"
                                     type="text"
-                                    className={`org-input ${formErrors.city ? "has-error" : ""}`}
+                                    className={`boq-modal-input ${formErrors.city ? "has-error" : ""}`}
                                     value={city}
                                     onChange={(e) => {
                                         setCity(e.target.value);
@@ -176,20 +173,18 @@ export default function OrganizationLocationModal({
                                     required
                                 />
                                 {formErrors.city && (
-                                    <span className="org-field-error" role="alert">{formErrors.city}</span>
+                                    <span className="boq-field-error" role="alert">{formErrors.city}</span>
                                 )}
                             </div>
                         </div>
 
                         {/* Row 2: State * */}
-                        <div className="org-field" style={{ marginTop: "14px" }}>
-                            <label htmlFor="locState">
-                                State <span className="required">*</span>
-                            </label>
+                        <div className="boq-modal-field">
+                            <div className="boq-modal-label-row"><label htmlFor="locState" className="boq-modal-label">State</label><span className="boq-modal-required">*</span></div>
                             <input
                                 id="locState"
                                 type="text"
-                                className={`org-input ${formErrors.state ? "has-error" : ""}`}
+                                className={`boq-modal-input ${formErrors.state ? "has-error" : ""}`}
                                 value={state}
                                 onChange={(e) => {
                                     setState(e.target.value);
@@ -200,19 +195,17 @@ export default function OrganizationLocationModal({
                                 required
                             />
                             {formErrors.state && (
-                                <span className="org-field-error" role="alert">{formErrors.state}</span>
+                                <span className="boq-field-error" role="alert">{formErrors.state}</span>
                             )}
                         </div>
 
                         {/* Row 3: Address * */}
-                        <div className="org-field" style={{ marginTop: "14px" }}>
-                            <label htmlFor="locAddress">
-                                Address <span className="required">*</span>
-                            </label>
+                        <div className="boq-modal-field">
+                            <div className="boq-modal-label-row"><label htmlFor="locAddress" className="boq-modal-label">Address</label><span className="boq-modal-required">*</span></div>
                             <input
                                 id="locAddress"
                                 type="text"
-                                className={`org-input ${formErrors.address ? "has-error" : ""}`}
+                                className={`boq-modal-input ${formErrors.address ? "has-error" : ""}`}
                                 value={address}
                                 onChange={(e) => {
                                     setAddress(e.target.value);
@@ -223,24 +216,24 @@ export default function OrganizationLocationModal({
                                 required
                             />
                             {formErrors.address && (
-                                <span className="org-field-error" role="alert">{formErrors.address}</span>
+                                <span className="boq-field-error" role="alert">{formErrors.address}</span>
                             )}
                         </div>
                     </div>
 
                     {/* Modal Footer */}
-                    <div className="org-modal-footer">
+                    <div className="boq-modal-footer">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="org-modal-btn-cancel"
+                            className="boq-modal-btn-cancel"
                             disabled={submitting}
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            className="btn-primary org-modal-btn-submit"
+                            className="boq-modal-btn-submit"
                             disabled={submitting}
                         >
                             {submitting && <Loader2 size={16} className="spin" aria-hidden="true" />}
@@ -249,6 +242,7 @@ export default function OrganizationLocationModal({
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

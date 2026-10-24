@@ -24,9 +24,9 @@ export default function SecurityAccessNavigation({
     onSelectSubTab,
 }: SecurityAccessNavigationProps) {
     return (
-        <aside className="org-subnav-card" aria-label="Security & Access sub-navigation">
-            <div className="org-subnav-header">SELECT MENU</div>
-            <nav className="org-subnav-list" role="tablist">
+        <aside className="security-subnav-card org-subnav-card" aria-label="Security & Access sub-navigation">
+            <div className="security-subnav-header org-subnav-header">SELECT MENU</div>
+            <nav className="security-subnav-list org-subnav-list" role="tablist">
                 {navItems.map((item) => {
                     const isActive = activeSubTab === item.key;
                     return (
@@ -35,11 +35,11 @@ export default function SecurityAccessNavigation({
                             type="button"
                             role="tab"
                             aria-selected={isActive}
-                            className={`org-subnav-item ${isActive ? "is-active" : ""}`}
+                            className={`security-subnav-item org-subnav-item ${isActive ? "is-active" : ""}`}
                             onClick={() => onSelectSubTab(item.key)}
                         >
-                            <span className="org-subnav-label">{item.label}</span>
-                            {isActive && <ChevronRight size={16} className="org-subnav-chevron" aria-hidden="true" />}
+                            <span className="security-subnav-label org-subnav-label">{item.label}</span>
+                            {isActive && <ChevronRight size={18} className="security-subnav-chevron org-subnav-chevron" aria-hidden="true" />}
                         </button>
                     );
                 })}

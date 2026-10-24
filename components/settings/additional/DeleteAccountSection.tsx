@@ -31,16 +31,20 @@ export default function DeleteAccountSection({
     };
 
     return (
-        <div className="additional-main-container" data-testid="delete-account-section">
+        <div className="additional-main-container is-delete-account" data-testid="delete-account-section">
+            {/* Header Frame 2147225544 Title */}
             <div className="additional-section-header">
                 <div className="additional-section-header-left">
                     <h2 className="additional-section-title">Delete Account</h2>
                 </div>
             </div>
 
+            {/* Divider Rectangle 34624165 */}
             <div className="additional-card-divider" />
 
+            {/* Danger Zone Container Frame 2147225547 */}
             <div className="danger-zone-container">
+                {/* Danger Zone Info Frame 2147225522 */}
                 <div className="danger-zone-info">
                     <h3 className="danger-zone-title">Danger Zone</h3>
                     <p className="danger-zone-subtitle">
@@ -48,6 +52,7 @@ export default function DeleteAccountSection({
                     </p>
                 </div>
 
+                {/* Actions Row Frame 2147225546 */}
                 <div className="danger-zone-actions">
                     <button
                         type="button"

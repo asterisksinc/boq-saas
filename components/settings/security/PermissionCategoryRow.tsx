@@ -34,10 +34,11 @@ export default function PermissionCategoryRow({
                     aria-expanded={isExpanded}
                 >
                     <ChevronDown
-                        size={16}
+                        size={20}
                         className={`security-category-chevron ${isExpanded ? "" : "collapsed"}`}
+                        aria-hidden="true"
                     />
-                    <span>{categoryGroup.category}</span>
+                    <span className="security-category-title">{categoryGroup.category}</span>
                 </button>
             </td>
 
@@ -77,9 +78,9 @@ export default function PermissionCategoryRow({
                             }
                         >
                             {status === "all" ? (
-                                <Check size={13} strokeWidth={3} />
+                                <Check size={14} strokeWidth={3} />
                             ) : status === "some" ? (
-                                <Minus size={13} strokeWidth={3} />
+                                <Minus size={14} strokeWidth={3} />
                             ) : null}
                         </button>
                     </td>

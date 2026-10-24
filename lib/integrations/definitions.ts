@@ -11,6 +11,26 @@ export const integrationDefinitions: IntegrationDefinition[] = [
     { provider: 'razorpay', title: 'RazorPay Integration', description: 'Start receiving payments from your clients on the invoices created.', category: 'payment', iconPath: '/assets/integrations/razorpay.svg' },
 ];
 
+export const emailIntegrationDefinition: IntegrationDefinition = {
+    provider: 'email',
+    title: 'Email Integration',
+    description: 'Share files Proposal, Order Sheet & Invoice, etc., to your clients via Email from your BOQ SaaS Account',
+    category: 'automation',
+    iconPath: '/assets/integrations/email.svg',
+};
+
+export const dashboardIntegrationDefinitions: IntegrationDefinition[] = [
+    // Lead Source
+    integrationDefinitions[0], // meta_lead_ads
+    integrationDefinitions[1], // google_ads
+    integrationDefinitions[2], // custom_website
+    // Automation
+    integrationDefinitions[3], // whatsapp
+    emailIntegrationDefinition, // email
+    // Payment
+    integrationDefinitions[4], // razorpay
+];
+
 export const categoryLabels: Record<IntegrationCategory, string> = {
     lead_source: 'Lead Source',
     automation: 'Automation',
@@ -20,5 +40,6 @@ export const categoryLabels: Record<IntegrationCategory, string> = {
 export const categoryOrder: IntegrationCategory[] = ['lead_source', 'automation', 'payment'];
 
 export function getDefinition(provider: string): IntegrationDefinition | undefined {
+    if (provider === 'email') return emailIntegrationDefinition;
     return integrationDefinitions.find(d => d.provider === provider);
 }

@@ -64,7 +64,7 @@ export default function SettingsNotifications({
 
         const toggleKey = `${event}:${channel}`;
         if (activeToggles.has(toggleKey)) {
-            return; // Prevent duplicate concurrent in-flight requests for the exact same toggle
+            return;
         }
 
         const currentVal = matrixRef.current[event]?.[channel] ?? true;
@@ -80,7 +80,6 @@ export default function SettingsNotifications({
         };
         setMatrix(updatedMatrix);
 
-        // Mark toggle as in-flight
         setActiveToggles((prev) => new Set(prev).add(toggleKey));
         setSavingStatus("saving");
 
@@ -92,7 +91,6 @@ export default function SettingsNotifications({
                 setSavingStatus((current) => (current === "saved" ? "idle" : current));
             }, 2500);
         } catch (err: unknown) {
-            // Revert optimistic update on failure
             setMatrix((prev) => ({
                 ...prev,
                 [event]: {
@@ -179,6 +177,13 @@ export default function SettingsNotifications({
             <div className="notif-matrix-card">
                 <div className="notif-table-wrapper">
                     <table className="notif-matrix-table" role="grid" aria-label="Notification Preferences Matrix">
+                        <colgroup>
+                            <col style={{ width: "460px" }} />
+                            <col style={{ width: "206.5px" }} />
+                            <col style={{ width: "206.5px" }} />
+                            <col style={{ width: "206.5px" }} />
+                            <col style={{ width: "206.5px" }} />
+                        </colgroup>
                         <thead>
                             <tr className="notif-matrix-header-row">
                                 <th scope="col" className="notif-col-name">

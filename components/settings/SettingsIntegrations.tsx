@@ -96,28 +96,26 @@ export default function SettingsIntegrations({
 
     if (loading) {
         return (
-            <div className="intg-grid" aria-label="Loading integrations">
-                {[1, 2, 3, 4, 5].map((i) => (
-                    <div key={i} className="intg-card intg-card-skeleton">
-                        <div className="intg-card-header">
-                            <div className="intg-card-header-main">
-                                <div className="skeleton" style={{ width: 48, height: 48, borderRadius: 10, flexShrink: 0 }} />
-                                <div className="intg-card-meta" style={{ flex: 1 }}>
-                                    <div className="skeleton" style={{ width: "65%", height: 16, borderRadius: 4, marginBottom: 8 }} />
-                                    <div className="skeleton" style={{ width: "35%", height: 12, borderRadius: 4 }} />
+            <div className="settings-integrations-wrap" aria-label="Loading integrations">
+                <div className="intg-grid">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                        <div key={i} className="intg-card intg-card-skeleton">
+                            <div className="intg-card-top">
+                                <div className="intg-card-header">
+                                    <div className="intg-card-header-left">
+                                        <div className="skeleton" style={{ width: 46, height: 46, borderRadius: 8, flexShrink: 0 }} />
+                                        <div className="skeleton" style={{ width: 140, height: 18, borderRadius: 4 }} />
+                                    </div>
+                                    <div className="skeleton" style={{ width: 60, height: 14, borderRadius: 4 }} />
                                 </div>
+                                <div className="skeleton" style={{ width: "100%", height: 38, borderRadius: 4, marginTop: 8 }} />
                             </div>
-                            <div className="skeleton" style={{ width: 20, height: 20, borderRadius: 4 }} />
+                            <div className="intg-card-footer">
+                                <div className="skeleton" style={{ width: "100%", height: 46, borderRadius: 6 }} />
+                            </div>
                         </div>
-                        <div className="intg-card-body">
-                            <div className="skeleton" style={{ width: "100%", height: 14, borderRadius: 4, marginBottom: 8 }} />
-                            <div className="skeleton" style={{ width: "80%", height: 14, borderRadius: 4 }} />
-                        </div>
-                        <div className="intg-card-footer">
-                            <div className="skeleton" style={{ width: "100%", height: 38, borderRadius: 8 }} />
-                        </div>
-                    </div>
-                ))}
+                    ))}
+                </div>
             </div>
         );
     }

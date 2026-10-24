@@ -109,25 +109,28 @@ export default function DocumentPreviewCanvas({
             >
                 {/* Document Header */}
                 <header className="doc-preview-header">
-                    <div className="doc-header-left">
-                        {branding.primaryLogo ? (
-                            <div className="doc-header-logo-wrap">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                    src={branding.primaryLogo}
-                                    alt={`${orgName} logo`}
-                                    className="doc-header-logo-img"
-                                />
-                            </div>
-                        ) : null}
-                        <h2 className="doc-company-name">{orgName}</h2>
-                        <p className="doc-company-address">{orgAddress}</p>
-                    </div>
-
-                    <div className="doc-header-right">
-                        <span className="doc-type-title" style={{ color: primaryColor }}>
+                    <div className="doc-header-top-row">
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            {branding.primaryLogo ? (
+                                <div className="doc-header-logo-wrap" style={{ margin: 0 }}>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                        src={branding.primaryLogo}
+                                        alt={`${orgName} logo`}
+                                        className="doc-header-logo-img"
+                                        style={{ maxHeight: 24, maxWidth: 120, objectFit: "contain" }}
+                                    />
+                                </div>
+                            ) : null}
+                            <h2 className="doc-company-name">{orgName}</h2>
+                        </div>
+                        <span className="doc-type-badge" style={{ color: primaryColor }}>
                             {docTypeLabel}
                         </span>
+                    </div>
+
+                    <div className="doc-header-sub-row">
+                        <p className="doc-company-address">{orgAddress}</p>
                         <span className="doc-identifier">{docIdentifier}</span>
                     </div>
                 </header>
@@ -136,14 +139,14 @@ export default function DocumentPreviewCanvas({
 
                 {/* Document Body Content */}
                 {viewMode === "reference" ? (
-                    // Exact visual match with Screenshots 3, 4, 5: 6 rounded placeholder bars
+                    // Exact visual match with Figma Reference: 6 rounded placeholder bars
                     <div className="doc-skeleton-content" aria-label="Reference layout preview">
-                        <div className="doc-skeleton-bar" style={{ width: "100%", height: "26px" }} />
-                        <div className="doc-skeleton-bar" style={{ width: "90%", height: "24px" }} />
-                        <div className="doc-skeleton-bar" style={{ width: "92%", height: "24px" }} />
-                        <div className="doc-skeleton-bar" style={{ width: "62%", height: "24px" }} />
-                        <div className="doc-skeleton-bar" style={{ width: "78%", height: "24px" }} />
-                        <div className="doc-skeleton-bar" style={{ width: "90%", height: "24px" }} />
+                        <div className="doc-skeleton-bar" style={{ width: "100%", height: "28px" }} />
+                        <div className="doc-skeleton-bar" style={{ width: "88%", height: "28px" }} />
+                        <div className="doc-skeleton-bar" style={{ width: "91%", height: "28px" }} />
+                        <div className="doc-skeleton-bar" style={{ width: "59%", height: "28px" }} />
+                        <div className="doc-skeleton-bar" style={{ width: "75%", height: "28px" }} />
+                        <div className="doc-skeleton-bar" style={{ width: "90%", height: "28px" }} />
                     </div>
                 ) : type === "email" ? (
                     // Detailed Email Preview

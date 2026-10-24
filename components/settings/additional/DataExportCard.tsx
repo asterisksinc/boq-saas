@@ -49,7 +49,8 @@ export default function DataExportCard({ showNotice }: DataExportCardProps) {
     };
 
     return (
-        <div className="additional-main-container" data-testid="data-export-card">
+        <div className="additional-main-container is-data-export" data-testid="data-export-card">
+            {/* Header Frame 2147225610 */}
             <div className="additional-section-header">
                 <div className="additional-section-header-left">
                     <h2 className="additional-section-title">Data Export</h2>
@@ -64,16 +65,18 @@ export default function DataExportCard({ showNotice }: DataExportCardProps) {
                     disabled={exporting}
                     data-testid="export-selected-btn"
                 >
-                    {exporting && <Loader2 size={15} className="spin" />}
+                    {exporting && <Loader2 size={14} className="spin" />}
                     <span>{exporting ? "Exporting..." : "Export Selected"}</span>
                 </button>
             </div>
 
+            {/* Divider Rectangle 34624165 */}
             <div className="additional-card-divider" />
 
+            {/* Checkboxes Frame 2147225609 */}
             <div className="additional-checkbox-grid">
-                {/* Column 1: Projects & Documents */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "22px" }}>
+                {/* Row 1: Projects & BOQS (Frame 2147225607) */}
+                <div className="additional-checkbox-row">
                     <button
                         type="button"
                         className="additional-checkbox-item"
@@ -85,30 +88,11 @@ export default function DataExportCard({ showNotice }: DataExportCardProps) {
                         <span
                             className={`additional-checkbox-box ${selected.projects ? "is-checked" : ""}`}
                         >
-                            {selected.projects && <Check size={12} strokeWidth={3} />}
+                            {selected.projects && <Check size={14} strokeWidth={3} />}
                         </span>
                         <span className="additional-checkbox-label">Projects</span>
                     </button>
 
-                    <button
-                        type="button"
-                        className="additional-checkbox-item"
-                        onClick={() => toggleCategory("documents")}
-                        role="checkbox"
-                        aria-checked={selected.documents}
-                        data-testid="checkbox-documents"
-                    >
-                        <span
-                            className={`additional-checkbox-box ${selected.documents ? "is-checked" : ""}`}
-                        >
-                            {selected.documents && <Check size={12} strokeWidth={3} />}
-                        </span>
-                        <span className="additional-checkbox-label">Documents</span>
-                    </button>
-                </div>
-
-                {/* Column 2: BOQS & Billing History */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "22px" }}>
                     <button
                         type="button"
                         className="additional-checkbox-item"
@@ -120,9 +104,28 @@ export default function DataExportCard({ showNotice }: DataExportCardProps) {
                         <span
                             className={`additional-checkbox-box ${selected.boqs ? "is-checked" : ""}`}
                         >
-                            {selected.boqs && <Check size={12} strokeWidth={3} />}
+                            {selected.boqs && <Check size={14} strokeWidth={3} />}
                         </span>
                         <span className="additional-checkbox-label">BOQS</span>
+                    </button>
+                </div>
+
+                {/* Row 2: Documents & Billing History (Frame 2147225608) */}
+                <div className="additional-checkbox-row">
+                    <button
+                        type="button"
+                        className="additional-checkbox-item"
+                        onClick={() => toggleCategory("documents")}
+                        role="checkbox"
+                        aria-checked={selected.documents}
+                        data-testid="checkbox-documents"
+                    >
+                        <span
+                            className={`additional-checkbox-box ${selected.documents ? "is-checked" : ""}`}
+                        >
+                            {selected.documents && <Check size={14} strokeWidth={3} />}
+                        </span>
+                        <span className="additional-checkbox-label">Documents</span>
                     </button>
 
                     <button
@@ -136,7 +139,7 @@ export default function DataExportCard({ showNotice }: DataExportCardProps) {
                         <span
                             className={`additional-checkbox-box ${selected.billing ? "is-checked" : ""}`}
                         >
-                            {selected.billing && <Check size={12} strokeWidth={3} />}
+                            {selected.billing && <Check size={14} strokeWidth={3} />}
                         </span>
                         <span className="additional-checkbox-label">Billing History</span>
                     </button>

@@ -64,19 +64,18 @@ export default function RoleSection({ showNotice, userRole }: RoleSectionProps) 
 
     if (loading) {
         return (
-            <div className="security-access-content">
+            <div className="security-section-wrapper" aria-busy="true">
                 <div className="security-section-header">
                     <h3 className="security-section-title">Roles & Privileges</h3>
-                    <div className="skeleton" style={{ width: 110, height: 38, borderRadius: 8 }} />
+                    <div className="skeleton" style={{ width: 106, height: 38, borderRadius: 6 }} />
                 </div>
-                <div className="security-matrix-card" style={{ padding: 24 }}>
-                    <div className="skeleton" style={{ height: 40, marginBottom: 16, borderRadius: 8 }} />
-                    <div className="skeleton" style={{ height: 44, marginBottom: 8, borderRadius: 6 }} />
-                    <div className="skeleton" style={{ height: 36, marginBottom: 6, borderRadius: 6 }} />
-                    <div className="skeleton" style={{ height: 36, marginBottom: 6, borderRadius: 6 }} />
-                    <div className="skeleton" style={{ height: 36, marginBottom: 14, borderRadius: 6 }} />
-                    <div className="skeleton" style={{ height: 44, marginBottom: 8, borderRadius: 6 }} />
-                    <div className="skeleton" style={{ height: 36, marginBottom: 6, borderRadius: 6 }} />
+                <div className="security-matrix-card">
+                    <div className="skeleton" style={{ height: 56, marginBottom: 8, borderRadius: 6 }} />
+                    <div className="skeleton" style={{ height: 36, marginBottom: 4, borderRadius: 4 }} />
+                    <div className="skeleton" style={{ height: 44, marginBottom: 4, borderRadius: 4 }} />
+                    <div className="skeleton" style={{ height: 44, marginBottom: 4, borderRadius: 4 }} />
+                    <div className="skeleton" style={{ height: 36, marginBottom: 4, borderRadius: 4 }} />
+                    <div className="skeleton" style={{ height: 44, marginBottom: 4, borderRadius: 4 }} />
                 </div>
             </div>
         );
@@ -84,7 +83,7 @@ export default function RoleSection({ showNotice, userRole }: RoleSectionProps) 
 
     if (error) {
         return (
-            <div className="security-access-content">
+            <div className="security-section-wrapper">
                 <div className="security-section-header">
                     <h3 className="security-section-title">Roles & Privileges</h3>
                 </div>
@@ -104,7 +103,7 @@ export default function RoleSection({ showNotice, userRole }: RoleSectionProps) 
     }
 
     return (
-        <div className="security-access-content">
+        <div className="security-section-wrapper">
             <div className="security-section-header">
                 <h3 className="security-section-title">Roles & Privileges</h3>
                 {canManage && (
@@ -112,8 +111,9 @@ export default function RoleSection({ showNotice, userRole }: RoleSectionProps) 
                         type="button"
                         className="security-btn-primary"
                         onClick={handleAddRoleClick}
+                        data-testid="add-role-btn"
                     >
-                        <Plus size={16} />
+                        <Plus size={20} strokeWidth={2.2} />
                         <span>Add Role</span>
                     </button>
                 )}

@@ -201,6 +201,11 @@ export interface BoqRevisionSettings {
     lockApprovedVersions: boolean;
     reopenAfterApproval: boolean;
     compareVersions: boolean;
+    requireRevisionReason?: boolean;
+    autoArchiveOnApprove?: boolean;
+    lockAfterExport?: boolean;
+    notifyOnNewRevision?: boolean;
+    trackUnitCostChanges?: boolean;
 }
 
 export interface BoqApprovalSettings {

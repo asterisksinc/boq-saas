@@ -18,8 +18,8 @@ export const ApprovalSettingRow: React.FC<ApprovalSettingRowProps> = ({
     onChange,
 }) => {
     return (
-        <div className="boq-approval-toggle-row">
-            <label htmlFor={id} className="boq-approval-toggle-label">
+        <div className="boq-approval-toggle-row-1020 boq-approval-toggle-row">
+            <label htmlFor={id} className="boq-approval-toggle-label-1020 boq-approval-toggle-label">
                 {label}
             </label>
             <button
@@ -29,10 +29,10 @@ export const ApprovalSettingRow: React.FC<ApprovalSettingRowProps> = ({
                 aria-checked={checked}
                 disabled={!canEdit}
                 onClick={() => onChange(!checked)}
-                className={`boq-toggle-switch ${checked ? "is-active" : ""}`}
+                className={`boq-figma-toggle boq-toggle-switch ${checked ? "is-active" : ""}`}
                 aria-label={`Toggle ${label}`}
             >
-                <span className="boq-toggle-knob" />
+                <span className="boq-figma-toggle-knob boq-toggle-knob" />
             </button>
         </div>
     );

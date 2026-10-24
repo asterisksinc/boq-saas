@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { Loader2, Save } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 import { BoqNumberingSettings } from "@/lib/settings/types";
 import NumberingPreview from "./NumberingPreview";
 
@@ -90,143 +90,171 @@ export default function NumberingForm({
     };
 
     return (
-        <div className="boq-content-card">
-            <form onSubmit={handleSubmit} noValidate>
-                <div className="boq-form-grid">
-                    {/* Row 1: BOQ Prefix * | Project Prefix * */}
-                    <div className="boq-field">
-                        <label htmlFor="boqPrefix">
-                            BOQ Prefix <span className="required">*</span>
-                        </label>
-                        <input
-                            id="boqPrefix"
-                            type="text"
-                            className={`boq-input ${errors.boqPrefix ? "has-error" : ""}`}
-                            value={boqPrefix}
-                            onChange={(e) => {
-                                setBoqPrefix(e.target.value);
-                                if (errors.boqPrefix) setErrors((prev) => ({ ...prev, boqPrefix: "" }));
-                            }}
-                            placeholder="e.g. BOQ"
-                            disabled={!canEdit || saving}
-                            required
-                        />
+        <form onSubmit={handleSubmit} className="boq-numbering-column" noValidate>
+            {/* Form Card: Frame 2147225143 (1060px x 299px) */}
+            <div className="boq-numbering-card">
+                {/* Row 1: Frame 2147225536 (1020px x 73px) */}
+                <div className="boq-numbering-row">
+                    {/* BOQ Prefix */}
+                    <div className="boq-numbering-field">
+                        <div className="boq-numbering-label-row">
+                            <label htmlFor="boqPrefix" className="boq-numbering-label">
+                                BOQ Prefix
+                            </label>
+                            <span className="boq-numbering-required">*</span>
+                        </div>
+                        <div className="boq-numbering-input-wrap">
+                            <input
+                                id="boqPrefix"
+                                type="text"
+                                className={`boq-numbering-input ${errors.boqPrefix ? "has-error" : ""}`}
+                                value={boqPrefix}
+                                onChange={(e) => {
+                                    setBoqPrefix(e.target.value);
+                                    if (errors.boqPrefix) setErrors((prev) => ({ ...prev, boqPrefix: "" }));
+                                }}
+                                placeholder="BOQ"
+                                disabled={!canEdit || saving}
+                                required
+                            />
+                        </div>
                         {errors.boqPrefix && (
                             <span className="boq-field-error" role="alert">{errors.boqPrefix}</span>
                         )}
                     </div>
 
-                    <div className="boq-field">
-                        <label htmlFor="projectPrefix">
-                            Project Prefix <span className="required">*</span>
-                        </label>
-                        <input
-                            id="projectPrefix"
-                            type="text"
-                            className={`boq-input ${errors.projectPrefix ? "has-error" : ""}`}
-                            value={projectPrefix}
-                            onChange={(e) => {
-                                setProjectPrefix(e.target.value);
-                                if (errors.projectPrefix) setErrors((prev) => ({ ...prev, projectPrefix: "" }));
-                            }}
-                            placeholder="e.g. PRJ"
-                            disabled={!canEdit || saving}
-                            required
-                        />
+                    {/* Project Prefix */}
+                    <div className="boq-numbering-field">
+                        <div className="boq-numbering-label-row">
+                            <label htmlFor="projectPrefix" className="boq-numbering-label">
+                                Project Prefix
+                            </label>
+                            <span className="boq-numbering-required">*</span>
+                        </div>
+                        <div className="boq-numbering-input-wrap">
+                            <input
+                                id="projectPrefix"
+                                type="text"
+                                className={`boq-numbering-input ${errors.projectPrefix ? "has-error" : ""}`}
+                                value={projectPrefix}
+                                onChange={(e) => {
+                                    setProjectPrefix(e.target.value);
+                                    if (errors.projectPrefix) setErrors((prev) => ({ ...prev, projectPrefix: "" }));
+                                }}
+                                placeholder="PRJ"
+                                disabled={!canEdit || saving}
+                                required
+                            />
+                        </div>
                         {errors.projectPrefix && (
                             <span className="boq-field-error" role="alert">{errors.projectPrefix}</span>
                         )}
                     </div>
+                </div>
 
-                    {/* Row 2: Financial Year * | Sequence Format * */}
-                    <div className="boq-field">
-                        <label htmlFor="financialYear">
-                            Financial Year <span className="required">*</span>
-                        </label>
-                        <input
-                            id="financialYear"
-                            type="text"
-                            className={`boq-input ${errors.financialYear ? "has-error" : ""}`}
-                            value={financialYear}
-                            onChange={(e) => {
-                                setFinancialYear(e.target.value);
-                                if (errors.financialYear) setErrors((prev) => ({ ...prev, financialYear: "" }));
-                            }}
-                            placeholder="e.g. 2025-26"
-                            disabled={!canEdit || saving}
-                            required
-                        />
+                {/* Row 2: Frame 2147225541 inner (1020px x 73px) */}
+                <div className="boq-numbering-row">
+                    {/* Financial Year */}
+                    <div className="boq-numbering-field">
+                        <div className="boq-numbering-label-row">
+                            <label htmlFor="financialYear" className="boq-numbering-label">
+                                Financial Year
+                            </label>
+                            <span className="boq-numbering-required">*</span>
+                        </div>
+                        <div className="boq-numbering-input-wrap">
+                            <input
+                                id="financialYear"
+                                type="text"
+                                className={`boq-numbering-input ${errors.financialYear ? "has-error" : ""}`}
+                                value={financialYear}
+                                onChange={(e) => {
+                                    setFinancialYear(e.target.value);
+                                    if (errors.financialYear) setErrors((prev) => ({ ...prev, financialYear: "" }));
+                                }}
+                                placeholder="2025-26"
+                                disabled={!canEdit || saving}
+                                required
+                            />
+                        </div>
                         {errors.financialYear && (
                             <span className="boq-field-error" role="alert">{errors.financialYear}</span>
                         )}
                     </div>
 
-                    <div className="boq-field">
-                        <label htmlFor="sequenceFormat">
-                            Sequence Format <span className="required">*</span>
-                        </label>
-                        <select
-                            id="sequenceFormat"
-                            className="boq-select"
-                            value={sequenceFormat}
-                            onChange={(e) => setSequenceFormat(e.target.value)}
-                            disabled={!canEdit || saving}
-                        >
-                            {SEQUENCE_FORMATS.map((fmt) => (
-                                <option key={fmt.value} value={fmt.value}>
-                                    {fmt.label}
-                                </option>
-                            ))}
-                        </select>
+                    {/* Sequence Format */}
+                    <div className="boq-numbering-field">
+                        <div className="boq-numbering-label-row">
+                            <label htmlFor="sequenceFormat" className="boq-numbering-label">
+                                Sequence Format
+                            </label>
+                            <span className="boq-numbering-required">*</span>
+                        </div>
+                        <div className="boq-numbering-select-wrap">
+                            <select
+                                id="sequenceFormat"
+                                className="boq-numbering-select"
+                                value={sequenceFormat}
+                                onChange={(e) => setSequenceFormat(e.target.value)}
+                                disabled={!canEdit || saving}
+                            >
+                                {SEQUENCE_FORMATS.map((fmt) => (
+                                    <option key={fmt.value} value={fmt.value}>
+                                        {fmt.label}
+                                    </option>
+                                ))}
+                            </select>
+                            <ChevronDown size={20} className="boq-numbering-select-arrow" aria-hidden="true" />
+                        </div>
                     </div>
+                </div>
 
-                    {/* Row 3: Revision Format * | LIVE PREVIEW */}
-                    <div className="boq-field">
-                        <label htmlFor="revisionFormat">
-                            Revision Format <span className="required">*</span>
-                        </label>
-                        <input
-                            id="revisionFormat"
-                            type="text"
-                            className={`boq-input ${errors.revisionFormat ? "has-error" : ""}`}
-                            value={revisionFormat}
-                            onChange={(e) => {
-                                setRevisionFormat(e.target.value);
-                                if (errors.revisionFormat) setErrors((prev) => ({ ...prev, revisionFormat: "" }));
-                            }}
-                            placeholder="e.g. REV-##"
-                            disabled={!canEdit || saving}
-                            required
-                        />
+                {/* Row 3: Frame 2147225537 (1020px x 73px) */}
+                <div className="boq-numbering-row">
+                    {/* Revision Format */}
+                    <div className="boq-numbering-field">
+                        <div className="boq-numbering-label-row">
+                            <label htmlFor="revisionFormat" className="boq-numbering-label">
+                                Revision Format
+                            </label>
+                            <span className="boq-numbering-required">*</span>
+                        </div>
+                        <div className="boq-numbering-input-wrap">
+                            <input
+                                id="revisionFormat"
+                                type="text"
+                                className={`boq-numbering-input ${errors.revisionFormat ? "has-error" : ""}`}
+                                value={revisionFormat}
+                                onChange={(e) => {
+                                    setRevisionFormat(e.target.value);
+                                    if (errors.revisionFormat) setErrors((prev) => ({ ...prev, revisionFormat: "" }));
+                                }}
+                                placeholder="REV-##"
+                                disabled={!canEdit || saving}
+                                required
+                            />
+                        </div>
                         {errors.revisionFormat && (
                             <span className="boq-field-error" role="alert">{errors.revisionFormat}</span>
                         )}
                     </div>
 
-                    <div className="boq-field">
-                        <label style={{ visibility: "hidden" }} aria-hidden="true">
-                            Preview
-                        </label>
+                    {/* Live Preview Box: Frame 95 */}
+                    <div className="boq-numbering-field">
                         <NumberingPreview settings={currentNumberingSettings} />
                     </div>
                 </div>
+            </div>
 
-                {/* Form Footer */}
-                <div className="boq-form-footer" style={{ marginTop: "24px", display: "flex", justifyContent: "flex-end" }}>
-                    <button
-                        type="submit"
-                        className="boq-btn-primary"
-                        disabled={!canEdit || saving}
-                    >
-                        {saving ? (
-                            <Loader2 size={16} className="spin" aria-hidden="true" />
-                        ) : (
-                            <Save size={16} aria-hidden="true" />
-                        )}
-                        <span>Save Changes</span>
-                    </button>
-                </div>
-            </form>
-        </div>
+            {/* Save Changes Button: Buttons Frame (119px x 46px, order 1) */}
+            <button
+                type="submit"
+                className="boq-btn-save-numbering"
+                disabled={!canEdit || saving}
+            >
+                {saving && <Loader2 size={16} className="spin" aria-hidden="true" />}
+                <span>Save Changes</span>
+            </button>
+        </form>
     );
 }

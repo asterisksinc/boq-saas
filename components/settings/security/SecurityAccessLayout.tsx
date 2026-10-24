@@ -37,13 +37,13 @@ export default function SecurityAccessLayout({
     };
 
     return (
-        <div className="security-access-container">
+        <div className="security-access-container org-settings-container" data-testid="security-access-container">
             <SecurityAccessNavigation
                 activeSubTab={activeSubTab}
                 onSelectSubTab={handleSelectSubTab}
             />
 
-            <div className="security-access-content">
+            <div className="security-content-card" data-testid="security-content-card">
                 {activeSubTab === "user" ? (
                     <UsersSection showNotice={showNotice} userRole={userRole} />
                 ) : (

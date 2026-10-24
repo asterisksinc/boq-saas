@@ -32,10 +32,11 @@ export default function AdditionalSubNavigation({
                             className={`additional-subnav-item ${isActive ? "is-active" : ""}`}
                             onClick={() => onSelectSection(item.id)}
                             aria-current={isActive ? "page" : undefined}
+                            data-testid={`subnav-item-${item.id}`}
                         >
                             <span>{item.label}</span>
                             {isActive && (
-                                <ChevronRight size={16} className="additional-subnav-chevron" />
+                                <ChevronRight size={18} className="additional-subnav-chevron" />
                             )}
                         </button>
                     );

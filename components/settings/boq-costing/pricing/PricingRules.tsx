@@ -111,14 +111,15 @@ export const PricingRules: React.FC<PricingRulesProps> = ({
 
     return (
         <div className="boq-pricing-layout">
-            {/* Left Column: Configuration Cards */}
+            {/* Left Column: Configuration Cards (Width: 640px) */}
             <form onSubmit={handleSave} className="boq-pricing-main-col">
-                {/* 1. Default Markup Card */}
-                <div className="boq-pricing-card">
+                {/* 1. Default Markup Card (Frame 2147225145: 640px x 171px) */}
+                <div className="boq-pricing-card-markup boq-pricing-card">
                     <h2 className="boq-pricing-card-title">Default Markup</h2>
-                    <div className="boq-form-group">
-                        <label htmlFor="default-markup-input" className="boq-form-label">
-                            Default Markup (%) <span className="boq-required">*</span>
+                    <div className="boq-pricing-divider-600" />
+                    <div className="boq-pricing-field-600 boq-form-group">
+                        <label htmlFor="default-markup-input" className="boq-pricing-label boq-form-label">
+                            Default Markup (%) <span className="boq-required" style={{ color: "#EF4444" }}>*</span>
                         </label>
                         <input
                             id="default-markup-input"
@@ -130,15 +131,16 @@ export const PricingRules: React.FC<PricingRulesProps> = ({
                             placeholder="18"
                             onChange={(e) => setDefaultMarkup(e.target.value === "" ? 0 : Number(e.target.value))}
                             disabled={!canEdit}
-                            className="boq-form-input"
+                            className="boq-pricing-input-600 boq-form-input"
                             required
                         />
                     </div>
                 </div>
 
-                {/* 2. Category Markups Card */}
-                <div className="boq-pricing-card">
-                    <h2 className="boq-pricing-card-title boq-title-with-divider">Category Markups</h2>
+                {/* 2. Category Markups Card (Frame 2147225148: 640px x 302px) */}
+                <div className="boq-pricing-card-categories">
+                    <h2 className="boq-pricing-card-title">Category Markups</h2>
+                    <div className="boq-pricing-divider-600" />
                     <div className="boq-category-markups-list">
                         {categoryMarkups.map((cat) => (
                             <CategoryMarkupRow
@@ -151,12 +153,16 @@ export const PricingRules: React.FC<PricingRulesProps> = ({
                     </div>
                 </div>
 
-                {/* 3. Additional Configuration Card */}
-                <div className="boq-pricing-card">
-                    <div className="boq-form-grid">
-                        <div className="boq-form-group">
-                            <label htmlFor="discount-limit-input" className="boq-form-label">
-                                Discount Limit (max %) <span className="boq-required">*</span>
+                {/* 3. Thresholds & Rules Card (Frame 2147225146: 640px x 299px) */}
+                <div className="boq-pricing-card-thresholds">
+                    <h2 className="boq-pricing-card-title">Thresholds & Rules</h2>
+                    <div className="boq-pricing-divider-600" />
+
+                    {/* Row 1: Discount Limit & Margin Threshold (600px x 73px, gap 20px) */}
+                    <div className="boq-pricing-row-2col">
+                        <div className="boq-pricing-field-290 boq-form-group">
+                            <label htmlFor="discount-limit-input" className="boq-pricing-label boq-form-label">
+                                Discount Limit (max %) <span className="boq-required" style={{ color: "#EF4444" }}>*</span>
                             </label>
                             <input
                                 id="discount-limit-input"
@@ -168,14 +174,14 @@ export const PricingRules: React.FC<PricingRulesProps> = ({
                                 placeholder="10"
                                 onChange={(e) => setDiscountLimit(e.target.value === "" ? 0 : Number(e.target.value))}
                                 disabled={!canEdit}
-                                className="boq-form-input"
+                                className="boq-pricing-input-290 boq-form-input"
                                 required
                             />
                         </div>
 
-                        <div className="boq-form-group">
-                            <label htmlFor="margin-threshold-input" className="boq-form-label">
-                                Margin Threshold (min %) <span className="boq-required">*</span>
+                        <div className="boq-pricing-field-290 boq-form-group">
+                            <label htmlFor="margin-threshold-input" className="boq-pricing-label boq-form-label">
+                                Margin Threshold (min %) <span className="boq-required" style={{ color: "#EF4444" }}>*</span>
                             </label>
                             <input
                                 id="margin-threshold-input"
@@ -187,16 +193,17 @@ export const PricingRules: React.FC<PricingRulesProps> = ({
                                 placeholder="25"
                                 onChange={(e) => setMarginThreshold(e.target.value === "" ? 0 : Number(e.target.value))}
                                 disabled={!canEdit}
-                                className="boq-form-input"
+                                className="boq-pricing-input-290 boq-form-input"
                                 required
                             />
                         </div>
                     </div>
 
-                    <div className="boq-form-grid" style={{ marginTop: "16px" }}>
-                        <div className="boq-form-group">
-                            <label htmlFor="wastage-input" className="boq-form-label">
-                                Wastage (%) <span className="boq-required">*</span>
+                    {/* Row 2: Wastage & Contingency (600px x 73px, gap 20px) */}
+                    <div className="boq-pricing-row-2col">
+                        <div className="boq-pricing-field-290 boq-form-group">
+                            <label htmlFor="wastage-input" className="boq-pricing-label boq-form-label">
+                                Wastage (%) <span className="boq-required" style={{ color: "#EF4444" }}>*</span>
                             </label>
                             <input
                                 id="wastage-input"
@@ -208,14 +215,14 @@ export const PricingRules: React.FC<PricingRulesProps> = ({
                                 placeholder="5"
                                 onChange={(e) => setWastage(e.target.value === "" ? 0 : Number(e.target.value))}
                                 disabled={!canEdit}
-                                className="boq-form-input"
+                                className="boq-pricing-input-290 boq-form-input"
                                 required
                             />
                         </div>
 
-                        <div className="boq-form-group">
-                            <label htmlFor="contingency-input" className="boq-form-label">
-                                Contingency (%) <span className="boq-required">*</span>
+                        <div className="boq-pricing-field-290 boq-form-group">
+                            <label htmlFor="contingency-input" className="boq-pricing-label boq-form-label">
+                                Contingency (%) <span className="boq-required" style={{ color: "#EF4444" }}>*</span>
                             </label>
                             <input
                                 id="contingency-input"
@@ -227,23 +234,24 @@ export const PricingRules: React.FC<PricingRulesProps> = ({
                                 placeholder="3"
                                 onChange={(e) => setContingency(e.target.value === "" ? 0 : Number(e.target.value))}
                                 disabled={!canEdit}
-                                className="boq-form-input"
+                                className="boq-pricing-input-290 boq-form-input"
                                 required
                             />
                         </div>
                     </div>
 
-                    <div className="boq-form-grid" style={{ marginTop: "16px" }}>
-                        <div className="boq-form-group">
-                            <label htmlFor="rounding-select" className="boq-form-label">
-                                Rounding <span className="boq-required">*</span>
+                    {/* Row 3: Rounding & Empty Spacer (600px x 73px, gap 20px) */}
+                    <div className="boq-pricing-row-2col">
+                        <div className="boq-pricing-field-290 boq-form-group">
+                            <label htmlFor="rounding-select" className="boq-pricing-label boq-form-label">
+                                Rounding <span className="boq-required" style={{ color: "#EF4444" }}>*</span>
                             </label>
                             <select
                                 id="rounding-select"
                                 value={rounding}
                                 onChange={(e) => setRounding(e.target.value)}
                                 disabled={!canEdit}
-                                className="boq-form-select"
+                                className="boq-pricing-select-290 boq-form-select"
                                 required
                             >
                                 {ROUNDING_OPTIONS.map((opt) => (
@@ -253,32 +261,30 @@ export const PricingRules: React.FC<PricingRulesProps> = ({
                                 ))}
                             </select>
                         </div>
-                        <div>{/* Empty column cell to maintain 2-column width balance */}</div>
+                        <div className="boq-pricing-field-290" style={{ visibility: "hidden" }} aria-hidden="true" />
                     </div>
                 </div>
 
-                {/* Save Changes Button */}
+                {/* Save Changes Button (Buttons Frame: 119px x 46px, radius 6px, #2563EB) */}
                 {canEdit && (
-                    <div className="boq-pricing-actions">
-                        <button
-                            type="submit"
-                            disabled={saving}
-                            className="boq-btn-primary boq-save-btn"
-                        >
-                            {saving ? (
-                                <>
-                                    <Loader2 size={16} className="boq-spinner" aria-hidden="true" />
-                                    <span>Saving...</span>
-                                </>
-                            ) : (
-                                <span>Save Changes</span>
-                            )}
-                        </button>
-                    </div>
+                    <button
+                        type="submit"
+                        disabled={saving}
+                        className="boq-btn-save-changes boq-btn-primary boq-save-btn"
+                    >
+                        {saving ? (
+                            <>
+                                <Loader2 size={16} className="boq-spinner animate-spin" aria-hidden="true" />
+                                <span>Saving...</span>
+                            </>
+                        ) : (
+                            <span>Save Changes</span>
+                        )}
+                    </button>
                 )}
             </form>
 
-            {/* Right Column: Pricing Preview */}
+            {/* Right Column: Pricing Preview (Width: 412px, Height: 375px) */}
             <div className="boq-pricing-sidebar-col">
                 <PricingPreview
                     baseCost={previewBaseCost}

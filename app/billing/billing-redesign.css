@@ -1,0 +1,3169 @@
+/* ==========================================================================
+   BILLING REDESIGN — FIGMA EXACT IMPLEMENTATION
+   Visual Foundation:
+   - Main Background: #F1F5F9
+   - Top Background Gradient: linear-gradient(180deg, #2563EB -371.16%, rgba(37, 99, 235, 0) 100%) opacity: 0.5
+   - Primary Text: #0F172A
+   - Secondary Text: #64748B
+   - Primary Action / Blue: #2563EB
+   - Light Blue Accent: #E4ECFB / rgba(37, 99, 235, 0.12)
+   - Borders & Dividers: #E2E8F0, #EBEBEB, #2A344C
+   - Font Family: 'Urbanist', Inter, sans-serif
+   - Outer Section Background: rgba(255, 255, 255, 0.6), radius 6px, padding 20px
+   - Inner Cards: linear-gradient(0deg, #FFFFFF, #FFFFFF), rgba(255, 255, 255, 0.6), radius 14px, shadow 0px 0px 6px rgba(0,0,0,0.06)
+   - Dark Status Card: linear-gradient(0deg, #0F172A, #0F172A), rgba(255, 255, 255, 0.6), radius 14px
+   ========================================================================== */
+
+/* Main Billing page surface */
+.billing-page {
+    background: #F1F5F9;
+    min-height: 100vh;
+    position: relative;
+    font-family: 'Urbanist', Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #0F172A;
+}
+
+/* Subtle top background gradient glow (Rectangle 14 in Figma) */
+.billing-gradient-glow {
+    position: absolute;
+    width: 100%;
+    height: 622px;
+    left: 0;
+    top: 0;
+    background: linear-gradient(180deg, #2563EB -371.16%, rgba(37, 99, 235, 0) 100%);
+    opacity: 0.5;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Page body frame (Frame 2147225065 in Figma: max-width: 1326px reference canvas) */
+/* Full-width fluid layout to utilize available dashboard tab width without artificial left/right whitespace */
+.billing-page-body {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    margin: 0;
+    padding: 0 0 48px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    box-sizing: border-box;
+}
+
+.billing-page-body.mp-page-body,
+.mp-page-body {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    margin: 0;
+    padding: 0 0 48px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    box-sizing: border-box;
+}
+
+/* ─── Page Title Row (Frame 2147225066) ────────────────────────────────────── */
+.billing-page-title-row {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0;
+    gap: 16px;
+    width: 100%;
+    min-height: 49px;
+    box-sizing: border-box;
+}
+
+.billing-title-text-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    gap: 4px;
+}
+
+.billing-page-h1 {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.billing-page-desc {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.billing-title-actions {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0;
+    gap: 16px;
+    flex-shrink: 0;
+}
+
+/* ─── Base Button Styles matching Figma (height 46px, radius 6px) ─────────── */
+.billing-btn-primary {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px 20px;
+    gap: 6px;
+    height: 46px;
+    background: #2563EB;
+    border-radius: 6px;
+    border: none;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #FFFFFF;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+    white-space: nowrap;
+}
+
+.billing-btn-primary:hover:not(:disabled) {
+    background: #1D4ED8;
+}
+
+.billing-btn-primary:active:not(:disabled) {
+    transform: scale(0.98);
+}
+
+.billing-btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.billing-btn-outline {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px 20px;
+    gap: 6px;
+    height: 46px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    box-shadow: 0px 0px 6px rgba(0, 0, 0, 0.06);
+    border-radius: 6px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+    white-space: nowrap;
+}
+
+.billing-btn-outline:hover:not(:disabled) {
+    background: #F8FAFC;
+    border-color: #CBD5E1;
+}
+
+.billing-btn-outline:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ─── Outer Section Wrapper (Translucent White, Frame 2147225073/74/75) ───── */
+.billing-section-wrapper {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px;
+    gap: 16px;
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 6px;
+    width: 100%;
+}
+
+.billing-section-header {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.billing-section-label {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+/* ─── Inner White Cards (Frame 93 in Figma) ────────────────────────────────── */
+.billing-inner-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 20px;
+    gap: 16px;
+    width: 100%;
+    background: linear-gradient(0deg, #FFFFFF, #FFFFFF), rgba(255, 255, 255, 0.6);
+    box-shadow: 0px 0px 6px rgba(0, 0, 0, 0.06);
+    border-radius: 14px;
+}
+
+/* ─── 1. BILLING DETAIL Section (Frame 2147225073) ────────────────────────── */
+.billing-detail-row {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    padding: 0;
+    gap: 16px;
+    width: 100%;
+}
+
+.billing-detail-col {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    gap: 4px;
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.billing-detail-col-label {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.billing-detail-col-value {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.billing-detail-col-email-btn {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: none;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #2563EB;
+    cursor: pointer;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: opacity 0.15s ease;
+}
+
+.billing-detail-col-email-btn:hover {
+    text-decoration: underline;
+    opacity: 0.85;
+}
+
+/* ─── 2. SUBSCRIPTION OVERVIEW ROW (Frame 2147225464: 3 Columns) ───────────── */
+.billing-overview-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr) minmax(0, 1fr);
+    gap: 16px;
+    width: 100%;
+    align-items: stretch;
+}
+
+/* Section wrapper adaptation for overview cards */
+.billing-overview-card-wrapper {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px;
+    gap: 16px;
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 6px;
+    height: 100%;
+}
+
+.billing-overview-card-wrapper .billing-inner-card {
+    height: 100%;
+    justify-content: space-between;
+}
+
+/* Dividers */
+.billing-divider {
+    width: 100%;
+    height: 1px;
+    background: #EBEBEB;
+    border: none;
+    margin: 0;
+}
+
+.billing-divider-dark {
+    width: 100%;
+    height: 1px;
+    background: #2A344C;
+    border: none;
+    margin: 0;
+}
+
+/* ── Current Plan Card Internals ── */
+.bcp-header-row {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 0;
+    gap: 16px;
+    width: 100%;
+}
+
+.bcp-title-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    gap: 4px;
+}
+
+.bcp-plan-name {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 700;
+    font-size: 24px;
+    line-height: 120%;
+    letter-spacing: -0.005em;
+    color: #0F172A;
+}
+
+.bcp-plan-interval {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.bcp-status-badge {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 2px 8px;
+    gap: 10px;
+    background: rgba(22, 163, 74, 0.12);
+    border-radius: 9999px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #16A34A;
+    text-transform: uppercase;
+}
+
+.bcp-price-row {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0;
+    gap: 4px;
+    width: 100%;
+}
+
+.bcp-price-label {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.bcp-price-value {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 24px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.bcp-meta-row {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    padding: 0;
+    gap: 16px;
+    width: 100%;
+}
+
+.bcp-meta-col {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    gap: 4px;
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.bcp-meta-col-label {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.bcp-meta-col-value {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bcp-actions-row {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0;
+    gap: 16px;
+    width: 100%;
+    flex-wrap: wrap;
+}
+
+/* ── Next Charge Card Internals ── */
+.bnc-amount-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    gap: 4px;
+    width: 100%;
+}
+
+.bnc-amount-value {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 700;
+    font-size: 24px;
+    line-height: 120%;
+    letter-spacing: -0.005em;
+    color: #0F172A;
+}
+
+.bnc-tax-label {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.bnc-renews-box {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    gap: 16px;
+    width: 100%;
+    min-height: 61px;
+    background: rgba(226, 232, 240, 0.2);
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+}
+
+.bnc-renews-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    gap: 4px;
+}
+
+.bnc-renews-label {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.bnc-renews-date {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.bnc-calendar-icon {
+    color: #2563EB;
+    flex-shrink: 0;
+}
+
+.bnc-pm-row {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0;
+    gap: 4px;
+    width: 100%;
+}
+
+.bnc-pm-left {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0;
+    gap: 6px;
+}
+
+.bnc-pm-label {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.bnc-pm-val {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.bnc-view-details-btn {
+    background: transparent;
+    border: none;
+    padding: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    text-align: center;
+    color: #2563EB;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.bnc-view-details-btn:hover {
+    text-decoration: underline;
+}
+
+.bnc-renewal-info-link {
+    background: transparent;
+    border: none;
+    padding: 0;
+    width: 100%;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    text-align: center;
+    color: #2563EB;
+    cursor: pointer;
+}
+
+.bnc-renewal-info-link:hover {
+    text-decoration: underline;
+}
+
+/* ── Subscription Status Dark Card (Frame 93 in Figma) ── */
+.billing-status-dark-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 32px 24px;
+    gap: 16px;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(0deg, #0F172A, #0F172A), rgba(255, 255, 255, 0.6);
+    box-shadow: 0px 0px 6px rgba(0, 0, 0, 0.06);
+    border-radius: 14px;
+    color: #FFFFFF;
+}
+
+.bsdc-label {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #FFFFFF !important;
+    text-transform: uppercase;
+    margin: 0;
+}
+
+.bsdc-status-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    gap: 12px;
+    width: 100%;
+}
+
+.bsdc-pill {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 6px 12px;
+    gap: 8px;
+    background: #FFFFFF;
+    border-radius: 4px;
+}
+
+.bsdc-check-icon {
+    color: #16A34A;
+    flex-shrink: 0;
+}
+
+.bsdc-pill-text {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 24px;
+    line-height: 120%;
+    color: #16A34A;
+}
+
+.bsdc-scope-desc {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 140%;
+    color: #64748B;
+}
+
+.bsdc-freq-row {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0;
+    gap: 4px;
+    width: 100%;
+}
+
+.bsdc-freq-label {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.bsdc-freq-val {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 120%;
+    color: #FFFFFF;
+}
+
+/* ─── 3. USAGE SNAPSHOT SECTION (Frame 2147225074) ─────────────────────────── */
+.billing-usage-grid {
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    align-items: stretch;
+    padding: 0;
+    gap: 20px;
+    width: 100%;
+}
+
+.billing-usage-kpi-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 16px;
+    gap: 16px;
+    min-height: 167px;
+    background: #FFFFFF;
+    box-shadow: 0px 0px 6px rgba(0, 0, 0, 0.06);
+    border-radius: 14px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    text-align: left;
+}
+
+.billing-usage-kpi-card:hover {
+    transform: translateY(-2px);
+    border-color: #BFDBFE;
+    box-shadow: 0px 4px 12px rgba(37, 99, 235, 0.08);
+}
+
+.buk-top-row {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0;
+    gap: 16px;
+    width: 100%;
+}
+
+.buk-title {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.buk-icon {
+    color: #64748B;
+    flex-shrink: 0;
+}
+
+.buk-body {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 0;
+    gap: 12px;
+    width: 100%;
+    flex: 1;
+}
+
+.buk-value-main {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 400;
+    font-size: 32px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.buk-progress-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    gap: 6px;
+    width: 100%;
+}
+
+.buk-progress-track {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    width: 100%;
+    height: 8px;
+    background: rgba(37, 99, 235, 0.1);
+    border-radius: 140px;
+    overflow: hidden;
+}
+
+.buk-progress-fill {
+    height: 8px;
+    background: #2563EB;
+    border-radius: 60px;
+    transition: width 0.4s ease;
+}
+
+.buk-subtitle-text {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 140%;
+    color: #64748B;
+}
+
+/* ─── 4. BOTTOM ROW (Frame 2147225476: Payment + Contact + Recent Invoices) ── */
+.billing-bottom-grid {
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+    align-items: stretch;
+    padding: 0;
+    gap: 16px;
+    width: 100%;
+}
+
+.billing-bottom-subgrid {
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: stretch;
+    padding: 0;
+    gap: 16px;
+}
+
+/* Shared Bottom Card Styling (Frame 2147225027, 2147225465, 2147225466) */
+.billing-bottom-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 16px;
+    gap: 16px;
+    min-height: 179px;
+    background: #FFFFFF;
+    box-shadow: 0px 0px 6px rgba(0, 0, 0, 0.06);
+    border-radius: 14px;
+}
+
+.bbc-header-row {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0;
+    gap: 16px;
+    width: 100%;
+}
+
+.bbc-icon-box {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 10px;
+    width: 40px;
+    height: 40px;
+    background: #E4ECFB;
+    border-radius: 6px;
+    flex-shrink: 0;
+}
+
+.bbc-icon-box svg {
+    color: #2563EB;
+}
+
+.bbc-title-block {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 0;
+    gap: 4px;
+    min-width: 0;
+}
+
+.bbc-card-title {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    white-space: nowrap;
+}
+
+.bbc-card-subtitle {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
+    white-space: nowrap;
+}
+
+.bbc-value-row {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0;
+    gap: 12px;
+    width: 100%;
+}
+
+.bbc-value-digits {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 24px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.bbc-default-badge {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 2px 8px;
+    background: rgba(22, 163, 74, 0.12);
+    border-radius: 9999px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #16A34A;
+}
+
+.bbc-email-val {
+    margin: 0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 20px;
+    line-height: 120%;
+    color: #2563EB;
+    word-break: break-all;
+}
+
+/* Recent Billing Invoices specific */
+.binv-top-bar {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0;
+    gap: 16px;
+    width: 100%;
+}
+
+.binv-item-row {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0;
+    gap: 16px;
+    width: 100%;
+}
+
+.binv-item-left {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0;
+    gap: 16px;
+    min-width: 0;
+    flex: 1;
+}
+
+.binv-item-actions {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+/* ─── Modal Overlay & Dialogs ──────────────────────────────────────────────── */
+.billing-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 16px;
+    animation: billingFadeIn 0.15s ease-out;
+}
+
+.billing-modal {
+    background: #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.16);
+    width: 100%;
+    max-width: 480px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    animation: billingScaleUp 0.15s ease-out;
+    border: 1px solid #E2E8F0;
+}
+
+.billing-modal-md {
+    max-width: 640px;
+}
+
+.billing-modal-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid #EBEBEB;
+    position: relative;
+}
+
+.billing-modal-header h2 {
+    margin: 0 0 4px;
+    font-size: 18px;
+    font-weight: 700;
+    color: #0F172A;
+    font-family: 'Urbanist', sans-serif;
+}
+
+.billing-modal-header p {
+    margin: 0;
+    font-size: 13px;
+    color: #64748B;
+    font-family: 'Urbanist', sans-serif;
+}
+
+.billing-modal-close {
+    position: absolute;
+    top: 18px;
+    right: 20px;
+    border: none;
+    background: transparent;
+    color: #64748B;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease;
+}
+
+.billing-modal-close:hover {
+    background: #F1F5F9;
+    color: #0F172A;
+}
+
+.billing-modal-body {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.billing-modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid #EBEBEB;
+    background: #F8FAFC;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.billing-form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.billing-form-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.billing-form-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+    font-family: 'Urbanist', sans-serif;
+}
+
+.billing-form-input {
+    width: 100%;
+    box-sizing: border-box;
+    height: 42px;
+    padding: 0 14px;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: 'Urbanist', sans-serif;
+    color: #0F172A;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.billing-form-input:focus {
+    border-color: #2563EB;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+/* ─── Toast Notifications ──────────────────────────────────────────────────── */
+.billing-toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: 'Urbanist', sans-serif;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.15);
+    z-index: 1100;
+    animation: billingSlideIn 0.2s ease-out;
+}
+
+.billing-toast.success {
+    background: #16A34A;
+    color: #FFFFFF;
+}
+
+.billing-toast.error {
+    background: #DC2626;
+    color: #FFFFFF;
+}
+
+.billing-toast button {
+    background: transparent;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    padding: 2px;
+    display: flex;
+    align-items: center;
+    margin-left: 6px;
+    opacity: 0.8;
+}
+
+.billing-toast button:hover {
+    opacity: 1;
+}
+
+/* ─── Error / Loading Skeletons ────────────────────────────────────────────── */
+.billing-error-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 18px;
+    background: #FEF2F2;
+    border: 1px solid #FECACA;
+    border-radius: 8px;
+    color: #DC2626;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: 'Urbanist', sans-serif;
+}
+
+.billing-skel {
+    background: linear-gradient(90deg, #E2E8F0 25%, #F1F5F9 50%, #E2E8F0 75%);
+    background-size: 200% 100%;
+    animation: billingShimmer 1.5s infinite;
+    border-radius: 6px;
+}
+
+.billing-spin {
+    animation: billingSpin 1s linear infinite;
+}
+
+@keyframes billingSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@keyframes billingShimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+@keyframes billingFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes billingScaleUp {
+    from { transform: scale(0.96); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+@keyframes billingSlideIn {
+    from { transform: translateY(12px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+/* ==========================================================================
+   MANAGE PLAN PAGE — FIGMA REDESIGN
+   ========================================================================== */
+
+/* Back Button (Frame 2147225121) */
+.mp-back-btn {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    margin: 0;
+    color: #0F172A;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 120%;
+    transition: color 0.15s ease;
+    align-self: flex-start;
+}
+
+.mp-back-btn:hover {
+    color: #2563EB;
+}
+
+.mp-back-btn svg {
+    color: inherit;
+    flex-shrink: 0;
+}
+
+/* Outer Section Card / Wrapper (Frame 2147225073, 2147225477, 2147225478, 2147225512) */
+.mp-section-wrapper,
+.mp-section-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px;
+    gap: 16px;
+    width: 100%;
+    box-sizing: border-box;
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 6px;
+    border: none;
+}
+
+.mp-section-label {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* Inner White Card (Frame 93) */
+.mp-inner-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px;
+    gap: 16px;
+    width: 100%;
+    box-sizing: border-box;
+    background: linear-gradient(0deg, #FFFFFF, #FFFFFF), rgba(255, 255, 255, 0.6);
+    box-shadow: 0px 0px 6px rgba(0, 0, 0, 0.06);
+    border-radius: 14px;
+    border: none;
+}
+
+/* ─── Section 1: YOUR CURRENT PLAN ─────────────────────────────────────── */
+.mp-current-header {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+    gap: 16px;
+}
+
+.mp-current-left {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    min-width: 0;
+}
+
+.mp-current-title-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.mp-current-name {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-weight: 700;
+    font-size: 24px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.mp-status-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 12px;
+    border-radius: 9999px;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    background: #16A34A;
+    color: #FFFFFF;
+}
+
+.mp-current-desc {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 140%;
+    color: #64748B;
+}
+
+.mp-current-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.mp-price-label {
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.mp-price-value-group {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+}
+
+.mp-current-price {
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-weight: 700;
+    font-size: 24px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.mp-current-interval {
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+/* 3-Column Metadata Box (Frame 2147225460) */
+.mp-current-meta-box,
+.mp-current-meta {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 16px;
+    gap: 16px;
+    width: 100%;
+    box-sizing: border-box;
+    background: rgba(226, 232, 240, 0.2);
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+}
+
+.mp-meta-column,
+.mp-meta-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+}
+
+.mp-meta-sub,
+.mp-meta-label {
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.mp-meta-main,
+.mp-meta-value {
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mp-meta-divider {
+    width: 1px;
+    height: 35px;
+    background: #E2E8F0;
+    flex-shrink: 0;
+}
+
+/* Footer Row (Frame 2147225504) */
+.mp-current-footer {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+    gap: 16px;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.mp-current-footer strong {
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-weight: 500;
+    font-size: 14px;
+    color: #0F172A;
+}
+
+.mp-footer-addon-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* ─── Section 2: INCLUDED WITH YOUR PLAN (Frame 2147225477) ─────────────── */
+.mp-included-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.mp-included-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    min-width: 0;
+}
+
+.mp-included-label {
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.mp-included-value {
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ─── Section 3: PLAN COMPARISON (Frame 2147225478) ─────────────────────── */
+.mp-plan-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.mp-plan-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 20px;
+    gap: 20px;
+    background: linear-gradient(0deg, #FFFFFF, #FFFFFF), rgba(255, 255, 255, 0.6);
+    box-shadow: 0px 0px 6px rgba(0, 0, 0, 0.06);
+    border-radius: 14px;
+    border: 1px solid transparent;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.mp-plan-card:hover {
+    box-shadow: 0px 4px 12px rgba(37, 99, 235, 0.1);
+    border-color: #BFDBFE;
+}
+
+.mp-plan-card.mp-plan-current {
+    border-color: #93C5FD;
+}
+
+.mp-plan-top {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+}
+
+.mp-plan-name-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    justify-content: space-between;
+}
+
+.mp-plan-name {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.mp-plan-active-pill {
+    padding: 3px 10px;
+    font-size: 11px;
+}
+
+.mp-plan-desc {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 140%;
+    color: #64748B;
+    min-height: 34px;
+}
+
+.mp-plan-price-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+}
+
+.mp-plan-price-val {
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-weight: 500;
+    font-size: 20px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.mp-plan-price-interval {
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.mp-plan-divider {
+    width: 100%;
+    height: 1px;
+    background: #EBEBEB;
+    margin: 4px 0;
+}
+
+.mp-plan-features-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    flex: 1;
+}
+
+.mp-plan-feat-row {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+}
+
+.mp-plan-feat-label {
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.mp-plan-feat-val {
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    text-align: right;
+}
+
+.mp-plan-btn {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px;
+    gap: 6px;
+    width: 100%;
+    height: 46px;
+    border-radius: 6px;
+    border: none;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #FFFFFF;
+    cursor: pointer;
+    transition: background 0.15s ease, opacity 0.15s ease;
+    box-sizing: border-box;
+    margin-top: auto;
+}
+
+.mp-plan-btn-action {
+    background: #2563EB;
+}
+
+.mp-plan-btn-action:hover {
+    background: #1D4ED8;
+}
+
+.mp-plan-btn-action:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.mp-plan-btn-current {
+    background: #0F172A;
+    opacity: 0.4;
+    cursor: default;
+}
+
+/* ─── Section 4: ADD-ONS (Frame 2147225512) ─────────────────────────────── */
+.mp-addon-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.mp-addon-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 20px;
+    gap: 20px;
+    background: linear-gradient(0deg, #FFFFFF, #FFFFFF), rgba(255, 255, 255, 0.6);
+    box-shadow: 0px 0px 6px rgba(0, 0, 0, 0.06);
+    border-radius: 14px;
+    border: 1px solid transparent;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.mp-addon-card:hover {
+    box-shadow: 0px 4px 12px rgba(37, 99, 235, 0.1);
+    border-color: #BFDBFE;
+}
+
+.mp-addon-top-row {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    height: 40px;
+}
+
+.mp-addon-icon-circle {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    width: 40px;
+    height: 40px;
+    background: #E4ECFB;
+    border-radius: 48px;
+    color: #2563EB;
+    flex-shrink: 0;
+}
+
+.mp-addon-pill {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 6px 12px;
+    background: rgba(15, 23, 42, 0.12);
+    border-radius: 9999px;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    white-space: nowrap;
+}
+
+.mp-addon-text-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    width: 100%;
+    flex: 1;
+}
+
+.mp-addon-title {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.mp-addon-desc {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 140%;
+    color: #64748B;
+    min-height: 40px;
+}
+
+.mp-addon-bottom-row {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    height: 32px;
+}
+
+.mp-addon-price {
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.mp-addon-btn {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 9px 8px;
+    gap: 6px;
+    height: 32px;
+    background: #2563EB;
+    border-radius: 6px;
+    border: none;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #FFFFFF;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    white-space: nowrap;
+}
+
+.mp-addon-btn:hover {
+    background: #1D4ED8;
+}
+
+/* ==========================================================================
+   PLAN-CHANGE STICKY NAVIGATION BAR (Frame 2147225331)
+   ========================================================================== */
+.plan-change-bar-wrapper {
+    position: fixed;
+    bottom: 24px;
+    left: 98px;
+    right: 16px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 900;
+    pointer-events: none;
+    animation: planBarSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes planBarSlideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@media (max-width: 760px) {
+    .plan-change-bar-wrapper {
+        left: 16px;
+        right: 16px;
+        bottom: 16px;
+    }
+}
+
+.plan-change-bar {
+    pointer-events: auto;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 14px;
+    gap: 16px;
+    width: 100%;
+    max-width: 1028px;
+    min-height: 71px;
+    background: #FFFFFF;
+    border: 1px solid #2563EB;
+    box-shadow: 0px 10px 20px -4px rgba(2, 6, 23, 0.1);
+    border-radius: 6px;
+}
+
+/* Frame 2147225505 (Plan Information Columns Group) */
+.plan-change-bar-plans {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0px;
+    gap: 16px;
+    flex: 1;
+    min-width: 0;
+}
+
+/* Frame 2147225462 & Frame 2147225463 (Individual Plan Column) */
+.plan-change-bar-col {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0px;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+}
+
+/* CURRENT PLAN / UPGRADING TO labels */
+.plan-change-bar-label {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.plan-change-bar-label.target {
+    color: #2563EB;
+}
+
+/* Plan names (e.g. Professional, Business) */
+.plan-change-bar-val {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 120%;
+    color: #0F172A;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Frame 2147225506 (Actions Group) */
+.plan-change-bar-actions {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 0px;
+    gap: 16px;
+    flex-shrink: 0;
+}
+
+/* Cancel Action */
+.plan-change-bar-cancel {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 6px 8px;
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    transition: color 0.15s ease;
+}
+
+.plan-change-bar-cancel:hover {
+    color: #2563EB;
+}
+
+/* Review Change Button */
+.plan-change-bar-review {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 9px 8px;
+    gap: 6px;
+    min-width: 136px;
+    height: 32px;
+    background: #2563EB;
+    border-radius: 6px;
+    border: none;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #FFFFFF;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    white-space: nowrap;
+}
+
+.plan-change-bar-review:hover {
+    background: #1D4ED8;
+}
+
+.plan-change-bar-review:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Selected state on plan cards in PLAN COMPARISON */
+.mp-plan-card.mp-plan-selected {
+    border-color: #2563EB;
+    box-shadow: 0px 0px 0px 2px rgba(37, 99, 235, 0.25), 0px 4px 12px rgba(37, 99, 235, 0.1);
+}
+
+.mp-plan-card.mp-plan-selected .mp-plan-btn-action {
+    background: #1D4ED8;
+}
+
+/* Page body padding adjustment when bar is active */
+.billing-page-body.mp-page-body.has-plan-bar,
+.mp-page-body.has-plan-bar {
+    padding-bottom: 104px;
+}
+
+/* ==========================================================================
+   PLAN CHANGE CONFIRMATION MODAL (Frame 2147225092 & Rectangle 69)
+   ========================================================================== */
+.plan-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 16px;
+    overflow-y: auto;
+    animation: pcmFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes pcmFadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Frame 2147225092 */
+.pcm-modal {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-start;
+    padding: 16px;
+    gap: 16px;
+    width: 100%;
+    max-width: 590px;
+    max-height: 92vh;
+    overflow-y: auto;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: 16px;
+    box-shadow: 0px 20px 40px rgba(15, 23, 42, 0.15);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    animation: pcmSlideIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes pcmSlideIn {
+    from {
+        transform: translateY(16px) scale(0.98);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}
+
+/* Frame 2147225093 (Modal Header) */
+.pcm-header {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0px;
+    gap: 24px;
+    width: 100%;
+    min-height: 48px;
+    flex-shrink: 0;
+}
+
+/* Frame 2147224969 */
+.pcm-header-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0px;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+}
+
+/* Upgrade to Business */
+.pcm-title {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+/* Review the immediate charge, credit and new limits before confirming. */
+.pcm-subtitle {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+/* Frame close button */
+.pcm-close {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    margin: 0;
+    color: #0F172A;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.15s ease;
+    flex-shrink: 0;
+}
+
+.pcm-close:hover {
+    background: rgba(15, 23, 42, 0.06);
+}
+
+/* Frame 2147225027 (Inner White Container) */
+.pcm-inner-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 16px;
+    gap: 16px;
+    width: 100%;
+    background: #FFFFFF;
+    border-radius: 14px;
+}
+
+/* Frame 2147225505 (Plan Pair Header) */
+.pcm-plan-pair {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0px;
+    gap: 16px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Frame 2147225462 (CURRENT PLAN) */
+.pcm-plan-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 16px;
+    gap: 4px;
+    flex: 1;
+    min-height: 72px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+}
+
+/* Frame 2147225463 (NEW PLAN) */
+.pcm-plan-card.new-plan {
+    background: rgba(37, 99, 235, 0.1);
+    border: 1px solid #2563EB;
+}
+
+.pcm-plan-card-label {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
+    text-transform: uppercase;
+}
+
+.pcm-plan-card.new-plan .pcm-plan-card-label {
+    color: #2563EB;
+}
+
+.pcm-plan-card-name {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 18px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+/* Inner Sections (Frame 93, Frame 2147225506, Frame 2147225507, Frame 2147225508) */
+.pcm-section-box {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 20px;
+    gap: 16px;
+    width: 100%;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 14px;
+}
+
+.pcm-section-heading {
+    margin: 0;
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    color: #0F172A;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+/* Frame 2147225513 (Price Breakdown List) */
+.pcm-breakdown-list {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0px;
+    gap: 16px;
+    width: 100%;
+}
+
+/* Frame 2147225462 & Frame 2147225463 (Price Breakdown Rows) */
+.pcm-breakdown-row {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0px;
+    gap: 4px;
+    width: 100%;
+    min-height: 19px;
+}
+
+.pcm-breakdown-label {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.pcm-breakdown-val {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+/* Rectangle 30 & Rectangle 31 (Dividers) */
+.pcm-divider {
+    box-sizing: border-box;
+    width: 100%;
+    height: 1px;
+    background: #EBEBEB;
+    border: none;
+    margin: 0;
+}
+
+/* Frame 2147225462 (Due today) */
+.pcm-due-today-row {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0px;
+    gap: 4px;
+    width: 100%;
+    min-height: 24px;
+}
+
+.pcm-due-today-label {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.pcm-due-today-amount {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 20px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+/* Frame 2147225463 (Renewal Row) */
+.pcm-renewal-row {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0px;
+    gap: 4px;
+    width: 100%;
+    min-height: 19px;
+}
+
+.pcm-renewal-label {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.pcm-renewal-amount {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+/* Frame 2147225508 (What Changes List) */
+.pcm-changes-list {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 0px;
+    gap: 16px;
+    width: 100%;
+}
+
+.pcm-change-row {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0px;
+    gap: 4px;
+    width: 100%;
+    min-height: 20px;
+}
+
+.pcm-change-label {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+    flex: 1;
+    min-width: 0;
+}
+
+.pcm-change-from {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 120%;
+    color: #0F172A;
+    flex: 1;
+    min-width: 0;
+}
+
+.pcm-change-arrow-icon {
+    color: #2563EB;
+    flex-shrink: 0;
+    margin: 0 4px;
+}
+
+.pcm-change-to {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 120%;
+    color: #0F172A;
+    text-align: right;
+    flex: 1;
+    min-width: 0;
+}
+
+/* Add-on Effect (Frame 2147225507) */
+.pcm-addon-text {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+/* Payment Method Box (Frame 2147225508) */
+.pcm-pm-box {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    min-height: 90px;
+}
+
+/* Frame 2147225515 */
+.pcm-pm-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0px;
+    gap: 8px;
+}
+
+.pcm-pm-label {
+    margin: 0;
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    color: #0F172A;
+}
+
+.pcm-pm-card {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 18px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+/* Change Payment Method Button */
+.pcm-pm-btn {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px;
+    gap: 6px;
+    min-width: 188px;
+    height: 46px;
+    background: #2563EB;
+    border-radius: 6px;
+    border: none;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #FFFFFF;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    white-space: nowrap;
+}
+
+.pcm-pm-btn:hover {
+    background: #1D4ED8;
+}
+
+/* Footer Actions (Frame 2147225069) */
+.pcm-footer {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0px;
+    gap: 16px;
+    width: 100%;
+    min-height: 46px;
+    flex-shrink: 0;
+}
+
+/* Cancel Button */
+.pcm-btn-cancel {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px;
+    gap: 6px;
+    min-width: 71px;
+    height: 46px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.pcm-btn-cancel:hover {
+    background: #F8FAFC;
+    border-color: #CBD5E1;
+}
+
+/* Confirm Upgrade Button */
+.pcm-btn-confirm {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px;
+    gap: 6px;
+    min-width: 241px;
+    height: 46px;
+    background: #2563EB;
+    border-radius: 6px;
+    border: none;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #FFFFFF;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    white-space: nowrap;
+}
+
+.pcm-btn-confirm:hover {
+    background: #1D4ED8;
+}
+
+.pcm-btn-confirm:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+/* ==========================================================================
+   PLAN CHANGE SUCCESS MODAL (Frame 2147225094 & Frame 2147225096)
+   ========================================================================== */
+
+/* Outer Frosted Glass Shell (Frame 2147225094) */
+.psm-modal {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 16px;
+    gap: 16px;
+    width: 100%;
+    max-width: 590px;
+    min-height: 343px;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: 16px;
+    box-shadow: 0px 20px 40px rgba(15, 23, 42, 0.15);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    animation: psmSlideIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes psmSlideIn {
+    from {
+        transform: translateY(16px) scale(0.98);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}
+
+/* Inner White Panel (Frame 2147225096) */
+.psm-inner-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px;
+    gap: 16px;
+    width: 100%;
+    min-height: 249px;
+    background: #FFFFFF;
+    border-radius: 14px;
+    flex: none;
+    order: 0;
+    align-self: stretch;
+    flex-grow: 0;
+}
+
+/* Success Check Icon Circle Wrapper (Frame 2147225105) */
+.psm-icon-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    order: 0;
+    flex-grow: 0;
+}
+
+.psm-icon-circle {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    gap: 10px;
+    width: 68px;
+    height: 68px;
+    background: rgba(22, 163, 74, 0.12);
+    border-radius: 100px;
+}
+
+.psm-check-icon {
+    width: 28px;
+    height: 28px;
+    color: #16A34A;
+    stroke: #16A34A;
+}
+
+/* Title & Subtitle Group (Frame 2147224969) */
+.psm-title-group {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 0px;
+    gap: 6px;
+    width: 100%;
+    max-width: 320px;
+    flex: none;
+    order: 1;
+    flex-grow: 0;
+    text-align: center;
+}
+
+/* Upgrade Successful */
+.psm-title {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 120%;
+    color: #0F172A;
+    text-align: center;
+}
+
+/* Your plan has been changed to Business. */
+.psm-subtitle {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 140%;
+    text-align: center;
+    color: #64748B;
+}
+
+/* Metadata Info Box (Frame 2147225460) */
+.psm-meta-box {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 8px 12px;
+    gap: 16px;
+    isolation: isolate;
+    width: 100%;
+    min-height: 53px;
+    background: rgba(226, 232, 240, 0.2);
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    flex: none;
+    order: 2;
+    align-self: stretch;
+    flex-grow: 0;
+}
+
+/* Frame 2147225000 & Frame 2147225313 */
+.psm-meta-col {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0px;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+}
+
+/* Effective / Next Renewal Label */
+.psm-meta-label {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
+    white-space: nowrap;
+}
+
+/* Effective Today / Next Renewal Value */
+.psm-meta-val {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+}
+
+/* Footer Actions (Frame 2147225095) */
+.psm-footer {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0px;
+    gap: 16px;
+    width: 100%;
+    height: 46px;
+    flex: none;
+    order: 1;
+    align-self: stretch;
+    flex-grow: 0;
+}
+
+/* Back to Plan Button */
+.psm-btn-back {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px;
+    gap: 6px;
+    min-width: 105px;
+    height: 46px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.psm-btn-back:hover {
+    background: #F8FAFC;
+    border-color: #CBD5E1;
+}
+
+/* View Subscription Button */
+.psm-btn-view {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px;
+    gap: 6px;
+    min-width: 141px;
+    height: 46px;
+    background: #2563EB;
+    border: 1px solid #2563EB;
+    border-radius: 6px;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #FFFFFF;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.psm-btn-view:hover {
+    background: #1D4ED8;
+    border-color: #1D4ED8;
+}
+
+/* ─── Responsive Media Queries ────────────────────────────────────────────── */
+@media (max-width: 1200px) {
+    .mp-plan-grid,
+    .mp-addon-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .billing-overview-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .billing-usage-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .billing-bottom-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 900px) {
+    .mp-included-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .mp-current-meta-box,
+    .mp-current-meta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px;
+    }
+
+    .mp-meta-divider {
+        display: none;
+    }
+
+    .mp-current-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .mp-current-right {
+        align-items: flex-start;
+        text-align: left;
+    }
+
+    .billing-detail-row {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .billing-usage-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .billing-bottom-subgrid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .billing-page-body.mp-page-body,
+    .mp-page-body {
+        padding: 0 0 32px;
+        gap: 12px;
+    }
+
+    .mp-section-wrapper,
+    .mp-section-card {
+        padding: 14px;
+        gap: 12px;
+    }
+
+    .mp-inner-card,
+    .mp-plan-card,
+    .mp-addon-card {
+        padding: 14px;
+        gap: 14px;
+    }
+
+    .mp-plan-grid,
+    .mp-addon-grid,
+    .mp-included-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .mp-current-footer {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .mp-addon-bottom-row {
+        flex-direction: column;
+        align-items: flex-start;
+        height: auto;
+        gap: 8px;
+    }
+
+    .mp-addon-btn {
+        width: 100%;
+    }
+
+    .plan-change-bar {
+        flex-direction: column;
+        align-items: stretch;
+        min-height: auto;
+        padding: 12px;
+        gap: 12px;
+    }
+
+    .plan-change-bar-plans {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .plan-change-bar-actions {
+        width: 100%;
+        justify-content: space-between;
+        border-top: 1px solid #E2E8F0;
+        padding-top: 10px;
+    }
+
+    .plan-change-bar-review {
+        flex: 1;
+    }
+
+    .billing-page-body {
+        padding: 0 8px 32px;
+        gap: 12px;
+    }
+
+    .billing-page-title-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .billing-title-actions {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .billing-title-actions .billing-btn-outline,
+    .billing-title-actions .billing-btn-primary {
+        flex: 1 1 100%;
+    }
+
+    .bcp-meta-row {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .bcp-actions-row {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .bcp-actions-row button {
+        width: 100%;
+    }
+
+    .billing-usage-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .binv-top-bar {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .binv-item-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .binv-item-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .pcm-modal {
+        padding: 12px;
+        gap: 12px;
+        max-width: 100%;
+        max-height: 94vh;
+    }
+
+    .pcm-inner-card {
+        padding: 12px;
+        gap: 12px;
+    }
+
+    .pcm-plan-pair {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .pcm-pm-box {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .pcm-pm-btn {
+        width: 100%;
+    }
+
+    .pcm-footer {
+        flex-direction: column-reverse;
+        gap: 8px;
+        height: auto;
+    }
+
+    .pcm-btn-cancel,
+    .pcm-btn-confirm {
+        width: 100%;
+    }
+
+    /* Success Modal Mobile Adjustments */
+    .psm-modal {
+        padding: 12px;
+        gap: 12px;
+        max-width: 100%;
+        min-height: auto;
+    }
+
+    .psm-inner-card {
+        padding: 16px 12px;
+        gap: 14px;
+        min-height: auto;
+    }
+
+    .psm-meta-box {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+        min-height: auto;
+    }
+
+    .psm-meta-col {
+        width: 100%;
+    }
+
+    .psm-meta-val {
+        white-space: normal;
+    }
+
+    .psm-footer {
+        flex-direction: column-reverse;
+        gap: 8px;
+        height: auto;
+    }
+
+    .psm-btn-back,
+    .psm-btn-view {
+        width: 100%;
+    }
+}

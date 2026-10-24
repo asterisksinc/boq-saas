@@ -24,6 +24,10 @@ export default function SettingsProfileHeader({
 }: SettingsProfileHeaderProps) {
     const [editModalOpen, setEditModalOpen] = useState(false);
 
+    // Format subtitle to match Figma: "Owner riya@arvininteriors.com"
+    const subtitle = [role, email].filter(Boolean).join(" ");
+    const clampedPercent = Math.min(100, Math.max(0, completionPercent));
+
     return (
         <div className="settings-profile-card">
             <div className="settings-profile-top">
@@ -37,12 +41,7 @@ export default function SettingsProfileHeader({
                     </div>
                     <div className="settings-profile-meta">
                         <h2 className="settings-profile-name">{displayName}</h2>
-                        <div className="settings-profile-role-row">
-                            <span className="settings-profile-role">{role}</span>
-                            {email ? (
-                                <span className="settings-profile-email">{email}</span>
-                            ) : null}
-                        </div>
+                        <p className="settings-profile-subtitle">{subtitle || "Member"}</p>
                     </div>
                 </div>
 
@@ -61,18 +60,18 @@ export default function SettingsProfileHeader({
                 <div
                     className="settings-profile-progress-track"
                     role="progressbar"
-                    aria-valuenow={completionPercent}
+                    aria-valuenow={clampedPercent}
                     aria-valuemin={0}
                     aria-valuemax={100}
                     aria-label="Profile completion progress"
                 >
                     <div
                         className="settings-profile-progress-fill"
-                        style={{ width: `${completionPercent}%` }}
+                        style={{ width: `${clampedPercent}%` }}
                     />
                 </div>
                 <span className="settings-profile-progress-percent">
-                    {completionPercent}%
+                    {clampedPercent}%
                 </span>
             </div>
 

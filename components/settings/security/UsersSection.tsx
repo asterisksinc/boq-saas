@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus } from "lucide-react";
 import {
     WorkspaceUserItem,
     WorkspaceRoleItem,
@@ -74,16 +74,16 @@ export default function UsersSection({ showNotice, userRole }: UsersSectionProps
 
     if (loading) {
         return (
-            <div className="security-access-content">
+            <div className="security-section-wrapper" aria-busy="true">
                 <div className="security-section-header">
                     <h3 className="security-section-title">User</h3>
-                    <div className="skeleton" style={{ width: 110, height: 38, borderRadius: 8 }} />
+                    <div className="skeleton" style={{ width: 109, height: 38, borderRadius: 6 }} />
                 </div>
                 <div className="security-user-cards-list">
-                    <div className="skeleton" style={{ height: 115, borderRadius: 12 }} />
-                    <div className="skeleton" style={{ height: 115, borderRadius: 12 }} />
-                    <div className="skeleton" style={{ height: 115, borderRadius: 12 }} />
-                    <div className="skeleton" style={{ height: 115, borderRadius: 12 }} />
+                    <div className="skeleton" style={{ height: 128, borderRadius: 6 }} />
+                    <div className="skeleton" style={{ height: 128, borderRadius: 6 }} />
+                    <div className="skeleton" style={{ height: 128, borderRadius: 6 }} />
+                    <div className="skeleton" style={{ height: 128, borderRadius: 6 }} />
                 </div>
             </div>
         );
@@ -91,7 +91,7 @@ export default function UsersSection({ showNotice, userRole }: UsersSectionProps
 
     if (error) {
         return (
-            <div className="security-access-content">
+            <div className="security-section-wrapper">
                 <div className="security-section-header">
                     <h3 className="security-section-title">User</h3>
                 </div>
@@ -111,7 +111,7 @@ export default function UsersSection({ showNotice, userRole }: UsersSectionProps
     }
 
     return (
-        <div className="security-access-content">
+        <div className="security-section-wrapper">
             <div className="security-section-header">
                 <h3 className="security-section-title">User</h3>
                 {canManage && (
@@ -119,8 +119,9 @@ export default function UsersSection({ showNotice, userRole }: UsersSectionProps
                         type="button"
                         className="security-btn-primary"
                         onClick={handleAddUserClick}
+                        data-testid="add-user-btn"
                     >
-                        <Plus size={16} />
+                        <Plus size={20} strokeWidth={2.2} />
                         <span>Add User</span>
                     </button>
                 )}
@@ -131,12 +132,12 @@ export default function UsersSection({ showNotice, userRole }: UsersSectionProps
                     style={{
                         padding: "48px 24px",
                         textAlign: "center",
-                        background: "#ffffff",
-                        borderRadius: "12px",
+                        background: "rgba(255, 255, 255, 0.6)",
+                        borderRadius: "6px",
                         border: "1px dashed #cbd5e1",
                     }}
                 >
-                    <p style={{ color: "#64748b", margin: "0 0 16px 0", fontSize: "14px" }}>
+                    <p style={{ color: "#64748b", margin: "0 0 16px 0", fontSize: "14px", fontFamily: "Urbanist, sans-serif" }}>
                         No users currently assigned to this workspace.
                     </p>
                     {canManage && (
@@ -145,13 +146,13 @@ export default function UsersSection({ showNotice, userRole }: UsersSectionProps
                             className="security-btn-primary"
                             onClick={handleAddUserClick}
                         >
-                            <Plus size={16} />
-                            <span>Add First User</span>
+                            <Plus size={20} strokeWidth={2.2} />
+                            <span>Add User</span>
                         </button>
                     )}
                 </div>
             ) : (
-                <div className="security-user-cards-list">
+                <div className="security-user-cards-list" data-testid="security-user-cards-list">
                     {users.map((user) => (
                         <UserCard
                             key={user.id}

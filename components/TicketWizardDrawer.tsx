@@ -436,13 +436,25 @@ export default function TicketWizardDrawer({
 
             {/* Slide-over Drawer Panel */}
             <div className="ticket-drawer" role="dialog" aria-modal="true">
-                {/* Header */}
+                {/* Header (Frame 2147225093 header) */}
                 <div className="ticket-drawer-header">
                     <div className="ticket-drawer-header-content">
-                        <h2>Let's Get This Sorted.</h2>
-                        <p>
-                            {draftTicketId ? "Resuming saved draft ticket" : "Submit a request to our engineering and support specialists"}
-                        </p>
+                        <h2>Let&apos;s Get This Sorted.</h2>
+                        {draftTicketId && (
+                            <span
+                                className="ticket-draft-badge"
+                                style={{
+                                    fontSize: "11px",
+                                    fontWeight: 600,
+                                    padding: "2px 6px",
+                                    background: "#f1f5f9",
+                                    color: "#64748b",
+                                    borderRadius: "4px",
+                                }}
+                            >
+                                Draft
+                            </span>
+                        )}
                     </div>
                     <button
                         type="button"
@@ -450,17 +462,18 @@ export default function TicketWizardDrawer({
                         onClick={handleCloseRequest}
                         aria-label="Close ticket drawer"
                     >
-                        <X size={18} />
+                        <X size={20} />
                     </button>
                 </div>
 
-                {/* Stepper Bar */}
+                {/* Stepper Bar (Frame 93) */}
                 <div className="ticket-stepper-wrap">
                     <div className="ticket-stepper">
                         {STEPS.map((s, idx) => {
                             const isCompleted = s.id < currentStep;
                             const isActive = s.id === currentStep;
                             const isUpcoming = s.id > currentStep;
+                            const stepNumberStr = s.id < 10 ? `0${s.id}` : `${s.id}`;
 
                             return (
                                 <div key={s.id} style={{ display: "contents" }}>
@@ -469,9 +482,10 @@ export default function TicketWizardDrawer({
                                         className={`ticket-step-node ${isActive ? "active" : isCompleted ? "completed" : "upcoming"}`}
                                         onClick={() => handleJumpStep(s.id)}
                                         disabled={isUpcoming}
+                                        title={`Step ${stepNumberStr}: ${s.label}`}
                                     >
                                         <div className="ticket-step-circle">
-                                            {isCompleted ? <Check size={14} strokeWidth={3} /> : s.id}
+                                            {isCompleted ? <Check size={13} strokeWidth={2.5} /> : stepNumberStr}
                                         </div>
                                         <span className="ticket-step-label">{s.label}</span>
                                     </button>
@@ -486,7 +500,7 @@ export default function TicketWizardDrawer({
                     </div>
                 </div>
 
-                {/* Drawer Body (Steps 1 to 7) */}
+                {/* Drawer Body (Steps 1 to 7 - Frame 2147225096) */}
                 <div className="ticket-drawer-body">
                     {errorMsg && (
                         <div
@@ -512,10 +526,9 @@ export default function TicketWizardDrawer({
                     {currentStep === 1 && (
                         <div>
                             <div className="ticket-step-header">
-                                <span className="ticket-step-tag">Step 01 of 07</span>
-                                <h3 className="ticket-step-title">Select the category that best describes your issue</h3>
+                                <h3 className="ticket-step-title">What Can We Help You With?</h3>
                                 <p className="ticket-step-desc">
-                                    Choosing the right area routes your ticket directly to the specialized engineering team.
+                                    Choose the area closest to your issue.
                                 </p>
                             </div>
 
@@ -1104,13 +1117,13 @@ export default function TicketWizardDrawer({
                     )}
                 </div>
 
-                {/* Footer Controls */}
+                {/* Footer Controls (Frame 2147225095) */}
                 <div className="ticket-drawer-footer">
                     <div>
                         {currentStep > 1 ? (
                             <button
                                 type="button"
-                                className="ticket-drawer-btn-cancel"
+                                className="ticket-drawer-btn-cancel ticket-drawer-btn-back"
                                 onClick={handlePrevStep}
                                 disabled={submitting || savingDraft}
                             >
@@ -1128,7 +1141,7 @@ export default function TicketWizardDrawer({
                         )}
                     </div>
 
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <div className="ticket-drawer-footer-right">
                         <button
                             type="button"
                             className="ticket-drawer-btn-draft"
@@ -1140,9 +1153,7 @@ export default function TicketWizardDrawer({
                                     <Loader2 size={14} className="spin" /> Saving...
                                 </>
                             ) : (
-                                <>
-                                    <Bookmark size={14} /> Save as Draft
-                                </>
+                                "Save as Draft"
                             )}
                         </button>
 
@@ -1153,15 +1164,14 @@ export default function TicketWizardDrawer({
                                 onClick={handleNextStep}
                                 disabled={submitting || savingDraft}
                             >
-                                Continue <ChevronRight size={14} />
+                                Continue
                             </button>
                         ) : (
                             <button
                                 type="button"
-                                className="ticket-drawer-btn-continue"
+                                className="ticket-drawer-btn-continue ticket-drawer-btn-submit"
                                 onClick={handleSubmitTicket}
                                 disabled={submitting || savingDraft}
-                                style={{ background: "#2563eb" }}
                             >
                                 {submitting ? (
                                     <>

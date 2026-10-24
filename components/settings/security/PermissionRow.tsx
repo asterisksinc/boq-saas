@@ -21,7 +21,8 @@ export default function PermissionRow({
     return (
         <tr className="security-privilege-row">
             <td className="security-privilege-name-cell">
-                <span>{privilege.name}</span>
+                <span className="security-privilege-indent-spacer" aria-hidden="true" />
+                <span className="security-privilege-label">{privilege.name}</span>
             </td>
 
             {roles.map((role) => {
@@ -40,7 +41,7 @@ export default function PermissionRow({
                             aria-label={`Toggle ${privilege.name} for ${role.name}`}
                             title={isEnabled ? `Enabled for ${role.name}` : `Disabled for ${role.name}`}
                         >
-                            {isEnabled && <Check size={13} strokeWidth={3} />}
+                            {isEnabled && <Check size={14} strokeWidth={3} />}
                         </button>
                     </td>
                 );

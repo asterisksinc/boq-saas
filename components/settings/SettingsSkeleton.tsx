@@ -3,70 +3,73 @@
 export default function SettingsSkeleton() {
     return (
         <div className="settings-overview-layout settings-skeleton-animate" aria-busy="true" aria-label="Loading settings...">
-            {/* Profile Header Skeleton */}
+            {/* Profile Header Skeleton (Frame 93) */}
             <div className="settings-profile-card">
                 <div className="settings-profile-top">
                     <div className="settings-profile-user">
-                        <div className="skeleton skeleton-avatar" />
+                        <div className="skeleton" style={{ width: 48, height: 48, borderRadius: "50%" }} />
                         <div className="settings-profile-meta">
-                            <div className="skeleton skeleton-title" style={{ width: "160px", height: "20px" }} />
-                            <div className="skeleton skeleton-subtitle" style={{ width: "240px", height: "14px", marginTop: "8px" }} />
+                            <div className="skeleton skeleton-title" style={{ width: 140, height: 20 }} />
+                            <div className="skeleton skeleton-subtitle" style={{ width: 200, height: 14, marginTop: 6 }} />
                         </div>
                     </div>
-                    <div className="skeleton skeleton-btn" style={{ width: "100px", height: "36px", borderRadius: "8px" }} />
+                    <div className="skeleton skeleton-btn" style={{ width: 99, height: 34, borderRadius: 6 }} />
                 </div>
-                <div className="settings-profile-progress-wrap" style={{ marginTop: "24px" }}>
-                    <div className="skeleton" style={{ flex: 1, height: "8px", borderRadius: "9999px" }} />
-                    <div className="skeleton" style={{ width: "36px", height: "14px" }} />
+                <div className="settings-profile-progress-wrap">
+                    <div className="skeleton" style={{ flex: 1, height: 8, borderRadius: 9999 }} />
+                    <div className="skeleton" style={{ width: 28, height: 14 }} />
                 </div>
             </div>
 
-            {/* KPI Cards Skeleton */}
+            {/* KPI Cards Skeleton (Frame 2147225138) */}
             <div className="settings-kpi-grid">
                 {[1, 2, 3].map((i) => (
                     <div key={i} className="settings-kpi-card">
-                        <div className="skeleton skeleton-subtitle" style={{ width: "60px", height: "12px" }} />
-                        <div className="skeleton skeleton-title" style={{ width: "40px", height: "32px", marginTop: "8px" }} />
+                        <div className="skeleton skeleton-subtitle" style={{ width: 60, height: 14 }} />
+                        <div className="skeleton skeleton-title" style={{ width: 50, height: 28, marginTop: 8 }} />
                     </div>
                 ))}
             </div>
 
-            {/* Configuration Health Skeleton */}
-            <div className="settings-section">
-                <div className="skeleton skeleton-title" style={{ width: "180px", height: "20px", marginBottom: "16px" }} />
+            {/* Configuration Health Skeleton (Frame 2147225140) */}
+            <div className="settings-config-card">
+                <div className="skeleton skeleton-title" style={{ width: 140, height: 17 }} />
                 <div className="settings-health-grid">
                     {[1, 2, 3, 4, 5, 6, 7].map((i) => (
                         <div key={i} className="settings-health-card" style={{ cursor: "default" }}>
                             <div className="settings-health-card-top">
-                                <div className="skeleton" style={{ width: "40px", height: "40px", borderRadius: "10px" }} />
-                                <div className="skeleton" style={{ width: "50px", height: "20px", borderRadius: "9999px" }} />
+                                <div className="skeleton" style={{ width: 38, height: 38, borderRadius: 8 }} />
+                                <div className="skeleton" style={{ width: 44, height: 18, borderRadius: 9999 }} />
                             </div>
-                            <div className="settings-health-card-bottom" style={{ marginTop: "16px" }}>
+                            <div className="settings-health-card-bottom">
                                 <div style={{ flex: 1 }}>
-                                    <div className="skeleton skeleton-title" style={{ width: "100px", height: "14px" }} />
-                                    <div className="skeleton skeleton-subtitle" style={{ width: "130px", height: "12px", marginTop: "6px" }} />
+                                    <div className="skeleton skeleton-title" style={{ width: 90, height: 14 }} />
+                                    <div className="skeleton skeleton-subtitle" style={{ width: 120, height: 12, marginTop: 4 }} />
                                 </div>
-                                <div className="skeleton" style={{ width: "24px", height: "24px", borderRadius: "6px" }} />
+                                <div className="skeleton" style={{ width: 34, height: 34, borderRadius: 6 }} />
                             </div>
                         </div>
                     ))}
                 </div>
             </div>
 
-            {/* Recent Changes Skeleton */}
-            <div className="settings-section">
-                <div className="skeleton skeleton-title" style={{ width: "140px", height: "20px", marginBottom: "16px" }} />
-                <div className="settings-recent-changes-card" style={{ padding: "16px" }}>
+            {/* Recent Changes Skeleton (Frame 2147225141) */}
+            <div className="settings-recent-card">
+                <div className="skeleton skeleton-title" style={{ width: 120, height: 17 }} />
+                <div className="settings-recent-list">
                     {[1, 2, 3, 4].map((i) => (
-                        <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: i < 4 ? "1px solid #f1f5f9" : "none" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                                <div className="skeleton" style={{ width: "36px", height: "36px", borderRadius: "50%" }} />
-                                <div>
-                                    <div className="skeleton skeleton-title" style={{ width: "120px", height: "14px" }} />
-                                    <div className="skeleton skeleton-subtitle" style={{ width: "180px", height: "12px", marginTop: "6px" }} />
+                        <div key={i} className="settings-recent-entry">
+                            <div className="settings-recent-row">
+                                <div className="skeleton" style={{ width: 32, height: 32, borderRadius: "50%" }} />
+                                <div className="settings-recent-content">
+                                    <div className="settings-recent-details">
+                                        <div className="skeleton skeleton-title" style={{ width: 100, height: 14 }} />
+                                        <div className="skeleton skeleton-subtitle" style={{ width: 160, height: 12 }} />
+                                    </div>
+                                    <div className="skeleton" style={{ width: 40, height: 12 }} />
                                 </div>
                             </div>
-                            <div className="skeleton" style={{ width: "48px", height: "12px" }} />
+                            {i < 4 && <div className="settings-recent-divider" />}
                         </div>
                     ))}
                 </div>

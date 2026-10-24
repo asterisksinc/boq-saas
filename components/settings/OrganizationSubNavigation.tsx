@@ -45,7 +45,7 @@ export default function OrganizationSubNavigation({
                             onClick={() => onSelectSubTab(item.key)}
                         >
                             <span className="org-subnav-label">{item.label}</span>
-                            {isActive && <ChevronRight size={16} className="org-subnav-chevron" aria-hidden="true" />}
+                            {isActive && <ChevronRight size={18} className="org-subnav-chevron" aria-hidden="true" />}
                         </button>
                     );
                 })}

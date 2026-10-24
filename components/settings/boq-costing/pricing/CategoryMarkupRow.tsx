@@ -29,7 +29,7 @@ export const CategoryMarkupRow: React.FC<CategoryMarkupRowProps> = ({
     return (
         <div className="boq-category-markup-row">
             <span className="boq-category-name">{category.name}</span>
-            <div className="boq-compact-input-group">
+            <div className="boq-category-input-group boq-compact-input-group">
                 <input
                     type="number"
                     min="0"
@@ -39,10 +39,10 @@ export const CategoryMarkupRow: React.FC<CategoryMarkupRowProps> = ({
                     placeholder="0"
                     onChange={handleChange}
                     disabled={!canEdit}
-                    className="boq-compact-number-input"
+                    className="boq-category-number-input boq-compact-number-input"
                     aria-label={`${category.name} markup percentage`}
                 />
-                <span className="boq-input-suffix" aria-hidden="true">%</span>
+                <span className="boq-category-percent-label boq-input-suffix" aria-hidden="true">%</span>
             </div>
         </div>
     );

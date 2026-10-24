@@ -135,11 +135,17 @@ export default function RolePermissionMatrix({
     };
 
     return (
-        <div className="security-matrix-card">
+        <div className="security-matrix-card" data-testid="security-matrix-card">
             <div className="security-matrix-table-wrap">
                 <table className="security-matrix-table">
+                    <colgroup>
+                        <col style={{ width: 260 }} />
+                        {roles.map((r) => (
+                            <col key={r.id} style={{ width: 152 }} />
+                        ))}
+                    </colgroup>
                     <thead>
-                        <tr>
+                        <tr className="security-matrix-header-row">
                             <th className="security-matrix-search-cell">
                                 <div className="security-matrix-search-box">
                                     <input
@@ -150,17 +156,19 @@ export default function RolePermissionMatrix({
                                         onChange={(e) => setSearchQuery(e.target.value)}
                                         aria-label="Filter privileges by name"
                                     />
-                                    <Search size={15} className="security-matrix-search-icon" />
+                                    <Search size={16} className="security-matrix-search-icon" aria-hidden="true" />
                                 </div>
                             </th>
 
                             {roles.map((role) => (
                                 <th key={role.id} className="security-role-col-header">
-                                    <span className="security-role-label">Role</span>
-                                    <div className="security-role-name-wrap">
-                                        <span className="security-role-name" title={role.name}>
-                                            {role.name}
-                                        </span>
+                                    <div className="security-role-header-content">
+                                        <div className="security-role-info-wrap">
+                                            <span className="security-role-label">Role</span>
+                                            <span className="security-role-name" title={role.name}>
+                                                {role.name}
+                                            </span>
+                                        </div>
                                         {canManage && (
                                             <button
                                                 type="button"
@@ -169,7 +177,7 @@ export default function RolePermissionMatrix({
                                                 aria-label={`Edit ${role.name}`}
                                                 title={`Edit ${role.name}`}
                                             >
-                                                <Pencil size={12} />
+                                                <Pencil size={16} strokeWidth={1.8} />
                                             </button>
                                         )}
                                     </div>
@@ -187,7 +195,8 @@ export default function RolePermissionMatrix({
                                         textAlign: "center",
                                         padding: "32px 16px",
                                         color: "#64748b",
-                                        fontSize: "13.5px",
+                                        fontSize: "14px",
+                                        fontFamily: "Urbanist, sans-serif",
                                     }}
                                 >
                                     No privileges found matching &quot;{searchQuery}&quot;.

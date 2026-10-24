@@ -1,14 +1,14 @@
 "use client";
 
-import { GripVertical, Pencil, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
+import { GripVertical, Pencil, Trash2 } from 'lucide-react';
 import { CustomFormField } from '@/lib/integrations/types';
 
-const fieldTypeLabels: Record<string, string> = {
-    short_answer: 'Short Answer',
-    long_answer: 'Long Answer',
-    dropdown: 'Drop Down',
-    checkbox: 'Check Box',
-    link: 'Link',
+const FIELD_TYPE_BADGES: Record<string, string> = {
+    short_answer: 'SHORT ANSWER',
+    long_answer: 'LONG ANSWER',
+    dropdown: 'DROP DOWN',
+    checkbox: 'CHECK BOX',
+    link: 'LINK',
 };
 
 interface Props {
@@ -20,19 +20,47 @@ interface Props {
     onMoveDown?: () => void;
 }
 
-export default function FormFieldRow({ field, onEdit, onDelete, index, onMoveUp, onMoveDown }: Props) {
+export default function FormFieldRow({ field, onEdit, onDelete }: Props) {
+    const badgeText = FIELD_TYPE_BADGES[field.type] || field.type.replace(/_/g, ' ').toUpperCase();
+
     return (
-        <div className="intg-field-row">
-            <div className="intg-field-row-drag">
-                {onMoveUp && <button className="intg-field-reorder" onClick={onMoveUp} aria-label="Move up"><ChevronUp size={14} /></button>}
-                <GripVertical size={16} className="intg-grip" />
-                {onMoveDown && <button className="intg-field-reorder" onClick={onMoveDown} aria-label="Move down"><ChevronDown size={14} /></button>}
+        <div className="intg-field-row" data-field-id={field.id}>
+            {/* Left side: Drag handle and Name */}
+            <div className="intg-field-row-left">
+                <span className="intg-field-drag-handle" title="Reorder field">
+                    <GripVertical size={18} />
+                </span>
+                <span className="intg-field-row-name">
+                    {field.name}
+                    {field.required && <span className="intg-custom-required"> *</span>}
+                </span>
             </div>
-            <span className="intg-field-name">{field.name}{field.required && <span className="text-red"> *</span>}</span>
-            <span className="intg-field-type-badge">{fieldTypeLabels[field.type] || field.type}</span>
-            <div className="intg-field-actions">
-                <button className="intg-field-action-btn" onClick={onEdit} aria-label="Edit field"><Pencil size={14} /></button>
-                <button className="intg-field-action-btn intg-field-action-delete" onClick={onDelete} aria-label="Delete field"><Trash2 size={14} /></button>
+
+            {/* Type badge */}
+            <div className="intg-field-type-pill">
+                <span className="intg-field-type-pill-text">{badgeText}</span>
+            </div>
+
+            {/* Right side: Actions */}
+            <div className="intg-field-row-actions">
+                <button 
+                    type="button" 
+                    className="intg-field-icon-btn intg-field-edit-btn" 
+                    onClick={onEdit} 
+                    aria-label={`Edit ${field.name}`}
+                    title="Edit field"
+                >
+                    <Pencil size={18} />
+                </button>
+                <button 
+                    type="button" 
+                    className="intg-field-icon-btn intg-field-delete-btn" 
+                    onClick={onDelete} 
+                    aria-label={`Delete ${field.name}`}
+                    title="Delete field"
+                >
+                    <Trash2 size={18} />
+                </button>
             </div>
         </div>
     );

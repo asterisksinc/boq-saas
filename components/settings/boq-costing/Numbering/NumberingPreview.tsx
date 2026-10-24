@@ -14,9 +14,11 @@ export default function NumberingPreview({ settings }: NumberingPreviewProps) {
     }, [settings]);
 
     return (
-        <div className="boq-live-preview-container" aria-label="Live numbering preview">
+        <div className="boq-live-preview-box" aria-label="Live numbering preview">
             <span className="boq-live-preview-label">LIVE PREVIEW</span>
-            <span className="boq-live-preview-value" aria-live="polite">{previewString}</span>
+            <span className="boq-live-preview-value" aria-live="polite">
+                {previewString}
+            </span>
         </div>
     );
 }

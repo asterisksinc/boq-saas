@@ -56,7 +56,7 @@ export default function UserCard({
                             aria-label={`Edit ${user.displayName}`}
                             title="Edit User"
                         >
-                            <Pencil size={15} />
+                            <Pencil size={18} strokeWidth={1.8} />
                         </button>
                         <button
                             type="button"
@@ -65,7 +65,7 @@ export default function UserCard({
                             aria-label={`Delete ${user.displayName}`}
                             title="Delete User"
                         >
-                            <Trash2 size={15} />
+                            <Trash2 size={18} strokeWidth={1.8} />
                         </button>
                     </div>
                 )}
@@ -78,6 +78,7 @@ export default function UserCard({
                     <span className="security-meta-label">Phone:</span>
                     <span className="security-meta-value">{user.phone || "—"}</span>
                 </div>
+                <div className="security-user-meta-divider" />
                 <div className="security-user-meta-item">
                     <span className="security-meta-label">Email:</span>
                     <span className="security-meta-value">{user.email || "—"}</span>

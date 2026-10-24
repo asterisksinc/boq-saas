@@ -21,6 +21,7 @@ import {
 import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
 import TicketWizardDrawer from "@/components/TicketWizardDrawer";
+import "../help-redesign.css";
 
 const DEFAULT_ARTICLES: Record<string, HelpArticle> = {
     "how-to-import-an-excel-boq": {
@@ -29,11 +30,11 @@ const DEFAULT_ARTICLES: Record<string, HelpArticle> = {
         title: "How to import an Excel BOQ",
         summary: "Upload your workbook from the BOQ menu, map the required columns, then review the validation summary before importing.",
         readMinutes: 4,
-        helpfulYes: 96,
-        helpfulNo: 4,
+        helpfulYes: 0,
+        helpfulNo: 0,
         popular: true,
         updatedAt: "2026-08-28T10:00:00Z",
-        category: { slug: "boqs-costing", name: "BOQs & Costing" },
+        category: { slug: "boqs-costing", name: "BOQS & COSTING" },
         content: {
             shortAnswer: "Upload your workbook from the BOQ menu, map the required columns, then review the validation summary before importing.",
             sections: [
@@ -63,11 +64,11 @@ const DEFAULT_ARTICLES: Record<string, HelpArticle> = {
         title: "Create Your First Project",
         summary: "Set up a project workspace, invite your team, and start building your estimate.",
         readMinutes: 4,
-        helpfulYes: 96,
-        helpfulNo: 4,
+        helpfulYes: 0,
+        helpfulNo: 0,
         popular: true,
         updatedAt: "2026-08-28T10:00:00Z",
-        category: { slug: "getting-started", name: "Getting Started" },
+        category: { slug: "getting-started", name: "GETTING STARTED" },
         content: {
             shortAnswer: "Set up a project workspace, invite your team, and start building your estimate.",
             sections: [
@@ -82,11 +83,11 @@ const DEFAULT_ARTICLES: Record<string, HelpArticle> = {
         title: "Add a Costing Item",
         summary: "Add materials, labour, and custom rates to your Costing Library or directly to a BOQ.",
         readMinutes: 4,
-        helpfulYes: 96,
-        helpfulNo: 4,
+        helpfulYes: 0,
+        helpfulNo: 0,
         popular: true,
         updatedAt: "2026-08-28T10:00:00Z",
-        category: { slug: "boqs-costing", name: "BOQs & Costing" },
+        category: { slug: "boqs-costing", name: "BOQS & COSTING" },
         content: {
             shortAnswer: "Add materials, labour, and custom rates to your Costing Library or directly to a BOQ.",
             sections: [
@@ -101,11 +102,11 @@ const DEFAULT_ARTICLES: Record<string, HelpArticle> = {
         title: "Send a Proposal to a Client",
         summary: "Turn your approved BOQ into a polished proposal and send it for review.",
         readMinutes: 4,
-        helpfulYes: 96,
-        helpfulNo: 4,
+        helpfulYes: 0,
+        helpfulNo: 0,
         popular: true,
         updatedAt: "2026-08-28T10:00:00Z",
-        category: { slug: "boqs-costing", name: "BOQs & Costing" },
+        category: { slug: "boqs-costing", name: "BOQS & COSTING" },
         content: {
             shortAnswer: "Turn your approved BOQ into a polished proposal and send it for review.",
             sections: [
@@ -132,7 +133,13 @@ const formatArticleDate = (iso?: string | null) => {
 };
 
 function getArticleCategory(article: HelpArticle): { slug: string; name: string } | null {
-    if (article.category) return article.category;
+    if (article.category) {
+        if (typeof article.category === "string") {
+            const raw = article.category as string;
+            return { slug: raw.toLowerCase().replace(/\s+/g, "-"), name: raw };
+        }
+        return article.category;
+    }
     if (article.help_categories) {
         if (Array.isArray(article.help_categories)) {
             return article.help_categories[0] ?? null;
@@ -146,12 +153,31 @@ function getHelpfulPercentage(article: HelpArticle): number | null {
     const yes = article.helpfulYes ?? article.helpful_yes ?? 0;
     const no = article.helpfulNo ?? article.helpful_no ?? 0;
     const total = yes + no;
-    if (total <= 0) return null;
+    // Only return percentage when there is a statistically meaningful sample size (at least 5 votes)
+    if (total < 5) return null;
     return Math.round((yes / total) * 100);
 }
 
 function getReadMinutes(article: HelpArticle): number {
-    return article.readMinutes ?? article.read_minutes ?? 4;
+    if (article.readMinutes && article.readMinutes > 0) return article.readMinutes;
+    if (article.read_minutes && article.read_minutes > 0) return article.read_minutes;
+    // Calculate based on content length: standard average 200 words per minute
+    let text = article.summary || "";
+    if (article.content && typeof article.content === "object") {
+        if ("shortAnswer" in article.content && typeof (article.content as any).shortAnswer === "string") {
+            text += " " + (article.content as any).shortAnswer;
+        }
+        if (Array.isArray(article.content.sections)) {
+            for (const s of article.content.sections) {
+                text += " " + (s.heading || "") + " " + (s.body || "");
+                if (Array.isArray(s.items)) text += " " + s.items.join(" ");
+            }
+        }
+    } else if (typeof article.content === "string") {
+        text += " " + article.content;
+    }
+    const words = text.trim().split(/\s+/).filter(Boolean).length;
+    return Math.max(1, Math.ceil(words / 200));
 }
 
 function getArticleShortAnswer(article: HelpArticle): string | null {
@@ -164,7 +190,7 @@ function getArticleShortAnswer(article: HelpArticle): string | null {
 
 function ArticleContentRenderer({ content, summary }: { content?: any; summary?: string | null }) {
     if (!content) {
-        return <p className="article-default-summary">{summary || "No article content available."}</p>;
+        return <p className="article-plain-body">{summary || "No article content available."}</p>;
     }
 
     if (typeof content === "object") {
@@ -175,7 +201,7 @@ function ArticleContentRenderer({ content, summary }: { content?: any; summary?:
                         <div key={idx} className="article-section-block">
                             {section.heading && <h3>{section.heading}</h3>}
                             {section.body && <p>{section.body}</p>}
-                            {Array.isArray(section.items) && (
+                            {Array.isArray(section.items) && section.items.length > 0 && (
                                 <ol className="article-ordered-steps">
                                     {section.items.map((item: string, iIdx: number) => (
                                         <li key={iIdx}>{item}</li>
@@ -200,7 +226,64 @@ function ArticleContentRenderer({ content, summary }: { content?: any; summary?:
         return <p className="article-plain-body" style={{ whiteSpace: "pre-wrap" }}>{content}</p>;
     }
 
-    return <p className="article-default-summary">{summary || "No article content available."}</p>;
+    return <p className="article-plain-body">{summary || "No article content available."}</p>;
+}
+
+function ArticleDetailSkeleton() {
+    return (
+        <div className="article-view" aria-label="Loading article details">
+            {/* Back Nav Skeleton */}
+            <div className="article-back-nav">
+                <div style={{ width: "180px", height: "24px", background: "#E2E8F0", borderRadius: "6px" }} />
+            </div>
+
+            {/* Frame 2147225477: Metadata Skeleton */}
+            <div className="article-meta-section help-article-page__section">
+                <div style={{ width: "120px", height: "18px", background: "rgba(100, 116, 139, 0.2)", borderRadius: "4px" }} />
+                <div className="article-title-card help-article-page__card">
+                    <div style={{ width: "65%", height: "28px", background: "#E2E8F0", borderRadius: "6px", marginBottom: "8px" }} />
+                    <div style={{ width: "40%", height: "16px", background: "#F1F5F9", borderRadius: "4px" }} />
+                </div>
+            </div>
+
+            {/* Frame 2147225478: Main Content Skeleton */}
+            <div className="article-content-section help-article-page__section">
+                {/* Short Answer Skeleton */}
+                <div className="article-short-answer-callout help-article-page__card">
+                    <div style={{ width: "90px", height: "18px", background: "rgba(22, 163, 74, 0.2)", borderRadius: "4px", marginBottom: "6px" }} />
+                    <div style={{ width: "100%", height: "16px", background: "#F1F5F9", borderRadius: "4px" }} />
+                </div>
+
+                {/* Body Card Skeleton */}
+                <div className="article-body-card help-article-page__card" style={{ gap: "20px" }}>
+                    <div style={{ width: "140px", height: "18px", background: "#E2E8F0", borderRadius: "4px" }} />
+                    <div style={{ width: "100%", height: "16px", background: "#F8FAFC", borderRadius: "4px" }} />
+                    <div style={{ width: "95%", height: "16px", background: "#F8FAFC", borderRadius: "4px" }} />
+                    <div style={{ width: "120px", height: "18px", background: "#E2E8F0", borderRadius: "4px", marginTop: "12px" }} />
+                    <div style={{ width: "80%", height: "16px", background: "#F8FAFC", borderRadius: "4px" }} />
+                    <div style={{ width: "85%", height: "16px", background: "#F8FAFC", borderRadius: "4px" }} />
+                </div>
+
+                {/* Feedback Skeleton */}
+                <div className="article-feedback-card help-article-page__card">
+                    <div style={{ width: "160px", height: "18px", background: "#E2E8F0", borderRadius: "4px" }} />
+                    <div style={{ display: "flex", gap: "16px" }}>
+                        <div style={{ width: "76px", height: "36px", background: "#F1F5F9", borderRadius: "6px" }} />
+                        <div style={{ width: "76px", height: "36px", background: "#F1F5F9", borderRadius: "6px" }} />
+                    </div>
+                </div>
+            </div>
+
+            {/* Frame 2147225027: Bottom CTA Skeleton */}
+            <div className="article-support-cta help-support-cta help-article-page__card">
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", flex: 1 }}>
+                    <div style={{ width: "160px", height: "24px", background: "rgba(255, 255, 255, 0.2)", borderRadius: "4px" }} />
+                    <div style={{ width: "320px", height: "14px", background: "rgba(255, 255, 255, 0.1)", borderRadius: "4px" }} />
+                </div>
+                <div style={{ width: "143px", height: "46px", background: "rgba(37, 99, 235, 0.5)", borderRadius: "6px" }} />
+            </div>
+        </div>
+    );
 }
 
 export default function ArticleDetailPage() {
@@ -211,6 +294,7 @@ export default function ArticleDetailPage() {
     const [article, setArticle] = useState<HelpArticle | null>(null);
     const [loading, setLoading] = useState(true);
     const [articleFeedbackGiven, setArticleFeedbackGiven] = useState(false);
+    const [feedbackVote, setFeedbackVote] = useState<"yes" | "no" | null>(null);
     const [notice, setNotice] = useState<{ message: string; type: "success" | "error" } | null>(null);
     const [isTicketDrawerOpen, setIsTicketDrawerOpen] = useState(false);
 
@@ -227,18 +311,34 @@ export default function ArticleDetailPage() {
                 const fetched = await getHelpArticle(idOrSlug);
                 if (isMounted && fetched) {
                     setArticle(fetched);
+                    setLoading(false);
                     return;
                 }
             } catch {
-                if (isMounted) {
-                    setArticle(null);
+                // Fallback to offline defaults if available
+                if (DEFAULT_ARTICLES[idOrSlug]) {
+                    if (isMounted) {
+                        setArticle(DEFAULT_ARTICLES[idOrSlug]);
+                        setLoading(false);
+                    }
+                    return;
                 }
             }
-            if (isMounted) setLoading(false);
+            if (isMounted) {
+                // Fallback check
+                if (DEFAULT_ARTICLES[idOrSlug]) {
+                    setArticle(DEFAULT_ARTICLES[idOrSlug]);
+                } else {
+                    setArticle(null);
+                }
+                setLoading(false);
+            }
         }
 
         if (idOrSlug) {
             void loadArticle();
+        } else {
+            setLoading(false);
         }
         return () => {
             isMounted = false;
@@ -261,6 +361,7 @@ export default function ArticleDetailPage() {
                     helpful_no: no,
                 };
             });
+            setFeedbackVote(helpful ? "yes" : "no");
             setArticleFeedbackGiven(true);
             showNotice("Thank you for your feedback!");
         } catch {
@@ -281,15 +382,19 @@ export default function ArticleDetailPage() {
         }
     };
 
+    const category = article ? getArticleCategory(article) : null;
+    const shortAnswer = article ? getArticleShortAnswer(article) : null;
+    const helpfulPct = article ? getHelpfulPercentage(article) : null;
+
     return (
         <main className="fig-dashboard boq-dashboard help-page">
-            <div className="fig-dashboard-glow" />
+            <div className="help-gradient-glow" aria-hidden="true" />
             <DashboardRail current="/help" />
 
             <div className="fig-dashboard-main">
                 <DashboardHeader title="Help & Support" />
 
-                <section className="help-content">
+                <section className="help-content help-article-page help-article-page__content">
                     {notice && (
                         <div
                             className={`notice-banner ${notice.type}`}
@@ -312,116 +417,131 @@ export default function ArticleDetailPage() {
                     )}
 
                     {loading ? (
-                        <div style={{ padding: "60px 20px", textAlign: "center", color: "#64748b" }}>
-                            <Loader2 size={28} className="spin" style={{ margin: "0 auto 12px" }} />
-                            <p style={{ fontSize: "14px" }}>Loading article details...</p>
-                        </div>
+                        <ArticleDetailSkeleton />
                     ) : article ? (
                         <div className="article-view">
-                            {/* Back to Help Centre */}
-                            <button
-                                type="button"
-                                className="article-back-link"
-                                onClick={() => router.push("/help")}
-                            >
-                                <ArrowLeft size={16} />
-                                <span>Back to Help Centre</span>
-                            </button>
+                            {/* Frame 2147225121: Back to Help Centre */}
+                            <div className="article-back-nav">
+                                <button
+                                    type="button"
+                                    className="article-back-link"
+                                    onClick={() => router.push("/help")}
+                                >
+                                    <ArrowLeft size={24} className="article-back-icon" />
+                                    <span>Back to Help Centre</span>
+                                </button>
+                            </div>
 
-                            {/* Card 1: Article Header Card */}
-                            <div className="article-header-card">
-                                {getArticleCategory(article) && (
-                                    <span className="article-header-category">
-                                        {getArticleCategory(article)?.name}
+                            {/* Frame 2147225477: Outer Translucent Section Container 1 (Metadata) */}
+                            <div className="article-meta-section help-article-page__section">
+                                {category && (
+                                    <span className="article-category-badge">
+                                        {category.name}
                                     </span>
                                 )}
-                                <h1 className="article-header-title">{article.title}</h1>
-                                <div className="article-header-meta">
-                                    <span>Updated {formatArticleDate(article.updatedAt || article.updated_at)}</span>
-                                    <span className="meta-dot">·</span>
-                                    <span>{getReadMinutes(article)} min read</span>
-                                    {getHelpfulPercentage(article) !== null && (
-                                        <>
-                                            <span className="meta-dot">·</span>
-                                            <span>{getHelpfulPercentage(article)}% helpful</span>
-                                        </>
+                                <div className="article-title-card help-article-page__card">
+                                    <h1 className="article-title">{article.title}</h1>
+                                    <div className="article-meta-row">
+                                        <span>Updated {formatArticleDate(article.updatedAt || article.updated_at)}</span>
+                                        <span className="article-meta-dot">·</span>
+                                        <span>{getReadMinutes(article)} min read</span>
+                                        {helpfulPct !== null && (
+                                            <>
+                                                <span className="article-meta-dot">·</span>
+                                                <span>{helpfulPct}% helpful</span>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Frame 2147225478: Outer Translucent Section Container 2 (Main Content) */}
+                            <div className="article-content-section help-article-page__section">
+                                {/* Frame 2147225027: Short answer callout */}
+                                {shortAnswer && (
+                                    <div className="article-short-answer-callout help-article-page__card">
+                                        <h4>Short answer</h4>
+                                        <p>{shortAnswer}</p>
+                                    </div>
+                                )}
+
+                                {/* Frame 2147225029: Main article body card */}
+                                <div className="article-body-card help-article-page__card">
+                                    <ArticleContentRenderer
+                                        content={article.content}
+                                        summary={article.summary}
+                                    />
+                                </div>
+
+                                {/* Frame 2147225030: Feedback card */}
+                                <div className="article-feedback-card help-article-page__card">
+                                    <div className="article-feedback-question-wrap">
+                                        <h4 className="feedback-label">Was this article helpful?</h4>
+                                        <div className="feedback-buttons-row">
+                                            <button
+                                                type="button"
+                                                className={`feedback-action-btn ${feedbackVote === "yes" ? "voted" : ""}`}
+                                                onClick={() => void handleArticleFeedback(true)}
+                                                disabled={articleFeedbackGiven}
+                                            >
+                                                <ThumbsUp size={20} />
+                                                <span>Yes</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className={`feedback-action-btn ${feedbackVote === "no" ? "voted" : ""}`}
+                                                onClick={() => void handleArticleFeedback(false)}
+                                                disabled={articleFeedbackGiven}
+                                            >
+                                                <ThumbsDown size={20} />
+                                                <span>No</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {articleFeedbackGiven && (
+                                        <span className="feedback-thanks">
+                                            ✓ Feedback recorded. Thank you!
+                                        </span>
                                     )}
                                 </div>
                             </div>
 
-                            {/* Card 2: Short Answer Card */}
-                            {getArticleShortAnswer(article) && (
-                                <div className="article-short-answer-card">
-                                    <h4>Short answer</h4>
-                                    <p>{getArticleShortAnswer(article)}</p>
-                                </div>
-                            )}
-
-                            {/* Card 3: Main Article Body Card */}
-                            <div className="article-body-card">
-                                <ArticleContentRenderer
-                                    content={article.content}
-                                    summary={article.summary}
-                                />
-                            </div>
-
-                            {/* Card 4: Feedback Card */}
-                            <div className="article-feedback-card">
-                                <span className="feedback-label">Was this article helpful?</span>
-                                <div className="feedback-buttons-row">
-                                    <button
-                                        type="button"
-                                        className={`feedback-action-btn ${articleFeedbackGiven ? "voted" : ""}`}
-                                        onClick={() => void handleArticleFeedback(true)}
-                                        disabled={articleFeedbackGiven}
-                                    >
-                                        <ThumbsUp size={14} />
-                                        <span>Yes</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="feedback-action-btn"
-                                        onClick={() => void handleArticleFeedback(false)}
-                                        disabled={articleFeedbackGiven}
-                                    >
-                                        <ThumbsDown size={14} />
-                                        <span>No</span>
-                                    </button>
-                                </div>
-                                {articleFeedbackGiven && (
-                                    <span className="feedback-thanks">
-                                        ✓ Feedback recorded. Thank you!
-                                    </span>
-                                )}
-                            </div>
-
-                            {/* Card 5: Bottom Support CTA */}
-                            <div className="article-support-cta">
-                                <span className="cta-watermark">?</span>
+                            {/* Frame 2147225027: Still need help? Support CTA Card */}
+                            <div className="article-support-cta help-support-cta help-article-page__card">
+                                <span className="cta-watermark" aria-hidden="true">?</span>
                                 <div className="cta-content">
+                                    <span className="cta-tag">NEED A HUMAN?</span>
                                     <h3>Still need help?</h3>
-                                    <p>Carry this article into a support ticket so you don't have to repeat yourself.</p>
+                                    <p>Carry this article into a support ticket so you don&apos;t have to repeat yourself.</p>
                                 </div>
                                 <button
                                     type="button"
-                                    className="btn-cta-raise"
+                                    className="btn-raise-ticket-cta btn-cta-raise"
                                     onClick={handleRaiseTicket}
+                                    aria-label="Raise a Support Ticket"
                                 >
                                     <span>Raise a Ticket</span>
-                                    <ChevronRight size={15} />
+                                    <ChevronRight size={20} />
                                 </button>
                             </div>
                         </div>
                     ) : (
-                        <div className="empty-state">
-                            <h3>Article not found</h3>
-                            <p>The requested help article could not be located.</p>
+                        <div className="empty-state article-not-found-card" style={{ padding: "60px 20px", textAlign: "center" }}>
+                            <AlertCircle size={40} style={{ color: "#EF4444", margin: "0 auto 12px" }} />
+                            <h3 style={{ fontFamily: "Urbanist", fontSize: "20px", fontWeight: 700, color: "#0F172A", margin: "0 0 8px" }}>
+                                Article not found
+                            </h3>
+                            <p style={{ fontFamily: "Urbanist", fontSize: "14px", color: "#64748B", margin: "0 0 20px" }}>
+                                The requested help article could not be located.
+                            </p>
                             <button
                                 type="button"
                                 className="btn-raise-ticket"
                                 onClick={() => router.push("/help")}
+                                style={{ margin: "0 auto", display: "inline-flex", alignItems: "center", gap: "8px" }}
                             >
-                                Back to Help Center
+                                <ArrowLeft size={16} />
+                                <span>Back to Help Centre</span>
                             </button>
                         </div>
                     )}

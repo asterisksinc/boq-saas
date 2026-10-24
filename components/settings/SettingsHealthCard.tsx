@@ -54,14 +54,21 @@ export default function SettingsHealthCard({
     };
 
     return (
-        <button
-            type="button"
+        <div
             className="settings-health-card"
             onClick={handleClick}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleClick();
+                }
+            }}
             aria-label={`${card.title}: ${card.status}, ${card.subtitle}`}
         >
             <div className="settings-health-card-top">
-                <div className="settings-health-icon-box">
+                <div className="settings-health-icon-box" aria-hidden="true">
                     {renderHealthIcon(card.iconType)}
                 </div>
                 <span className={`settings-health-badge badge-${card.status.toLowerCase()}`}>
@@ -74,10 +81,18 @@ export default function SettingsHealthCard({
                     <h3 className="settings-health-card-title">{card.title}</h3>
                     <p className="settings-health-card-subtitle">{card.subtitle}</p>
                 </div>
-                <div className="settings-health-arrow-box" aria-hidden="true">
-                    <ChevronRight size={16} />
-                </div>
+                <button
+                    type="button"
+                    className="settings-health-action-btn"
+                    aria-label={`Configure ${card.title}`}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        handleClick();
+                    }}
+                >
+                    <ChevronRight size={18} />
+                </button>
             </div>
-        </button>
+        </div>
     );
 }

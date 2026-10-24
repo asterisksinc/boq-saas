@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
 import { UserSessionInfo } from "@/lib/api/auth";
 import RevokeSessionModal from "./RevokeSessionModal";
 
@@ -25,17 +24,17 @@ export default function ActiveSessionsSection({
 
     if (loading) {
         return (
-            <div className="advanced-cards-stack">
+            <div className="advanced-cards-stack" data-testid="active-sessions-loading">
                 {[1, 2].map((i) => (
                     <div key={i} className="advanced-card advanced-card-skeleton">
                         <div className="advanced-card-left">
-                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                                <div className="skeleton" style={{ width: 150, height: 16, borderRadius: 4 }} />
-                                {i === 1 && <div className="skeleton" style={{ width: 55, height: 18, borderRadius: 6 }} />}
+                            <div className="advanced-session-device-row">
+                                <div className="skeleton" style={{ width: 136, height: 19, borderRadius: 4 }} />
+                                {i === 1 && <div className="skeleton" style={{ width: 65, height: 18, borderRadius: 9999 }} />}
                             </div>
-                            <div className="skeleton" style={{ width: 100, height: 13, borderRadius: 4 }} />
+                            <div className="skeleton" style={{ width: 71, height: 17, borderRadius: 4 }} />
                         </div>
-                        <div className="skeleton" style={{ width: i === 1 ? 40 : 75, height: i === 1 ? 14 : 32, borderRadius: i === 1 ? 4 : 8 }} />
+                        <div className="skeleton" style={{ width: i === 1 ? 40 : 77, height: i === 1 ? 17 : 34, borderRadius: i === 1 ? 4 : 6 }} />
                     </div>
                 ))}
             </div>
@@ -44,8 +43,22 @@ export default function ActiveSessionsSection({
 
     if (error) {
         return (
-            <div className="advanced-card" style={{ flexDirection: "column", alignItems: "center", padding: "32px 20px", gap: 12 }}>
-                <p style={{ margin: 0, color: "#dc2626", fontSize: 13.5 }}>{error}</p>
+            <div
+                className="advanced-card"
+                style={{
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "32px 20px",
+                    gap: 12,
+                    height: "auto",
+                    minHeight: 120,
+                }}
+                data-testid="active-sessions-error"
+            >
+                <p style={{ margin: 0, color: "#DC2626", fontSize: 14, fontFamily: "'Urbanist', sans-serif", fontWeight: 500 }}>
+                    {error}
+                </p>
                 <button type="button" className="btn-advanced-action" onClick={onRetry}>
                     Try Again
                 </button>
@@ -55,8 +68,20 @@ export default function ActiveSessionsSection({
 
     if (!sessions || sessions.length === 0) {
         return (
-            <div className="advanced-card" style={{ justifyContent: "center", padding: "40px 20px" }}>
-                <p style={{ margin: 0, color: "#64748b", fontSize: 13.5 }}>No active sessions found.</p>
+            <div
+                className="advanced-card"
+                style={{
+                    justifyContent: "center",
+                    alignItems: "center",
+                    padding: "40px 20px",
+                    height: "auto",
+                    minHeight: 120,
+                }}
+                data-testid="active-sessions-empty"
+            >
+                <p style={{ margin: 0, color: "#64748B", fontSize: 14, fontFamily: "'Urbanist', sans-serif", fontWeight: 500 }}>
+                    No active sessions found.
+                </p>
             </div>
         );
     }
@@ -74,9 +99,9 @@ export default function ActiveSessionsSection({
 
     return (
         <>
-            <div className="advanced-cards-stack" aria-label="Active user sessions">
+            <div className="advanced-cards-stack" aria-label="Active user sessions" data-testid="active-sessions-stack">
                 {sessions.map((session) => (
-                    <article key={session.id} className="advanced-card advanced-session-card">
+                    <article key={session.id} className="advanced-card advanced-session-card" data-testid={`session-item-${session.id}`}>
                         <div className="advanced-card-left">
                             <div className="advanced-session-device-row">
                                 <span className="advanced-card-title">{session.device}</span>
@@ -93,6 +118,7 @@ export default function ActiveSessionsSection({
                                 type="button"
                                 className="btn-advanced-revoke"
                                 onClick={() => setSelectedSession(session)}
+                                data-testid={`revoke-session-${session.id}`}
                             >
                                 Revoke
                             </button>

@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { Loader2, X } from "lucide-react";
+import { createPortal } from "react-dom";
+import { ChevronDown, Loader2, X } from "lucide-react";
 import { BoqUnit, UnitType } from "@/lib/settings/types";
 
 interface UnitModalProps {
@@ -128,14 +129,14 @@ export default function UnitModal({
         }
     };
 
-    return (
+    return createPortal(
         <div className="boq-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="unit-modal-title">
             <div className="boq-modal-container">
-                {/* Modal Header */}
+                {/* Modal Header (Frame 2147225093) */}
                 <div className="boq-modal-header">
-                    <h3 id="unit-modal-title" className="boq-modal-title">
+                    <h6 id="unit-modal-title" className="boq-modal-title">
                         {mode === "create" ? "Add Custom Unit" : "Edit Unit"}
-                    </h3>
+                    </h6>
                     <button
                         type="button"
                         onClick={onClose}
@@ -143,88 +144,109 @@ export default function UnitModal({
                         aria-label="Close modal"
                         disabled={submitting}
                     >
-                        <X size={18} />
+                        <X size={20} />
                     </button>
                 </div>
 
                 {/* Modal Form */}
-                <form onSubmit={handleSubmit} noValidate>
-                    <div className="boq-modal-body">
-                        {/* Unit Name * */}
-                        <div className="boq-field">
-                            <label htmlFor="unitName">
-                                Unit Name <span className="required">*</span>
-                            </label>
-                            <input
-                                id="unitName"
-                                type="text"
-                                className={`boq-input ${formErrors.name ? "has-error" : ""}`}
-                                value={name}
-                                onChange={(e) => {
-                                    setName(e.target.value);
-                                    if (formErrors.name) setFormErrors((prev) => ({ ...prev, name: "" }));
-                                }}
-                                placeholder="e.g. Bundle"
-                                disabled={submitting}
-                                required
-                                autoFocus
-                            />
+                <form onSubmit={handleSubmit} noValidate className="boq-modal-form">
+                    {/* Inner White Card (Frame 2147225027) */}
+                    <div className="boq-modal-inner-card">
+                        {/* 1. Unit Name * */}
+                        <div className="boq-modal-field">
+                            <div className="boq-modal-label-row">
+                                <label htmlFor="unitName" className="boq-modal-label">
+                                    Unit Name
+                                </label>
+                                <span className="boq-modal-required">*</span>
+                            </div>
+                            <div className="boq-modal-input-wrap">
+                                <input
+                                    id="unitName"
+                                    type="text"
+                                    className={`boq-modal-input ${formErrors.name ? "has-error" : ""}`}
+                                    value={name}
+                                    onChange={(e) => {
+                                        setName(e.target.value);
+                                        if (formErrors.name) setFormErrors((prev) => ({ ...prev, name: "" }));
+                                    }}
+                                    placeholder="e.g. Bundle"
+                                    disabled={submitting}
+                                    required
+                                    autoFocus
+                                />
+                            </div>
                             {formErrors.name && (
                                 <span className="boq-field-error" role="alert">{formErrors.name}</span>
                             )}
                         </div>
 
-                        {/* Short Code * & Decimal Places */}
-                        <div className="boq-modal-grid">
-                            <div className="boq-field">
-                                <label htmlFor="shortCode">
-                                    Short Code <span className="required">*</span>
-                                </label>
-                                <input
-                                    id="shortCode"
-                                    type="text"
-                                    className={`boq-input ${formErrors.code ? "has-error" : ""}`}
-                                    value={code}
-                                    onChange={(e) => {
-                                        setCode(e.target.value);
-                                        if (formErrors.code) setFormErrors((prev) => ({ ...prev, code: "" }));
-                                    }}
-                                    placeholder="e.g. Bndl"
-                                    disabled={submitting}
-                                    required
-                                />
+                        {/* 2. Short Code * & Decimal Places (Frame 2147225548) */}
+                        <div className="boq-modal-row-2col">
+                            {/* Short Code * */}
+                            <div className="boq-modal-field">
+                                <div className="boq-modal-label-row">
+                                    <label htmlFor="shortCode" className="boq-modal-label">
+                                        Short Code
+                                    </label>
+                                    <span className="boq-modal-required">*</span>
+                                </div>
+                                <div className="boq-modal-input-wrap">
+                                    <input
+                                        id="shortCode"
+                                        type="text"
+                                        className={`boq-modal-input ${formErrors.code ? "has-error" : ""}`}
+                                        value={code}
+                                        onChange={(e) => {
+                                            setCode(e.target.value);
+                                            if (formErrors.code) setFormErrors((prev) => ({ ...prev, code: "" }));
+                                        }}
+                                        placeholder="e.g. Bndl"
+                                        disabled={submitting}
+                                        required
+                                    />
+                                </div>
                                 {formErrors.code && (
                                     <span className="boq-field-error" role="alert">{formErrors.code}</span>
                                 )}
                             </div>
 
-                            <div className="boq-field">
-                                <label htmlFor="decimalPlaces">
-                                    Decimal Places
-                                </label>
-                                <select
-                                    id="decimalPlaces"
-                                    className="boq-select"
-                                    value={decimals}
-                                    onChange={(e) => setDecimals(Number(e.target.value))}
-                                    disabled={submitting}
-                                >
-                                    {DECIMAL_OPTIONS.map((num) => (
-                                        <option key={num} value={num}>
-                                            {num}
-                                        </option>
-                                    ))}
-                                </select>
+                            {/* Decimal Places */}
+                            <div className="boq-modal-field">
+                                <div className="boq-modal-label-row">
+                                    <label htmlFor="decimalPlaces" className="boq-modal-label">
+                                        Decimal Places
+                                    </label>
+                                </div>
+                                <div className="boq-modal-select-wrap">
+                                    <select
+                                        id="decimalPlaces"
+                                        className="boq-modal-select"
+                                        value={decimals}
+                                        onChange={(e) => setDecimals(Number(e.target.value))}
+                                        disabled={submitting}
+                                    >
+                                        {DECIMAL_OPTIONS.map((num) => (
+                                            <option key={num} value={num}>
+                                                {num}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <ChevronDown size={20} className="boq-modal-select-arrow" aria-hidden="true" />
+                                </div>
                             </div>
                         </div>
 
-                        {/* Type * Segmented Buttons */}
-                        <div className="boq-field">
-                            <label id="unit-type-label">
-                                Type <span className="required">*</span>
-                            </label>
+                        {/* 3. Type * (Frame 2147225303) */}
+                        <div className="boq-modal-field">
+                            <div className="boq-modal-label-row">
+                                <label id="unit-type-label" className="boq-modal-label">
+                                    Type
+                                </label>
+                                <span className="boq-modal-required">*</span>
+                            </div>
                             <div
-                                className="boq-pill-group"
+                                className="boq-modal-pills-row"
                                 role="radiogroup"
                                 aria-labelledby="unit-type-label"
                             >
@@ -236,7 +258,7 @@ export default function UnitModal({
                                             type="button"
                                             role="radio"
                                             aria-checked={isSelected}
-                                            className={`boq-pill-btn ${isSelected ? "is-selected" : ""}`}
+                                            className={`boq-type-pill ${isSelected ? "is-selected" : ""}`}
                                             onClick={() => setType(t)}
                                             disabled={submitting}
                                         >
@@ -248,7 +270,7 @@ export default function UnitModal({
                         </div>
                     </div>
 
-                    {/* Modal Footer */}
+                    {/* Modal Footer (Frame 2147225095) */}
                     <div className="boq-modal-footer">
                         <button
                             type="button"
@@ -260,7 +282,7 @@ export default function UnitModal({
                         </button>
                         <button
                             type="submit"
-                            className="boq-btn-primary boq-modal-btn-submit"
+                            className="boq-modal-btn-submit"
                             disabled={submitting}
                         >
                             {submitting && <Loader2 size={16} className="spin" aria-hidden="true" />}
@@ -269,6 +291,7 @@ export default function UnitModal({
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

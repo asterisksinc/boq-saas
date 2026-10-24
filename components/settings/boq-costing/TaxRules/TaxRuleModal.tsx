@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Loader2, X } from "lucide-react";
 import { BoqTaxRule } from "@/lib/settings/types";
 
@@ -119,14 +120,14 @@ export default function TaxRuleModal({
         }
     };
 
-    return (
+    return createPortal(
         <div className="boq-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="tax-modal-title">
             <div className="boq-modal-container">
-                {/* Modal Header */}
+                {/* Modal Header: Frame 2147225093 (558px x 24px) */}
                 <div className="boq-modal-header">
-                    <h3 id="tax-modal-title" className="boq-modal-title">
+                    <h5 id="tax-modal-title" className="boq-modal-title">
                         {mode === "create" ? "Add Tax Rule" : "Edit Tax Rule"}
-                    </h3>
+                    </h5>
                     <button
                         type="button"
                         onClick={onClose}
@@ -139,84 +140,101 @@ export default function TaxRuleModal({
                 </div>
 
                 {/* Modal Form */}
-                <form onSubmit={handleSubmit} noValidate>
-                    <div className="boq-modal-body">
-                        {/* Rule Name * */}
-                        <div className="boq-field">
-                            <label htmlFor="taxRuleName">
-                                Rule Name <span className="required">*</span>
-                            </label>
-                            <input
-                                id="taxRuleName"
-                                type="text"
-                                className={`boq-input ${formErrors.name ? "has-error" : ""}`}
-                                value={name}
-                                onChange={(e) => {
-                                    setName(e.target.value);
-                                    if (formErrors.name) setFormErrors((prev) => ({ ...prev, name: "" }));
-                                }}
-                                placeholder="e.g. GST 18%"
-                                disabled={submitting}
-                                required
-                                autoFocus
-                            />
+                <form onSubmit={handleSubmit} className="boq-modal-form" noValidate>
+                    {/* Inner Card: Frame 2147225027 (558px x 232px) */}
+                    <div className="boq-modal-inner-card">
+                        {/* Field 1: Rule Name (526px x 73px) */}
+                        <div className="boq-modal-field">
+                            <div className="boq-modal-label-row">
+                                <label htmlFor="taxRuleName" className="boq-modal-label">
+                                    Rule Name
+                                </label>
+                                <span className="boq-modal-required">*</span>
+                            </div>
+                            <div className="boq-modal-input-wrap">
+                                <input
+                                    id="taxRuleName"
+                                    type="text"
+                                    className={`boq-modal-input ${formErrors.name ? "has-error" : ""}`}
+                                    value={name}
+                                    onChange={(e) => {
+                                        setName(e.target.value);
+                                        if (formErrors.name) setFormErrors((prev) => ({ ...prev, name: "" }));
+                                    }}
+                                    placeholder="e.g. GST 18%"
+                                    disabled={submitting}
+                                    required
+                                    autoFocus
+                                />
+                            </div>
                             {formErrors.name && (
                                 <span className="boq-field-error" role="alert">{formErrors.name}</span>
                             )}
                         </div>
 
-                        {/* Tax Code * & Rate (%) */}
-                        <div className="boq-modal-grid">
-                            <div className="boq-field">
-                                <label htmlFor="taxCode">
-                                    Tax Code <span className="required">*</span>
-                                </label>
-                                <input
-                                    id="taxCode"
-                                    type="text"
-                                    className={`boq-input ${formErrors.code ? "has-error" : ""}`}
-                                    value={code}
-                                    onChange={(e) => {
-                                        setCode(e.target.value);
-                                        if (formErrors.code) setFormErrors((prev) => ({ ...prev, code: "" }));
-                                    }}
-                                    placeholder="e.g. GST18"
-                                    disabled={submitting}
-                                    required
-                                />
+                        {/* Field 2: Frame 2147225548 (Tax Code & Rate (%)) */}
+                        <div className="boq-modal-row-2col">
+                            {/* Tax Code */}
+                            <div className="boq-modal-field">
+                                <div className="boq-modal-label-row">
+                                    <label htmlFor="taxCode" className="boq-modal-label">
+                                        Tax Code
+                                    </label>
+                                    <span className="boq-modal-required">*</span>
+                                </div>
+                                <div className="boq-modal-input-wrap">
+                                    <input
+                                        id="taxCode"
+                                        type="text"
+                                        className={`boq-modal-input ${formErrors.code ? "has-error" : ""}`}
+                                        value={code}
+                                        onChange={(e) => {
+                                            setCode(e.target.value);
+                                            if (formErrors.code) setFormErrors((prev) => ({ ...prev, code: "" }));
+                                        }}
+                                        placeholder="e.g. GST18"
+                                        disabled={submitting}
+                                        required
+                                    />
+                                </div>
                                 {formErrors.code && (
                                     <span className="boq-field-error" role="alert">{formErrors.code}</span>
                                 )}
                             </div>
 
-                            <div className="boq-field">
-                                <label htmlFor="taxRate">
-                                    Rate (%) <span className="required">*</span>
-                                </label>
-                                <input
-                                    id="taxRate"
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    step="0.1"
-                                    className={`boq-input ${formErrors.rate ? "has-error" : ""}`}
-                                    value={rate}
-                                    onChange={(e) => {
-                                        setRate(e.target.value);
-                                        if (formErrors.rate) setFormErrors((prev) => ({ ...prev, rate: "" }));
-                                    }}
-                                    placeholder="18"
-                                    disabled={submitting}
-                                    required
-                                />
+                            {/* Rate (%) */}
+                            <div className="boq-modal-field">
+                                <div className="boq-modal-label-row">
+                                    <label htmlFor="taxRate" className="boq-modal-label">
+                                        Rate (%)
+                                    </label>
+                                </div>
+                                <div className="boq-modal-input-wrap">
+                                    <input
+                                        id="taxRate"
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        step="0.1"
+                                        className={`boq-modal-input ${formErrors.rate ? "has-error" : ""}`}
+                                        value={rate}
+                                        onChange={(e) => {
+                                            setRate(e.target.value);
+                                            if (formErrors.rate) setFormErrors((prev) => ({ ...prev, rate: "" }));
+                                        }}
+                                        placeholder="18"
+                                        disabled={submitting}
+                                        required
+                                    />
+                                </div>
                                 {formErrors.rate && (
                                     <span className="boq-field-error" role="alert">{formErrors.rate}</span>
                                 )}
                             </div>
                         </div>
 
-                        {/* Tax Inclusive Toggle Switch */}
-                        <div className="boq-toggle-row">
+                        {/* Field 3: Tax Inclusive Toggle Row: Frame 16 (526px x 22px) */}
+                        <div className="boq-tax-modal-toggle-row">
                             <button
                                 type="button"
                                 role="switch"
@@ -225,16 +243,17 @@ export default function TaxRuleModal({
                                 className={`boq-toggle ${inclusive ? "is-active" : ""}`}
                                 onClick={() => setInclusive(!inclusive)}
                                 disabled={submitting}
+                                aria-label="Toggle tax inclusive"
                             >
                                 <span className="boq-toggle-thumb" />
                             </button>
-                            <label htmlFor="taxInclusive" style={{ cursor: "pointer", fontWeight: 500, fontSize: "13.5px", color: "#334155" }}>
+                            <label htmlFor="taxInclusive" className="boq-tax-modal-toggle-label">
                                 Tax Inclusive
                             </label>
                         </div>
                     </div>
 
-                    {/* Modal Footer */}
+                    {/* Modal Footer: Frame 2147225095 (558px x 46px) */}
                     <div className="boq-modal-footer">
                         <button
                             type="button"
@@ -246,7 +265,7 @@ export default function TaxRuleModal({
                         </button>
                         <button
                             type="submit"
-                            className="boq-btn-primary boq-modal-btn-submit"
+                            className="boq-modal-btn-submit"
                             disabled={submitting}
                         >
                             {submitting && <Loader2 size={16} className="spin" aria-hidden="true" />}
@@ -255,6 +274,7 @@ export default function TaxRuleModal({
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

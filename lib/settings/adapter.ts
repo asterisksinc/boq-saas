@@ -317,6 +317,11 @@ export const DEFAULT_BOQ_REVISION_SETTINGS: BoqRevisionSettings = {
     lockApprovedVersions: true,
     reopenAfterApproval: true,
     compareVersions: true,
+    requireRevisionReason: true,
+    autoArchiveOnApprove: true,
+    lockAfterExport: true,
+    notifyOnNewRevision: true,
+    trackUnitCostChanges: true,
 };
 
 export const DEFAULT_BOQ_APPROVAL_SETTINGS: BoqApprovalSettings = {
@@ -612,22 +617,47 @@ export function adaptBoqCostingSettings(raw: unknown): BoqCostingSettingsData {
 
     // ── Refined Revision Settings (Screenshot 2) ─────────────────────────────
     const rawRevObj = (data.revision && typeof data.revision === "object" ? data.revision : {}) as Record<string, unknown>;
-    const revision: BoqRevisionSettings = {
-        autoRevisionNumbering: rawRevObj.autoRevisionNumbering !== undefined
-            ? Boolean(rawRevObj.autoRevisionNumbering)
-            : (data.autoRevisionNumbering !== undefined ? Boolean(data.autoRevisionNumbering) : true),
-        revisionReasonRequired: rawRevObj.revisionReasonRequired !== undefined
+    const requireReason = rawRevObj.requireRevisionReason !== undefined
+        ? Boolean(rawRevObj.requireRevisionReason)
+        : (rawRevObj.revisionReasonRequired !== undefined
             ? Boolean(rawRevObj.revisionReasonRequired)
-            : (data.revisionReasonRequired !== undefined ? Boolean(data.revisionReasonRequired) : true),
-        lockApprovedVersions: rawRevObj.lockApprovedVersions !== undefined
+            : (data.revisionReasonRequired !== undefined ? Boolean(data.revisionReasonRequired) : true));
+
+    const autoArchive = rawRevObj.autoArchiveOnApprove !== undefined
+        ? Boolean(rawRevObj.autoArchiveOnApprove)
+        : (rawRevObj.autoRevisionNumbering !== undefined
+            ? Boolean(rawRevObj.autoRevisionNumbering)
+            : (data.autoRevisionNumbering !== undefined ? Boolean(data.autoRevisionNumbering) : true));
+
+    const lockExport = rawRevObj.lockAfterExport !== undefined
+        ? Boolean(rawRevObj.lockAfterExport)
+        : (rawRevObj.lockApprovedVersions !== undefined
             ? Boolean(rawRevObj.lockApprovedVersions)
-            : (data.lockApprovedVersions !== undefined ? Boolean(data.lockApprovedVersions) : true),
-        reopenAfterApproval: rawRevObj.reopenAfterApproval !== undefined
+            : (data.lockApprovedVersions !== undefined ? Boolean(data.lockApprovedVersions) : true));
+
+    const notifyNew = rawRevObj.notifyOnNewRevision !== undefined
+        ? Boolean(rawRevObj.notifyOnNewRevision)
+        : (rawRevObj.reopenAfterApproval !== undefined
             ? Boolean(rawRevObj.reopenAfterApproval)
-            : (data.reopenAfterApproval !== undefined ? Boolean(data.reopenAfterApproval) : true),
-        compareVersions: rawRevObj.compareVersions !== undefined
+            : (data.reopenAfterApproval !== undefined ? Boolean(data.reopenAfterApproval) : true));
+
+    const trackCosts = rawRevObj.trackUnitCostChanges !== undefined
+        ? Boolean(rawRevObj.trackUnitCostChanges)
+        : (rawRevObj.compareVersions !== undefined
             ? Boolean(rawRevObj.compareVersions)
-            : (data.compareVersions !== undefined ? Boolean(data.compareVersions) : true),
+            : (data.compareVersions !== undefined ? Boolean(data.compareVersions) : true));
+
+    const revision: BoqRevisionSettings = {
+        autoRevisionNumbering: autoArchive,
+        revisionReasonRequired: requireReason,
+        lockApprovedVersions: lockExport,
+        reopenAfterApproval: notifyNew,
+        compareVersions: trackCosts,
+        requireRevisionReason: requireReason,
+        autoArchiveOnApprove: autoArchive,
+        lockAfterExport: lockExport,
+        notifyOnNewRevision: notifyNew,
+        trackUnitCostChanges: trackCosts,
     };
 
     // ── Refined Approval Settings (Screenshot 3) ─────────────────────────────

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from 'react';
-import { CustomFormField, FormFieldType } from '@/lib/integrations/types';
+import { Plus, X } from 'lucide-react';
+import { CustomFormField } from '@/lib/integrations/types';
 import FormFieldRow from './FormFieldRow';
 import FieldEditor from './FieldEditor';
 
@@ -13,10 +14,21 @@ interface Props {
     onNext: () => void;
     onBack: () => void;
     onCancel: () => void;
+    onClose?: () => void;
     saving?: boolean;
 }
 
-export default function FormDetailsStep({ formName, setFormName, fields, setFields, onNext, onBack, onCancel, saving }: Props) {
+export default function FormDetailsStep({ 
+    formName, 
+    setFormName, 
+    fields, 
+    setFields, 
+    onNext, 
+    onBack, 
+    onCancel, 
+    onClose,
+    saving 
+}: Props) {
     const [addingField, setAddingField] = useState(false);
     const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
 
@@ -43,75 +55,118 @@ export default function FormDetailsStep({ formName, setFormName, fields, setFiel
     };
 
     return (
-        <div className="intg-modal-content">
-            <h2>Form Details</h2>
-            <p className="intg-modal-subtitle">Configure your lead capture form fields.</p>
-            
-            <div className="intg-form-group">
-                <label>Form Name <span className="text-red">*</span></label>
-                <input 
-                    type="text" 
-                    className="intg-input" 
-                    value={formName} 
-                    onChange={e => setFormName(e.target.value)} 
-                    placeholder="e.g. Contact Us Form"
-                />
+        <div className="intg-custom-step-container">
+            {/* Header: Frame 2147225093 */}
+            <div className="intg-custom-modal-header">
+                <div className="intg-custom-modal-title-group">
+                    <h2 className="intg-custom-modal-title">Form Details</h2>
+                    <p className="intg-custom-modal-subtitle">Add basic details for your form</p>
+                </div>
+                <button 
+                    type="button" 
+                    className="intg-custom-modal-close" 
+                    onClick={onClose || onCancel} 
+                    aria-label="Close"
+                >
+                    <X size={20} />
+                </button>
             </div>
 
-            <div className="intg-fields-section">
-                <div className="intg-fields-section-header">
-                    <h3>Fields</h3>
-                    <span className="intg-fields-count">{fields.length} field{fields.length !== 1 ? 's' : ''}</span>
+            {/* Inner White Card: Frame 2147225027 */}
+            <div className="intg-custom-modal-card">
+                {/* Form Name Input */}
+                <div className="intg-custom-form-group">
+                    <label className="intg-custom-label">
+                        Form Name <span className="intg-custom-required">*</span>
+                    </label>
+                    <input 
+                        type="text" 
+                        className="intg-custom-input" 
+                        value={formName} 
+                        onChange={e => setFormName(e.target.value)} 
+                        placeholder="Enter form name"
+                    />
                 </div>
-                <div className="intg-fields-list">
-                    {fields.length === 0 && !addingField && <p className="intg-muted text-sm">No fields added yet. Click &quot;Add New Field&quot; below.</p>}
-                    
-                    {fields.map((field, index) => (
-                        <div key={field.id} className="intg-field-row-wrapper">
-                            {editingFieldId === field.id ? (
-                                <FieldEditor
-                                    initialData={field}
-                                    onSave={handleSaveField}
-                                    onCancel={() => setEditingFieldId(null)}
-                                />
-                            ) : (
-                                <FormFieldRow 
-                                    field={field} 
-                                    onEdit={() => {
-                                        setEditingFieldId(field.id);
-                                        setAddingField(false);
-                                    }} 
-                                    onDelete={() => handleDelete(field.id)}
-                                    index={index}
-                                    onMoveUp={index > 0 ? () => handleReorder(index, index - 1) : undefined}
-                                    onMoveDown={index < fields.length - 1 ? () => handleReorder(index, index + 1) : undefined}
-                                />
-                            )}
-                        </div>
-                    ))}
-                    
-                    {addingField && (
-                        <FieldEditor
-                            initialData={null}
-                            onSave={handleSaveField}
-                            onCancel={() => setAddingField(false)}
-                        />
+
+                {/* Fields Section: Frame 2147225438 */}
+                <div className="intg-fields-section">
+                    <label className="intg-fields-section-title">Fields</label>
+
+                    <div className="intg-fields-list">
+                        {fields.map((field, index) => (
+                            <div key={field.id} className="intg-field-row-wrapper">
+                                {editingFieldId === field.id ? (
+                                    <FieldEditor
+                                        initialData={field}
+                                        onSave={handleSaveField}
+                                        onCancel={() => setEditingFieldId(null)}
+                                    />
+                                ) : (
+                                    <FormFieldRow 
+                                        field={field} 
+                                        onEdit={() => {
+                                            setEditingFieldId(field.id);
+                                            setAddingField(false);
+                                        }} 
+                                        onDelete={() => handleDelete(field.id)}
+                                        index={index}
+                                        onMoveUp={index > 0 ? () => handleReorder(index, index - 1) : undefined}
+                                        onMoveDown={index < fields.length - 1 ? () => handleReorder(index, index + 1) : undefined}
+                                    />
+                                )}
+                            </div>
+                        ))}
+
+                        {/* Inline Add Field Box: Frame 2147225130 */}
+                        {addingField && (
+                            <FieldEditor
+                                initialData={null}
+                                onSave={handleSaveField}
+                                onCancel={() => setAddingField(false)}
+                            />
+                        )}
+                    </div>
+
+                    {/* "+ Add New Field" button */}
+                    {!addingField && !editingFieldId && (
+                        <button 
+                            type="button" 
+                            className="intg-add-new-field-btn" 
+                            onClick={() => setAddingField(true)}
+                        >
+                            <Plus size={18} />
+                            <span>Add New Field</span>
+                        </button>
                     )}
                 </div>
-                
-                {!addingField && !editingFieldId && (
-                    <button className="intg-btn intg-btn-outline intg-btn-add-field" onClick={() => setAddingField(true)}>
-                        + Add New Field
-                    </button>
-                )}
             </div>
 
-            <div className="intg-modal-actions">
-                <button className="intg-btn intg-btn-modal-cancel" onClick={onCancel}>Cancel</button>
-                <button className="intg-btn intg-btn-secondary" onClick={onBack}>Back</button>
-                <button className="intg-btn intg-btn-primary" onClick={onNext} disabled={!formName.trim() || saving || !!editingFieldId || addingField}>
-                    {saving ? 'Saving…' : 'Save & Complete'}
+            {/* Footer Actions: Frame 2147225094 */}
+            <div className="intg-custom-modal-footer intg-custom-footer-form-details">
+                <button 
+                    type="button" 
+                    className="intg-custom-btn intg-custom-btn-back" 
+                    onClick={onBack}
+                >
+                    Back
                 </button>
+                <div className="intg-custom-footer-right-group">
+                    <button 
+                        type="button" 
+                        className="intg-custom-btn intg-custom-btn-cancel" 
+                        onClick={onCancel}
+                    >
+                        Cancel
+                    </button>
+                    <button 
+                        type="button" 
+                        className="intg-custom-btn intg-custom-btn-primary" 
+                        onClick={onNext} 
+                        disabled={!formName.trim() || saving || !!editingFieldId || addingField}
+                    >
+                        {saving ? 'Saving...' : 'Next'}
+                    </button>
+                </div>
             </div>
         </div>
     );
