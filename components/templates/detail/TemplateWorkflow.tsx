@@ -1,12 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Search,
   Edit3,
   SlidersHorizontal,
   Plus,
   ChevronDown,
+  X,
+  Filter,
 } from "lucide-react";
 import { updateTemplateSection } from "@/lib/api/templates";
 import type {
@@ -40,13 +42,35 @@ export default function TemplateWorkflow({
   initialSubTab,
   onUpdate,
 }: TemplateWorkflowProps) {
-  // Active sub-tab state (Rules active by default when accessing workflow rules)
+  // Active sub-tab state (Stages active by default)
   const [workflowSubTab, setWorkflowSubTab] = useState<
     "Stages" | "Tasks" | "Milestones" | "Approvals" | "Rules"
-  >(initialSubTab || "Rules");
+  >(initialSubTab || "Stages");
+
+  const handleSubTabChange = (
+    subTab: "Stages" | "Tasks" | "Milestones" | "Approvals" | "Rules"
+  ) => {
+    setWorkflowSubTab(subTab);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", "Workflow");
+      url.searchParams.set("subtab", subTab);
+      window.history.replaceState(null, "", url.toString());
+    }
+  };
+
+  useEffect(() => {
+    if (initialSubTab) {
+      setWorkflowSubTab(initialSubTab);
+    }
+  }, [initialSubTab]);
 
   // Search input state
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Filter state & popover
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>("All");
 
   // Sub-items data collections
   const [stages, setStages] = useState<WorkflowStageItem[]>(
@@ -75,7 +99,7 @@ export default function TemplateWorkflow({
       : []
   );
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (initialWorkflow?.stages && Array.isArray(initialWorkflow.stages) && initialWorkflow.stages.length > 0) {
       setStages(initialWorkflow.stages);
     }
@@ -180,25 +204,51 @@ export default function TemplateWorkflow({
 
   return (
     <div className="td-workflow-container">
-      {/* ── Top Header Row ────────────────────────────────────────── */}
+      {/* ── Top Header Row (Figma Frame 2147225198 & 2147225069) ──── */}
       <div className="td-workflow-top-bar">
         <div className="td-workflow-title-block">
-          <h2 className="title">Workflow</h2>
+          <h2 className="title">
+            {workflowSubTab === "Approvals"
+              ? "Approvals"
+              : workflowSubTab === "Milestones" ? "Milestones" : "Workflow"}
+          </h2>
           <p className="desc">
-            Define the operational process inherited by projects created from this template.
+            {workflowSubTab === "Milestones"
+              ? "Define the key checkpoints and deliverables inherited by projects created from this template."
+              : workflowSubTab === "Approvals"
+              ? "Configure the approval flows inherited by projects created from this template."
+              : "Define the operational process inherited by projects created from this template."}
           </p>
         </div>
 
         <div className="td-workflow-controls">
           <div className="td-workflow-search-box">
-            <Search size={14} className="icon" />
+            <div className="icon-wrap">
+              <Search size={16} />
+            </div>
             <input
               type="text"
-              placeholder="Search workflow..."
+              placeholder={
+                workflowSubTab === "Milestones"
+                  ? "Search milestones…"
+                  : workflowSubTab === "Approvals"
+                  ? "Search approvals…"
+                  : "Search workflow…"
+              }
               className="input"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
+            {searchQuery && (
+              <button
+                type="button"
+                className="clear-btn"
+                onClick={() => setSearchQuery("")}
+                title="Clear search"
+              >
+                <X size={13} />
+              </button>
+            )}
           </div>
 
           <button
@@ -207,17 +257,65 @@ export default function TemplateWorkflow({
             title="Edit Workflow"
             onClick={() => handleSaveToBackend({})}
           >
-            <Edit3 size={15} />
+            <Edit3 size={16} />
           </button>
 
-          <button
-            type="button"
-            className="td-wf-btn-filter"
-            title="Filter Workflow"
-          >
-            <SlidersHorizontal size={14} />
-            <span>Filter</span>
-          </button>
+          <div className="td-relative-inline">
+            <button
+              type="button"
+              className={`td-wf-btn-filter ${statusFilter !== "All" ? "active-filter" : ""}`}
+              title="Filter Workflow"
+              onClick={() => setIsFilterOpen(!isFilterOpen)}
+            >
+              <SlidersHorizontal size={14} />
+              <span>{statusFilter !== "All" ? `Filter: ${statusFilter}` : "Filter"}</span>
+            </button>
+
+            {isFilterOpen && (
+              <div className="td-wf-filter-popover">
+                <div className="filter-header">
+                  <span>Filter by Status</span>
+                  <button
+                    type="button"
+                    className="close-filter-btn"
+                    onClick={() => setIsFilterOpen(false)}
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+                <div className="filter-options">
+                  {["All", "Configured", "Active", "Draft", "Needs Attention"].map((st) => (
+                    <button
+                      key={st}
+                      type="button"
+                      className={`filter-opt ${statusFilter === st ? "active" : ""}`}
+                      onClick={() => {
+                        setStatusFilter(st);
+                        setIsFilterOpen(false);
+                      }}
+                    >
+                      <span>{st}</span>
+                      {statusFilter === st && <span className="check">✓</span>}
+                    </button>
+                  ))}
+                </div>
+                {statusFilter !== "All" && (
+                  <div className="filter-footer">
+                    <button
+                      type="button"
+                      className="clear-all-filter-btn"
+                      onClick={() => {
+                        setStatusFilter("All");
+                        setIsFilterOpen(false);
+                      }}
+                    >
+                      Reset Filter
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           <div className="td-relative-inline">
             <button
@@ -226,7 +324,13 @@ export default function TemplateWorkflow({
               onClick={() => setIsAddModalOpen(true)}
             >
               <Plus size={15} />
-              <span>Add</span>
+              <span>
+                {workflowSubTab === "Milestones"
+                  ? "Add Milestone"
+                  : workflowSubTab === "Approvals"
+                  ? "Add Approval Flow"
+                  : "Add"}
+              </span>
               <ChevronDown
                 size={14}
                 onClick={(e) => {
@@ -242,7 +346,18 @@ export default function TemplateWorkflow({
                   type="button"
                   className="item"
                   onClick={() => {
-                    setWorkflowSubTab("Tasks");
+                    handleSubTabChange("Stages");
+                    setIsAddModalOpen(true);
+                    setIsAddMenuOpen(false);
+                  }}
+                >
+                  Add Stage
+                </button>
+                <button
+                  type="button"
+                  className="item"
+                  onClick={() => {
+                    handleSubTabChange("Tasks");
                     setIsAddModalOpen(true);
                     setIsAddMenuOpen(false);
                   }}
@@ -253,7 +368,7 @@ export default function TemplateWorkflow({
                   type="button"
                   className="item"
                   onClick={() => {
-                    setWorkflowSubTab("Milestones");
+                    handleSubTabChange("Milestones");
                     setIsAddModalOpen(true);
                     setIsAddMenuOpen(false);
                   }}
@@ -264,7 +379,7 @@ export default function TemplateWorkflow({
                   type="button"
                   className="item"
                   onClick={() => {
-                    setWorkflowSubTab("Approvals");
+                    handleSubTabChange("Approvals");
                     setIsAddModalOpen(true);
                     setIsAddMenuOpen(false);
                   }}
@@ -275,23 +390,12 @@ export default function TemplateWorkflow({
                   type="button"
                   className="item"
                   onClick={() => {
-                    setWorkflowSubTab("Rules");
+                    handleSubTabChange("Rules");
                     setIsAddModalOpen(true);
                     setIsAddMenuOpen(false);
                   }}
                 >
                   Add Rule
-                </button>
-                <button
-                  type="button"
-                  className="item"
-                  onClick={() => {
-                    setWorkflowSubTab("Stages");
-                    setIsAddModalOpen(true);
-                    setIsAddMenuOpen(false);
-                  }}
-                >
-                  Add Stage
                 </button>
               </div>
             )}
@@ -299,7 +403,7 @@ export default function TemplateWorkflow({
         </div>
       </div>
 
-      {/* ── Workflow Sub-Tabs ─────────────────────────────────────── */}
+      {/* ── Workflow Sub-Tabs (Figma Frame 2147225196) ───────────── */}
       <div className="td-workflow-subtabs">
         {(["Stages", "Tasks", "Milestones", "Approvals", "Rules"] as const).map(
           (subTab) => (
@@ -307,7 +411,7 @@ export default function TemplateWorkflow({
               key={subTab}
               type="button"
               className={`td-wf-subtab ${workflowSubTab === subTab ? "active" : ""}`}
-              onClick={() => setWorkflowSubTab(subTab)}
+              onClick={() => handleSubTabChange(subTab)}
             >
               {subTab}
             </button>
@@ -319,12 +423,20 @@ export default function TemplateWorkflow({
       {workflowSubTab === "Stages" && (
         <WorkflowStagesView
           stages={stages}
+          allTasks={tasks}
+          allMilestones={milestones}
+          allApprovals={approvals}
           searchQuery={searchQuery}
+          statusFilter={statusFilter}
           onUpdateStages={(updated) => {
             setStages(updated);
             handleSaveToBackend({ stages: updated });
           }}
-          onSaveBackend={() => handleSaveToBackend({ stages })}
+          onUpdateTasks={(updated) => {
+            setTasks(updated);
+            handleSaveToBackend({ tasks: updated });
+          }}
+          onSaveBackend={() => handleSaveToBackend({ stages, tasks })}
           saving={saving}
           saveSuccess={saveSuccess}
           saveError={saveError}
@@ -334,36 +446,56 @@ export default function TemplateWorkflow({
       {workflowSubTab === "Tasks" && (
         <WorkflowTasksView
           tasks={tasks}
+          stages={stages}
           searchQuery={searchQuery}
+          statusFilter={statusFilter}
           onUpdateTasks={(updated) => {
             setTasks(updated);
             handleSaveToBackend({ tasks: updated });
           }}
           onAddTaskClick={() => setIsAddModalOpen(true)}
+          onSaveBackend={() => handleSaveToBackend({ tasks })}
+          saving={saving}
+          saveSuccess={saveSuccess}
+          saveError={saveError}
         />
       )}
 
       {workflowSubTab === "Milestones" && (
         <WorkflowMilestonesView
+          templateId={templateId}
+          templateName={templateName}
           milestones={milestones}
+          stages={stages}
+          tasks={tasks}
           searchQuery={searchQuery}
+          statusFilter={statusFilter}
           onUpdateMilestones={(updated) => {
             setMilestones(updated);
             handleSaveToBackend({ milestones: updated });
           }}
           onAddMilestoneClick={() => setIsAddModalOpen(true)}
+          saving={saving}
+          saveSuccess={saveSuccess}
+          saveError={saveError}
         />
       )}
 
       {workflowSubTab === "Approvals" && (
         <WorkflowApprovalsView
+          templateId={templateId}
+          templateName={templateName}
           approvals={approvals}
           searchQuery={searchQuery}
+          statusFilter={statusFilter}
           onUpdateApprovals={(updated) => {
             setApprovals(updated);
             handleSaveToBackend({ approvals: updated });
           }}
           onAddApprovalClick={() => setIsAddModalOpen(true)}
+          saving={saving}
+          saveSuccess={saveSuccess}
+          saveError={saveError}
         />
       )}
 

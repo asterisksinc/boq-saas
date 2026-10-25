@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Copy, Edit3, Play } from "lucide-react";
+import { Copy, Edit3 } from "lucide-react";
 
 export type DetailTabType =
   | "Overview"
@@ -40,7 +40,8 @@ export default function TemplateDetailTabs({
   onUseTemplate,
 }: TemplateDetailTabsProps) {
   return (
-    <div className="td-tabs-bar-row">
+    <div className="td-tabs-bar-row" role="toolbar" aria-label="Template Controls">
+      {/* Tabbing: Buttons (Pill bar container matching Figma Frame) */}
       <nav className="td-tabs-pill-nav" role="tablist" aria-label="Template Detail Tabs">
         {DETAIL_TABS.map((tab) => {
           const isActive = activeTab === tab;
@@ -59,10 +60,11 @@ export default function TemplateDetailTabs({
         })}
       </nav>
 
+      {/* Frame 2147225194: Action buttons */}
       <div className="td-tabs-actions">
         <button
           type="button"
-          className="td-icon-action-btn"
+          className="td-action-icon-btn"
           title="Duplicate template"
           aria-label="Duplicate template"
           onClick={onDuplicate}
@@ -72,7 +74,7 @@ export default function TemplateDetailTabs({
 
         <button
           type="button"
-          className="td-icon-action-btn"
+          className="td-action-icon-btn"
           title="Edit template"
           aria-label="Edit template"
           onClick={onEdit}

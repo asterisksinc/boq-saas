@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "./templates-overview.css";
 import { PermissionsProvider } from "@/components/PermissionsProvider";
 
 export const metadata: Metadata = {

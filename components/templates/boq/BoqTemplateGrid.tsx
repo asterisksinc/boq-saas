@@ -99,9 +99,9 @@ export default function BoqTemplateGrid({
   };
 
   const getMappingColor = (percent: number) => {
-    if (percent >= 90) return "#10b981";
-    if (percent >= 70) return "#f59e0b";
-    return "#ef4444";
+    if (percent >= 90) return "#16A34A";
+    if (percent >= 70) return "#D97706";
+    return "#DC2626";
   };
 
   const renderPaginationButtons = () => {
@@ -124,9 +124,14 @@ export default function BoqTemplateGrid({
 
   if (loading) {
     return (
-      <div className="template-cards-grid">
+      <div className="boq-templates-grid template-cards-grid" data-testid="boq-template-grid-loading">
         {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-          <div key={i} className="template-card-skeleton skeleton-shimmer" />
+          <div key={i} className="boq-card-skeleton skeleton-shimmer">
+            <div className="boq-skeleton-img" />
+            <div className="boq-skeleton-line" style={{ width: "60%" }} />
+            <div className="boq-skeleton-line" style={{ width: "40%" }} />
+            <div className="boq-skeleton-line" style={{ width: "90%", marginTop: "auto" }} />
+          </div>
         ))}
       </div>
     );
@@ -134,17 +139,20 @@ export default function BoqTemplateGrid({
 
   if (items.length === 0) {
     return (
-      <div className="templates-empty" style={{ padding: "48px 20px", textAlign: "center" }}>
-        <h3 style={{ fontSize: 16, margin: "0 0 6px 0", color: "#0f172a" }}>No BOQ templates found</h3>
-        <p style={{ fontSize: 13, color: "#64748b", margin: "0 0 16px 0" }}>
+      <div className="templates-empty" style={{ padding: "48px 20px", textAlign: "center" }} data-testid="boq-template-grid-empty">
+        <h3 style={{ fontSize: 16, margin: "0 0 6px 0", color: "#0F172A", fontFamily: "'Urbanist', sans-serif", fontWeight: 600 }}>
+          No BOQ templates found
+        </h3>
+        <p style={{ fontSize: 14, color: "#64748B", margin: "0 0 16px 0", fontFamily: "'Urbanist', sans-serif" }}>
           No templates match your current filters or search query.
         </p>
         {onCreateTemplate && (
           <button
             type="button"
-            className="template-btn-primary"
+            className="template-new-btn"
             style={{ margin: "0 auto", display: "inline-flex" }}
             onClick={onCreateTemplate}
+            data-testid="empty-create-boq-btn"
           >
             <Plus size={16} />
             <span>New BOQ Template</span>
@@ -156,89 +164,110 @@ export default function BoqTemplateGrid({
 
   return (
     <>
-      <div className="template-cards-grid">
+      <div className="boq-templates-grid template-cards-grid" data-testid="boq-template-grid">
         {items.map((template) => {
           const coverImg = getCoverImage(template);
           const isMenuOpen = menuId === template.id;
-          const displayTags = template.tags?.filter(
-            (t) => !["active", "draft", "published", "v1.0", "v2.0", "v3.0"].includes(t.toLowerCase())
-          ).slice(0, 2) || [template.projectType || "Residential", template.category || "Interior"];
+          
+          // Determine clean category and type tags
+          const rawTags = template.tags?.filter(
+            (t) => !["active", "draft", "archived", "published", "v1.0", "v2.0", "v3.0", "v3.2"].includes(t.toLowerCase())
+          ) || [];
+          
+          const categoryTag = template.projectType || rawTags[0] || "Residential";
+          const subCategoryTag = template.category && template.category.toLowerCase() !== categoryTag.toLowerCase()
+            ? template.category
+            : rawTags[1] || "Interior";
+
+          const statusNormalized = (template.status || "active").toLowerCase();
+          const statusClass = statusNormalized === "active" ? "status-active" : statusNormalized === "draft" ? "status-draft" : "status-archived";
+
+          const mappingPercent = Math.min(100, Math.max(0, template.costMapping ?? 98));
 
           return (
             <div
               key={template.id}
-              className="target-template-card"
+              className="boq-template-card target-template-card"
               onClick={() => router.push(`/templates/boq/${template.id}`)}
+              data-testid={`boq-card-${template.id}`}
             >
-              <div className="target-card-img-wrap">
+              {/* 1. Preview Image (Rectangle 78) */}
+              <div className="boq-card-img-wrap target-card-img-wrap">
                 <img
                   src={coverImg}
                   alt={template.name}
-                  className="target-card-img"
+                  className="boq-card-img target-card-img"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = fallbackImages.Default;
                   }}
                 />
               </div>
 
-              <div className="target-card-body">
-                <div className="target-card-top-row">
-                  <h4 className="target-card-title" title={template.name}>
-                    {template.name}
-                  </h4>
-                  <span
-                    className={`target-status-pill ${
-                      template.status.toLowerCase() === "active" ? "status-active" : "status-draft"
-                    }`}
-                  >
-                    {template.status.toUpperCase()}
-                  </span>
-                </div>
+              {/* 2. Card Body (Frame 2147225073) */}
+              <div className="boq-card-body target-card-body">
+                {/* Header Row: Title & Subtitle + Badges */}
+                <div className="boq-card-header-row">
+                  {/* Left: Title & Sections/Items */}
+                  <div className="boq-card-title-group">
+                    <h4 className="boq-card-title target-card-title" title={template.name}>
+                      {template.name}
+                    </h4>
+                    <p className="boq-card-meta target-card-meta">
+                      {template.sections || 18} Sections • {template.items || 186} Items
+                    </p>
+                  </div>
 
-                <p className="target-card-meta">
-                  {template.sections} Sections · {template.items} Items
-                </p>
-
-                <div className="boq-tags-row" style={{ marginTop: 8, marginBottom: 8 }}>
-                  {displayTags.map((tag) => (
-                    <span key={tag} className="boq-tag-pill">
-                      {tag}
+                  {/* Right: Status Pill & Category Tags */}
+                  <div className="boq-card-badges-wrap">
+                    <span className={`boq-status-pill target-status-pill ${statusClass}`}>
+                      {template.status ? template.status.toUpperCase() : "ACTIVE"}
                     </span>
-                  ))}
+                    <div className="boq-card-tags-row boq-tags-row">
+                      <span className="boq-tag-pill">{categoryTag}</span>
+                      {subCategoryTag && <span className="boq-tag-pill">{subCategoryTag}</span>}
+                    </div>
+                  </div>
                 </div>
 
-                {/* Cost Mapping Progress Bar */}
-                <div className="boq-progress-wrap">
-                  <div className="boq-progress-bar-bg">
+                {/* 3. Cost Mapping Progress Bar (Frame 2147225258) */}
+                <div className="boq-progress-wrap boq-card-progress-row">
+                  <div className="boq-progress-bar-bg boq-card-progress-track">
                     <div
-                      className="boq-progress-bar-fill"
+                      className="boq-progress-bar-fill boq-card-progress-fill"
                       style={{
-                        width: `${template.costMapping}%`,
-                        backgroundColor: getMappingColor(template.costMapping),
+                        width: `${mappingPercent}%`,
+                        backgroundColor: getMappingColor(mappingPercent),
                       }}
                     />
                   </div>
-                  <span className="boq-progress-text">{template.costMapping}% Mapped</span>
+                  <span className="boq-progress-text boq-card-progress-text">
+                    {mappingPercent}% Mapped
+                  </span>
                 </div>
               </div>
 
-              <div className="target-card-footer">
-                <span className="target-card-used">
-                  {template.version} · Used {template.useCount} Times
+              {/* 4. Divider Line (Rectangle 40) */}
+              <hr className="boq-card-divider" />
+
+              {/* 5. Footer (Frame 2147225074) */}
+              <div className="boq-card-footer target-card-footer">
+                <span className="boq-card-used target-card-used">
+                  {template.version || "v3.2"} • Used {template.useCount ?? 42} Times
                 </span>
 
                 <div style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
                   <button
                     type="button"
-                    className="target-card-menu-btn"
+                    className="boq-card-menu-btn target-card-menu-btn"
                     aria-label="More options"
                     onClick={() => setMenuId(isMenuOpen ? null : template.id)}
+                    data-testid={`boq-card-menu-btn-${template.id}`}
                   >
                     <MoreHorizontal size={16} />
                   </button>
 
                   {isMenuOpen && (
-                    <div className="target-card-menu-dropdown">
+                    <div className="boq-card-menu-dropdown target-card-menu-dropdown" data-testid="boq-card-menu-dropdown">
                       <button
                         type="button"
                         onClick={() => {
@@ -295,7 +324,7 @@ export default function BoqTemplateGrid({
       </div>
 
       {/* Pagination Footer */}
-      <div className="target-table-pagination-row">
+      <div className="target-table-pagination-row" data-testid="boq-pagination-row">
         <div className="target-table-total-count">
           Total BOQ Templates: {total}
         </div>

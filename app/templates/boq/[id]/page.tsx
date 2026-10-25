@@ -42,7 +42,7 @@ import {
   Settings
 } from "lucide-react";
 import React, { useEffect, useState, useMemo } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
 import {
@@ -51,6 +51,7 @@ import {
   AddBoqSectionModal,
   AddBoqItemModal,
 } from "@/components/templates/boq/BoqTemplateModals";
+import BoqTemplateOverview from "@/components/templates/boq/BoqTemplateOverview";
 import { duplicateBoqTemplate } from "@/lib/api/boqs";
 
 type BoqItem = {
@@ -157,12 +158,40 @@ const tabs = ["Overview", "BOQ Structure", "Costing", "Rules", "Usage", "Version
 export default function BoqTemplateDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = (params?.id as string) || "";
 
   const [activeTab, setActiveTab] = useState<string>("Overview");
   const [template, setTemplate] = useState<BoqTemplateDetailData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [duplicating, setDuplicating] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+
+  // Handle tab change and sync to URL query parameter
+  const handleTabChange = (t: string) => {
+    setActiveTab(t);
+    if (typeof window !== "undefined") {
+      const tabSlug = t.toLowerCase().replace(/\s+/g, "-");
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", tabSlug);
+      window.history.replaceState({}, "", url.toString());
+    }
+  };
+
+  // Sync activeTab from URL search params on mount or param update
+  useEffect(() => {
+    const tabParam = searchParams?.get("tab");
+    if (tabParam) {
+      const matched = tabs.find(
+        (t) =>
+          t.toLowerCase().replace(/\s+/g, "-") === tabParam.toLowerCase() ||
+          t.toLowerCase() === tabParam.toLowerCase()
+      );
+      if (matched && matched !== activeTab) {
+        setActiveTab(matched);
+      }
+    }
+  }, [searchParams]);
 
   // BOQ Structure state
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({ "Master Bedroom": true });
@@ -240,8 +269,9 @@ export default function BoqTemplateDetailPage() {
   }, [template]);
 
   const handleDuplicate = async () => {
-    if (!template) return;
+    if (!template || duplicating) return;
     try {
+      setDuplicating(true);
       const res = await duplicateBoqTemplate(template.id);
       setNotice(`Template "${template.name}" duplicated successfully.`);
       if (res?.id) {
@@ -251,8 +281,18 @@ export default function BoqTemplateDetailPage() {
       }
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "Failed to duplicate template.");
+    } finally {
+      setDuplicating(false);
     }
   };
+
+  const discipline = useMemo(() => {
+    return template?.tags?.find(t => ["Interior Design", "Civil & Structural", "MEP", "Architecture"].includes(t)) || "Interior Design";
+  }, [template]);
+
+  const tier = useMemo(() => {
+    return template?.tags?.find(t => ["Premium", "Luxury", "Standard", "Affordable", "High-End"].includes(t)) || "Premium";
+  }, [template]);
 
   // Current selected category items
   const currentCategoryData = useMemo(() => {
@@ -303,8 +343,70 @@ export default function BoqTemplateDetailPage() {
       <main className="fig-dashboard boq-dashboard">
         <div className="fig-dashboard-glow" />
         <DashboardRail />
-        <div className="fig-dashboard-main" style={{ padding: 40, color: "#64748b" }}>
-          Loading BOQ template...
+        <div className="fig-dashboard-main">
+          <DashboardHeader title="Templates" onNew={() => {}} />
+          <div className="boq-detail-page-shell boq-page-shell">
+            {/* Back link skeleton */}
+            <div className="boq-skeleton-line" style={{ width: 140, height: 20, marginBottom: 8 }} />
+
+            {/* Header row skeleton */}
+            <div className="boq-detail-header-row">
+              <div className="boq-detail-title-group" style={{ gap: 10 }}>
+                <div className="boq-skeleton-title" style={{ width: 340, height: 29 }} />
+                <div className="boq-skeleton-line" style={{ width: 420, height: 18 }} />
+                <div className="boq-skeleton-line" style={{ width: 500, height: 18 }} />
+              </div>
+              <div className="boq-detail-header-actions">
+                <div className="boq-skeleton-box" style={{ width: 48, height: 46 }} />
+                <div className="boq-skeleton-box" style={{ width: 48, height: 46 }} />
+                <div className="boq-skeleton-box" style={{ width: 115, height: 46 }} />
+              </div>
+            </div>
+
+            {/* Tabs bar skeleton */}
+            <div className="boq-skeleton-tabs" style={{ width: 851, height: 46, display: "flex", alignItems: "center", padding: "6px", gap: 6 }}>
+              {Array.from({ length: 7 }).map((_, i) => (
+                <div key={i} className="boq-skeleton-line" style={{ width: i === 0 ? 110 : 90, height: 34, borderRadius: 4 }} />
+              ))}
+            </div>
+
+            {/* 4 KPI cards skeleton */}
+            <div className="boq-kpi-row">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="boq-kpi-card boq-skeleton-card" style={{ height: 106, padding: 16 }}>
+                  <div className="boq-skeleton-line" style={{ width: 80, height: 16, marginBottom: 12 }} />
+                  <div className="boq-skeleton-title" style={{ width: 120, height: 26, marginBottom: 8 }} />
+                  <div className="boq-skeleton-line" style={{ width: 100, height: 14 }} />
+                </div>
+              ))}
+            </div>
+
+            {/* 3x3 cards grid skeleton */}
+            <div className="boq-row-grid">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="boq-card boq-skeleton-card" style={{ height: 250, padding: 24 }}>
+                  <div className="boq-skeleton-line" style={{ width: 140, height: 20, marginBottom: 16 }} />
+                  <div className="boq-skeleton-box" style={{ width: "100%", height: 140 }} />
+                </div>
+              ))}
+            </div>
+            <div className="boq-row-grid">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="boq-card boq-skeleton-card" style={{ height: 250, padding: 24 }}>
+                  <div className="boq-skeleton-line" style={{ width: 140, height: 20, marginBottom: 16 }} />
+                  <div className="boq-skeleton-box" style={{ width: "100%", height: 140 }} />
+                </div>
+              ))}
+            </div>
+            <div className="boq-row-grid">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="boq-card boq-skeleton-card" style={{ height: 250, padding: 24 }}>
+                  <div className="boq-skeleton-line" style={{ width: 140, height: 20, marginBottom: 16 }} />
+                  <div className="boq-skeleton-box" style={{ width: "100%", height: 140 }} />
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </main>
     );
@@ -315,9 +417,40 @@ export default function BoqTemplateDetailPage() {
       <main className="fig-dashboard boq-dashboard">
         <div className="fig-dashboard-glow" />
         <DashboardRail />
-        <div className="fig-dashboard-main" style={{ padding: 40 }}>
-          <div style={{ color: "#ef4444", marginBottom: 12 }}>BOQ Template not found.</div>
-          <button className="primary" onClick={() => router.push("/templates")}>Back to Templates</button>
+        <div className="fig-dashboard-main">
+          <DashboardHeader title="Templates" onNew={() => router.push("/templates")} />
+          <div className="boq-detail-page-shell boq-page-shell">
+            <div className="boq-error-state">
+              <div className="boq-error-icon">
+                <AlertTriangle size={28} />
+              </div>
+              <h2 className="boq-error-title">BOQ Template Not Found</h2>
+              <p className="boq-error-desc">
+                The BOQ template you are trying to view does not exist or has been removed.
+              </p>
+              <div className="boq-error-actions">
+                <button
+                  type="button"
+                  className="boq-detail-use-btn"
+                  onClick={() => {
+                    setLoading(true);
+                    fetchTemplate();
+                  }}
+                  style={{ display: "flex", alignItems: "center", gap: 6 }}
+                >
+                  <RefreshCw size={16} /> Retry
+                </button>
+                <button
+                  type="button"
+                  className="boq-detail-action-icon-btn"
+                  style={{ width: "auto", padding: "0 16px", height: 46 }}
+                  onClick={() => router.push("/templates?tab=boqs")}
+                >
+                  Back to BOQ Templates
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </main>
     );
@@ -330,45 +463,57 @@ export default function BoqTemplateDetailPage() {
       <div className="fig-dashboard-main">
         <DashboardHeader title="Templates" onNew={() => setUseModalOpen(true)} />
 
-        <div className="boq-page-shell boq-detail-container">
-          {/* Breadcrumb */}
-          <div className="boq-detail-back-link" onClick={() => router.push("/templates")}>
-            <ArrowLeft size={16} /> BOQ Templates
-          </div>
+        <div className="boq-detail-page-shell boq-page-shell">
+          {/* Breadcrumb / Back Navigation */}
+          <button
+            type="button"
+            className="boq-detail-back-link"
+            onClick={() => router.push("/templates?tab=boqs")}
+            aria-label="Back to BOQ Templates"
+          >
+            <ArrowLeft size={16} /> <span>BOQ Templates</span>
+          </button>
 
           {/* Header row */}
           <div className="boq-detail-header-row">
             <div className="boq-detail-title-group">
-              <h1>{template.name}</h1>
+              <h1 className="boq-detail-title">{template.name}</h1>
               <div className="boq-detail-meta-line">
-                <span style={{ fontWeight: 600, color: "#0f172a" }}>{template.templateCode}</span>
-                <span>·</span>
-                <span>{template.projectType}</span>
-                <span>·</span>
-                <span>Interior Design</span>
-                <span>·</span>
-                <span>Premium</span>
+                <span className="boq-detail-code">{template.templateCode}</span>
+                <span className="boq-detail-dot">•</span>
+                <span>{template.category || template.projectType || "Residential"}</span>
+                <span className="boq-detail-dot">•</span>
+                <span>{discipline}</span>
+                <span className="boq-detail-dot">•</span>
+                <span>{tier}</span>
               </div>
               <p className="boq-detail-desc">{template.description}</p>
             </div>
 
             <div className="boq-detail-header-actions">
               <button 
-                className="boq-detail-icon-btn" 
-                title="Duplicate"
+                type="button"
+                className="boq-detail-action-icon-btn" 
+                title={duplicating ? "Duplicating..." : "Duplicate"}
+                aria-label="Duplicate template"
+                disabled={duplicating}
                 onClick={handleDuplicate}
               >
-                <Copy size={16} />
+                {duplicating ? <RefreshCw size={20} className="boq-spin" /> : <Copy size={20} />}
               </button>
               <button 
-                className="boq-detail-icon-btn" 
+                type="button"
+                className="boq-detail-action-icon-btn" 
                 title="Edit"
+                aria-label="Edit template"
                 onClick={() => setEditModalOpen(true)}
               >
-                <Edit3 size={16} />
+                <Edit3 size={20} />
               </button>
               <button 
+                type="button"
                 className="boq-detail-use-btn"
+                aria-label="Use template"
                 onClick={() => setUseModalOpen(true)}
               >
                 Use Template
@@ -376,13 +521,16 @@ export default function BoqTemplateDetailPage() {
             </div>
           </div>
 
-          {/* Tab buttons */}
-          <div className="boq-detail-tabs">
+          {/* Tabs Bar */}
+          <div className="boq-detail-tabs-bar" role="tablist">
             {tabs.map(t => (
               <button
                 key={t}
-                className={`boq-detail-tab-btn ${activeTab === t ? "active" : ""}`}
-                onClick={() => setActiveTab(t)}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === t}
+                className={`boq-detail-tab-pill ${activeTab === t ? "active" : ""}`}
+                onClick={() => handleTabChange(t)}
               >
                 {t}
               </button>
@@ -390,467 +538,14 @@ export default function BoqTemplateDetailPage() {
           </div>
 
           {/* =========================================================================
-              TAB 1: OVERVIEW (Screen 4)
+              TAB 1: OVERVIEW (Figma Exact Redesign)
              ========================================================================= */}
           {activeTab === "Overview" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-              {/* 4 Top Metric Cards */}
-              <div className="boq-metric-cards-4">
-                <div className="boq-mcard">
-                  <span className="boq-mcard-label">Sections</span>
-                  <div className="boq-mcard-val">{template.sections}</div>
-                  <span className="boq-mcard-sub">Organised Structure</span>
-                </div>
-                <div className="boq-mcard">
-                  <span className="boq-mcard-label">Line Items</span>
-                  <div className="boq-mcard-val">{template.items}</div>
-                  <span className="boq-mcard-sub">Total Items</span>
-                </div>
-                <div className="boq-mcard">
-                  <span className="boq-mcard-label">Indicative Base Cost</span>
-                  <div className="boq-mcard-val accent">{template.indicativeBaseCost}</div>
-                  <span className="boq-mcard-sub">Current Library Rates</span>
-                </div>
-                <div className="boq-mcard">
-                  <span className="boq-mcard-label">Rate Mapping</span>
-                  <div className="boq-mcard-val blue">{template.costMapping}%</div>
-                  <span className="boq-mcard-sub">Mapped to Library</span>
-                </div>
-              </div>
-
-              {/* Middle Row: Readiness, Commercial Summary, Commercial Defaults */}
-              <div className="boq-overview-row-3">
-                {/* 1. BOQ Readiness */}
-                <div className="boq-panel-card">
-                  <div className="boq-panel-head">
-                    <h3>BOQ Readiness</h3>
-                  </div>
-                  <div className="boq-readiness-content">
-                    <div className="boq-donut-score">
-                      <div className="boq-donut-inner">
-                        <span className="boq-donut-num">{template.readiness}</span>
-                        <span className="boq-donut-total">/ 100</span>
-                      </div>
-                    </div>
-                    <div className="boq-readiness-checks">
-                      <div className="boq-check-item" style={{ color: "#059669" }}>
-                        <CheckCircle2 size={15} /> <span>Structure Complete</span>
-                      </div>
-                      <div className="boq-check-item" style={{ color: "#059669" }}>
-                        <CheckCircle2 size={15} /> <span>{template.sections}/{template.sections} Sections Configured</span>
-                      </div>
-                      <div className="boq-check-item" style={{ color: "#059669" }}>
-                        <CheckCircle2 size={15} /> <span>Units Configured</span>
-                      </div>
-                      <div className="boq-check-item" style={{ color: "#059669" }}>
-                        <CheckCircle2 size={15} /> <span>Commercial Defaults Configured</span>
-                      </div>
-                      <div className="boq-check-item" style={{ color: (template.costingHealth?.reviewRequired || 0) > 0 ? "#d97706" : "#059669" }}>
-                        {(template.costingHealth?.reviewRequired || 0) > 0 ? <AlertTriangle size={15} /> : <CheckCircle2 size={15} />}
-                        <span>{template.costingHealth?.reviewRequired || 0} Automated Rate references</span>
-                      </div>
-                      <div className="boq-check-item" style={{ color: (template.costingHealth?.outdated || 0) > 0 ? "#d97706" : "#059669" }}>
-                        {(template.costingHealth?.outdated || 0) > 0 ? <AlertTriangle size={15} /> : <CheckCircle2 size={15} />}
-                        <span>{template.costingHealth?.outdated || 0} items require review</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f1f5f9", paddingTop: 12, marginTop: "auto", fontSize: 12 }}>
-                    <span style={{ color: "#64748b" }}>
-                      {template.readiness >= 90 ? "Ready for production use." : "Ready with minor warnings."}
-                    </span>
-                    <a href="#" className="boq-panel-link" onClick={e => { e.preventDefault(); setActiveTab("Rules"); }}>View Validation →</a>
-                  </div>
-                </div>
-
-                {/* 2. Commercial Summary */}
-                <div className="boq-panel-card">
-                  <div className="boq-panel-head">
-                    <h3>Commercial Summary</h3>
-                    <span className="boq-panel-link" onClick={() => setActiveTab("Costing")}>View Costing →</span>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: 11, color: "#64748b" }}>Base Cost</span>
-                    <div style={{ fontSize: 18, fontWeight: 700, color: "#0f172a" }}>
-                      ₹{(template.commercialSummary?.indicativeCost || template.baseCostAmount || 0).toLocaleString("en-IN")}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6, fontSize: 12 }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <span style={{ width: 8, height: 8, borderRadius: 2, background: "#2563eb" }} /> Material
-                        </span>
-                        <b>₹{(template.commercialSummary?.material.amount || 0).toLocaleString("en-IN")} ({template.commercialSummary?.material.percent || 0}%)</b>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <span style={{ width: 8, height: 8, borderRadius: 2, background: "#10b981" }} /> Labour
-                        </span>
-                        <b>₹{(template.commercialSummary?.labour.amount || 0).toLocaleString("en-IN")} ({template.commercialSummary?.labour.percent || 0}%)</b>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <span style={{ width: 8, height: 8, borderRadius: 2, background: "#06b6d4" }} /> Transport
-                        </span>
-                        <b>₹{(template.commercialSummary?.transport.amount || 0).toLocaleString("en-IN")} ({template.commercialSummary?.transport.percent || 0}%)</b>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <span style={{ width: 8, height: 8, borderRadius: 2, background: "#f59e0b" }} /> Other
-                        </span>
-                        <b>₹{(template.commercialSummary?.other.amount || 0).toLocaleString("en-IN")} ({template.commercialSummary?.other.percent || 0}%)</b>
-                      </div>
-                    </div>
-                    {/* SVG Donut */}
-                    {(() => {
-                      const mat = template.commercialSummary?.material.percent ?? 75;
-                      const lab = template.commercialSummary?.labour.percent ?? 17;
-                      const tra = template.commercialSummary?.transport.percent ?? 3;
-                      const oth = template.commercialSummary?.other.percent ?? 5;
-
-                      const matOffset = 0;
-                      const labOffset = -mat;
-                      const traOffset = -(mat + lab);
-                      const othOffset = -(mat + lab + tra);
-
-                      return (
-                        <div style={{ width: 90, height: 90, flexShrink: 0 }}>
-                          <svg viewBox="0 0 36 36" style={{ width: "100%", height: "100%", transform: "rotate(-90deg)" }}>
-                            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#e2e8f0" strokeWidth="5.5" />
-                            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#2563eb" strokeWidth="5.5" strokeDasharray={`${mat} 100`} strokeDashoffset={matOffset} />
-                            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#10b981" strokeWidth="5.5" strokeDasharray={`${lab} 100`} strokeDashoffset={labOffset} />
-                            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#06b6d4" strokeWidth="5.5" strokeDasharray={`${tra} 100`} strokeDashoffset={traOffset} />
-                            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#f59e0b" strokeWidth="5.5" strokeDasharray={`${oth} 100`} strokeDashoffset={othOffset} />
-                          </svg>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                  <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 10, display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748b" }}>
-                    <span>Indicative Cost</span>
-                    <b style={{ color: "#0f172a" }}>₹{(template.commercialSummary?.indicativeCost || template.baseCostAmount || 0).toLocaleString("en-IN")}</b>
-                  </div>
-                </div>
-
-                {/* 3. Commercial Defaults */}
-                <div className="boq-panel-card">
-                  <div className="boq-panel-head">
-                    <h3>Commercial Defaults</h3>
-                    <span className="boq-panel-link" onClick={() => setActiveTab("Rules")}>View Rules →</span>
-                  </div>
-                  <div className="boq-defaults-list">
-                    <div className="boq-default-item">
-                      <div className="boq-default-icon boq-icon-blue">₹</div>
-                      <div className="boq-default-info">
-                        <span className="boq-default-label">Currency</span>
-                        <span className="boq-default-val">{template.commercialDefaults.currency}</span>
-                      </div>
-                    </div>
-                    <div className="boq-default-item">
-                      <div className="boq-default-icon boq-icon-amber">%</div>
-                      <div className="boq-default-info">
-                        <span className="boq-default-label">Default Wastage</span>
-                        <span className="boq-default-val">{template.commercialDefaults.defaultWastage}%</span>
-                      </div>
-                    </div>
-                    <div className="boq-default-item">
-                      <div className="boq-default-icon boq-icon-purple"><Building size={16} /></div>
-                      <div className="boq-default-info">
-                        <span className="boq-default-label">Tax Profile</span>
-                        <span className="boq-default-val">{template.commercialDefaults.taxProfile}</span>
-                      </div>
-                    </div>
-                    <div className="boq-default-item">
-                      <div className="boq-default-icon boq-icon-blue"><TrendingUp size={16} /></div>
-                      <div className="boq-default-info">
-                        <span className="boq-default-label">Default Markup</span>
-                        <span className="boq-default-val">{template.commercialDefaults.defaultMarkup}%</span>
-                      </div>
-                    </div>
-                    <div className="boq-default-item">
-                      <div className="boq-default-icon boq-icon-green"><Percent size={16} /></div>
-                      <div className="boq-default-info">
-                        <span className="boq-default-label">Tax</span>
-                        <span className="boq-default-val">{template.commercialDefaults.taxPercent}%</span>
-                      </div>
-                    </div>
-                    <div className="boq-default-item">
-                      <div className="boq-default-icon boq-icon-purple">#</div>
-                      <div className="boq-default-info">
-                        <span className="boq-default-label">Rounding</span>
-                        <span className="boq-default-val">{template.commercialDefaults.rounding}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Next Row: BOQ Structure & Coverage, Costing Health, Usage & Dependencies */}
-              <div className="boq-overview-row-3">
-                {/* 1. BOQ Structure & Coverage */}
-                <div className="boq-panel-card">
-                  <div className="boq-panel-head">
-                    <h3>BOQ Structure & Coverage</h3>
-                    <span className="boq-panel-link" onClick={() => setActiveTab("BOQ Structure")}>View Structure →</span>
-                  </div>
-                  <div className="boq-coverage-counts">
-                    <div className="boq-cov-col">
-                      <b>{template.sections}</b>
-                      <span>Sections</span>
-                    </div>
-                    <div className="boq-cov-col">
-                      <b>{template.categories}</b>
-                      <span>Categories</span>
-                    </div>
-                    <div className="boq-cov-col">
-                      <b>{template.items}</b>
-                      <span>Line Items</span>
-                    </div>
-                  </div>
-                  <div className="boq-cov-bars">
-                    <div className="boq-cov-bar-row">
-                      <div className="boq-cov-bar-label">
-                        <span>Sections Configured</span>
-                        <b>{template.sections} / {template.sections}</b>
-                      </div>
-                      <div className="boq-progress-bar-bg">
-                        <div className="boq-progress-bar-fill" style={{ width: "100%", background: "#10b981" }} />
-                      </div>
-                    </div>
-                    <div className="boq-cov-bar-row">
-                      <div className="boq-cov-bar-label">
-                        <span>Items with valid units</span>
-                        <b>{Math.max(0, template.items - (template.costingHealth?.missing || 0))} / {template.items}</b>
-                      </div>
-                      <div className="boq-progress-bar-bg">
-                        <div
-                          className="boq-progress-bar-fill"
-                          style={{
-                            width: `${template.items > 0 ? Math.round(((template.items - (template.costingHealth?.missing || 0)) / template.items) * 100) : 100}%`,
-                            background: "#10b981"
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <div className="boq-cov-bar-row">
-                      <div className="boq-cov-bar-label">
-                        <span>Items with quantity rules</span>
-                        <b>{Math.round(template.items * 0.95)} / {template.items}</b>
-                      </div>
-                      <div className="boq-progress-bar-bg">
-                        <div className="boq-progress-bar-fill" style={{ width: "95%", background: "#10b981" }} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. Costing Health */}
-                <div className="boq-panel-card">
-                  <div className="boq-panel-head">
-                    <h3>Costing Health</h3>
-                    <span className="boq-panel-link" onClick={() => setActiveTab("Costing")}>Review Costing →</span>
-                  </div>
-                  <div className="boq-health-split">
-                    <div className="boq-health-list">
-                      <div className="boq-health-item">
-                        <div className="boq-h-sq boq-sq-blue" />
-                        <div className="boq-h-content">
-                          <b>{template.costingHealth?.mapped || 0} Mapped</b>
-                          <p>Current mappings active</p>
-                        </div>
-                      </div>
-                      <div className="boq-health-item">
-                        <div className="boq-h-sq boq-sq-yellow" />
-                        <div className="boq-h-content">
-                          <b>{(template.costingHealth?.outdated || 0) < 10 ? '0' : ''}{template.costingHealth?.outdated || 0} Outdated</b>
-                          <p>Rate references outdated</p>
-                        </div>
-                      </div>
-                      <div className="boq-health-item">
-                        <div className="boq-h-sq boq-sq-yellow" />
-                        <div className="boq-h-content">
-                          <b>{(template.costingHealth?.reviewRequired || 0) < 10 ? '0' : ''}{template.costingHealth?.reviewRequired || 0} Review Required</b>
-                          <p>Mapping requires review</p>
-                        </div>
-                      </div>
-                      <div className="boq-health-item">
-                        <div className="boq-h-sq boq-sq-red" />
-                        <div className="boq-h-content">
-                          <b>{(template.costingHealth?.missing || 0) < 10 ? '0' : ''}{template.costingHealth?.missing || 0} Missing</b>
-                          <p>No Costing Reference</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="boq-health-list">
-                      <span style={{ fontSize: 11, fontWeight: 700, color: "#64748b" }}>Rate Freshness</span>
-                      <div className="boq-health-item">
-                        <div className="boq-h-sq boq-sq-blue" />
-                        <div className="boq-h-content">
-                          <b>{template.costingHealth?.rateFreshness?.current || 0} Current</b>
-                          <p>Rates Updated</p>
-                        </div>
-                      </div>
-                      <div className="boq-health-item">
-                        <div className="boq-h-sq boq-sq-yellow" />
-                        <div className="boq-h-content">
-                          <b>{template.costingHealth?.rateFreshness?.reviewSoon || 0} Review Soon</b>
-                          <p>Approaching Review</p>
-                        </div>
-                      </div>
-                      <div className="boq-health-item">
-                        <div className="boq-h-sq boq-sq-red" />
-                        <div className="boq-h-content">
-                          <b>{(template.costingHealth?.rateFreshness?.outdated || 0) < 10 ? '0' : ''}{template.costingHealth?.rateFreshness?.outdated || 0} Outdated</b>
-                          <p>Require Update</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 3. Usage & Dependencies */}
-                <div className="boq-panel-card">
-                  <div className="boq-panel-head">
-                    <h3>Usage & Dependencies</h3>
-                    <span className="boq-panel-link" onClick={() => setActiveTab("Usage")}>View Usage →</span>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                        <div className="boq-default-icon boq-icon-blue" style={{ width: 28, height: 28, fontSize: 12 }}>₹</div>
-                        <div>
-                          <b>{template.usageDependencies.projectTemplatesCount}</b>
-                          <p style={{ margin: 0, fontSize: 11, color: "#64748b" }}>Project Templates</p>
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                        <div className="boq-default-icon boq-icon-purple" style={{ width: 28, height: 28, fontSize: 12 }}><Building size={14} /></div>
-                        <div>
-                          <b>{template.usageDependencies.activeProjectsCount}</b>
-                          <p style={{ margin: 0, fontSize: 11, color: "#64748b" }}>Active Projects</p>
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                        <div className="boq-default-icon boq-icon-green" style={{ width: 28, height: 28, fontSize: 12 }}><Percent size={14} /></div>
-                        <div>
-                          <b>0{template.usageDependencies.draftTemplatesCount}</b>
-                          <p style={{ margin: 0, fontSize: 11, color: "#64748b" }}>Draft Templates</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: "#64748b" }}>Dependencies</span>
-                      {template.usageDependencies.dependencies.map(d => (
-                        <div key={d.name} style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 11.5 }}>
-                          <span style={{ width: 8, height: 8, borderRadius: 2, background: "#10b981", marginTop: 4, flexShrink: 0 }} />
-                          <div>
-                            <span style={{ color: "#1e293b", fontWeight: 500 }}>{d.name}</span>
-                            <div style={{ color: "#64748b" }}>{d.status}</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="boq-notice-box">
-                    <Info size={16} style={{ flexShrink: 0 }} />
-                    <span>This BOQ Template is actively used by 12 Project Templates and 38 Projects. Changes will create a new version.</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Bottom Row: Attention Required, Version Governance, Recent Activity */}
-              <div className="boq-overview-row-3">
-                {/* 1. Attention Required */}
-                <div className="boq-panel-card">
-                  <div className="boq-panel-head">
-                    <h3>Attention Required</h3>
-                    <span style={{ background: "#fee2e2", color: "#dc2626", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>
-                      {(template.attentionRequired?.total || 0) < 10 ? '0' : ''}{template.attentionRequired?.total || 0} Issues
-                    </span>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, textAlign: "left" }}>
-                    <div>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: "#dc2626" }}>CRITICAL</span>
-                      <div style={{ fontSize: 24, fontWeight: 800, color: "#dc2626" }}>
-                        {(template.attentionRequired?.critical || 0) < 10 ? '0' : ''}{template.attentionRequired?.critical || 0}
-                      </div>
-                      <span style={{ fontSize: 11, color: "#64748b" }}>Missing Cost References</span>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: "#d97706" }}>WARNING</span>
-                      <div style={{ fontSize: 24, fontWeight: 800, color: "#d97706" }}>
-                        {(template.attentionRequired?.warning || 0) < 10 ? '0' : ''}{template.attentionRequired?.warning || 0}
-                      </div>
-                      <span style={{ fontSize: 11, color: "#64748b" }}>Outdated rate References</span>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: "#2563eb" }}>INFO</span>
-                      <div style={{ fontSize: 24, fontWeight: 800, color: "#2563eb" }}>
-                        {(template.attentionRequired?.info || 0) < 10 ? '0' : ''}{template.attentionRequired?.info || 0}
-                      </div>
-                      <span style={{ fontSize: 11, color: "#64748b" }}>Deprecated Item</span>
-                    </div>
-                  </div>
-                  <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 12, marginTop: "auto" }}>
-                    <a href="#" className="boq-panel-link" onClick={e => { e.preventDefault(); setNotice("Viewing all issues."); }}>Review All Issues →</a>
-                  </div>
-                </div>
-
-                {/* 2. Version Governance */}
-                <div className="boq-panel-card">
-                  <div className="boq-panel-head">
-                    <h3>Version Governance</h3>
-                    <span className="boq-panel-link" onClick={() => setActiveTab("Versions")}>View Versions →</span>
-                  </div>
-                  <div style={{ display: "flex", gap: 20 }}>
-                    <div>
-                      <div style={{ fontSize: 22, fontWeight: 800, color: "#059669" }}>{template.versionGovernance.version}</div>
-                      <span className="boq-badge-active" style={{ fontSize: 10 }}>{template.versionGovernance.status}</span>
-                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 16 }}>
-                        <span>Published</span>
-                        <div style={{ fontWeight: 600, color: "#1e293b" }}>{template.versionGovernance.publishedDate}</div>
-                      </div>
-                    </div>
-                    <div style={{ flex: 1, borderLeft: "1px solid #f1f5f9", paddingLeft: 16 }}>
-                      <span style={{ fontSize: 11, color: "#64748b", fontWeight: 600 }}>Changes since v2.3</span>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6, fontSize: 12, color: "#334155" }}>
-                        {template.versionGovernance.changes.map((c, i) => (
-                          <span key={i}>{c.text}</span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 3. Recent Activity */}
-                <div className="boq-panel-card">
-                  <div className="boq-panel-head">
-                    <h3>Recent Activity</h3>
-                    <span className="boq-panel-link" onClick={() => setActiveTab("Activity")}>View Activity →</span>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                    <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981", marginTop: 6 }} />
-                      <div>
-                        <b style={{ fontSize: 13, color: "#0f172a" }}>Published</b>
-                        <div style={{ fontSize: 11, color: "#64748b" }}>06 Aug 2026 · 14:32</div>
-                        <div style={{ fontSize: 12, color: "#334155", marginTop: 2 }}>Pradhyumn Published v3.2</div>
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#8b5cf6", marginTop: 6 }} />
-                      <div>
-                        <b style={{ fontSize: 13, color: "#0f172a" }}>Approved</b>
-                        <div style={{ fontSize: 11, color: "#64748b" }}>06 Aug 2026 · 14:11</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <BoqTemplateOverview
+              template={template}
+              onNavigateTab={(tab) => handleTabChange(tab)}
+              onNotice={(msg) => setNotice(msg)}
+            />
           )}
 
           {/* =========================================================================

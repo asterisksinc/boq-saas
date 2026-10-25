@@ -2650,10 +2650,10 @@ textarea {
     font-weight: 500
 }
 
-.blue {
+/* .blue {
     background: var(--blue);
     color: #fff
-}
+} */
 
 .soft {
     background: var(--line)
@@ -8026,7 +8026,7 @@ textarea {
 }
 
 .boq-dashboard {
-    background: #dde6f7;
+    /* background: #dde6f7; */
 }
 
 /* Projects screen: Figma project directory and project table redesign */
@@ -14101,8 +14101,8 @@ textarea {
 
 .boq-page-shell,
 .boq-detail-shell {
-    background: rgba(255, 255, 255, 0.38);
-    border: 1px solid rgba(148, 163, 184, 0.22);
+    /* background: rgba(255, 255, 255, 0.38); */
+    /* border: 1px solid rgba(148, 163, 184, 0.22); */
     border-radius: 22px;
     padding: 18px 18px 20px;
     margin-top: 18px;
@@ -49642,7 +49642,7 @@ textarea {
     justify-content: space-between;
     align-items: center;
     padding-top: 18px;
-    border-top: 1px solid #f1f5f9;
+    /* border-top: 1px solid #f1f5f9; */
     margin-top: 8px;
 }
 
@@ -50041,23 +50041,30 @@ textarea {
 }
 
 /* ==========================================================================
-   Project Template Detail Experience (Matches Reference Designs 1, 2, 3, 4)
+   Project Template Detail Experience — Figma-Accurate Overview Redesign
+   Visual Reference: Urbanist font, #F1F5F9 canvas, translucent panels rgba(255,255,255,0.6),
+   white inner cards with 0px 0px 6px rgba(0,0,0,0.06), #2563EB primary, fluid 100% layout.
    ========================================================================== */
 
 .td-page-shell {
-    padding: 0 28px 40px 28px;
     width: 100%;
     max-width: 100%;
+    min-width: 0;
     box-sizing: border-box;
+    padding: 0 24px 40px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 768px) {
     .td-page-shell {
-        padding: 0 20px 32px 20px;
+        padding: 0 16px 32px 16px;
+        gap: 14px;
     }
 }
 
-/* Back Link */
+/* Back Link: Frame 2147225070 */
 .td-back-link {
     display: inline-flex;
     align-items: center;
@@ -50065,41 +50072,103 @@ textarea {
     background: transparent;
     border: none;
     cursor: pointer;
-    font-size: 13.5px;
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
     font-weight: 500;
+    font-size: 16px;
+    line-height: 120%;
     color: #475569;
     padding: 0;
-    margin: 16px 0 20px 0;
+    margin: 12px 0 6px 0;
     transition: color 0.15s ease;
+    align-self: flex-start;
 }
 
 .td-back-link:hover {
-    color: #0f172a;
+    color: #0F172A;
 }
 
-/* Template Information Card */
-.td-info-card {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 14px;
-    padding: 24px;
-    margin-bottom: 24px;
-    display: flex;
-    gap: 24px;
-    align-items: flex-start;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+/* ── Outer Translucent Panel (Figma Frames 2147225071, 2147225075, 2147225078, 2147225077) ── */
+.td-outer-panel {
     box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px;
+    gap: 20px;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 6px;
+}
+
+@media (max-width: 768px) {
+    .td-outer-panel {
+        padding: 16px;
+        gap: 14px;
+    }
+}
+
+.td-panel-header-row {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.td-panel-heading {
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    margin: 0;
+}
+
+/* ── Inner White Card (Figma Frame 2147225027) ── */
+.td-inner-card {
+    box-sizing: border-box;
+    display: flex;
+    background: #FFFFFF;
+    box-shadow: 0px 0px 6px rgba(0, 0, 0, 0.06);
+    border-radius: 14px;
+    padding: 16px;
+    width: 100%;
+}
+
+/* ── Section 1: Template Information Card ── */
+.td-info-card-inner {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+@media (max-width: 820px) {
+    .td-info-card-inner {
+        flex-direction: column;
+        align-items: center;
+    }
 }
 
 .td-info-image-wrap {
-    width: 180px;
-    height: 125px;
-    border-radius: 8px;
+    width: 155px;
+    height: 155px;
+    border-radius: 4px;
     overflow: hidden;
-    flex-shrink: 0;
-    background: #f1f5f9;
     position: relative;
-    border: 1px solid #e2e8f0;
+    flex-shrink: 0;
+    background: #D9D9D9;
+}
+
+@media (max-width: 820px) {
+    .td-info-image-wrap {
+        width: 100%;
+        max-width: 280px;
+        height: 180px;
+    }
 }
 
 .td-info-img {
@@ -50107,22 +50176,23 @@ textarea {
     height: 100%;
     object-fit: cover;
     display: block;
+    border-radius: 4px;
 }
 
 .td-info-img-upload-btn {
     position: absolute;
     top: 8px;
     right: 8px;
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
     border-radius: 6px;
     background: rgba(15, 23, 42, 0.65);
-    color: #ffffff;
+    color: #FFFFFF;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    backdrop-filter: blur(2px);
+    backdrop-filter: blur(4px);
     transition: background 0.15s ease;
 }
 
@@ -50130,231 +50200,268 @@ textarea {
     background: rgba(15, 23, 42, 0.85);
 }
 
-.td-info-grid {
+.td-info-details-col {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
     flex: 1;
-    display: grid;
-    grid-template-columns: 1.8fr 1fr 1fr;
-    gap: 24px;
     min-width: 0;
+    width: 100%;
 }
 
-@media (max-width: 900px) {
-    .td-info-card {
+.td-info-details-row {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 16px;
+    width: 100%;
+}
+
+@media (max-width: 640px) {
+    .td-info-details-row {
         flex-direction: column;
-    }
-    .td-info-image-wrap {
-        width: 100%;
-        height: 180px;
-    }
-    .td-info-grid {
-        grid-template-columns: 1fr;
-        gap: 16px;
+        gap: 12px;
     }
 }
 
 .td-info-field {
     display: flex;
     flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+}
+
+.td-info-field-full {
+    width: 100%;
+    flex: none;
 }
 
 .td-info-label {
-    font-size: 11.5px;
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
     font-weight: 500;
-    color: #64748b;
-    margin-bottom: 4px;
-}
-
-.td-info-title {
-    font-size: 16px;
-    font-weight: 600;
-    color: #0f172a;
-    margin: 0;
-    line-height: 1.3;
-}
-
-.td-info-value-bold {
-    font-size: 13.5px;
-    font-weight: 600;
-    color: #0f172a;
-    line-height: 1.3;
-}
-
-.td-info-tags-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 2px;
-}
-
-.td-info-tag-pill {
-    background: #f1f5f9;
-    color: #475569;
-    border: 1px solid #e2e8f0;
-    border-radius: 4px;
-    padding: 2.5px 8px;
-    font-size: 11px;
-    font-weight: 500;
-}
-
-.td-info-desc {
     font-size: 12px;
-    font-weight: 400;
-    color: #334155;
-    line-height: 1.45;
+    line-height: 120%;
+    color: #64748B;
     margin: 0;
+}
+
+.td-info-value {
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    margin: 0;
+    word-break: break-word;
+}
+
+.td-info-tags-wrap {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.td-tag-chip {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 8px;
+    background: rgba(100, 116, 139, 0.12);
+    border-radius: 9999px;
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
 }
 
 /* Status Pills */
 .td-status-pill {
-    display: inline-block;
-    padding: 2.5px 9px;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 8px;
     border-radius: 9999px;
-    font-size: 11px;
-    font-weight: 600;
-    line-height: 1.3;
-    letter-spacing: 0.03em;
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
     text-transform: uppercase;
 }
 
 .td-status-pill.status-pill-active {
-    background: #ecfdf5;
-    color: #059669;
-    border: 1px solid #a7f3d0;
+    background: rgba(22, 163, 74, 0.12);
+    color: #16A34A;
 }
 
 .td-status-pill.status-pill-review {
-    background: #fef3c7;
-    color: #d97706;
-    border: 1px solid #fde68a;
+    background: rgba(245, 158, 11, 0.12);
+    color: #D97706;
 }
 
 .td-status-pill.status-pill-draft {
-    background: #f1f5f9;
-    color: #64748b;
-    border: 1px solid #e2e8f0;
+    background: rgba(100, 116, 139, 0.12);
+    color: #64748B;
 }
 
-/* Tabs Bar & Actions Row */
+.td-info-desc {
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 140%;
+    color: #0F172A;
+    margin: 0;
+    word-break: break-word;
+}
+
+/* ── Section 2: Tabbing & Actions Row (Figma Tabbing) ── */
 .td-tabs-bar-row {
+    box-sizing: border-box;
     display: flex;
+    flex-direction: row;
     justify-content: space-between;
     align-items: center;
+    width: 100%;
     gap: 16px;
-    margin-bottom: 24px;
+    margin: 4px 0;
     flex-wrap: wrap;
 }
 
+@media (max-width: 900px) {
+    .td-tabs-bar-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+}
+
 .td-tabs-pill-nav {
-    display: flex;
+    box-sizing: border-box;
+    display: inline-flex;
+    flex-direction: row;
     align-items: center;
-    gap: 4px;
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 3px;
+    padding: 6px;
+    gap: 6px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    min-height: 46px;
+    max-width: 100%;
     overflow-x: auto;
 }
 
 .td-tab-pill-btn {
-    padding: 7px 16px;
-    border-radius: 6px;
     border: none;
     background: transparent;
-    font-size: 13px;
-    font-weight: 500;
-    color: #64748b;
+    border-radius: 4px;
+    padding: 7px 14px;
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #475569;
     cursor: pointer;
     white-space: nowrap;
     transition: all 0.15s ease;
 }
 
 .td-tab-pill-btn:hover:not(.active) {
-    color: #0f172a;
-    background: #f8fafc;
+    color: #0F172A;
+    background: #F8FAFC;
 }
 
 .td-tab-pill-btn.active {
-    background: #eff6ff;
-    color: #2563eb;
+    background: #EFF6FF;
+    color: #2563EB;
     font-weight: 600;
 }
 
 .td-tabs-actions {
     display: flex;
+    flex-direction: row;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
+    flex-shrink: 0;
 }
 
-.td-icon-action-btn {
-    width: 36px;
-    height: 36px;
+@media (max-width: 900px) {
+    .td-tabs-actions {
+        justify-content: flex-end;
+    }
+}
+
+.td-action-icon-btn {
+    width: 48px;
+    height: 46px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
     color: #475569;
     cursor: pointer;
     transition: all 0.15s ease;
 }
 
-.td-icon-action-btn:hover {
-    background: #f8fafc;
-    border-color: #cbd5e1;
-    color: #0f172a;
+.td-action-icon-btn:hover {
+    color: #0F172A;
+    background: #F8FAFC;
+    border-color: #CBD5E1;
 }
 
 .td-primary-use-btn {
-    height: 36px;
-    padding: 0 18px;
+    height: 46px;
+    min-width: 115px;
+    padding: 14px 18px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: #2563eb;
-    color: #ffffff;
+    gap: 6px;
+    background: #2563EB;
     border: none;
-    border-radius: 8px;
-    font-size: 13px;
+    border-radius: 6px;
+    color: #FFFFFF;
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
     font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
     cursor: pointer;
     transition: background 0.15s ease;
 }
 
 .td-primary-use-btn:hover {
-    background: #1d4ed8;
+    background: #1D4ED8;
 }
 
-/* ── Generic Card Styles ─────────────────────────────────────────── */
-.td-card {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 22px;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
-    box-sizing: border-box;
-}
-
-.td-card-heading {
-    font-size: 11.5px;
-    font-weight: 600;
-    color: #64748b;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    margin: 0 0 18px 0;
-}
-
-/* ── Overview Tab Layout ─────────────────────────────────────────── */
+/* ── Section 3: Middle Row (Template Summary & Composition) ── */
 .td-overview-wrapper {
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 16px;
+    width: 100%;
 }
 
 .td-overview-top-row {
     display: grid;
-    grid-template-columns: 2.2fr 1fr;
-    gap: 24px;
+    grid-template-columns: minmax(0, 3fr) minmax(280px, 1fr);
+    gap: 16px;
+    width: 100%;
+    align-items: stretch;
 }
 
 @media (max-width: 960px) {
@@ -50363,73 +50470,120 @@ textarea {
     }
 }
 
+.td-summary-inner {
+    flex-direction: column;
+    gap: 16px;
+    flex: 1;
+    justify-content: space-between;
+}
+
 .td-summary-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px 32px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 24px;
+    width: 100%;
+}
+
+@media (max-width: 600px) {
+    .td-summary-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
 }
 
 .td-summary-item {
     display: flex;
     flex-direction: column;
-    gap: 3px;
-}
-
-.td-summary-label {
-    font-size: 11.5px;
-    color: #64748b;
-    font-weight: 500;
-}
-
-.td-summary-value {
-    font-size: 13.5px;
-    color: #0f172a;
-    font-weight: 500;
-}
-
-.td-summary-description-block {
-    margin-top: 18px;
-    padding-top: 16px;
-    border-top: 1px solid #f1f5f9;
-    display: flex;
-    flex-direction: column;
     gap: 4px;
 }
 
-.td-summary-description-text {
-    font-size: 13px;
-    color: #334155;
-    line-height: 1.45;
+.td-summary-label {
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.td-summary-value {
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    word-break: break-word;
+}
+
+.td-summary-desc-block {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+    margin-top: 8px;
+}
+
+.td-summary-desc-text {
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 140%;
+    color: #0F172A;
     margin: 0;
+}
+
+/* Template Composition Inner */
+.td-comp-inner {
+    flex-direction: column;
+    gap: 12px;
+    flex: 1;
+    justify-content: space-between;
 }
 
 .td-comp-list {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
+    width: 100%;
 }
 
 .td-comp-row {
     display: flex;
+    flex-direction: row;
     justify-content: space-between;
     align-items: center;
-    font-size: 13px;
+    width: 100%;
+    height: 18px;
 }
 
 .td-comp-label {
-    color: #475569;
-    font-weight: 400;
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
 }
 
 .td-comp-count {
-    color: #0f172a;
-    font-weight: 600;
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
 }
 
+/* ── Section 4: Bottom Row (3 Equal Cards) ── */
 .td-overview-bottom-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 24px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    width: 100%;
+    margin-top: 4px;
+    align-items: stretch;
 }
 
 @media (max-width: 960px) {
@@ -50438,120 +50592,277 @@ textarea {
     }
 }
 
-.td-structure-pill-header {
-    background: #eef2f6;
-    border-radius: 6px;
-    padding: 8px 12px;
-    display: flex;
-    justify-content: space-between;
-    font-size: 11px;
-    font-weight: 600;
-    color: #475569;
-    letter-spacing: 0.03em;
-    margin-bottom: 14px;
+/* Included Project Structure */
+.td-structure-inner {
+    flex-direction: column;
+    gap: 16px;
+    flex: 1;
 }
 
-.td-structure-pill-header .col-rooms { flex: 1.5; }
-.td-structure-pill-header .col-sec { flex: 1; text-align: center; }
-.td-structure-pill-header .col-itm { flex: 1; text-align: right; }
-
-.td-structure-preview-list {
+.td-structure-table-wrap {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 8px;
+    width: 100%;
 }
 
-.td-structure-preview-row {
+.td-structure-table-header {
     display: flex;
-    justify-content: space-between;
+    flex-direction: row;
     align-items: center;
-    font-size: 13px;
+    width: 100%;
+    height: 36px;
+    border-radius: 8px;
+    background: #E4ECFB;
+    overflow: hidden;
 }
 
-.td-structure-preview-row .area-name { flex: 1.5; font-weight: 500; color: #0f172a; }
-.td-structure-preview-row .area-sec { flex: 1; text-align: center; color: #475569; }
-.td-structure-preview-row .area-itm { flex: 1; text-align: right; color: #475569; }
+.td-structure-table-header .col-rooms {
+    flex: 1.2;
+    padding: 8px 12px;
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    text-transform: uppercase;
+    color: #64748B;
+}
 
-.td-governance-list {
+.td-structure-table-header .col-sec {
+    flex: 1;
+    padding: 8px 12px;
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    text-transform: uppercase;
+    color: #64748B;
+    text-align: center;
+}
+
+.td-structure-table-header .col-itm {
+    flex: 0.8;
+    padding: 8px 12px;
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    text-transform: uppercase;
+    color: #64748B;
+    text-align: right;
+}
+
+.td-structure-table-body {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+.td-structure-table-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    width: 100%;
+    height: 56px;
+    border-bottom: 1px solid #EBEBEB;
+    padding: 0 4px;
+}
+
+.td-structure-table-row .area-name {
+    flex: 1.2;
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-right: 8px;
+}
+
+.td-structure-table-row .area-sec {
+    flex: 1;
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    text-align: center;
+}
+
+.td-structure-table-row .area-itm {
+    flex: 0.8;
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    text-align: right;
+}
+
+.td-structure-empty-state {
+    padding: 24px 12px;
+    text-align: center;
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 13px;
+    color: #64748B;
+}
+
+/* Status & Governance Card */
+.td-gov-inner {
+    flex-direction: column;
+    gap: 14px;
+    flex: 1;
+    justify-content: space-between;
+}
+
+.td-gov-list {
     display: flex;
     flex-direction: column;
     gap: 12px;
+    width: 100%;
 }
 
 .td-gov-row {
     display: flex;
+    flex-direction: row;
     justify-content: space-between;
     align-items: center;
-    font-size: 13px;
+    width: 100%;
+    height: 18px;
 }
 
-.td-gov-label { color: #64748b; font-weight: 400; }
-.td-gov-val { color: #0f172a; font-weight: 500; }
+.td-gov-label {
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.td-gov-val {
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.td-divider-line {
+    height: 1px;
+    background: #EBEBEB;
+    width: 100%;
+    margin: 4px 0;
+}
 
 .td-health-row {
-    margin-top: 18px;
-    padding-top: 14px;
-    border-top: 1px solid #f1f5f9;
     display: flex;
+    flex-direction: row;
     justify-content: space-between;
     align-items: center;
+    width: 100%;
+    height: 19px;
 }
 
 .td-health-label {
-    font-size: 13px;
-    font-weight: 600;
-    color: #0f172a;
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 120%;
+    color: #0F172A;
 }
 
 .td-health-pill {
-    background: #ecfdf5;
-    color: #059669;
-    border: 1px solid #a7f3d0;
-    border-radius: 9999px;
-    padding: 2.5px 9px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.03em;
-}
-
-.td-usage-preview-list {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-}
-
-.td-usage-p-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 13px;
-}
-
-.td-usage-p-row .label { color: #64748b; font-weight: 400; }
-.td-usage-p-row .val { color: #0f172a; font-weight: 600; }
-
-.td-usage-link-wrap {
-    margin-top: 24px;
-    padding-top: 14px;
-    border-top: 1px solid #f1f5f9;
-}
-
-.td-view-analytics-link {
-    background: none;
-    border: none;
-    color: #2563eb;
-    font-size: 13px;
-    font-weight: 500;
+    box-sizing: border-box;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    cursor: pointer;
-    padding: 0;
+    justify-content: center;
+    padding: 2px 8px;
+    background: rgba(22, 163, 74, 0.12);
+    border-radius: 9999px;
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #16A34A;
 }
 
-.td-view-analytics-link:hover {
-    text-decoration: underline;
+/* Usage Summary Card */
+.td-usage-inner {
+    flex-direction: column;
+    gap: 14px;
+    flex: 1;
+    justify-content: space-between;
 }
+
+.td-usage-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+}
+
+.td-usage-row {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    height: 17px;
+}
+
+.td-usage-label {
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.td-usage-val {
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.td-view-analytics-btn {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    color: #2563EB;
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 120%;
+    transition: opacity 0.15s ease;
+}
+
+.td-view-analytics-btn:hover {
+    opacity: 0.8;
+}
+
 
 /* ── Structure Tab 3-Column Layout ───────────────────────────────── */
 .td-structure-layout {

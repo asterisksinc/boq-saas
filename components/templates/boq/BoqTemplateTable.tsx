@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  MoreHorizontal,
+  MoreVertical,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -75,22 +75,22 @@ export default function BoqTemplateTable({
     return fallbackImages.Residential;
   };
 
-  const getCategoryBadgeClass = (category: string) => {
-    const c = category.toUpperCase();
-    if (c.includes("INTERIOR")) return "boq-cat-interior";
-    if (c.includes("KITCHEN")) return "boq-cat-kitchen";
-    if (c.includes("ELECTRICAL")) return "boq-cat-electrical";
-    if (c.includes("FLOOR")) return "boq-cat-flooring";
-    if (c.includes("PLUMB")) return "boq-cat-plumbing";
-    if (c.includes("PAINT")) return "boq-cat-painting";
-    if (c.includes("COMMERC")) return "boq-cat-commercial";
-    return "boq-cat-default";
+  const getCategoryClass = (category?: string) => {
+    const c = (category || "").toUpperCase();
+    if (c.includes("INTERIOR")) return "cat-interior";
+    if (c.includes("KITCHEN")) return "cat-kitchen";
+    if (c.includes("ELECTRICAL")) return "cat-electrical";
+    if (c.includes("FLOOR")) return "cat-flooring";
+    if (c.includes("PLUMB")) return "cat-plumbing";
+    if (c.includes("PAINT")) return "cat-painting";
+    if (c.includes("COMMERC")) return "cat-commercial";
+    return "cat-default";
   };
 
-  const getMappingColor = (percent: number) => {
-    if (percent >= 90) return "#10b981";
-    if (percent >= 70) return "#f59e0b";
-    return "#ef4444";
+  const getMappingLevel = (pct: number) => {
+    if (pct >= 90) return "high";
+    if (pct >= 70) return "medium";
+    return "low";
   };
 
   const formatDateTime = (dateStr?: string | null) => {
@@ -100,6 +100,21 @@ export default function BoqTemplateTable({
     const date = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(d);
     const time = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).format(d);
     return { date, time };
+  };
+
+  const getUsedIn = (item: BoqTemplateItem) => {
+    if (item.usedIn) {
+      const match = String(item.usedIn).match(/^(\d+)\s*(.*)$/);
+      if (match) return { num: match[1], label: match[2] || "Templates" };
+      return { num: String(item.usedIn), label: "Templates" };
+    }
+    return { num: String(item.useCount || 0), label: "Templates" };
+  };
+
+  const getTemplateCode = (item: BoqTemplateItem) => {
+    if (item.templateCode) return item.templateCode;
+    const cat = (item.category || item.projectType || "BOQ").substring(0, 3).toUpperCase();
+    return `BOQ-${cat}-${item.id.replace(/-/g, "").slice(0, 4).toUpperCase()}`;
   };
 
   const renderPaginationButtons = () => {
@@ -112,7 +127,7 @@ export default function BoqTemplateTable({
       <button
         key={p}
         type="button"
-        className={`target-table-page-btn ${p === page ? "active" : ""}`}
+        className={`boq-page-num-btn ${p === page ? "active" : ""}`}
         onClick={() => onPageChange(p)}
       >
         {p}
@@ -122,20 +137,48 @@ export default function BoqTemplateTable({
 
   if (loading) {
     return (
-      <div className="boq-table-flex" style={{ padding: 24 }}>
-        {[1, 2, 3, 4, 5, 6].map((i) => (
-          <div key={i} className="template-card-skeleton skeleton-shimmer" style={{ height: 60, marginBottom: 12 }} />
-        ))}
+      <div className="boq-table-card">
+        <div className="boq-table-scroll-wrap">
+          <div className="boq-table-inner">
+            <table className="boq-list-table">
+              <thead>
+                <tr>
+                  <th className="boq-col-name">TEMPLATE NAME</th>
+                  <th className="boq-col-category">CATEGORY</th>
+                  <th className="boq-col-sections">SECTIONS</th>
+                  <th className="boq-col-items">ITEMS</th>
+                  <th className="boq-col-mapping">COST MAPPING</th>
+                  <th className="boq-col-used">USED IN</th>
+                  <th className="boq-col-version">VERSION</th>
+                  <th className="boq-col-status">STATUS</th>
+                  <th className="boq-col-modified">LAST MODIFIED</th>
+                  <th className="boq-col-actions" />
+                </tr>
+              </thead>
+              <tbody>
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <tr key={i} className="boq-table-row-skeleton">
+                    <td colSpan={10}>
+                      <div className="skeleton-shimmer" style={{ height: 48, borderRadius: 4 }} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (items.length === 0) {
     return (
-      <div className="boq-table-flex">
-        <div className="templates-empty" style={{ padding: "48px 20px", textAlign: "center" }}>
-          <h3 style={{ fontSize: 16, margin: "0 0 6px 0", color: "#0f172a" }}>No BOQ templates found</h3>
-          <p style={{ fontSize: 13, color: "#64748b", margin: "0 0 16px 0" }}>
+      <div className="boq-table-card">
+        <div className="templates-empty" style={{ padding: "48px 20px", textAlign: "center", width: "100%" }}>
+          <h3 style={{ fontSize: 16, margin: "0 0 6px 0", color: "#0F172A", fontFamily: "'Urbanist', sans-serif", fontWeight: 600 }}>
+            No BOQ templates found
+          </h3>
+          <p style={{ fontSize: 14, color: "#64748B", margin: "0 0 16px 0", fontFamily: "'Urbanist', sans-serif" }}>
             No templates match your current filters or search query.
           </p>
           {onCreateTemplate && (
@@ -155,236 +198,246 @@ export default function BoqTemplateTable({
   }
 
   return (
-    <div className="boq-table-flex">
-      <div style={{ overflowX: "auto" }}>
-        <table className="boq-data-table">
-          <thead>
-            <tr>
-              <th>TEMPLATE NAME</th>
-              <th>CATEGORY</th>
-              <th>SECTIONS</th>
-              <th>ITEMS</th>
-              <th>COST MAPPING</th>
-              <th>USED IN</th>
-              <th>VERSION</th>
-              <th>STATUS</th>
-              <th>LAST MODIFIED</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((t) => {
-              const coverImg = getCoverImage(t);
-              const isMenuOpen = menuId === t.id;
-              const { date, time } = formatDateTime(t.updatedAt || t.createdAt);
-              const displayTags = t.tags?.filter(
-                (tag) => !["active", "draft", "published", "v1.0", "v2.0", "v3.0"].includes(tag.toLowerCase())
-              ).slice(0, 2) || [t.projectType || "Residential", t.category || "Interior"];
+    <div className="boq-table-card">
+      <div className="boq-table-scroll-wrap">
+        <div className="boq-table-inner">
+          <table className="boq-list-table">
+            <thead>
+              <tr>
+                <th className="boq-col-name">TEMPLATE NAME</th>
+                <th className="boq-col-category">CATEGORY</th>
+                <th className="boq-col-sections">SECTIONS</th>
+                <th className="boq-col-items">ITEMS</th>
+                <th className="boq-col-mapping">COST MAPPING</th>
+                <th className="boq-col-used">USED IN</th>
+                <th className="boq-col-version">VERSION</th>
+                <th className="boq-col-status">STATUS</th>
+                <th className="boq-col-modified">LAST MODIFIED</th>
+                <th className="boq-col-actions" />
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((t) => {
+                const coverImg = getCoverImage(t);
+                const isMenuOpen = menuId === t.id;
+                const { date, time } = formatDateTime(t.updatedAt || t.createdAt);
+                const displayTags = t.tags?.filter(
+                  (tag) => !["active", "draft", "published", "v1.0", "v2.0", "v3.0"].includes(tag.toLowerCase())
+                ).slice(0, 2) || [t.projectType || "Residential", t.category || "Interior"];
+                const used = getUsedIn(t);
+                const code = getTemplateCode(t);
+                const catClass = getCategoryClass(t.category);
+                const mappingLevel = getMappingLevel(t.costMapping);
+                const statusCls = t.status.toLowerCase() === "active"
+                  ? "status-active"
+                  : t.status.toLowerCase() === "archived"
+                  ? "status-archived"
+                  : "status-draft";
 
-              return (
-                <tr
-                  key={t.id}
-                  onClick={() => router.push(`/templates/boq/${t.id}`)}
-                >
-                  {/* TEMPLATE NAME */}
-                  <td>
-                    <div className="boq-name-cell">
-                      <img
-                        src={coverImg}
-                        alt={t.name}
-                        className="boq-name-thumb"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = fallbackImages.Default;
-                        }}
-                      />
-                      <div className="boq-name-info">
-                        <b>{t.name}</b>
-                        <span className="boq-code-text">{t.templateCode}</span>
-                        <div className="boq-tags-row" style={{ marginTop: 2 }}>
-                          {displayTags.map((tag) => (
-                            <span key={tag} className="boq-tag-pill" style={{ fontSize: 10, padding: "1px 6px" }}>
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* CATEGORY */}
-                  <td>
-                    <span className={`boq-cat-badge ${getCategoryBadgeClass(t.category)}`}>
-                      {t.category.toUpperCase()}
-                    </span>
-                  </td>
-
-                  {/* SECTIONS */}
-                  <td>
-                    <span style={{ fontWeight: 600, color: "#1e293b" }}>{t.sections}</span>
-                  </td>
-
-                  {/* ITEMS */}
-                  <td>
-                    <span style={{ fontWeight: 600, color: "#1e293b" }}>{t.items}</span>
-                  </td>
-
-                  {/* COST MAPPING */}
-                  <td>
-                    <div className="boq-mapping-cell">
-                      <div className="boq-mapping-bar">
-                        <div
-                          className="boq-mapping-fill"
-                          style={{
-                            width: `${t.costMapping}%`,
-                            backgroundColor: getMappingColor(t.costMapping),
+                return (
+                  <tr
+                    key={t.id}
+                    onClick={() => router.push(`/templates/boq/${t.id}`)}
+                  >
+                    {/* TEMPLATE NAME: Frame 2147225071 */}
+                    <td className="boq-col-name">
+                      <div className="boq-cell-name-wrap">
+                        <img
+                          src={coverImg}
+                          alt={t.name}
+                          className="boq-cell-thumb"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = fallbackImages.Default;
                           }}
                         />
-                      </div>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: "#334155", minWidth: 38 }}>
-                        {t.costMapping}%
-                      </span>
-                    </div>
-                  </td>
-
-                  {/* USED IN */}
-                  <td>
-                    <span style={{ fontSize: 12.5, color: "#475569", fontWeight: 500 }}>
-                      {t.usedIn || `${t.useCount} Templates`}
-                    </span>
-                  </td>
-
-                  {/* VERSION */}
-                  <td>
-                    <span style={{ fontSize: 12, color: "#64748b", fontFamily: "monospace", fontWeight: 600 }}>
-                      {t.version}
-                    </span>
-                  </td>
-
-                  {/* STATUS */}
-                  <td>
-                    <span
-                      className={`target-status-pill ${
-                        t.status.toLowerCase() === "active" ? "status-active" : "status-draft"
-                      }`}
-                    >
-                      {t.status.toUpperCase()}
-                    </span>
-                  </td>
-
-                  {/* LAST MODIFIED */}
-                  <td>
-                    <div style={{ display: "flex", flexDirection: "column", fontSize: 12 }}>
-                      <span style={{ color: "#1e293b", fontWeight: 500 }}>{date}</span>
-                      <span style={{ color: "#94a3b8", fontSize: 11 }}>{time}</span>
-                    </div>
-                  </td>
-
-                  {/* ACTIONS */}
-                  <td onClick={(e) => e.stopPropagation()}>
-                    <div style={{ position: "relative" }}>
-                      <button
-                        type="button"
-                        className="boq-card-menu-btn"
-                        aria-label="More actions"
-                        onClick={() => setMenuId(isMenuOpen ? null : t.id)}
-                      >
-                        <MoreHorizontal size={16} />
-                      </button>
-
-                      {isMenuOpen && (
-                        <div className="target-card-menu-dropdown target-table-dropdown">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setMenuId(null);
-                              onUseTemplate(t);
-                            }}
-                          >
-                            <Play size={14} /> Use Template
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setMenuId(null);
-                              router.push(`/templates/boq/${t.id}`);
-                            }}
-                          >
-                            <Eye size={14} /> View Details
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setMenuId(null);
-                              onEditTemplate(t);
-                            }}
-                          >
-                            <Edit3 size={14} /> Edit Template
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setMenuId(null);
-                              onDuplicateTemplate(t);
-                            }}
-                          >
-                            <Copy size={14} /> Duplicate
-                          </button>
-                          <button
-                            type="button"
-                            className="danger"
-                            onClick={() => {
-                              setMenuId(null);
-                              onArchiveTemplate(t);
-                            }}
-                          >
-                            <Trash2 size={14} /> Archive
-                          </button>
+                        <div className="boq-cell-name-info">
+                          <h4 className="boq-cell-title" title={t.name}>{t.name}</h4>
+                          <span className="boq-cell-code">{code}</span>
+                          <div className="boq-cell-subtags">
+                            {displayTags.map((tag) => (
+                              <span key={tag} className="boq-cell-subtag-pill">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                      </div>
+                    </td>
+
+                    {/* CATEGORY: Frame 2147225014 */}
+                    <td className="boq-col-category">
+                      <div className="boq-cell-category-wrap">
+                        <span className={`boq-category-pill ${catClass}`}>
+                          {t.category.toUpperCase()}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* SECTIONS */}
+                    <td className="boq-col-sections">
+                      <span className="boq-cell-count-text">{t.sections}</span>
+                    </td>
+
+                    {/* ITEMS */}
+                    <td className="boq-col-items">
+                      <span className="boq-cell-count-text">{t.items}</span>
+                    </td>
+
+                    {/* COST MAPPING: Frame 2147225258 */}
+                    <td className="boq-col-mapping">
+                      <div className="boq-cell-mapping-wrap">
+                        <div className="boq-cell-mapping-track">
+                          <div
+                            className={`boq-cell-mapping-fill ${mappingLevel}`}
+                            style={{
+                              width: `${Math.min(100, Math.max(0, t.costMapping))}%`,
+                            }}
+                          />
+                        </div>
+                        <span className="boq-cell-mapping-pct">
+                          {t.costMapping}%
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* USED IN */}
+                    <td className="boq-col-used">
+                      <div className="boq-cell-used-wrap">
+                        <span className="boq-cell-used-num">{used.num}</span>
+                        <span className="boq-cell-used-label">{used.label}</span>
+                      </div>
+                    </td>
+
+                    {/* VERSION */}
+                    <td className="boq-col-version">
+                      <span className="boq-cell-version-text">{t.version}</span>
+                    </td>
+
+                    {/* STATUS */}
+                    <td className="boq-col-status">
+                      <span className={`boq-cell-status-pill ${statusCls}`}>
+                        {t.status.toUpperCase()}
+                      </span>
+                    </td>
+
+                    {/* LAST MODIFIED */}
+                    <td className="boq-col-modified">
+                      <div className="boq-cell-modified-wrap">
+                        <span className="boq-cell-modified-date">{date}</span>
+                        <span className="boq-cell-modified-time">{time}</span>
+                      </div>
+                    </td>
+
+                    {/* ACTIONS */}
+                    <td className="boq-col-actions" onClick={(e) => e.stopPropagation()}>
+                      <div className="boq-cell-action-wrap">
+                        <button
+                          type="button"
+                          className="boq-row-menu-btn"
+                          aria-label="More actions"
+                          onClick={() => setMenuId(isMenuOpen ? null : t.id)}
+                        >
+                          <MoreVertical size={16} />
+                        </button>
+
+                        {isMenuOpen && (
+                          <div
+                            className="boq-card-menu-dropdown target-table-dropdown"
+                            style={{ top: "100%", right: 0, zIndex: 50 }}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMenuId(null);
+                                onUseTemplate(t);
+                              }}
+                            >
+                              <Play size={14} /> Use Template
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMenuId(null);
+                                router.push(`/templates/boq/${t.id}`);
+                              }}
+                            >
+                              <Eye size={14} /> View Details
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMenuId(null);
+                                onEditTemplate(t);
+                              }}
+                            >
+                              <Edit3 size={14} /> Edit Template
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMenuId(null);
+                                onDuplicateTemplate(t);
+                              }}
+                            >
+                              <Copy size={14} /> Duplicate
+                            </button>
+                            <button
+                              type="button"
+                              className="danger"
+                              onClick={() => {
+                                setMenuId(null);
+                                onArchiveTemplate(t);
+                              }}
+                            >
+                              <Trash2 size={14} /> Archive
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* Pagination Bar */}
-      <div className="target-table-pagination-row">
-        <div className="target-table-total-count">
+      {/* Pagination Bar: Frame 2147225166 */}
+      <div className="boq-pagination-bar">
+        <div className="boq-pagination-total">
           Total BOQ Templates: {total}
         </div>
 
-        <div className="target-table-page-nav" role="navigation" aria-label="Pagination">
+        <div className="boq-pagination-nav" role="navigation" aria-label="Pagination">
           <button
             type="button"
-            className="target-table-page-btn arrow"
+            className="boq-page-num-btn"
             disabled={page <= 1}
             onClick={() => onPageChange(Math.max(1, page - 1))}
             aria-label="Previous page"
           >
-            <ChevronLeft size={15} />
+            <ChevronLeft size={16} />
           </button>
 
           {renderPaginationButtons()}
 
           <button
             type="button"
-            className="target-table-page-btn arrow"
+            className="boq-page-num-btn"
             disabled={page >= totalPages}
             onClick={() => onPageChange(page + 1)}
             aria-label="Next page"
           >
-            <ChevronRight size={15} />
+            <ChevronRight size={16} />
           </button>
         </div>
 
-        <div className="target-table-page-size-wrap">
-          <span className="target-table-page-size-label">Show per Page:</span>
-          <div className="target-table-page-size-select-wrap">
+        <div className="boq-pagination-size">
+          <span className="boq-pagination-size-label">Show per Page:</span>
+          <div className="boq-pagination-size-box">
             <select
-              className="target-table-page-size-select"
+              className="boq-pagination-size-select"
               value={pageSize}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
               aria-label="Items per page"
@@ -393,7 +446,7 @@ export default function BoqTemplateTable({
               <option value={20}>20</option>
               <option value={50}>50</option>
             </select>
-            <ChevronDown size={14} className="target-table-select-arrow" />
+            <ChevronDown size={14} style={{ position: "absolute", right: 10, pointerEvents: "none", color: "#64748B" }} />
           </div>
         </div>
       </div>

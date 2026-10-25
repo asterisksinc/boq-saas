@@ -99,6 +99,15 @@ export default function TemplateDetailPage() {
     setIsUseModalOpen(true);
   };
 
+  const handleTabChange = (newTab: DetailTabType) => {
+    setActiveTab(newTab);
+    const sub = newTab === "Workflow" ? (matchedSubtab || "Milestones") : undefined;
+    const q = new URLSearchParams();
+    q.set("tab", newTab);
+    if (sub) q.set("subtab", sub);
+    router.replace(`/templates/${id}?${q.toString()}`);
+  };
+
   const validSubtabs = ["Stages", "Tasks", "Milestones", "Approvals", "Rules"] as const;
   const matchedSubtab = validSubtabs.find(
     (s) => s.toLowerCase() === subtabParam?.toLowerCase()
@@ -205,7 +214,7 @@ export default function TemplateDetailPage() {
               {/* Tabs Bar & Actions */}
               <TemplateDetailTabs
                 activeTab={activeTab}
-                onChangeTab={setActiveTab}
+                onChangeTab={handleTabChange}
                 onDuplicate={handleDuplicate}
                 onEdit={handleEdit}
                 onUseTemplate={handleUseTemplate}
@@ -223,7 +232,16 @@ export default function TemplateDetailPage() {
                 <TemplateStructure
                   templateId={template.id}
                   initialAreas={template.structure?.areas || []}
+                  costingBoq={template.costingBoq}
+                  workflow={template.workflow}
+                  documents={template.documents}
+                  composition={template.composition}
                   onUpdate={fetchTemplateData}
+                  onNavigateTab={(tab) => {
+                    const valid = ["Overview", "Structure", "Costing & BOQ", "Workflow", "Documents", "Usage", "Versions", "Activity"] as DetailTabType[];
+                    const match = valid.find(t => t.toLowerCase() === tab.toLowerCase());
+                    if (match) setActiveTab(match);
+                  }}
                 />
               )}
 
@@ -241,7 +259,7 @@ export default function TemplateDetailPage() {
                   templateId={template.id}
                   templateName={template.name}
                   initialWorkflow={template.workflow}
-                  initialSubTab={matchedSubtab || "Stages"}
+                  initialSubTab={matchedSubtab || (tabParam?.toLowerCase() === "workflow" ? "Milestones" : "Stages")}
                   onUpdate={fetchTemplateData}
                 />
               )}
@@ -257,15 +275,23 @@ export default function TemplateDetailPage() {
               {activeTab === "Usage" && (
                 <TemplateUsage
                   templateId={template.id}
+                  templateName={template.name}
+                  templateCode={template.templateCode}
                   useCount={template.useCount}
                   lastUsedAt={template.lastUsedAt}
+                  currentVersion={template.version}
+                  onUseTemplate={handleUseTemplate}
                 />
               )}
 
               {activeTab === "Versions" && (
                 <TemplateVersions
                   templateId={template.id}
+                  templateName={template.name}
+                  templateCode={template.templateCode}
+                  useCount={template.useCount}
                   currentVersion={template.version}
+                  onUseTemplate={handleUseTemplate}
                   onUpdate={fetchTemplateData}
                 />
               )}

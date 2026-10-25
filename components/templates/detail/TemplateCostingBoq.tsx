@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Folder,
   FolderOpen,
@@ -16,6 +16,9 @@ import {
   Check,
   Trash2,
   Copy,
+  AlertCircle,
+  Layers,
+  ArrowUpDown,
 } from "lucide-react";
 import { updateTemplateSection } from "@/lib/api/templates";
 
@@ -40,6 +43,7 @@ export interface BoqSection {
   id: string;
   name: string;
   code?: string;
+  areaCode?: string;
   roomName?: string;
   roomId?: string;
   items: BoqItem[];
@@ -47,6 +51,7 @@ export interface BoqSection {
 
 export interface BoqRoom {
   id: string;
+  code?: string;
   name: string;
   sections: BoqSection[];
 }
@@ -59,7 +64,7 @@ interface TemplateCostingBoqProps {
   onUpdate?: () => void;
 }
 
-// Calculate row amount using exact formula
+// Calculate row amount using standard BOQ formula: Qty * Rate * (1 + Waste%) * (1 + Tax%)
 export function calculateItemAmount(
   quantity: number,
   rate: number,
@@ -80,250 +85,235 @@ export default function TemplateCostingBoq({
   initialStructure,
   onUpdate,
 }: TemplateCostingBoqProps) {
-  // Derive structure rooms and sections from template
-  const defaultInitialStructure = useMemo<BoqRoom[]>(() => {
-    // 1. If template has structure areas with sections and items
-    if (initialStructure?.areas && Array.isArray(initialStructure.areas) && initialStructure.areas.length > 0) {
-      return initialStructure.areas.map((area: any, aIdx: number) => ({
-        id: area.id || `room-${aIdx}`,
-        name: area.name || `Room ${aIdx + 1}`,
-        sections: (area.sections || []).map((sec: any, sIdx: number) => ({
-          id: sec.id || `sec-${aIdx}-${sIdx}`,
-          name: sec.name || `Section ${sIdx + 1}`,
-          roomId: area.id || `room-${aIdx}`,
-          roomName: area.name || `Room ${aIdx + 1}`,
-          items: (sec.items || []).map((it: any, iIdx: number) => ({
-            id: it.id || `itm-${aIdx}-${sIdx}-${iIdx}`,
+  // Normalize dynamic rooms and sections from database
+  const normalizeStructure = useCallback((): BoqRoom[] => {
+    const rawAreas = initialStructure?.areas || [];
+    const rawSections = initialCosting?.sections || [];
+
+    // If both areas and sections are empty, return empty array (clean empty state, no mock data)
+    if (rawAreas.length === 0 && rawSections.length === 0 && initialItems.length === 0) {
+      return [];
+    }
+
+    // 1. Build an Area Map from initialStructure.areas
+    const areaMap = new Map<string, BoqRoom>();
+    rawAreas.forEach((area: any, aIdx: number) => {
+      const code = area.code || `AREA-${aIdx + 1}`;
+      const id = area.id || `room-${code}`;
+      areaMap.set(code, {
+        id,
+        code,
+        name: area.name || `Area ${aIdx + 1}`,
+        sections: [],
+      });
+    });
+
+    // 2. Also check if areas already contained sections
+    rawAreas.forEach((area: any, aIdx: number) => {
+      const code = area.code || `AREA-${aIdx + 1}`;
+      const targetRoom = areaMap.get(code);
+      if (targetRoom && Array.isArray(area.sections) && area.sections.length > 0) {
+        area.sections.forEach((sec: any, sIdx: number) => {
+          const secId = sec.id || sec.code || `sec-${aIdx}-${sIdx}`;
+          const items: BoqItem[] = (sec.items || []).map((it: any, iIdx: number) => ({
+            id: it.id || it.code || `itm-${secId}-${iIdx}`,
             name: it.name || "Item",
             description: it.description || "",
+            code: it.code,
             unit: it.unit || "Nos",
             quantity: Number(it.quantity ?? 1),
             rate: Number(it.rate ?? it.sellingRate ?? it.baseCost ?? 0),
             wastePercent: Number(it.wastePercent ?? 0),
             taxPercent: Number(it.taxPercent ?? 18),
-            amount: calculateItemAmount(
-              Number(it.quantity ?? 1),
-              Number(it.rate ?? it.sellingRate ?? it.baseCost ?? 0),
-              Number(it.wastePercent ?? 0),
-              Number(it.taxPercent ?? 18)
-            ),
+            amount:
+              it.amount !== undefined && it.amount !== null
+                ? Number(it.amount)
+                : calculateItemAmount(
+                    Number(it.quantity ?? 1),
+                    Number(it.rate ?? it.sellingRate ?? it.baseCost ?? 0),
+                    Number(it.wastePercent ?? 0),
+                    Number(it.taxPercent ?? 18)
+                  ),
             rateStatus: it.rateStatus || "MAPPED",
-          })),
-        })),
-      }));
-    }
+          }));
 
-    // 2. If costingBoq has sections
-    if (initialCosting?.sections && Array.isArray(initialCosting.sections) && initialCosting.sections.length > 0) {
-      const roomMap: Record<string, BoqSection[]> = {};
-      initialCosting.sections.forEach((sec: any, sIdx: number) => {
-        const rName = sec.roomName || "General Area";
-        if (!roomMap[rName]) roomMap[rName] = [];
-        roomMap[rName].push({
-          id: sec.id || `sec-${sIdx}`,
-          name: sec.name || "Section",
-          roomName: rName,
-          items: (sec.items || []).map((it: any, iIdx: number) => ({
-            id: it.id || `itm-${sIdx}-${iIdx}`,
-            name: it.name || "Item",
-            description: it.description || "",
-            unit: it.unit || "Nos",
-            quantity: Number(it.quantity ?? 1),
-            rate: Number(it.rate ?? it.sellingRate ?? 0),
-            wastePercent: Number(it.wastePercent ?? 0),
-            taxPercent: Number(it.taxPercent ?? 18),
-            amount: calculateItemAmount(
-              Number(it.quantity ?? 1),
-              Number(it.rate ?? it.sellingRate ?? 0),
-              Number(it.wastePercent ?? 0),
-              Number(it.taxPercent ?? 18)
-            ),
-            rateStatus: it.rateStatus || "MAPPED",
-          })),
+          targetRoom.sections.push({
+            id: secId,
+            name: sec.name || `Section ${sIdx + 1}`,
+            code: sec.code,
+            areaCode: code,
+            roomId: targetRoom.id,
+            roomName: targetRoom.name,
+            items,
+          });
         });
+      }
+    });
+
+    // 3. Map sections from costingBoq.sections
+    const unmappedSections: BoqSection[] = [];
+    rawSections.forEach((sec: any, sIdx: number) => {
+      const secId = sec.id || sec.code || `sec-${sIdx}`;
+      const items: BoqItem[] = (sec.items || []).map((it: any, iIdx: number) => ({
+        id: it.id || it.code || `itm-${secId}-${iIdx}`,
+        name: it.name || "Item",
+        description: it.description || "",
+        code: it.code,
+        unit: it.unit || "Nos",
+        quantity: Number(it.quantity ?? 1),
+        rate: Number(it.rate ?? it.sellingRate ?? it.baseCost ?? 0),
+        wastePercent: Number(it.wastePercent ?? 0),
+        taxPercent: Number(it.taxPercent ?? 18),
+        amount:
+          it.amount !== undefined && it.amount !== null
+            ? Number(it.amount)
+            : calculateItemAmount(
+                Number(it.quantity ?? 1),
+                Number(it.rate ?? it.sellingRate ?? it.baseCost ?? 0),
+                Number(it.wastePercent ?? 0),
+                Number(it.taxPercent ?? 18)
+              ),
+        rateStatus: it.rateStatus || "MAPPED",
+      }));
+
+      // Match by areaCode, roomId, or roomName
+      let targetRoom: BoqRoom | undefined;
+      if (sec.areaCode && areaMap.has(sec.areaCode)) {
+        targetRoom = areaMap.get(sec.areaCode);
+      } else if (sec.roomId) {
+        targetRoom = Array.from(areaMap.values()).find((r) => r.id === sec.roomId);
+      } else if (sec.roomName) {
+        targetRoom = Array.from(areaMap.values()).find(
+          (r) => r.name.toLowerCase() === sec.roomName.toLowerCase()
+        );
+      }
+
+      const normalizedSec: BoqSection = {
+        id: secId,
+        name: sec.name || `Section ${sIdx + 1}`,
+        code: sec.code,
+        areaCode: targetRoom ? targetRoom.code : sec.areaCode,
+        roomId: targetRoom ? targetRoom.id : sec.roomId || "room-general",
+        roomName: targetRoom ? targetRoom.name : sec.roomName || "General Area",
+        items,
+      };
+
+      if (targetRoom) {
+        // Prevent duplicate section IDs within the same room
+        if (!targetRoom.sections.some((s) => s.id === secId)) {
+          targetRoom.sections.push(normalizedSec);
+        }
+      } else {
+        unmappedSections.push(normalizedSec);
+      }
+    });
+
+    const resultRooms: BoqRoom[] = Array.from(areaMap.values());
+
+    // Group any unmapped sections by roomName or into General Area
+    if (unmappedSections.length > 0) {
+      const extraMap: Record<string, BoqSection[]> = {};
+      unmappedSections.forEach((s) => {
+        const rName = s.roomName || "General Area";
+        if (!extraMap[rName]) extraMap[rName] = [];
+        extraMap[rName].push(s);
       });
 
-      return Object.entries(roomMap).map(([rName, secs], rIdx) => ({
-        id: `room-${rIdx}`,
-        name: rName,
-        sections: secs,
-      }));
+      Object.entries(extraMap).forEach(([rName, sList], rIdx) => {
+        resultRooms.push({
+          id: `room-extra-${rIdx}`,
+          name: rName,
+          sections: sList,
+        });
+      });
     }
 
-    // 3. Fallback: single room with initialItems or single default section
-    const defaultItems: BoqItem[] = initialItems.length > 0 ? initialItems.map(it => ({
-      ...it,
-      rate: Number(it.rate ?? it.sellingRate ?? 0),
-      quantity: Number(it.quantity ?? 1),
-      wastePercent: Number(it.wastePercent ?? 0),
-      taxPercent: Number(it.taxPercent ?? 18),
-      amount: calculateItemAmount(
-        Number(it.quantity ?? 1),
-        Number(it.rate ?? it.sellingRate ?? 0),
-        Number(it.wastePercent ?? 0),
-        Number(it.taxPercent ?? 18)
-      ),
-      rateStatus: it.rateStatus || "MAPPED",
-    })) : [
-      {
-        id: "itm-1",
-        name: "Full Height Wardrobe",
-        description: "19mm BWP ply, laminate finish",
-        unit: "Sq.ft",
-        quantity: 72,
-        rate: 2875,
-        wastePercent: 5,
-        taxPercent: 18,
-        amount: 227736,
-        rateStatus: "MAPPED",
-      },
-      {
-        id: "itm-2",
-        name: "King Size Bed",
-        description: "Upholstered headboard",
-        unit: "Nos",
-        quantity: 1,
-        rate: 45800,
-        wastePercent: 0,
-        taxPercent: 18,
-        amount: 54044,
-        rateStatus: "MAPPED",
-      },
-      {
-        id: "itm-3",
-        name: "Side Table",
-        description: "600mm W, laminate finish",
-        unit: "Nos",
-        quantity: 2,
-        rate: 6250,
-        wastePercent: 5,
-        taxPercent: 18,
-        amount: 13125,
-        rateStatus: "MAPPED",
-      },
-      {
-        id: "itm-4",
-        name: "Dressing Table",
-        description: "With mirror and drawers",
-        unit: "Nos",
-        quantity: 1,
-        rate: 24500,
-        wastePercent: 5,
-        taxPercent: 18,
-        amount: 28783,
-        rateStatus: "OUTDATED",
-      },
-      {
-        id: "itm-5",
-        name: "Study Table",
-        description: "Laminate top with storage",
-        unit: "Nos",
-        quantity: 1,
-        rate: 18750,
-        wastePercent: 5,
-        taxPercent: 18,
-        amount: 22031,
-        rateStatus: "MAPPED",
-      },
-      {
-        id: "itm-6",
-        name: "TV Unit",
-        description: "Floating unit, laminate finish",
-        unit: "Sq.ft",
-        quantity: 18,
-        rate: 2650,
-        wastePercent: 5,
-        taxPercent: 18,
-        amount: 53667,
-        rateStatus: "MAPPED",
-      },
-      {
-        id: "itm-7",
-        name: "Chest of Drawers",
-        description: "4 drawer unit",
-        unit: "Nos",
-        quantity: 1,
-        rate: 16500,
-        wastePercent: 5,
-        taxPercent: 18,
-        amount: 19404,
-        rateStatus: "MISSING",
-      },
-      {
-        id: "itm-8",
-        name: "Mirror with Frame",
-        description: "900mm x 1200mm",
-        unit: "Nos",
-        quantity: 1,
-        rate: 7250,
-        wastePercent: 0,
-        taxPercent: 18,
-        amount: 8555,
-        rateStatus: "MAPPED",
-      },
-    ];
+    // 4. If initialItems was provided and there are still no sections at all
+    if (resultRooms.length === 0 && initialItems.length > 0) {
+      resultRooms.push({
+        id: "room-default",
+        name: "General Area",
+        sections: [
+          {
+            id: "sec-default",
+            name: "General Section",
+            roomName: "General Area",
+            items: initialItems.map((it, idx) => ({
+              ...it,
+              id: it.id || `itm-${idx}`,
+              rate: Number(it.rate ?? it.sellingRate ?? 0),
+              quantity: Number(it.quantity ?? 1),
+              wastePercent: Number(it.wastePercent ?? 0),
+              taxPercent: Number(it.taxPercent ?? 18),
+              amount:
+                it.amount ??
+                calculateItemAmount(
+                  Number(it.quantity ?? 1),
+                  Number(it.rate ?? it.sellingRate ?? 0),
+                  Number(it.wastePercent ?? 0),
+                  Number(it.taxPercent ?? 18)
+                ),
+              rateStatus: it.rateStatus || "MAPPED",
+            })),
+          },
+        ],
+      });
+    }
 
-    return [
-      {
-        id: "rm-master",
-        name: "Master Bedroom",
-        sections: [
-          {
-            id: "sec-furniture",
-            name: "Furniture",
-            roomName: "Master Bedroom",
-            items: defaultItems,
-          },
-          {
-            id: "sec-painting",
-            name: "Painting",
-            roomName: "Master Bedroom",
-            items: [],
-          },
-          {
-            id: "sec-electrical",
-            name: "Electrical",
-            roomName: "Master Bedroom",
-            items: [],
-          },
-        ],
-      },
-      {
-        id: "rm-living",
-        name: "Living Room",
-        sections: [
-          {
-            id: "sec-liv-furn",
-            name: "Living Furniture",
-            roomName: "Living Room",
-            items: [],
-          },
-        ],
-      },
-      {
-        id: "rm-dining",
-        name: "Dining",
-        sections: [],
-      },
-      {
-        id: "rm-kitchen",
-        name: "Kitchen",
-        sections: [],
-      },
-    ];
+    return resultRooms;
   }, [initialStructure, initialCosting, initialItems]);
 
-  const [rooms, setRooms] = useState<BoqRoom[]>(defaultInitialStructure);
-  const [expandedRoomIds, setExpandedRoomIds] = useState<Record<string, boolean>>({
-    [defaultInitialStructure[0]?.id || "rm-master"]: true,
+  const [rooms, setRooms] = useState<BoqRoom[]>(normalizeStructure);
+
+  // Sync state when props change
+  useEffect(() => {
+    const next = normalizeStructure();
+    setRooms(next);
+  }, [normalizeStructure]);
+
+  // Initial expanded room: first room with sections or first room
+  const [expandedRoomIds, setExpandedRoomIds] = useState<Record<string, boolean>>(() => {
+    const initial = normalizeStructure();
+    const firstWithSections = initial.find((r) => r.sections.length > 0) || initial[0];
+    return firstWithSections ? { [firstWithSections.id]: true } : {};
   });
-  const [selectedSectionId, setSelectedSectionId] = useState<string>(
-    defaultInitialStructure[0]?.sections?.[0]?.id || "sec-furniture"
-  );
+
+  // Selected section ID
+  const [selectedSectionId, setSelectedSectionId] = useState<string>(() => {
+    const initial = normalizeStructure();
+    for (const r of initial) {
+      if (r.sections.length > 0) return r.sections[0].id;
+    }
+    return "";
+  });
+
+  // Keep selected section valid if rooms change
+  useEffect(() => {
+    if (rooms.length > 0) {
+      let found = false;
+      for (const r of rooms) {
+        if (r.sections.some((s) => s.id === selectedSectionId)) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        for (const r of rooms) {
+          if (r.sections.length > 0) {
+            setSelectedSectionId(r.sections[0].id);
+            setExpandedRoomIds((prev) => ({ ...prev, [r.id]: true }));
+            break;
+          }
+        }
+      }
+    }
+  }, [rooms, selectedSectionId]);
+
+  // Search & view toggles
   const [sidebarSearch, setSidebarSearch] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-  // Table pagination state
+  // Pagination state
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -332,12 +322,18 @@ export default function TemplateCostingBoq({
   const [openStatusId, setOpenStatusId] = useState<string | null>(null);
   const [isSectionMenuOpen, setIsSectionMenuOpen] = useState(false);
 
-  // Modals
+  // Modals state
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<BoqItem | null>(null);
+
   const [isAddStructureModalOpen, setIsAddStructureModalOpen] = useState(false);
+  const [selectedAreaCode, setSelectedAreaCode] = useState<string>("");
   const [newRoomName, setNewRoomName] = useState("");
   const [newSectionName, setNewSectionName] = useState("");
+  const [newSectionCode, setNewSectionCode] = useState("");
+
+  const [isRenameSectionModalOpen, setIsRenameSectionModalOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
 
   // Item form state
   const [itemName, setItemName] = useState("");
@@ -354,7 +350,10 @@ export default function TemplateCostingBoq({
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Find currently active section and room
+  // Drag and drop state for items
+  const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
+
+  // Find currently active section and its parent room
   const activeSectionInfo = useMemo(() => {
     for (const rm of rooms) {
       for (const sec of rm.sections) {
@@ -363,9 +362,13 @@ export default function TemplateCostingBoq({
         }
       }
     }
-    // Fallback to first section if available
-    const firstSec = rooms[0]?.sections?.[0];
-    return { room: rooms[0], section: firstSec };
+    // Fallback: first section available
+    for (const rm of rooms) {
+      if (rm.sections.length > 0) {
+        return { room: rm, section: rm.sections[0] };
+      }
+    }
+    return { room: rooms[0] || null, section: null };
   }, [rooms, selectedSectionId]);
 
   const activeSection = activeSectionInfo.section;
@@ -410,19 +413,25 @@ export default function TemplateCostingBoq({
       // Collect all sections flattened for costing_boq
       const allSections = nextRooms.flatMap((r) =>
         r.sections.map((s) => ({
-          ...s,
+          id: s.id,
+          code: s.code || s.id,
+          name: s.name,
+          areaCode: s.areaCode || r.code || r.id,
           roomId: r.id,
           roomName: r.name,
+          items: s.items,
         }))
       );
       const allItems = allSections.flatMap((s) => s.items);
 
       await updateTemplateSection(templateId, "costing-boq", {
-        sections: allSections,
-        items: allItems,
-        itemCount: allItems.length,
-        sectionCount: allSections.length,
-        totalAmount: allItems.reduce((sum, it) => sum + (it.amount || 0), 0),
+        data: {
+          sections: allSections,
+          items: allItems,
+          itemCount: allItems.length,
+          sectionCount: allSections.length,
+          totalAmount: allItems.reduce((sum, it) => sum + (it.amount || 0), 0),
+        },
       });
 
       setRooms(nextRooms);
@@ -449,6 +458,7 @@ export default function TemplateCostingBoq({
     setPage(1);
     setOpenActionId(null);
     setOpenStatusId(null);
+    setIsSectionMenuOpen(false);
   };
 
   // Status Change Handler
@@ -487,6 +497,7 @@ export default function TemplateCostingBoq({
     setItemTax(18);
     setItemRateStatus("MAPPED");
     setIsItemModalOpen(true);
+    setIsSectionMenuOpen(false);
   };
 
   const handleOpenEditItem = (item: BoqItem) => {
@@ -615,136 +626,320 @@ export default function TemplateCostingBoq({
   };
 
   // Section renaming
-  const handleRenameSection = () => {
+  const handleOpenRenameSection = () => {
     if (!activeSection) return;
-    const newName = window.prompt("Enter new section name:", activeSection.name);
-    if (!newName || !newName.trim()) return;
+    setRenameValue(activeSection.name);
+    setIsRenameSectionModalOpen(true);
+    setIsSectionMenuOpen(false);
+  };
+
+  const handleSaveRenameSection = () => {
+    if (!activeSection || !renameValue.trim()) return;
 
     const nextRooms = rooms.map((rm) => ({
       ...rm,
       sections: rm.sections.map((sec) =>
-        sec.id === activeSection.id ? { ...sec, name: newName.trim() } : sec
+        sec.id === activeSection.id ? { ...sec, name: renameValue.trim() } : sec
       ),
     }));
 
     persistChanges(nextRooms);
+    setIsRenameSectionModalOpen(false);
+  };
+
+  // Delete Section
+  const handleDeleteSection = () => {
+    if (!activeSection) return;
+    if (!window.confirm(`Are you sure you want to delete section "${activeSection.name}"?`)) return;
+
+    const nextRooms = rooms.map((rm) => ({
+      ...rm,
+      sections: rm.sections.filter((sec) => sec.id !== activeSection.id),
+    }));
+
+    persistChanges(nextRooms);
+    setIsSectionMenuOpen(false);
+
+    // Pick new active section
+    for (const r of nextRooms) {
+      if (r.sections.length > 0) {
+        setSelectedSectionId(r.sections[0].id);
+        break;
+      }
+    }
   };
 
   // Add BOQ Structure (Room or Section)
-  const handleAddStructure = () => {
-    if (!newRoomName.trim()) return;
+  const handleOpenAddStructureModal = () => {
+    setSelectedAreaCode(rooms[0]?.code || "");
+    setNewRoomName("");
+    setNewSectionName("");
+    setNewSectionCode(`BOQ-${String(totalSectionsCount + 1).padStart(2, "0")}`);
+    setIsAddStructureModalOpen(true);
+  };
 
-    const rId = `rm-${Date.now()}`;
+  const handleAddStructure = async () => {
+    if (!newSectionName.trim()) return;
+
     const sId = `sec-${Date.now()}`;
+    const generatedCode = newSectionCode.trim() || `BOQ-${String(totalSectionsCount + 1).padStart(2, "0")}`;
 
-    const newSec: BoqSection = {
-      id: sId,
-      name: newSectionName.trim() || "General Section",
-      roomName: newRoomName.trim(),
-      items: [],
-    };
+    let nextRooms: BoqRoom[];
 
-    const newRoom: BoqRoom = {
-      id: rId,
-      name: newRoomName.trim(),
-      sections: [newSec],
-    };
+    if (selectedAreaCode === "__NEW__") {
+      if (!newRoomName.trim()) return;
+      const rId = `rm-${Date.now()}`;
+      const rCode = newRoomName.trim().toUpperCase().replace(/[^A-Z0-9]/g, "-").slice(0, 8);
 
-    const nextRooms = [...rooms, newRoom];
-    setExpandedRoomIds((prev) => ({ ...prev, [rId]: true }));
+      const newSec: BoqSection = {
+        id: sId,
+        code: generatedCode,
+        name: newSectionName.trim(),
+        areaCode: rCode,
+        roomId: rId,
+        roomName: newRoomName.trim(),
+        items: [],
+      };
+
+      const newRoom: BoqRoom = {
+        id: rId,
+        code: rCode,
+        name: newRoomName.trim(),
+        sections: [newSec],
+      };
+
+      nextRooms = [...rooms, newRoom];
+      setExpandedRoomIds((prev) => ({ ...prev, [rId]: true }));
+
+      // Also persist new area to structure.areas if possible
+      try {
+        const existingAreas = initialStructure?.areas || [];
+        const updatedAreas = [...existingAreas, { code: rCode, name: newRoomName.trim() }];
+        await updateTemplateSection(templateId, "structure", {
+          data: { areas: updatedAreas },
+        });
+      } catch (e) {
+        console.warn("Could not auto-add area to template structure:", e);
+      }
+    } else {
+      // Add section to existing room
+      const targetRoom = rooms.find((r) => r.code === selectedAreaCode || r.id === selectedAreaCode) || rooms[0];
+      if (!targetRoom) return;
+
+      const newSec: BoqSection = {
+        id: sId,
+        code: generatedCode,
+        name: newSectionName.trim(),
+        areaCode: targetRoom.code,
+        roomId: targetRoom.id,
+        roomName: targetRoom.name,
+        items: [],
+      };
+
+      nextRooms = rooms.map((rm) => {
+        if (rm.id === targetRoom.id) {
+          return {
+            ...rm,
+            sections: [...rm.sections, newSec],
+          };
+        }
+        return rm;
+      });
+
+      setExpandedRoomIds((prev) => ({ ...prev, [targetRoom.id]: true }));
+    }
+
     setSelectedSectionId(sId);
     persistChanges(nextRooms);
     setIsAddStructureModalOpen(false);
     setNewRoomName("");
     setNewSectionName("");
+    setNewSectionCode("");
   };
+
+  // Drag and drop reordering for items table
+  const handleDragStart = (idx: number) => {
+    setDraggedItemIndex(idx);
+  };
+
+  const handleDragOver = (e: React.DragEvent, targetIdx: number) => {
+    e.preventDefault();
+    if (draggedItemIndex === null || draggedItemIndex === targetIdx || !activeSection) return;
+
+    const newItems = [...activeSection.items];
+    const draggedItem = newItems[draggedItemIndex];
+    newItems.splice(draggedItemIndex, 1);
+    newItems.splice(targetIdx, 0, draggedItem);
+
+    const nextRooms = rooms.map((rm) => ({
+      ...rm,
+      sections: rm.sections.map((sec) =>
+        sec.id === activeSection.id ? { ...sec, items: newItems } : sec
+      ),
+    }));
+
+    setRooms(nextRooms);
+    setDraggedItemIndex(targetIdx);
+  };
+
+  const handleDragEnd = () => {
+    if (draggedItemIndex !== null) {
+      persistChanges(rooms);
+      setDraggedItemIndex(null);
+    }
+  };
+
+  // Filtered rooms based on sidebar search
+  const filteredRooms = useMemo(() => {
+    if (!sidebarSearch.trim()) return rooms;
+    const q = sidebarSearch.toLowerCase();
+    return rooms
+      .map((rm) => {
+        const matchesRoom = rm.name.toLowerCase().includes(q) || (rm.code && rm.code.toLowerCase().includes(q));
+        const matchedSections = rm.sections.filter(
+          (s) => s.name.toLowerCase().includes(q) || (s.code && s.code.toLowerCase().includes(q))
+        );
+        if (matchesRoom) return rm;
+        if (matchedSections.length > 0) {
+          return { ...rm, sections: matchedSections };
+        }
+        return null;
+      })
+      .filter(Boolean) as BoqRoom[];
+  }, [rooms, sidebarSearch]);
 
   return (
     <div className="td-costing-layout">
-      {/* ── Left Sidebar: BOQ STRUCTURE ────────────────────────────── */}
-      <aside className="td-costing-sidebar" style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
+      {/* ── Left Sidebar: BOQ STRUCTURE (Figma Frame 2147225071) ────────── */}
+      <aside className="td-costing-sidebar">
+        {/* Header: BOQ STRUCTURE (Figma Frame 2147225199) */}
         <div className="td-costing-sidebar-header">
           <div className="td-costing-title-group">
             <span className="td-costing-sidebar-title">BOQ STRUCTURE</span>
             <span className="td-costing-sidebar-sub">
-              {totalSectionsCount} Sections · {totalItemsCount} Items
+              {totalSectionsCount} Sections • {totalItemsCount} Items
             </span>
           </div>
 
           <button
             type="button"
-            className="td-sidebar-search-btn"
+            className="td-costing-search-btn"
             title="Search structure"
+            aria-label="Search structure"
             onClick={() => setIsSearchOpen(!isSearchOpen)}
           >
-            <Search size={15} />
+            <div className="td-costing-search-btn-inner">
+              <Search size={16} />
+            </div>
           </button>
         </div>
 
+        {/* Inline Search Bar */}
         {isSearchOpen && (
-          <div style={{ padding: "6px 12px", borderBottom: "1px solid #f1f5f9" }}>
+          <div className="td-costing-search-bar">
+            <Search size={15} color="#94A3B8" />
             <input
               type="text"
-              placeholder="Search rooms & sections..."
+              placeholder="Search areas & sections..."
               value={sidebarSearch}
               onChange={(e) => setSidebarSearch(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "6px 8px",
-                fontSize: 12,
-                border: "1px solid #e2e8f0",
-                borderRadius: 6,
-                outline: "none",
-              }}
+              autoFocus
             />
+            {sidebarSearch && (
+              <button
+                type="button"
+                onClick={() => setSidebarSearch("")}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", padding: 0 }}
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
         )}
 
+        <hr className="td-costing-divider" />
+
+        {/* Structure Tree List (Figma Frame 2147225181) */}
         <div className="td-costing-tree-list">
-          {rooms
-            .filter((rm) =>
-              sidebarSearch
-                ? rm.name.toLowerCase().includes(sidebarSearch.toLowerCase()) ||
-                  rm.sections.some((s) => s.name.toLowerCase().includes(sidebarSearch.toLowerCase()))
-                : true
-            )
-            .map((rm) => {
+          {filteredRooms.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "24px 8px", color: "#94A3B8", fontSize: 13 }}>
+              {sidebarSearch ? "No matching areas or sections." : "No BOQ areas defined."}
+            </div>
+          ) : (
+            filteredRooms.map((rm) => {
               const isExpanded = !!expandedRoomIds[rm.id];
-              const secCount = rm.sections.length;
+              const roomItemCount = rm.sections.reduce((acc, s) => acc + s.items.length, 0);
 
               return (
-                <div key={rm.id}>
+                <div key={rm.id} className="td-costing-room-group">
+                  {/* Area / Room Header Row (Figma Frame 2147225184) */}
                   <div
-                    className="td-costing-tree-room-row"
+                    className="td-costing-room-row"
                     onClick={() => toggleRoomExpand(rm.id)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        toggleRoomExpand(rm.id);
+                      }
+                    }}
                   >
-                    <div className="left">
-                      <span className="chev">
-                        {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                    <div className="td-costing-room-left">
+                      <span
+                        className="td-costing-room-chevron"
+                        style={{ transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)" }}
+                      >
+                        <ChevronRight size={14} />
                       </span>
-                      <span className="folder-icon">
-                        {isExpanded ? <FolderOpen size={14} color="#64748b" /> : <Folder size={14} color="#64748b" />}
+                      <span className="td-costing-room-folder">
+                        {isExpanded ? <FolderOpen size={16} /> : <Folder size={16} />}
                       </span>
-                      <span>{rm.name}</span>
+                      <span className="td-costing-room-name" title={rm.name}>
+                        {rm.name}
+                      </span>
                     </div>
-                    <span className="count-badge">{secCount}</span>
+
+                    <span className="td-costing-count-badge" title={`${roomItemCount} total items`}>
+                      {roomItemCount}
+                    </span>
                   </div>
 
+                  {/* Subsections List (Figma Frame 2147225180) */}
                   {isExpanded && rm.sections.length > 0 && (
                     <div className="td-costing-subsections-list">
                       {rm.sections.map((sec) => {
                         const isSelected = sec.id === selectedSectionId;
+
                         return (
                           <div
                             key={sec.id}
                             className={`td-costing-sub-row ${isSelected ? "selected" : ""}`}
                             onClick={() => handleSelectSection(sec, rm)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                handleSelectSection(sec, rm);
+                              }
+                            }}
                           >
-                            <div className="left">
-                              <GripVertical size={12} className="grip" />
-                              <span>{sec.name}</span>
+                            <div className="td-costing-sub-left">
+                              <span className="td-costing-sub-grip">
+                                <GripVertical size={13} />
+                              </span>
+                              <span className="td-costing-sub-folder">
+                                <Layers size={14} />
+                              </span>
+                              <span className="td-costing-sub-name" title={sec.name}>
+                                {sec.name}
+                              </span>
                             </div>
-                            <span className="count-badge">{sec.items.length}</span>
+
+                            <span className="td-costing-count-badge">
+                              {sec.items.length}
+                            </span>
                           </div>
                         );
                       })}
@@ -752,23 +947,24 @@ export default function TemplateCostingBoq({
                   )}
                 </div>
               );
-            })}
+            })
+          )}
         </div>
 
-        <div className="td-costing-sidebar-footer">
-          <button
-            type="button"
-            className="td-add-structure-btn"
-            style={{ width: "100%" }}
-            onClick={() => setIsAddStructureModalOpen(true)}
-          >
-            <Plus size={15} />
-            <span>Add BOQ Structure</span>
-          </button>
-        </div>
+        <hr className="td-costing-divider" />
+
+        {/* Add BOQ Structure CTA Button (Figma Buttons: #2563EB, 46px) */}
+        <button
+          type="button"
+          className="td-costing-add-btn"
+          onClick={handleOpenAddStructureModal}
+        >
+          <Plus size={16} />
+          <span>Add BOQ Structure</span>
+        </button>
       </aside>
 
-      {/* ── Right Panel: Costing Main ──────────────────────────────── */}
+      {/* ── Right Panel: Costing Main Workspace (Figma Frame 2147225072) ─── */}
       <section className="td-costing-main">
         {saveSuccess && (
           <div className="td-inspector-alert success" style={{ marginBottom: 4 }}>
@@ -778,70 +974,83 @@ export default function TemplateCostingBoq({
         )}
         {saveError && (
           <div className="td-inspector-alert error" style={{ marginBottom: 4 }}>
+            <AlertCircle size={14} />
             <span>{saveError}</span>
           </div>
         )}
 
+        {/* Main Section Header (Figma Frame 2147225198) */}
         <div className="td-costing-main-header">
           <div className="td-costing-main-title-col">
-            <h2 className="title">{activeSection?.name || "BOQ Section"}</h2>
-            <span className="sub">
-              {activeRoom?.name || "Room"} · BOQ Section
-            </span>
-            <span className="meta">
-              {items.length} Items · ₹{currentSectionTotalAmount.toLocaleString("en-IN")} Illustrative Template Value
-            </span>
+            <h2 className="td-costing-main-title">
+              {activeSection?.name || "BOQ Workspace"}
+            </h2>
+            <p className="td-costing-main-subtitle">
+              {activeRoom?.name ? `${activeRoom.name} • BOQ Section` : "Template BOQ Section"}
+            </p>
           </div>
 
           <div className="td-costing-main-actions">
             <button
               type="button"
-              className="td-icon-box-btn"
-              title="Edit Section"
-              onClick={handleRenameSection}
+              className="td-costing-icon-btn"
+              title="Rename Section"
+              aria-label="Rename Section"
+              disabled={!activeSection}
+              onClick={handleOpenRenameSection}
             >
-              <Edit3 size={15} />
+              <Edit3 size={18} />
             </button>
+
             <button
               type="button"
-              className="td-icon-box-btn"
-              title="Add Item"
+              className="td-costing-icon-btn"
+              title="Add Item to Section"
+              aria-label="Add Item to Section"
+              disabled={!activeSection}
               onClick={handleOpenAddItem}
             >
-              <Plus size={15} />
+              <Plus size={18} />
             </button>
+
             <div style={{ position: "relative" }}>
               <button
                 type="button"
-                className="td-icon-box-btn"
-                title="More options"
+                className="td-costing-icon-btn"
+                title="More Section Options"
+                aria-label="More Section Options"
+                disabled={!activeSection}
                 onClick={() => setIsSectionMenuOpen(!isSectionMenuOpen)}
               >
-                <MoreHorizontal size={15} />
+                <MoreHorizontal size={18} />
               </button>
+
               {isSectionMenuOpen && (
-                <div className="td-wf-action-menu" style={{ position: "absolute", right: 0, top: 36, zIndex: 30 }}>
-                  <button
-                    type="button"
-                    className="item"
-                    onClick={() => {
-                      setIsSectionMenuOpen(false);
-                      handleRenameSection();
-                    }}
-                  >
-                    <Edit3 size={13} />
-                    <span>Rename Section</span>
+                <div
+                  className="td-row-kebab-dropdown"
+                  style={{
+                    position: "absolute",
+                    right: 0,
+                    top: 50,
+                    zIndex: 50,
+                    minWidth: 160,
+                  }}
+                >
+                  <button type="button" onClick={handleOpenRenameSection}>
+                    <Edit3 size={13} style={{ marginRight: 6 }} />
+                    Rename Section
+                  </button>
+                  <button type="button" onClick={handleOpenAddItem}>
+                    <Plus size={13} style={{ marginRight: 6 }} />
+                    Add Item
                   </button>
                   <button
                     type="button"
-                    className="item"
-                    onClick={() => {
-                      setIsSectionMenuOpen(false);
-                      handleOpenAddItem();
-                    }}
+                    className="danger"
+                    onClick={handleDeleteSection}
                   >
-                    <Plus size={13} />
-                    <span>Add Item to Section</span>
+                    <Trash2 size={13} style={{ marginRight: 6 }} />
+                    Delete Section
                   </button>
                 </div>
               )}
@@ -849,84 +1058,138 @@ export default function TemplateCostingBoq({
           </div>
         </div>
 
-        {/* Costing Table */}
-        <div className="td-costing-table-wrap">
+        {/* Sub-header Summary Line (Figma: 11 Items • ₹4,82,000 Illustrative Template Value) */}
+        <div className="td-costing-summary-bar">
+          {items.length} Items • ₹{currentSectionTotalAmount.toLocaleString("en-IN")} Illustrative Template Value
+        </div>
+
+        <hr className="td-costing-divider" />
+
+        {/* Inner Table Container (Figma Device Management_iOS: #F9FBFD) */}
+        <div className="td-costing-table-container">
           <table className="td-costing-table">
             <thead>
               <tr>
-                <th style={{ width: "26%" }}>ITEM</th>
-                <th style={{ width: "8%" }}>UNIT</th>
-                <th style={{ width: "7%" }}>QTY</th>
-                <th style={{ width: "11%" }}>RATE (₹)</th>
-                <th style={{ width: "9%" }}>WASTE (%)</th>
-                <th style={{ width: "8%" }}>TAX (%)</th>
-                <th style={{ width: "13%" }}>AMOUNT(₹)</th>
-                <th style={{ width: "13%" }}>RATE STATUS</th>
-                <th style={{ width: "5%" }} />
+                <th style={{ width: 36 }} aria-label="Reorder"></th>
+                <th style={{ minWidth: 200 }}>ITEM</th>
+                <th style={{ width: 85 }}>UNIT</th>
+                <th style={{ width: 60 }}>QTY</th>
+                <th style={{ width: 100 }}>RATE (₹)</th>
+                <th style={{ width: 90 }}>WASTE (%)</th>
+                <th style={{ width: 80 }}>TAX (%)</th>
+                <th style={{ width: 110 }}>AMOUNT(₹)</th>
+                <th style={{ width: 120 }}>RATE STATUS</th>
+                <th style={{ width: 48 }} aria-label="Actions"></th>
               </tr>
             </thead>
             <tbody>
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: "center", padding: "32px 0", color: "#94a3b8" }}>
-                    No items configured in this section. Click the + button above to add an item.
+                  <td colSpan={10}>
+                    <div className="td-costing-empty-state">
+                      <Layers size={32} color="#94A3B8" />
+                      <h4 className="td-costing-empty-title">
+                        No items in this section
+                      </h4>
+                      <p className="td-costing-empty-desc">
+                        Add items with rates, units, and tax to build this template section&apos;s BOQ.
+                      </p>
+                      <button
+                        type="button"
+                        className="td-modal-btn-primary"
+                        onClick={handleOpenAddItem}
+                        style={{ marginTop: 8 }}
+                      >
+                        <Plus size={15} style={{ marginRight: 6, display: "inline-block", verticalAlign: "middle" }} />
+                        <span>Add First Item</span>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ) : (
-                paginatedItems.map((item) => {
+                paginatedItems.map((item, idx) => {
                   const status = item.rateStatus || "MAPPED";
-                  const statusClass =
-                    status === "MAPPED"
-                      ? "status-mapped"
-                      : status === "OUTDATED"
-                      ? "status-outdated"
-                      : "status-missing";
-
+                  const statusClass = status.toLowerCase();
                   const isActionOpen = openActionId === item.id;
                   const isStatusOpen = openStatusId === item.id;
+                  const realIndex = (safePage - 1) * pageSize + idx;
 
                   return (
-                    <tr key={item.id} className="td-costing-row">
+                    <tr
+                      key={item.id}
+                      draggable
+                      onDragStart={() => handleDragStart(realIndex)}
+                      onDragOver={(e) => handleDragOver(e, realIndex)}
+                      onDragEnd={handleDragEnd}
+                      style={{
+                        opacity: draggedItemIndex === realIndex ? 0.4 : 1,
+                        cursor: "default",
+                      }}
+                    >
+                      {/* Drag Handle */}
+                      <td className="td-costing-grip-cell">
+                        <GripVertical size={16} />
+                      </td>
+
+                      {/* ITEM Name + Description */}
                       <td>
                         <div className="td-costing-item-cell">
-                          <GripVertical size={13} className="drag-grip" />
-                          <div className="item-text-group">
-                            <span className="name">{item.name}</span>
-                            <span className="desc">
-                              {item.description || "Specification not specified"}
-                            </span>
-                          </div>
+                          <span className="td-costing-item-name">{item.name}</span>
+                          <span className="td-costing-item-desc">
+                            {item.description || "Specification not specified"}
+                          </span>
                         </div>
                       </td>
+
+                      {/* UNIT */}
                       <td>
-                        <span className="unit-txt">{item.unit || "Nos"}</span>
+                        <span className="td-costing-val-secondary">
+                          {item.unit || "Nos"}
+                        </span>
                       </td>
+
+                      {/* QTY */}
                       <td>
-                        <span className="qty-txt">{item.quantity}</span>
+                        <span className="td-costing-val-secondary">
+                          {item.quantity}
+                        </span>
                       </td>
+
+                      {/* RATE (₹) */}
                       <td>
-                        <span className="rate-txt">
+                        <span className="td-costing-val-primary">
                           {Number(item.rate).toLocaleString("en-IN", {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
                           })}
                         </span>
                       </td>
+
+                      {/* WASTE (%) */}
                       <td>
-                        <span className="pct-txt">{item.wastePercent}%</span>
+                        <span className="td-costing-val-secondary">
+                          {item.wastePercent}%
+                        </span>
                       </td>
+
+                      {/* TAX (%) */}
                       <td>
-                        <span className="pct-txt">{item.taxPercent}%</span>
+                        <span className="td-costing-val-secondary">
+                          {item.taxPercent}%
+                        </span>
                       </td>
+
+                      {/* AMOUNT (₹) */}
                       <td>
-                        <span className="amount-txt" style={{ color: "#16a34a", fontWeight: 600 }}>
+                        <span className="td-costing-val-amount">
                           {Number(item.amount || 0).toLocaleString("en-IN")}
                         </span>
                       </td>
+
+                      {/* RATE STATUS Badge with dropdown selector */}
                       <td style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
                         <div
-                          className={`td-rate-status-pill ${statusClass}`}
-                          style={{ cursor: "pointer" }}
+                          className={`td-costing-status-pill ${statusClass}`}
                           onClick={() => setOpenStatusId(isStatusOpen ? null : item.id)}
                           title="Click to change rate status"
                         >
@@ -936,70 +1199,82 @@ export default function TemplateCostingBoq({
 
                         {isStatusOpen && (
                           <div
-                            className="td-wf-action-menu"
+                            className="td-row-kebab-dropdown"
                             style={{
                               position: "absolute",
                               left: 0,
-                              top: 32,
+                              top: 36,
                               zIndex: 40,
-                              minWidth: 120,
-                              boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                              minWidth: 130,
                             }}
                           >
                             <button
                               type="button"
-                              className="item"
                               onClick={() => handleRateStatusChange(item, "MAPPED")}
                             >
-                              <span style={{ color: "#16a34a", fontWeight: 600 }}>● MAPPED</span>
+                              <span style={{ color: "#16A34A", fontWeight: 600 }}>● MAPPED</span>
                             </button>
                             <button
                               type="button"
-                              className="item"
                               onClick={() => handleRateStatusChange(item, "OUTDATED")}
                             >
-                              <span style={{ color: "#d97706", fontWeight: 600 }}>● OUTDATED</span>
+                              <span style={{ color: "#D97706", fontWeight: 600 }}>● OUTDATED</span>
                             </button>
                             <button
                               type="button"
-                              className="item"
                               onClick={() => handleRateStatusChange(item, "MISSING")}
                             >
-                              <span style={{ color: "#dc2626", fontWeight: 600 }}>● MISSING</span>
+                              <span style={{ color: "#DC2626", fontWeight: 600 }}>● MISSING</span>
                             </button>
                           </div>
                         )}
                       </td>
+
+                      {/* Row Actions Menu */}
                       <td onClick={(e) => e.stopPropagation()}>
-                        <div className="td-row-kebab-wrap" style={{ position: "relative" }}>
+                        <div className="td-costing-row-actions">
                           <button
                             type="button"
-                            className="td-row-kebab-btn"
+                            className="td-costing-kebab-btn"
                             aria-label={`Actions for ${item.name}`}
                             onClick={() => setOpenActionId(isActionOpen ? null : item.id)}
                           >
-                            <MoreHorizontal size={14} />
+                            <MoreHorizontal size={16} />
                           </button>
 
                           {isActionOpen && (
-                            <div className="td-row-kebab-dropdown">
+                            <div
+                              className="td-row-kebab-dropdown"
+                              style={{
+                                position: "absolute",
+                                right: 0,
+                                top: 32,
+                                zIndex: 45,
+                              }}
+                            >
                               <button
+                                type="button"
                                 disabled={saving}
                                 onClick={() => handleOpenEditItem(item)}
                               >
+                                <Edit3 size={13} style={{ marginRight: 6 }} />
                                 Edit Item
                               </button>
                               <button
+                                type="button"
                                 disabled={saving}
                                 onClick={() => handleDuplicateItem(item)}
                               >
+                                <Copy size={13} style={{ marginRight: 6 }} />
                                 Duplicate
                               </button>
                               <button
+                                type="button"
                                 disabled={saving}
                                 className="danger"
                                 onClick={() => handleDeleteItem(item.id)}
                               >
+                                <Trash2 size={13} style={{ marginRight: 6 }} />
                                 Delete
                               </button>
                             </div>
@@ -1010,118 +1285,144 @@ export default function TemplateCostingBoq({
                   );
                 })
               )}
+
+              {/* Table Total Bar Row (Figma Frame 63: #E4ECFB, 36px) */}
+              {items.length > 0 && (
+                <tr className="td-costing-total-tr">
+                  <td></td>
+                  <td colSpan={2}>
+                    <strong>TOTAL ({items.length} ITEMS)</strong>
+                  </td>
+                  <td>
+                    <strong>{currentSectionTotalQuantity}</strong>
+                  </td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td>
+                    <strong style={{ color: "#0F172A" }}>
+                      ₹{currentSectionTotalAmount.toLocaleString("en-IN")}
+                    </strong>
+                  </td>
+                  <td></td>
+                  <td></td>
+                </tr>
+              )}
             </tbody>
           </table>
-
-          {/* Table Total Bar */}
-          <div className="td-costing-total-bar">
-            <span className="total-label">TOTAL ({items.length} ITEMS)</span>
-            <span className="total-qty">{currentSectionTotalQuantity}</span>
-            <span className="total-amount">
-              ₹{currentSectionTotalAmount.toLocaleString("en-IN")}
-            </span>
-          </div>
         </div>
 
-        {/* Bottom Pagination Bar */}
-        <div className="target-table-pagination-row">
-          <div className="target-table-total-count">
-            Total Items: {items.length}
-          </div>
+        {/* Bottom Pagination Bar (Figma Frame 2147225166: 50px height) */}
+        {items.length > 0 && (
+          <div className="td-costing-pagination-bar">
+            <div className="td-costing-pagination-total">
+              Total Items: {items.length}
+            </div>
 
-          <div className="target-table-page-nav" role="navigation" aria-label="Pagination">
-            <button
-              type="button"
-              className="target-table-page-btn arrow"
-              disabled={safePage <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              aria-label="Previous page"
-            >
-              <ChevronLeft size={15} />
-            </button>
-
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+            <div className="td-costing-pagination-nav" role="navigation" aria-label="Pagination">
               <button
-                key={pageNum}
                 type="button"
-                className={`target-table-page-btn ${safePage === pageNum ? "active" : ""}`}
-                onClick={() => setPage(pageNum)}
+                className="td-costing-page-btn"
+                disabled={safePage <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                aria-label="Previous page"
               >
-                {pageNum}
+                <ChevronLeft size={16} />
               </button>
-            ))}
 
-            <button
-              type="button"
-              className="target-table-page-btn arrow"
-              disabled={safePage >= totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              aria-label="Next page"
-            >
-              <ChevronRight size={15} />
-            </button>
-          </div>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                <button
+                  key={pageNum}
+                  type="button"
+                  className={`td-costing-page-btn ${safePage === pageNum ? "active" : ""}`}
+                  onClick={() => setPage(pageNum)}
+                >
+                  {pageNum}
+                </button>
+              ))}
 
-          <div className="target-table-page-size-wrap">
-            <span className="target-table-page-size-label">Show per Page:</span>
-            <div className="target-table-page-size-select-wrap">
-              <select
-                className="target-table-page-size-select"
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setPage(1);
-                }}
-                aria-label="Items per page"
+              <button
+                type="button"
+                className="td-costing-page-btn"
+                disabled={safePage >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                aria-label="Next page"
               >
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-              </select>
-              <ChevronDown size={14} className="target-table-select-arrow" />
+                <ChevronRight size={16} />
+              </button>
+            </div>
+
+            <div className="td-costing-page-size-wrap">
+              <span className="td-costing-page-size-label">Show per Page:</span>
+              <div className="td-costing-page-size-select-wrap">
+                <select
+                  className="td-costing-page-size-select"
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setPage(1);
+                  }}
+                  aria-label="Items per page"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+                <ChevronDown
+                  size={14}
+                  style={{
+                    position: "absolute",
+                    right: 8,
+                    top: "calc(50% - 7px)",
+                    pointerEvents: "none",
+                    color: "#64748B",
+                  }}
+                />
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </section>
 
-      {/* ── Add / Edit Item Modal ───────────────────────────────────── */}
+      {/* ── Add / Edit Item Modal ─────────────────────────────────────── */}
       {isItemModalOpen && (
         <div className="td-modal-overlay" onClick={() => setIsItemModalOpen(false)}>
           <div
-            className="td-modal-content"
-            style={{ maxWidth: 520, background: "#ffffff", borderRadius: 12, padding: 24, boxShadow: "0 10px 25px rgba(0,0,0,0.15)" }}
+            className="td-modal-card"
+            style={{ maxWidth: 520 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "#0f172a" }}>
+            <div className="td-modal-header">
+              <h3 className="td-modal-title">
                 {editingItem ? "Edit BOQ Item" : "Add BOQ Item"}
               </h3>
               <button
                 type="button"
-                style={{ background: "none", border: "none", cursor: "pointer", color: "#64748b" }}
+                className="td-modal-close"
                 onClick={() => setIsItemModalOpen(false)}
+                aria-label="Close modal"
               >
-                <X size={16} />
+                <X size={18} />
               </button>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "#334155", display: "block", marginBottom: 4 }}>
-                  Item Name *
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div className="td-inspector-field">
+                <label className="td-inspector-label">
+                  Item Name <span className="req">*</span>
                 </label>
                 <input
                   type="text"
                   value={itemName}
                   onChange={(e) => setItemName(e.target.value)}
-                  placeholder="e.g. Full Height Wardrobe"
-                  className="td-form-input"
-                  style={{ width: "100%", padding: "7px 10px", fontSize: 13, border: "1px solid #cbd5e1", borderRadius: 6 }}
+                  placeholder="e.g. Full Height Wardrobe, Side Table"
+                  className="td-inspector-input"
+                  autoFocus
                 />
               </div>
 
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "#334155", display: "block", marginBottom: 4 }}>
+              <div className="td-inspector-field">
+                <label className="td-inspector-label">
                   Description / Specification
                 </label>
                 <input
@@ -1129,20 +1430,17 @@ export default function TemplateCostingBoq({
                   value={itemDesc}
                   onChange={(e) => setItemDesc(e.target.value)}
                   placeholder="e.g. 19mm BWP ply, laminate finish"
-                  className="td-form-input"
-                  style={{ width: "100%", padding: "7px 10px", fontSize: 13, border: "1px solid #cbd5e1", borderRadius: 6 }}
+                  className="td-inspector-input"
                 />
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: "#334155", display: "block", marginBottom: 4 }}>
-                    Unit
-                  </label>
+                <div className="td-inspector-field">
+                  <label className="td-inspector-label">Unit</label>
                   <select
                     value={itemUnit}
                     onChange={(e) => setItemUnit(e.target.value)}
-                    style={{ width: "100%", padding: "7px 10px", fontSize: 13, border: "1px solid #cbd5e1", borderRadius: 6 }}
+                    className="td-inspector-select"
                   >
                     <option value="Nos">Nos</option>
                     <option value="Sq.ft">Sq.ft</option>
@@ -1155,104 +1453,110 @@ export default function TemplateCostingBoq({
                   </select>
                 </div>
 
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: "#334155", display: "block", marginBottom: 4 }}>
-                    Quantity
-                  </label>
+                <div className="td-inspector-field">
+                  <label className="td-inspector-label">Quantity</label>
                   <input
                     type="number"
                     min="1"
                     value={itemQty}
                     onChange={(e) => setItemQty(Number(e.target.value))}
-                    className="td-form-input"
-                    style={{ width: "100%", padding: "7px 10px", fontSize: 13, border: "1px solid #cbd5e1", borderRadius: 6 }}
+                    className="td-inspector-input"
                   />
                 </div>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: "#334155", display: "block", marginBottom: 4 }}>
-                    Rate (₹)
-                  </label>
+                <div className="td-inspector-field">
+                  <label className="td-inspector-label">Rate (₹)</label>
                   <input
                     type="number"
                     min="0"
                     step="0.01"
                     value={itemRate}
                     onChange={(e) => setItemRate(Number(e.target.value))}
-                    className="td-form-input"
-                    style={{ width: "100%", padding: "7px 10px", fontSize: 13, border: "1px solid #cbd5e1", borderRadius: 6 }}
+                    className="td-inspector-input"
                   />
                 </div>
 
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: "#334155", display: "block", marginBottom: 4 }}>
-                    Waste (%)
-                  </label>
+                <div className="td-inspector-field">
+                  <label className="td-inspector-label">Waste (%)</label>
                   <input
                     type="number"
                     min="0"
                     max="100"
                     value={itemWaste}
                     onChange={(e) => setItemWaste(Number(e.target.value))}
-                    className="td-form-input"
-                    style={{ width: "100%", padding: "7px 10px", fontSize: 13, border: "1px solid #cbd5e1", borderRadius: 6 }}
+                    className="td-inspector-input"
                   />
                 </div>
 
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: "#334155", display: "block", marginBottom: 4 }}>
-                    Tax (%)
-                  </label>
+                <div className="td-inspector-field">
+                  <label className="td-inspector-label">Tax (%)</label>
                   <input
                     type="number"
                     min="0"
                     max="100"
                     value={itemTax}
                     onChange={(e) => setItemTax(Number(e.target.value))}
-                    className="td-form-input"
-                    style={{ width: "100%", padding: "7px 10px", fontSize: 13, border: "1px solid #cbd5e1", borderRadius: 6 }}
+                    className="td-inspector-input"
                   />
                 </div>
               </div>
 
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "#334155", display: "block", marginBottom: 4 }}>
-                  Rate Status
-                </label>
+              <div className="td-inspector-field">
+                <label className="td-inspector-label">Rate Status</label>
                 <select
                   value={itemRateStatus}
                   onChange={(e) => setItemRateStatus(e.target.value as any)}
-                  style={{ width: "100%", padding: "7px 10px", fontSize: 13, border: "1px solid #cbd5e1", borderRadius: 6 }}
+                  className="td-inspector-select"
                 >
-                  <option value="MAPPED">MAPPED</option>
-                  <option value="OUTDATED">OUTDATED</option>
-                  <option value="MISSING">MISSING</option>
+                  <option value="MAPPED">MAPPED (Verified against master catalog)</option>
+                  <option value="OUTDATED">OUTDATED (Needs vendor rate refresh)</option>
+                  <option value="MISSING">MISSING (Unmapped or estimation)</option>
                 </select>
               </div>
 
-              <div style={{ background: "#f8fafc", padding: "10px 14px", borderRadius: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 12, color: "#64748b" }}>Calculated Amount:</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: "#16a34a" }}>
+              {/* Calculated Amount Preview Box */}
+              <div
+                style={{
+                  background: "#F8FAFC",
+                  border: "1px solid #E2E8F0",
+                  padding: "12px 16px",
+                  borderRadius: 8,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <span style={{ fontSize: 13, color: "#64748B", fontFamily: "'Urbanist', sans-serif" }}>
+                  Calculated Amount:
+                </span>
+                <span
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 700,
+                    color: "#16A34A",
+                    fontFamily: "'Urbanist', sans-serif",
+                  }}
+                >
                   ₹{calculateItemAmount(itemQty, itemRate, itemWaste, itemTax).toLocaleString("en-IN")}
                 </span>
               </div>
             </div>
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+            <div className="td-modal-actions">
               <button
                 type="button"
-                className="template-btn-secondary"
+                className="td-modal-btn-cancel"
                 onClick={() => setIsItemModalOpen(false)}
               >
                 Cancel
               </button>
               <button
                 type="button"
-                className="template-btn-primary"
+                className="td-modal-btn-primary"
                 onClick={handleSaveItemModal}
-                disabled={!itemName.trim()}
+                disabled={!itemName.trim() || saving}
               >
                 {editingItem ? "Update Item" : "Add Item"}
               </button>
@@ -1261,72 +1565,159 @@ export default function TemplateCostingBoq({
         </div>
       )}
 
-      {/* ── Add BOQ Structure Modal ─────────────────────────────────── */}
+      {/* ── Add BOQ Structure Modal ───────────────────────────────────── */}
       {isAddStructureModalOpen && (
         <div className="td-modal-overlay" onClick={() => setIsAddStructureModalOpen(false)}>
           <div
-            className="td-modal-content"
-            style={{ maxWidth: 440, background: "#ffffff", borderRadius: 12, padding: 24, boxShadow: "0 10px 25px rgba(0,0,0,0.15)" }}
+            className="td-modal-card"
+            style={{ maxWidth: 460 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "#0f172a" }}>
-                Add BOQ Structure
-              </h3>
+            <div className="td-modal-header">
+              <h3 className="td-modal-title">Add BOQ Structure</h3>
               <button
                 type="button"
-                style={{ background: "none", border: "none", cursor: "pointer", color: "#64748b" }}
+                className="td-modal-close"
                 onClick={() => setIsAddStructureModalOpen(false)}
+                aria-label="Close modal"
               >
-                <X size={16} />
+                <X size={18} />
               </button>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "#334155", display: "block", marginBottom: 4 }}>
-                  Room / Area Name *
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div className="td-inspector-field">
+                <label className="td-inspector-label">
+                  Target Area / Room <span className="req">*</span>
                 </label>
-                <input
-                  type="text"
-                  value={newRoomName}
-                  onChange={(e) => setNewRoomName(e.target.value)}
-                  placeholder="e.g. Master Bedroom, Living Room"
-                  className="td-form-input"
-                  style={{ width: "100%", padding: "7px 10px", fontSize: 13, border: "1px solid #cbd5e1", borderRadius: 6 }}
-                />
+                <select
+                  value={selectedAreaCode}
+                  onChange={(e) => setSelectedAreaCode(e.target.value)}
+                  className="td-inspector-select"
+                >
+                  {rooms.map((rm) => (
+                    <option key={rm.id} value={rm.code || rm.id}>
+                      {rm.name} {rm.code ? `(${rm.code})` : ""}
+                    </option>
+                  ))}
+                  <option value="__NEW__">+ Create New Room / Area</option>
+                </select>
               </div>
 
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "#334155", display: "block", marginBottom: 4 }}>
-                  Initial Section Name
+              {selectedAreaCode === "__NEW__" && (
+                <div className="td-inspector-field">
+                  <label className="td-inspector-label">
+                    New Room / Area Name <span className="req">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newRoomName}
+                    onChange={(e) => setNewRoomName(e.target.value)}
+                    placeholder="e.g. Master Bedroom, Balcony, Terrace"
+                    className="td-inspector-input"
+                    autoFocus
+                  />
+                </div>
+              )}
+
+              <div className="td-inspector-field">
+                <label className="td-inspector-label">
+                  Section Name <span className="req">*</span>
                 </label>
                 <input
                   type="text"
                   value={newSectionName}
                   onChange={(e) => setNewSectionName(e.target.value)}
-                  placeholder="e.g. Furniture, Electrical, Painting"
-                  className="td-form-input"
-                  style={{ width: "100%", padding: "7px 10px", fontSize: 13, border: "1px solid #cbd5e1", borderRadius: 6 }}
+                  placeholder="e.g. Furniture, Electrical, Painting, Flooring"
+                  className="td-inspector-input"
+                />
+              </div>
+
+              <div className="td-inspector-field">
+                <label className="td-inspector-label">Section Code (Optional)</label>
+                <input
+                  type="text"
+                  value={newSectionCode}
+                  onChange={(e) => setNewSectionCode(e.target.value)}
+                  placeholder="e.g. BOQ-19"
+                  className="td-inspector-input"
                 />
               </div>
             </div>
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+            <div className="td-modal-actions">
               <button
                 type="button"
-                className="template-btn-secondary"
+                className="td-modal-btn-cancel"
                 onClick={() => setIsAddStructureModalOpen(false)}
               >
                 Cancel
               </button>
               <button
                 type="button"
-                className="template-btn-primary"
+                className="td-modal-btn-primary"
                 onClick={handleAddStructure}
-                disabled={!newRoomName.trim()}
+                disabled={
+                  !newSectionName.trim() ||
+                  (selectedAreaCode === "__NEW__" && !newRoomName.trim()) ||
+                  saving
+                }
               >
                 Create Structure
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Rename Section Modal ──────────────────────────────────────── */}
+      {isRenameSectionModalOpen && (
+        <div className="td-modal-overlay" onClick={() => setIsRenameSectionModalOpen(false)}>
+          <div
+            className="td-modal-card"
+            style={{ maxWidth: 420 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="td-modal-header">
+              <h3 className="td-modal-title">Rename BOQ Section</h3>
+              <button
+                type="button"
+                className="td-modal-close"
+                onClick={() => setIsRenameSectionModalOpen(false)}
+                aria-label="Close modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="td-inspector-field">
+              <label className="td-inspector-label">
+                Section Name <span className="req">*</span>
+              </label>
+              <input
+                type="text"
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                className="td-inspector-input"
+                autoFocus
+              />
+            </div>
+
+            <div className="td-modal-actions">
+              <button
+                type="button"
+                className="td-modal-btn-cancel"
+                onClick={() => setIsRenameSectionModalOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="td-modal-btn-primary"
+                onClick={handleSaveRenameSection}
+                disabled={!renameValue.trim() || saving}
+              >
+                Save
               </button>
             </div>
           </div>

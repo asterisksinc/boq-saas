@@ -40,15 +40,19 @@ export interface MockArea {
 
 export interface MockWorkflowTask {
   id: string;
+  code?: string;
   name: string;
   stage?: string;
   assignee: string;
   assigneeRole?: string;
   duration: string;
+  durationDays?: number;
   dependency: string;
-  criticality?: "MEDIUM" | "HIGH" | "CRITICAL";
+  criticality?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   status?: "ACTIVE" | "COMPLETED" | "DRAFT";
   approval?: "Yes" | "No";
+  sla?: string;
+  rateStatus?: string;
   order?: number;
 }
 

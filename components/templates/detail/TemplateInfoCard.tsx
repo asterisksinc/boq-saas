@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Copy, Edit3, Image as ImageIcon } from "lucide-react";
+import { Image as ImageIcon } from "lucide-react";
 import { uploadTemplateImage } from "@/lib/api/templates";
 
 interface TemplateInfoCardProps {
@@ -27,9 +27,6 @@ const fallbackCover =
 
 export default function TemplateInfoCard({
   template,
-  onDuplicate,
-  onEdit,
-  onUseTemplate,
   onImageUploaded,
 }: TemplateInfoCardProps) {
   const [imgSrc, setImgSrc] = useState<string>(template.imageUrl || fallbackCover);
@@ -72,9 +69,17 @@ export default function TemplateInfoCard({
     : [template.businessType || "Residential", "Interior Design", template.projectType || "Standard"].filter(Boolean);
 
   return (
-    <div className="td-info-card-container">
-      <div className="td-info-section-pretitle">TEMPLATE INFORMATION</div>
-      <div className="td-info-card">
+    <section className="td-outer-panel" aria-labelledby="template-info-heading">
+      {/* Frame 2147225193: Header */}
+      <div className="td-panel-header-row">
+        <h2 id="template-info-heading" className="td-panel-heading">
+          TEMPLATE INFORMATION
+        </h2>
+      </div>
+
+      {/* Frame 2147225027: White Inner Card */}
+      <div className="td-inner-card td-info-card-inner">
+        {/* Rectangle 79: 155px x 155px cover image */}
         <div className="td-info-image-wrap">
           <img
             src={imgSrc}
@@ -82,7 +87,7 @@ export default function TemplateInfoCard({
             className="td-info-img"
             onError={() => setImgSrc(fallbackCover)}
           />
-          <label className="td-info-img-upload-btn" title="Change template image">
+          <label className="td-info-img-upload-btn" title="Change template image" aria-label="Change template image">
             <ImageIcon size={14} />
             <input
               type="file"
@@ -94,67 +99,67 @@ export default function TemplateInfoCard({
           </label>
         </div>
 
-        <div className="td-info-grid">
-          {/* Column 1: Name, Tags, Description */}
-          <div className="td-info-col td-info-col-main">
+        {/* Frame 2147225192: Metadata and Details */}
+        <div className="td-info-details-col">
+          {/* Row 1: Frame 2147225128: Template Name, Template ID, Template Type */}
+          <div className="td-info-details-row">
             <div className="td-info-field">
               <span className="td-info-label">Template Name</span>
-              <h2 className="td-info-title">{template.name}</h2>
+              <span className="td-info-value" title={template.name}>
+                {template.name}
+              </span>
             </div>
 
-            <div className="td-info-field" style={{ marginTop: 12 }}>
+            <div className="td-info-field">
+              <span className="td-info-label">Template ID</span>
+              <span className="td-info-value">
+                {template.templateCode || template.id}
+              </span>
+            </div>
+
+            <div className="td-info-field">
+              <span className="td-info-label">Template Type</span>
+              <span className="td-info-value">Project Template</span>
+            </div>
+          </div>
+
+          {/* Row 2: Frame 2147225129: Tag, Status, Type */}
+          <div className="td-info-details-row">
+            <div className="td-info-field">
               <span className="td-info-label">Tag</span>
-              <div className="td-info-tags-row">
+              <div className="td-info-tags-wrap">
                 {tags.map((t, idx) => (
-                  <span key={idx} className="td-info-tag-pill">
+                  <span key={idx} className="td-tag-chip">
                     {t}
                   </span>
                 ))}
               </div>
             </div>
 
-            <div className="td-info-field" style={{ marginTop: 12 }}>
-              <span className="td-info-label">Description</span>
-              <p className="td-info-desc">
-                {template.description ||
-                  "No description provided for this template."}
-              </p>
-            </div>
-          </div>
-
-          {/* Column 2: Template ID, Status */}
-          <div className="td-info-col td-info-col-meta">
             <div className="td-info-field">
-              <span className="td-info-label">Template ID</span>
-              <span className="td-info-value-bold">
-                {template.templateCode || template.id}
-              </span>
-            </div>
-
-            <div className="td-info-field" style={{ marginTop: 20 }}>
               <span className="td-info-label">Status</span>
               <div>
                 <span className={`td-status-pill ${statusClass}`}>{status}</span>
               </div>
             </div>
-          </div>
 
-          {/* Column 3: Template Type, Type */}
-          <div className="td-info-col td-info-col-type">
             <div className="td-info-field">
-              <span className="td-info-label">Template Type</span>
-              <span className="td-info-value-bold">Project Template</span>
-            </div>
-
-            <div className="td-info-field" style={{ marginTop: 20 }}>
               <span className="td-info-label">Type</span>
-              <span className="td-info-value-bold">
+              <span className="td-info-value">
                 {template.businessType || template.projectType || "Residential"}
               </span>
             </div>
           </div>
+
+          {/* Row 3: Frame 2147225000: Description */}
+          <div className="td-info-field td-info-field-full">
+            <span className="td-info-label">Description</span>
+            <p className="td-info-desc">
+              {template.description || "No description provided for this template."}
+            </p>
+          </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 }
