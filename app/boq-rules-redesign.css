@@ -1,0 +1,1190 @@
+/* =========================================================================
+   BOQ TEMPLATE DETAIL - RULES TAB (FIGMA EXACT REDESIGN)
+   Templates - Project Templates - BOQ Template - Template Detail - Rules
+   Canvas: 1440px wide, #F1F5F9, Frame 2147224971 (1326px container)
+   ========================================================================= */
+
+/* ── 1. Main Container & Subheader Row (Figma Frame 2147225198) ── */
+.boq-rules-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0px;
+  gap: 24px;
+  width: 100%;
+  /* max-width: 1326px; */
+  box-sizing: border-box;
+}
+
+.boq-rules-subheader {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0px;
+  gap: 8px;
+  width: 100%;
+  min-height: 47px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 900px) {
+  .boq-rules-subheader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}
+
+.boq-rules-subheader-left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0px;
+  gap: 8px;
+  min-width: 337px;
+}
+
+.boq-rules-title {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 120%;
+  color: #0F172A;
+  margin: 0;
+}
+
+.boq-rules-desc {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  margin: 0;
+}
+
+.boq-rules-toolbar {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 0px;
+  gap: 8px;
+  min-height: 46px;
+}
+
+@media (max-width: 600px) {
+  .boq-rules-toolbar {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+}
+
+/* Search Box (Frame 76): 270px x 46px, #F0F4F9, border rgba(255,255,255,0.32), radius 8px */
+.boq-rules-search-box {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 5px 12px 5px 5px;
+  gap: 8px;
+  width: 270px;
+  height: 46px;
+  background: #F0F4F9;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  backdrop-filter: blur(20.4px);
+  border-radius: 8px;
+}
+
+.boq-rules-search-icon-container {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: #FFFFFF;
+  border-radius: 6px;
+  color: #475569;
+  flex-shrink: 0;
+}
+
+.boq-rules-search-input {
+  width: 100%;
+  height: 20px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  background: transparent;
+  border: none;
+  outline: none;
+}
+
+.boq-rules-search-input::placeholder {
+  color: #64748B;
+}
+
+/* Primary Create Rule Button (Buttons): 132px x 46px, #2563EB, radius 6px */
+.boq-rules-create-btn {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 14px;
+  gap: 6px;
+  min-width: 132px;
+  height: 46px;
+  background: #2563EB;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #FFFFFF;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.boq-rules-create-btn:hover {
+  background: #1D4ED8;
+}
+
+.boq-rules-create-btn:active {
+  transform: scale(0.98);
+}
+
+/* Secondary Icon Button: 46px x 46px, #FFFFFF, border #E2E8F0, radius 6px */
+.boq-rules-icon-btn {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  width: 46px;
+  height: 46px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #1C1B1F;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  position: relative;
+}
+
+.boq-rules-icon-btn:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+.boq-rules-icon-btn.active {
+  background: #EFF6FF;
+  border-color: #2563EB;
+  color: #2563EB;
+}
+
+/* ── 2. Metric Summary Cards (Figma Frame 2147225138) ── */
+.boq-rules-metrics-grid {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  padding: 0px;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1024px) {
+  .boq-rules-metrics-grid {
+    flex-wrap: wrap;
+  }
+}
+
+.boq-rules-metric-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 8px;
+  flex: 1 1 240px;
+  min-height: 116px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 6px;
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.boq-rules-metric-label {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  margin: 0;
+}
+
+.boq-rules-metric-val {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 24px;
+  line-height: 120%;
+  color: #0F172A;
+  margin: 0;
+}
+
+.boq-rules-metric-val.accent {
+  color: #16A34A;
+}
+
+.boq-rules-metric-val.blue {
+  color: #2563EB;
+}
+
+.boq-rules-metric-sub {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+  margin: 0;
+}
+
+/* ── 3. Rule Category Filter Bar (Figma Frame 2147225291) ── */
+.boq-rules-filter-bar-wrap {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: center;
+  width: 100%;
+}
+
+.boq-rules-filter-bar {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: center;
+  padding: 6px;
+  gap: 6px;
+  max-width: 592px;
+  width: auto;
+  height: 46px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+}
+
+@media (max-width: 640px) {
+  .boq-rules-filter-bar {
+    max-width: 100%;
+    overflow-x: auto;
+    height: auto;
+    padding: 4px;
+  }
+}
+
+.boq-rules-filter-btn {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 7px 12px;
+  gap: 10px;
+  height: 34px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.boq-rules-filter-btn:hover {
+  color: #0F172A;
+  background: rgba(100, 116, 139, 0.05);
+}
+
+.boq-rules-filter-btn.active {
+  background: #EFF6FF;
+  color: #2563EB;
+}
+
+.boq-rules-filter-badge {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 2px 6px;
+  min-width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  box-sizing: border-box;
+}
+
+.boq-rules-filter-btn.active .boq-rules-filter-badge {
+  background: #FFFFFF;
+  color: #2563EB;
+}
+
+.boq-rules-filter-btn:not(.active) .boq-rules-filter-badge {
+  background: rgba(100, 116, 139, 0.12);
+  color: #64748B;
+}
+
+/* ── 4. Main Rules Table Area (Figma Frame 2147225085 & 2147225072) ── */
+.boq-rules-main-area {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.boq-rules-table-container {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 12px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(12px);
+  transition: all 0.2s ease;
+}
+
+.boq-rules-table-container.with-inspector {
+  flex: 1 1 0%;
+  min-width: 0;
+}
+
+.boq-rules-table-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0px;
+  gap: 8px;
+  width: 100%;
+  background: #F9FBFD;
+  border-radius: 8px;
+  overflow-x: auto;
+  box-sizing: border-box;
+}
+
+.boq-rules-table {
+  width: 100%;
+  min-width: 1286px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+/* Table Header Row (Frame 57): 1286px x 36px, #E4ECFB, radius 8px */
+.boq-rules-table thead tr {
+  height: 36px;
+  background: #E4ECFB;
+}
+
+.boq-rules-table thead th {
+  padding: 8px 12px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  text-transform: uppercase;
+  color: #64748B;
+  text-align: left;
+  border: none;
+  box-sizing: border-box;
+}
+
+.boq-rules-table thead th:first-child {
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+}
+
+.boq-rules-table thead th:last-child {
+  border-top-right-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+
+/* Column Widths */
+.boq-rules-th-drag, .boq-rules-td-drag {
+  width: 32px;
+  text-align: center !important;
+  padding: 6px 4px !important;
+}
+
+.boq-rules-th-name, .boq-rules-td-name {
+  width: 325px;
+}
+
+.boq-rules-th-scope, .boq-rules-td-scope {
+  width: 126px;
+}
+
+.boq-rules-th-val, .boq-rules-td-val {
+  width: 131px;
+}
+
+.boq-rules-th-source, .boq-rules-td-source {
+  width: 155px;
+}
+
+.boq-rules-th-status, .boq-rules-td-status {
+  width: 127px;
+}
+
+.boq-rules-th-impact, .boq-rules-td-impact {
+  width: 128px;
+}
+
+.boq-rules-th-updated, .boq-rules-td-updated {
+  width: 199px;
+}
+
+.boq-rules-th-actions, .boq-rules-td-actions {
+  width: 64px;
+  text-align: center !important;
+}
+
+/* Data Rows (Frames 59-64): 56px height, border-bottom 1px solid #EBEBEB */
+.boq-rules-table tbody tr {
+  height: 56px;
+  border-bottom: 1px solid #EBEBEB;
+  transition: background-color 0.12s ease;
+  cursor: pointer;
+}
+
+.boq-rules-table tbody tr:hover {
+  background: #F1F5F9;
+}
+
+.boq-rules-table tbody tr.selected {
+  background: #EFF6FF;
+}
+
+.boq-rules-table tbody td {
+  padding: 6px 12px;
+  vertical-align: middle;
+  box-sizing: border-box;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+}
+
+/* Drag indicator */
+.boq-rules-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #B8B9B9;
+  cursor: grab;
+}
+
+.boq-rules-drag-handle:active {
+  cursor: grabbing;
+}
+
+/* Name cell */
+.boq-rules-name-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0px;
+  gap: 2px;
+}
+
+.boq-rules-item-title {
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  margin: 0;
+}
+
+.boq-rules-item-subtitle {
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  margin: 0;
+}
+
+/* Scope & Value */
+.boq-rules-cell-text {
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  white-space: pre-line;
+}
+
+/* Source Badges */
+.boq-rules-source-badge {
+  display: inline-flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 2px 8px;
+  gap: 10px;
+  height: 18px;
+  border-radius: 9999px;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+}
+
+.boq-rules-source-badge.template {
+  background: rgba(37, 99, 235, 0.12);
+  color: #2563EB;
+}
+
+.boq-rules-source-badge.organisation {
+  background: rgba(83, 58, 253, 0.1);
+  color: #533AFD;
+}
+
+/* Status Badges */
+.boq-rules-status-badge {
+  display: inline-flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 2px 8px;
+  gap: 10px;
+  height: 18px;
+  border-radius: 9999px;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+}
+
+.boq-rules-status-badge.active {
+  background: rgba(22, 163, 74, 0.12);
+  color: #16A34A;
+}
+
+.boq-rules-status-badge.override {
+  background: rgba(250, 176, 0, 0.1);
+  color: #FAB000;
+}
+
+.boq-rules-status-badge.inactive {
+  background: rgba(100, 116, 139, 0.12);
+  color: #64748B;
+}
+
+/* Impact & Last Updated */
+.boq-rules-cell-impact, .boq-rules-cell-updated {
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+/* Row Actions Button & Dropdown */
+.boq-rules-row-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #64748B;
+  transition: all 0.15s ease;
+  margin: 0 auto;
+}
+
+.boq-rules-row-action-btn:hover {
+  background: #E2E8F0;
+  color: #0F172A;
+}
+
+/* Scroll Indicator Pill (Rectangle 70): 58px x 6px, #E2E8F0, radius 999px */
+.boq-rules-scroll-indicator {
+  width: 58px;
+  height: 6px;
+  background: #E2E8F0;
+  border-radius: 999px;
+  margin: 6px auto;
+}
+
+/* ── 5. Pagination Bar (Figma Frame 2147225166) ── */
+.boq-rules-pagination {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0px;
+  gap: 8px;
+  width: 100%;
+  height: 50px;
+}
+
+@media (max-width: 768px) {
+  .boq-rules-pagination {
+    flex-direction: column;
+    height: auto;
+    gap: 12px;
+  }
+}
+
+.boq-rules-pagination-total {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.boq-rules-pagination-pages {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.boq-rules-page-btn {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  width: 34px;
+  height: 34px;
+  background: #FFFFFF;
+  border: 1px solid #EBEBEB;
+  border-radius: 6px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.boq-rules-page-btn:hover:not(:disabled) {
+  background: #F1F5F9;
+  color: #0F172A;
+}
+
+.boq-rules-page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.boq-rules-page-btn.active {
+  background: #E4ECFB;
+  border: 1px solid #2563EB;
+  color: #2563EB;
+}
+
+.boq-rules-pagination-per-page {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.boq-rules-select-container {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  width: 83px;
+  height: 34px;
+  background: #FFFFFF;
+  border: 1px solid #EBEBEB;
+  border-radius: 6px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  cursor: pointer;
+}
+
+.boq-rules-select-native {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  color: #64748B;
+  cursor: pointer;
+  width: 100%;
+}
+
+/* ── 6. Rule Inspector Panel (Right Sliding Panel) ── */
+.boq-rules-inspector-panel {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 16px;
+  width: 340px;
+  min-width: 340px;
+  /* background: #FFFFFF; */
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+@media (max-width: 1024px) {
+  .boq-rules-inspector-panel {
+    width: 100%;
+    min-width: 100%;
+  }
+}
+
+.boq-rules-insp-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  position: relative;
+  gap: 4px;
+}
+
+.boq-rules-insp-title {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 120%;
+  color: #0F172A;
+  margin: 0;
+  padding-right: 28px;
+}
+
+.boq-rules-insp-desc {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 140%;
+  color: #64748B;
+  margin: 0;
+}
+
+.boq-rules-insp-close {
+  position: absolute;
+  right: 0;
+  top: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #94A3B8;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.boq-rules-insp-close:hover {
+  background: #F1F5F9;
+  color: #0F172A;
+}
+
+.boq-rules-insp-tabs {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  border-bottom: 1px solid #E2E8F0;
+  padding-bottom: 8px;
+}
+
+.boq-rules-insp-tab {
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 13px;
+  color: #64748B;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.boq-rules-insp-tab:hover {
+  color: #0F172A;
+}
+
+.boq-rules-insp-tab.active {
+  background: #EFF6FF;
+  color: #2563EB;
+}
+
+.boq-rules-insp-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.boq-rules-insp-field {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.boq-rules-insp-field-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748B;
+}
+
+.boq-rules-insp-field-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0F172A;
+  text-align: right;
+}
+
+.boq-rules-insp-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 12px;
+  background: #F8FAFC;
+  border-radius: 6px;
+  border: 1px solid #E2E8F0;
+}
+
+.boq-rules-insp-checklist-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #475569;
+  margin: 0 0 4px 0;
+}
+
+.boq-rules-checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #334155;
+  cursor: pointer;
+}
+
+.boq-rules-insp-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.boq-rules-btn-edit-primary {
+  width: 100%;
+  height: 38px;
+  background: #2563EB;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: background-color 0.15s ease;
+}
+
+.boq-rules-btn-edit-primary:hover {
+  background: #1D4ED8;
+}
+
+.boq-rules-btn-toggle-status {
+  width: 100%;
+  height: 38px;
+  background: #FFFFFF;
+  color: #475569;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.boq-rules-btn-toggle-status:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+/* ── 7. Modals (Create / Edit / Delete) ── */
+.boq-rules-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.boq-rules-modal-card {
+  background: #FFFFFF;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 520px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: boqModalFadeIn 0.15s ease-out;
+}
+
+@keyframes boqModalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.boq-rules-modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #E2E8F0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.boq-rules-modal-header h3 {
+  margin: 0;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.boq-rules-modal-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: calc(85vh - 120px);
+  overflow-y: auto;
+}
+
+.boq-rules-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.boq-rules-modal-field label {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.boq-rules-modal-input, .boq-rules-modal-select, .boq-rules-modal-textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #CBD5E1;
+  border-radius: 6px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 14px;
+  color: #0F172A;
+  background: #FFFFFF;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.boq-rules-modal-input:focus, .boq-rules-modal-select:focus, .boq-rules-modal-textarea:focus {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.boq-rules-modal-footer {
+  padding: 16px 20px;
+  border-top: 1px solid #E2E8F0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  background: #F8FAFC;
+}
+
+.boq-rules-btn-cancel {
+  padding: 8px 16px;
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 6px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.boq-rules-btn-cancel:hover {
+  background: #F1F5F9;
+  color: #0F172A;
+}
+
+.boq-rules-btn-save {
+  padding: 8px 18px;
+  background: #2563EB;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #FFFFFF;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background-color 0.15s ease;
+}
+
+.boq-rules-btn-save:hover:not(:disabled) {
+  background: #1D4ED8;
+}
+
+.boq-rules-btn-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.boq-rules-btn-delete-confirm {
+  padding: 8px 18px;
+  background: #DC2626;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #FFFFFF;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background-color 0.15s ease;
+}
+
+.boq-rules-btn-delete-confirm:hover:not(:disabled) {
+  background: #B91C1C;
+}
+
+/* ── 8. Empty & No Results State ── */
+.boq-rules-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+  width: 100%;
+  gap: 12px;
+}
+
+.boq-rules-empty-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: #EFF6FF;
+  color: #2563EB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.boq-rules-empty-title {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  color: #0F172A;
+  margin: 0;
+}
+
+.boq-rules-empty-desc {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #64748B;
+  max-width: 400px;
+  margin: 0;
+}
+
+.boq-rules-empty-btn {
+  margin-top: 8px;
+  padding: 8px 16px;
+  background: #2563EB;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}

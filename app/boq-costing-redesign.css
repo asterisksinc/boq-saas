@@ -1,0 +1,1061 @@
+/* =========================================================================
+   BOQ TEMPLATE DETAIL - COSTING TAB (FIGMA EXACT REDESIGN)
+   Templates - Project Templates - BOQ Template - Template Detail - Costing
+   Canvas: 1440px wide, #F1F5F9, Frame 2147224971 (1326px container)
+   ========================================================================= */
+
+/* ── 1. Subheader Row (Figma Frame 2147225198) ── */
+.boq-costing-subheader {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0px;
+  gap: 8px;
+  width: 100%;
+  min-height: 47px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 900px) {
+  .boq-costing-subheader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}
+
+.boq-costing-subheader-left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.boq-costing-subheader-title {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 120%;
+  color: #0F172A;
+  margin: 0;
+}
+
+.boq-costing-subheader-desc {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  margin: 0;
+}
+
+.boq-costing-subheader-right {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 24px;
+}
+
+.boq-costing-timestamp-wrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+.boq-costing-divider-line {
+  width: 18px;
+  height: 0px;
+  border-top: 1px solid #475569;
+  transform: rotate(90deg);
+}
+
+.boq-costing-refresh-btn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 0px;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #0F172A;
+  transition: opacity 0.15s ease;
+}
+
+.boq-costing-refresh-btn:hover {
+  opacity: 0.7;
+}
+
+/* ── 2. 4 Metric Summary Cards (Figma Frame 2147225138) ── */
+.boq-costing-metrics-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  padding: 0px;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1100px) {
+  .boq-costing-metrics-row {
+    flex-wrap: wrap;
+  }
+}
+
+.boq-costing-metric-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 8px;
+  flex: 1 1 0;
+  min-width: 200px;
+  height: 116px;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+
+.boq-costing-metric-label {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+.boq-costing-metric-val {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 24px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.boq-costing-metric-val.green {
+  color: #16A34A;
+}
+
+.boq-costing-metric-val.blue {
+  color: #2563EB;
+}
+
+.boq-costing-metric-sub {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+/* ── 3. Main Costing Layout (Figma Frame 2147225289) ── */
+.boq-costing-main-layout {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  padding: 0px;
+  gap: 8px;
+  width: 100%;
+  min-height: 538px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1200px) {
+  .boq-costing-main-layout {
+    flex-direction: column;
+  }
+}
+
+/* Table Panel (Figma Frame 2147225072 inside 2147225085) */
+.boq-costing-table-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 12px;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 538px;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 6px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+/* Header Bar (Figma Frame 2147225266) */
+.boq-costing-header-bar {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0px;
+  gap: 8px;
+  width: 100%;
+  min-height: 46px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 900px) {
+  .boq-costing-header-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}
+
+.boq-costing-title-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.boq-costing-title-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.boq-costing-title-text {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #1C1B1F;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
+.boq-costing-subtitle-text {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  margin: 0;
+}
+
+/* Actions Group */
+.boq-costing-actions-group {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Search Box (Figma Frame 76) */
+.boq-costing-search-box {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 5px 12px 5px 5px;
+  gap: 8px;
+  width: 270px;
+  height: 46px;
+  background: #F0F4F9;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  backdrop-filter: blur(20.4px);
+  border-radius: 8px;
+}
+
+@media (max-width: 600px) {
+  .boq-costing-search-box {
+    width: 100%;
+  }
+}
+
+.boq-costing-search-icon-box {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  background: #FFFFFF;
+  border-radius: 6px;
+}
+
+.boq-costing-search-input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  width: 100%;
+}
+
+.boq-costing-search-input::placeholder {
+  color: #64748B;
+}
+
+.boq-costing-add-item-btn {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 14px;
+  gap: 6px;
+  width: 113px;
+  height: 46px;
+  background: #2563EB;
+  border-radius: 6px;
+  border: none;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #FFFFFF;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  white-space: nowrap;
+}
+
+.boq-costing-add-item-btn:hover {
+  background: #1D4ED8;
+}
+
+.boq-costing-square-btn {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #1C1B1F;
+  transition: background 0.15s ease;
+}
+
+.boq-costing-square-btn:hover {
+  background: #F8FAFC;
+}
+
+.boq-costing-divider {
+  width: 100%;
+  height: 1px;
+  background: #EBEBEB;
+  border: none;
+  margin: 0;
+}
+
+/* ── 4. Table Wrapper & Table (Figma Frame 57 / 59 / 61) ── */
+.boq-costing-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 8px;
+  background: #F9FBFD;
+  box-sizing: border-box;
+}
+
+.boq-costing-table-wrap::-webkit-scrollbar {
+  height: 6px;
+}
+.boq-costing-table-wrap::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+.boq-costing-table {
+  width: 100%;
+  min-width: 1200px;
+  border-collapse: collapse;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Thead */
+.boq-costing-thead-tr {
+  background: #E4ECFB;
+  height: 36px;
+  border-radius: 8px;
+}
+
+.boq-costing-th {
+  padding: 8px 12px;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  text-transform: uppercase;
+  color: #64748B;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.boq-costing-th.text-center {
+  text-align: center;
+}
+
+/* Tbody Rows (Figma Frame 59 / 60 / 61 / 62 / 63) */
+.boq-costing-tbody-tr {
+  height: 56px;
+  border-bottom: 1px solid #EBEBEB;
+  transition: background 0.15s ease;
+  cursor: pointer;
+}
+
+.boq-costing-tbody-tr:hover {
+  background: rgba(228, 236, 251, 0.4);
+}
+
+.boq-costing-tbody-tr.selected {
+  background: #EFF6FF;
+}
+
+.boq-costing-td {
+  padding: 6px 12px;
+  vertical-align: middle;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+}
+
+.boq-costing-td-drag {
+  width: 32px;
+  color: #B8B9B9;
+  text-align: center;
+  cursor: grab;
+}
+
+.boq-costing-td-num {
+  width: 32px;
+  color: #64748B;
+  font-weight: 400;
+  font-size: 14px;
+  text-align: center;
+}
+
+.boq-costing-td-code {
+  width: 79px;
+  font-weight: 500;
+  font-size: 14px;
+  color: #0F172A;
+}
+
+.boq-costing-td-item {
+  min-width: 190px;
+}
+
+.boq-costing-item-name {
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.boq-costing-item-desc {
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+.boq-costing-td-unit {
+  width: 85px;
+  font-weight: 400;
+  font-size: 14px;
+  color: #64748B;
+}
+
+.boq-costing-td-source {
+  width: 164px;
+}
+
+.boq-costing-source-title {
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.boq-costing-source-sub {
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+.boq-costing-td-rate {
+  width: 143px;
+}
+
+.boq-costing-rate-main {
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.boq-costing-rate-sub {
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+.boq-costing-td-snap {
+  width: 114px;
+}
+
+.boq-costing-snap-main {
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.boq-costing-snap-sub {
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+.boq-costing-td-var {
+  width: 100px;
+}
+
+.boq-costing-var-percent {
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+}
+
+.boq-costing-var-percent.positive {
+  color: #2563EB;
+}
+
+.boq-costing-var-percent.negative {
+  color: #DC2626;
+}
+
+.boq-costing-var-amount {
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+/* Freshness Cell */
+.boq-costing-td-fresh {
+  width: 132px;
+}
+
+.boq-costing-fresh-top {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.boq-costing-fresh-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 19px;
+  flex-shrink: 0;
+}
+
+.boq-costing-fresh-dot.current {
+  background: #16A34A;
+}
+.boq-costing-fresh-dot.review {
+  background: #FAB000;
+}
+.boq-costing-fresh-dot.outdated {
+  background: #DC2626;
+}
+.boq-costing-fresh-dot.unmapped {
+  background: #64748B;
+}
+
+.boq-costing-fresh-text {
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+}
+.boq-costing-fresh-text.current {
+  color: #16A34A;
+}
+.boq-costing-fresh-text.review {
+  color: #FAB000;
+}
+.boq-costing-fresh-text.outdated {
+  color: #DC2626;
+}
+.boq-costing-fresh-text.unmapped {
+  color: #64748B;
+}
+
+.boq-costing-fresh-date {
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+/* Rate Status Pills */
+.boq-costing-status-pill {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  gap: 6px;
+  height: 20px;
+  border-radius: 9999px;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  white-space: nowrap;
+}
+
+.boq-costing-status-pill.mapped {
+  background: rgba(22, 163, 74, 0.12);
+  color: #16A34A;
+}
+
+.boq-costing-status-pill.review {
+  background: rgba(250, 176, 0, 0.1);
+  color: #FAB000;
+}
+
+.boq-costing-status-pill.unmapped {
+  background: rgba(220, 38, 38, 0.1);
+  color: #DC2626;
+}
+
+.boq-costing-more-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #64748B;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.boq-costing-more-btn:hover {
+  background: rgba(100, 116, 139, 0.12);
+  color: #0F172A;
+}
+
+/* Horizontal Scroll Indicator Bar (Figma Rectangle 70) */
+.boq-costing-scroll-indicator {
+  width: 58px;
+  height: 6px;
+  background: #E2E8F0;
+  border-radius: 999px;
+  margin: 4px auto 0 auto;
+}
+
+/* Pagination Footer (Figma Frame 2147225166) */
+.boq-costing-pagination-bar {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0px;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.boq-costing-total-items-text {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.boq-costing-page-buttons {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.boq-costing-page-btn {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid #EBEBEB;
+  border-radius: 6px;
+  background: #FFFFFF;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.boq-costing-page-btn:hover:not(:disabled) {
+  border-color: #2563EB;
+  color: #2563EB;
+}
+
+.boq-costing-page-btn.active {
+  background: #E4ECFB;
+  border: 1px solid #2563EB;
+  color: #2563EB;
+}
+
+.boq-costing-page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.boq-costing-per-page-wrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.boq-costing-per-page-select {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 4px 8px;
+  height: 34px;
+  border: 1px solid #EBEBEB;
+  background: #FFFFFF;
+  border-radius: 6px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  color: #64748B;
+  cursor: pointer;
+  outline: none;
+}
+
+/* ── 5. Costing Item Inspector Panel (Figma Frame 2147225215: 325.5px wide) ── */
+.boq-costing-inspector-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 20px;
+  width: 325.5px;
+  min-width: 325.5px;
+  max-width: 325.5px;
+  min-height: 538px;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 6px;
+  box-sizing: border-box;
+  flex: none;
+  order: 1;
+  flex-grow: 0;
+  transition: all 0.2s ease;
+}
+
+@media (max-width: 1200px) {
+  .boq-costing-inspector-panel {
+    width: 100%;
+    min-width: 100%;
+    max-width: 100%;
+  }
+}
+
+.boq-costing-inspector-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  height: 20px;
+}
+
+.boq-costing-inspector-title {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.boq-costing-inspector-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #1C1B1F;
+  padding: 2px;
+  border-radius: 4px;
+}
+
+.boq-costing-inspector-close-btn:hover {
+  background: rgba(100, 116, 139, 0.12);
+}
+
+.boq-costing-inspector-identity {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+}
+
+.boq-costing-inspector-item-name {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.boq-costing-inspector-item-meta {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* Accordion sections (Figma Frame 2147225188) */
+.boq-costing-accordion-list {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  flex: 1;
+}
+
+.boq-costing-accordion-item {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(226, 232, 240, 0.6);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.boq-costing-accordion-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  width: 100%;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  box-sizing: border-box;
+}
+
+.boq-costing-accordion-header-left {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.boq-costing-accordion-title {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #1C1B1F;
+}
+
+.boq-costing-accordion-arrow {
+  color: #1C1B1F;
+  transition: transform 0.2s ease;
+}
+
+.boq-costing-accordion-arrow.collapsed {
+  transform: rotate(-180deg);
+}
+
+.boq-costing-accordion-body {
+  padding: 8px 12px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid #F1F5F9;
+}
+
+.boq-costing-field-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.boq-costing-field-label {
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+.boq-costing-field-val {
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 120%;
+  color: #0F172A;
+  text-align: right;
+}
+
+/* Action Buttons */
+.boq-costing-inspector-btn-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: 46px;
+}
+
+.boq-costing-duplicate-btn {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  flex: 1;
+  height: 46px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0px 0px 6px rgba(0, 0, 0, 0.06);
+  border-radius: 6px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.boq-costing-duplicate-btn:hover {
+  background: #F8FAFC;
+}
+
+.boq-costing-remove-btn {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  flex: 1;
+  height: 46px;
+  background: rgba(220, 38, 38, 0.1);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  border-radius: 6px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #DC2626;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.boq-costing-remove-btn:hover {
+  background: rgba(220, 38, 38, 0.16);
+}
+
+.boq-costing-save-btn {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 46px;
+  background: #2563EB;
+  border-radius: 6px;
+  border: none;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #FFFFFF;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.boq-costing-save-btn:hover {
+  background: #1D4ED8;
+}

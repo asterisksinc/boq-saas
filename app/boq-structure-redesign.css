@@ -1,0 +1,1418 @@
+/* =========================================================================
+   TEMPLATES - PROJECT TEMPLATES - BOQ TEMPLATE - TEMPLATE DETAIL - BOQ STRUCTURE
+   Pixel-Perfect Implementation according to Figma Export Specifications
+   ========================================================================= */
+
+/* Subheader (Figma Frame 2147225198) */
+.boq-struct-subheader {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0px;
+  gap: 8px;
+  width: 100%;
+  min-height: 47px;
+  box-sizing: border-box;
+}
+
+.boq-struct-subheader-left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.boq-struct-subheader-title {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 120%;
+  color: #0F172A;
+  margin: 0;
+}
+
+.boq-struct-subheader-desc {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  margin: 0;
+}
+
+.boq-struct-subheader-right {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 24px;
+  height: 20px;
+}
+
+.boq-struct-timestamp-wrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+.boq-struct-divider-line {
+  width: 18px;
+  height: 0px;
+  border: 1px solid #475569;
+  transform: rotate(90deg);
+  opacity: 0.5;
+}
+
+.boq-struct-refresh-btn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 0px;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #0F172A;
+  transition: opacity 0.15s ease;
+}
+
+.boq-struct-refresh-btn:hover {
+  opacity: 0.75;
+}
+
+/* 5 Metric Summary Cards (Figma Frame 2147225138) */
+.boq-struct-metrics-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  padding: 0px;
+  gap: 8px;
+  width: 100%;
+  min-height: 116px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1024px) {
+  .boq-struct-metrics-row {
+    flex-wrap: wrap;
+  }
+}
+
+.boq-struct-metric-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 8px;
+  flex: 1 1 0;
+  min-width: 180px;
+  height: 116px;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 6px;
+  box-sizing: border-box;
+  justify-content: space-between;
+}
+
+.boq-struct-metric-label {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+.boq-struct-metric-val {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 24px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.boq-struct-metric-val.green {
+  color: #16A34A;
+}
+
+.boq-struct-metric-val.blue {
+  color: #2563EB;
+}
+
+.boq-struct-metric-sub {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+/* Main Structure Container (Figma Frame 2147225084) */
+.boq-struct-main-layout {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  padding: 0px;
+  gap: 8px;
+  width: 100%;
+  min-height: 789px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1100px) {
+  .boq-struct-main-layout {
+    flex-direction: column;
+  }
+}
+
+/* Left Column: Tree Sidebar (Figma Frame 2147225071) */
+.boq-struct-sidebar {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 20px;
+  width: 310px;
+  min-width: 310px;
+  min-height: 789px;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1100px) {
+  .boq-struct-sidebar {
+    width: 100%;
+    min-width: 100%;
+    min-height: auto;
+  }
+}
+
+.boq-struct-sidebar-title {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
+/* Search Box (Figma Frame 76) */
+.boq-struct-search-box {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 5px 12px 5px 5px;
+  gap: 8px;
+  width: 100%;
+  height: 46px;
+  background: #F0F4F9;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  backdrop-filter: blur(20.4px);
+  border-radius: 8px;
+}
+
+.boq-struct-search-icon-box {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  background: #FFFFFF;
+  border-radius: 6px;
+}
+
+.boq-struct-search-input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  width: 100%;
+}
+
+.boq-struct-search-input::placeholder {
+  color: #64748B;
+}
+
+.boq-struct-divider {
+  width: 100%;
+  height: 1px;
+  background: #EBEBEB;
+  border: none;
+  margin: 0;
+}
+
+/* Tree Sections List */
+.boq-struct-tree-list {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  max-height: 520px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.boq-struct-tree-list::-webkit-scrollbar {
+  width: 4px;
+}
+.boq-struct-tree-list::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+/* Section Header Item */
+.boq-struct-section-item {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 8px;
+}
+
+.boq-struct-section-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 6px;
+  gap: 4px;
+  width: 100%;
+  min-height: 28px;
+  border-radius: 4px;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: background 0.15s ease;
+}
+
+.boq-struct-section-row:hover {
+  background: rgba(100, 116, 139, 0.08);
+}
+
+.boq-struct-section-row.active {
+  background: #EFF6FF;
+}
+
+.boq-struct-section-left {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.boq-struct-arrow-icon {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  color: #1C1B1F;
+  transition: transform 0.2s ease;
+}
+
+.boq-struct-arrow-icon.expanded {
+  transform: rotate(90deg);
+}
+
+.boq-struct-folder-icon {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  color: #1C1B1F;
+}
+
+.boq-struct-section-name {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #1C1B1F;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.boq-struct-badges-wrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.boq-struct-count-badge {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 2px 6px;
+  min-width: 24px;
+  height: 24px;
+  background: rgba(100, 116, 139, 0.12);
+  border-radius: 4px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+  box-sizing: border-box;
+}
+
+.boq-struct-cost-badge {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 2px 6px;
+  min-width: 51px;
+  height: 24px;
+  background: rgba(100, 116, 139, 0.12);
+  border-radius: 4px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+  box-sizing: border-box;
+}
+
+/* Subcategories Tree under Expanded Section (Figma Frame 2147225180) */
+.boq-struct-subcategories-list {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding-left: 8px;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.boq-struct-subcat-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px;
+  gap: 10px;
+  width: 100%;
+  height: 34px;
+  border-radius: 4px;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.boq-struct-subcat-row:hover {
+  background: rgba(100, 116, 139, 0.08);
+}
+
+.boq-struct-subcat-row.active {
+  background: #EFF6FF;
+}
+
+.boq-struct-subcat-left {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.boq-struct-drag-handle {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  color: #B8B9B9;
+  cursor: grab;
+}
+
+.boq-struct-subcat-row.active .boq-struct-drag-handle {
+  color: rgba(37, 99, 235, 0.5);
+}
+
+.boq-struct-subcat-icon {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  color: #64748B;
+}
+
+.boq-struct-subcat-row.active .boq-struct-subcat-icon {
+  color: #2563EB;
+}
+
+.boq-struct-subcat-name {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.boq-struct-subcat-row.active .boq-struct-subcat-name {
+  color: #2563EB;
+}
+
+/* Add BOQ Section CTA Button */
+.boq-struct-add-section-btn {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 14px;
+  gap: 6px;
+  width: 100%;
+  height: 46px;
+  background: #2563EB;
+  border-radius: 6px;
+  border: none;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #FFFFFF;
+  cursor: pointer;
+  margin-top: auto;
+  transition: background 0.15s ease;
+}
+
+.boq-struct-add-section-btn:hover {
+  background: #1D4ED8;
+}
+
+/* =========================================================================
+   RIGHT COLUMN: Main Items Panel (Figma Frame 2147225085)
+   ========================================================================= */
+.boq-struct-items-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 12px;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 789px;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+
+/* Category Header Bar (Figma Frame 2147225266) */
+.boq-struct-category-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 0px;
+  gap: 8px;
+  width: 100%;
+  min-height: 45px;
+  box-sizing: border-box;
+}
+
+.boq-struct-category-title-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.boq-struct-breadcrumb {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  height: 20px;
+}
+
+.boq-struct-crumb-section {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #1C1B1F;
+  text-transform: uppercase;
+}
+
+.boq-struct-crumb-arrow {
+  color: #1C1B1F;
+  width: 16px;
+  height: 16px;
+}
+
+.boq-struct-crumb-category {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  text-transform: uppercase;
+}
+
+.boq-struct-category-summary {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+/* Action Buttons (Figma Frame 2147225265) */
+.boq-struct-category-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+}
+
+.boq-struct-add-item-btn {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 10px 14px;
+  gap: 6px;
+  height: 38px;
+  background: #2563EB;
+  border-radius: 6px;
+  border: none;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #FFFFFF;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.boq-struct-add-item-btn:hover {
+  background: #1D4ED8;
+}
+
+.boq-struct-square-btn {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  width: 38px;
+  height: 38px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  color: #1C1B1F;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.boq-struct-square-btn:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+/* =========================================================================
+   TABLE VIEW CONTAINER (Figma Device Management_iOS / Frame 57)
+   ========================================================================= */
+.boq-struct-table-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0px;
+  gap: 8px;
+  width: 100%;
+  background: #F9FBFD;
+  border-radius: 8px;
+  overflow-x: auto;
+  box-sizing: border-box;
+}
+
+.boq-struct-table-wrapper::-webkit-scrollbar {
+  height: 6px;
+}
+.boq-struct-table-wrapper::-webkit-scrollbar-thumb {
+  background: #E2E8F0;
+  border-radius: 999px;
+}
+
+.boq-struct-table {
+  width: 100%;
+  min-width: 1100px;
+  border-collapse: collapse;
+  box-sizing: border-box;
+}
+
+/* Table Header Row (Figma Frame 57) */
+.boq-struct-thead-tr {
+  height: 36px;
+  background: #E4ECFB;
+  border-radius: 8px;
+}
+
+.boq-struct-th {
+  padding: 8px 12px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 120%;
+  text-transform: uppercase;
+  color: #64748B;
+  text-align: left;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+.boq-struct-th:first-child {
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+}
+.boq-struct-th:last-child {
+  border-top-right-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+
+.boq-struct-th.text-center {
+  text-align: center;
+}
+
+.boq-struct-th.text-right {
+  text-align: right;
+}
+
+/* Table Body Rows (Figma Frame 59-66) */
+.boq-struct-tbody-tr {
+  height: 56px;
+  border-bottom: 1px solid #EBEBEB;
+  background: #FFFFFF;
+  transition: background 0.15s ease;
+}
+
+.boq-struct-tbody-tr:hover {
+  background: #F8FAFC;
+}
+
+.boq-struct-tbody-tr.selected {
+  background: #EFF6FF;
+}
+
+.boq-struct-td {
+  padding: 6px 12px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  vertical-align: middle;
+  box-sizing: border-box;
+}
+
+.boq-struct-td.text-center {
+  text-align: center;
+}
+
+.boq-struct-td.text-right {
+  text-align: right;
+}
+
+.boq-struct-td-drag {
+  width: 32px;
+  text-align: center;
+  color: #B8B9B9;
+  cursor: grab;
+}
+
+.boq-struct-td-num {
+  width: 32px;
+  color: #64748B;
+  font-weight: 400;
+  text-align: center;
+}
+
+.boq-struct-td-code {
+  width: 79px;
+  font-weight: 500;
+  color: #0F172A;
+  white-space: nowrap;
+}
+
+.boq-struct-td-item {
+  min-width: 190px;
+}
+
+.boq-struct-item-name {
+  font-weight: 500;
+  color: #0F172A;
+  margin-bottom: 2px;
+}
+
+.boq-struct-item-desc {
+  font-weight: 400;
+  font-size: 13px;
+  color: #64748B;
+}
+
+.boq-struct-td-unit {
+  width: 85px;
+  color: #64748B;
+}
+
+.boq-struct-td-qty {
+  width: 52px;
+  color: #64748B;
+  font-weight: 500;
+}
+
+.boq-struct-td-basis {
+  width: 145px;
+  text-align: center;
+  color: #0F172A;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.boq-struct-td-rate {
+  width: 100px;
+  color: #0F172A;
+  font-weight: 500;
+}
+
+.boq-struct-td-waste {
+  width: 114px;
+  color: #64748B;
+}
+
+.boq-struct-td-tax {
+  width: 100px;
+  color: #64748B;
+}
+
+.boq-struct-td-amount {
+  width: 132px;
+  font-weight: 600;
+  color: #16A34A; /* Exact Figma green */
+  font-size: 14px;
+}
+
+/* Rate Status Badges (Figma Frame 2147225015) */
+.boq-struct-status-badge {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  gap: 4px;
+  height: 22px;
+  border-radius: 9999px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 11px;
+  line-height: 120%;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.boq-struct-status-badge.mapped {
+  background: rgba(22, 163, 74, 0.12);
+  color: #16A34A;
+}
+
+.boq-struct-status-badge.outdated {
+  background: rgba(250, 176, 0, 0.1);
+  color: #D97706; /* High readability amber */
+}
+
+.boq-struct-status-badge.missing {
+  background: rgba(220, 38, 38, 0.1);
+  color: #DC2626;
+}
+
+.boq-struct-more-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #64748B;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  transition: background 0.15s ease;
+}
+
+.boq-struct-more-btn:hover {
+  background: #F1F5F9;
+  color: #0F172A;
+}
+
+/* Table Total Row (Figma Frame 63) */
+.boq-struct-total-tr {
+  height: 36px;
+  background: #E4ECFB;
+  border-radius: 8px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  text-transform: uppercase;
+  color: #0F172A;
+}
+
+.boq-struct-total-tr td {
+  padding: 8px 12px;
+  box-sizing: border-box;
+}
+
+.boq-struct-total-tr td:first-child {
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+}
+.boq-struct-total-tr td:last-child {
+  border-top-right-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+
+/* Horizontal Scroll Indicator Bar (Figma Rectangle 70) */
+.boq-struct-scroll-bar-indicator {
+  width: 58px;
+  height: 6px;
+  background: #E2E8F0;
+  border-radius: 999px;
+  margin: 4px auto;
+}
+
+/* Pagination Footer (Figma Frame 2147225166) */
+.boq-struct-pagination-bar {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0px;
+  gap: 8px;
+  width: 100%;
+  min-height: 50px;
+  box-sizing: border-box;
+  flex-wrap: wrap;
+}
+
+.boq-struct-total-items-text {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.boq-struct-page-buttons {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.boq-struct-page-btn {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid #EBEBEB;
+  background: #FFFFFF;
+  border-radius: 6px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.boq-struct-page-btn:hover:not(:disabled) {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+  color: #0F172A;
+}
+
+.boq-struct-page-btn.active {
+  background: #E4ECFB;
+  border: 1px solid #2563EB;
+  color: #2563EB;
+}
+
+.boq-struct-page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.boq-struct-per-page-wrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+}
+
+.boq-struct-per-page-select-box {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 4px 8px;
+  height: 34px;
+  border: 1px solid #EBEBEB;
+  background: #FFFFFF;
+  border-radius: 6px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  color: #64748B;
+  cursor: pointer;
+  outline: none;
+}
+
+/* =========================================================================
+   ITEM INSPECTOR IN-FLOW PANEL (Figma Frame 2147225086: 310px wide)
+   ========================================================================= */
+.boq-struct-inspector-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 20px;
+  width: 310px;
+  min-width: 310px;
+  max-width: 310px;
+  min-height: 789px;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 6px;
+  box-sizing: border-box;
+  flex: none;
+  order: 2;
+  flex-grow: 0;
+  transition: all 0.2s ease;
+}
+
+@media (max-width: 1200px) {
+  .boq-struct-inspector-panel {
+    width: 100%;
+    min-width: 100%;
+    max-width: 100%;
+    min-height: auto;
+  }
+}
+
+/* Header Row (Frame 2147225209) */
+.boq-struct-inspector-panel-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0px;
+  width: 100%;
+  height: 20px;
+  flex: none;
+  order: 0;
+  align-self: stretch;
+}
+
+.boq-struct-inspector-panel-title {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
+.boq-struct-inspector-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: #1C1B1F;
+  border-radius: 4px;
+  transition: background 0.15s ease;
+}
+
+.boq-struct-inspector-close-btn:hover {
+  background: rgba(100, 116, 139, 0.12);
+}
+
+/* Identity Row (Frame 2147225227) */
+.boq-struct-inspector-identity {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0px;
+  gap: 12px;
+  width: 100%;
+  min-height: 58px;
+  flex: none;
+  order: 1;
+  align-self: stretch;
+}
+
+.boq-struct-inspector-identity-left {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 0px;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.boq-struct-inspector-code {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 10px;
+  line-height: 120%;
+  color: #64748B;
+}
+
+.boq-struct-inspector-name {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.boq-struct-inspector-cat {
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 120%;
+  color: #64748B;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.boq-struct-inspector-status-badge {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 2px 6px;
+  gap: 6px;
+  min-width: 58px;
+  height: 18px;
+  background: rgba(22, 163, 74, 0.12);
+  border-radius: 9999px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #16A34A;
+  flex: none;
+}
+
+.boq-struct-inspector-status-badge.outdated {
+  background: rgba(234, 179, 8, 0.12);
+  color: #CA8A04;
+}
+
+.boq-struct-inspector-status-badge.missing {
+  background: rgba(220, 38, 38, 0.12);
+  color: #DC2626;
+}
+
+/* Tabbing (Tabbing / Frame 2147225196) */
+.boq-struct-inspector-tabs-wrap {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 0px;
+  width: 100%;
+  height: 48px;
+  border-bottom: 1px solid #EBEBEB;
+  flex: none;
+  order: 2;
+  align-self: stretch;
+  overflow-x: auto;
+}
+
+.boq-struct-inspector-tabs-wrap::-webkit-scrollbar {
+  height: 2px;
+}
+
+.boq-struct-inspector-tabs-wrap::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+.boq-struct-inspector-tab-btn {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 0px 10px;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 48px;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 150%;
+  letter-spacing: -0.02em;
+  color: #0F172A;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.boq-struct-inspector-tab-btn:hover {
+  color: #2563EB;
+}
+
+.boq-struct-inspector-tab-btn.active {
+  border-bottom: 3px solid #2563EB;
+  color: #2563EB;
+  font-weight: 600;
+}
+
+/* Content Area Fields */
+.boq-struct-inspector-content-area {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  align-self: stretch;
+  flex: 1;
+  order: 3;
+}
+
+.boq-struct-inspector-field-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  align-self: stretch;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.boq-struct-inspector-field-label {
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #64748B;
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding-top: 1px;
+}
+
+.boq-struct-inspector-field-val {
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  text-align: right;
+  word-break: break-word;
+  max-width: 160px;
+}
+
+.boq-struct-inspector-active-pill {
+  display: inline-flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 2px 6px;
+  background: rgba(22, 163, 74, 0.12);
+  border-radius: 9999px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 120%;
+  color: #16A34A;
+}
+
+.boq-struct-inspector-divider {
+  width: 100%;
+  height: 1px;
+  background: #EBEBEB;
+  border: none;
+  margin: 6px 0;
+  align-self: stretch;
+  flex: none;
+  order: 4;
+}
+
+/* Action Buttons (Figma Frame 2147225256 & 2147225189) */
+.boq-struct-inspector-btn-group {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  height: 46px;
+  align-self: stretch;
+  flex: none;
+  order: 5;
+}
+
+.boq-struct-inspector-duplicate-btn {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 14px;
+  width: 127px;
+  height: 46px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0px 0px 6px rgba(0, 0, 0, 0.06);
+  border-radius: 6px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #0F172A;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.boq-struct-inspector-duplicate-btn:hover {
+  background: #F8FAFC;
+}
+
+.boq-struct-inspector-remove-btn {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 14px;
+  width: 127px;
+  height: 46px;
+  background: rgba(220, 38, 38, 0.1);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  border-radius: 6px;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #DC2626;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.boq-struct-inspector-remove-btn:hover {
+  background: rgba(220, 38, 38, 0.16);
+}
+
+.boq-struct-inspector-save-btn {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 14px;
+  width: 100%;
+  height: 46px;
+  background: #2563EB;
+  border-radius: 6px;
+  border: none;
+  font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 120%;
+  color: #FFFFFF;
+  cursor: pointer;
+  align-self: stretch;
+  flex: none;
+  order: 6;
+  transition: background 0.15s ease;
+}
+
+.boq-struct-inspector-save-btn:hover {
+  background: #1D4ED8;
+}

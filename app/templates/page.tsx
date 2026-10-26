@@ -40,6 +40,7 @@ import {
   listBoqTemplates,
   duplicateBoqTemplate,
   deleteBoqTemplate,
+  restoreBoqTemplate,
 } from "@/lib/api/boqs";
 import {
   getTemplatesOverview,
@@ -49,7 +50,13 @@ import {
   restoreProjectTemplate,
   deleteProjectTemplatePermanently,
   useProjectTemplate,
+  listArchivedTemplates,
+  type ArchivedTemplateRecord,
 } from "@/lib/api/templates";
+import ArchivedTemplatesView from "@/components/templates/archived/ArchivedTemplatesView";
+import ArchivedFilterPopover, {
+  type ArchivedFilterState,
+} from "@/components/templates/archived/ArchivedFilterPopover";
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -271,7 +278,34 @@ function TemplatesContent() {
   const [docTemplates, setDocTemplates] = useState<DocumentTemplate[]>([]);
 
   // Archived Templates State
-  const [archivedTemplates, setArchivedTemplates] = useState<ArchivedTemplate[]>([]);
+  const [archivedTemplates, setArchivedTemplates] = useState<ArchivedTemplateRecord[]>([]);
+  const [archivedQuery, setArchivedQuery] = useState("");
+  const [archivedFilters, setArchivedFilters] = useState<ArchivedFilterState>({
+    category: "all",
+    type: "all",
+    sort: "newest",
+  });
+  const [archivedPage, setArchivedPage] = useState(1);
+  const [archivedPageSize, setArchivedPageSize] = useState(10);
+  const [archivedTotal, setArchivedTotal] = useState(0);
+  const [archivedTotalPages, setArchivedTotalPages] = useState(1);
+  const [archivedCategories, setArchivedCategories] = useState<string[]>([]);
+  const [archivedView, setArchivedView] = useState<"list" | "grid">(viewParam === "grid" ? "grid" : "list");
+  const [isArchivedFilterOpen, setIsArchivedFilterOpen] = useState(false);
+
+  const activeArchivedFiltersCount = useMemo(() => {
+    let count = 0;
+    if (archivedFilters.category && archivedFilters.category !== "all") count += 1;
+    if (archivedFilters.type && archivedFilters.type !== "all") count += 1;
+    if (archivedFilters.sort && archivedFilters.sort !== "newest") count += 1;
+    return count;
+  }, [archivedFilters]);
+
+  useEffect(() => {
+    if (tabParam && ["overview", "projects", "boqs", "documents", "archived"].includes(tabParam)) {
+      setTab(tabParam as any);
+    }
+  }, [tabParam]);
 
   const appliedFiltersCount = useMemo(() => {
     let count = 0;
@@ -446,12 +480,20 @@ function TemplatesContent() {
 
   const loadArchived = async () => {
     try {
-      const p = new URLSearchParams();
-      if (query) p.set("search", query);
-      const r = await fetch(`/api/v1/archived-templates?${p}`, { credentials: "include" });
-      const b = await r.json();
-      if (!r.ok) throw new Error(b?.message || "Could not load archived templates.");
-      setArchivedTemplates(b.data?.items || []);
+      const b = await listArchivedTemplates({
+        search: archivedQuery || undefined,
+        category: archivedFilters.category !== "all" ? archivedFilters.category : undefined,
+        type: archivedFilters.type !== "all" ? archivedFilters.type : undefined,
+        sort: archivedFilters.sort || "newest",
+        page: archivedPage,
+        pageSize: archivedPageSize,
+      });
+      setArchivedTemplates(b.items || []);
+      setArchivedTotal(b.total || 0);
+      setArchivedTotalPages(b.totalPages || 1);
+      if (b.categories?.length) {
+        setArchivedCategories(b.categories);
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to load archived templates.";
       setNotice(msg);
@@ -461,6 +503,7 @@ function TemplatesContent() {
   // Trigger loading based on active tab and query
   useEffect(() => {
     setLoading(true);
+    const isSearchActive = tab === "archived" ? archivedQuery : query;
     const timer = setTimeout(() => {
       if (tab === "overview") {
         Promise.all([loadOverview(), loadBoqTemplates()]).finally(() => setLoading(false));
@@ -473,10 +516,10 @@ function TemplatesContent() {
       } else if (tab === "archived") {
         loadArchived().finally(() => setLoading(false));
       }
-    }, query ? 250 : 0);
+    }, isSearchActive ? 250 : 0);
 
     return () => clearTimeout(timer);
-  }, [tab, query, page, pageSize, boqPage, boqPageSize, filters, boqFilters]);
+  }, [tab, query, page, pageSize, boqPage, boqPageSize, filters, boqFilters, archivedQuery, archivedFilters, archivedPage, archivedPageSize]);
 
   // ── BOQ Template Handlers ──────────────────────────────────────────
   const handleBoqDuplicate = async (t: BoqTemplateItem) => {
@@ -867,29 +910,33 @@ function TemplatesContent() {
               )}
 
               {/* Primary Action Button */}
-              <button
-                type="button"
-                className="template-new-btn"
-                onClick={() => {
-                  if (tab === "boqs") {
-                    setIsNewBoqModalOpen(true);
-                  } else {
-                    setIsNewModalOpen(true);
-                  }
-                }}
-              >
-                <Plus size={18} />
-                <span>{tab === "boqs" ? "New BOQ Template" : "New Template"}</span>
-              </button>
+              {tab !== "archived" && (
+                <>
+                  <button
+                    type="button"
+                    className="template-new-btn"
+                    onClick={() => {
+                      if (tab === "boqs") {
+                        setIsNewBoqModalOpen(true);
+                      } else {
+                        setIsNewModalOpen(true);
+                      }
+                    }}
+                  >
+                    <Plus size={18} />
+                    <span>{tab === "boqs" ? "New BOQ Template" : "New Template"}</span>
+                  </button>
 
-              {/* Import Excel Action */}
-              <button
-                type="button"
-                className="template-import-btn"
-                onClick={() => setIsImportModalOpen(true)}
-              >
-                <span>Import Excel</span>
-              </button>
+                  {/* Import Excel Action */}
+                  <button
+                    type="button"
+                    className="template-import-btn"
+                    onClick={() => setIsImportModalOpen(true)}
+                  >
+                    <span>Import Excel</span>
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -937,11 +984,105 @@ function TemplatesContent() {
                 role="tab"
                 aria-selected={tab === "archived"}
                 className={`template-category-tab ${tab === "archived" ? "active" : ""}`}
-                onClick={() => { setTab("archived"); setQuery(""); }}
+                onClick={() => {
+                  setTab("archived");
+                  router.push("/templates?tab=archived");
+                }}
               >
                 Archived
               </button>
             </div>
+
+            {/* Right Controls in Tabs Row for Archived Templates (Frame 2147225169 in Figma) */}
+            {tab === "archived" && (
+              <div className="template-category-controls-wrap">
+                {/* Search Archived template by name… (Frame 76 in Figma) */}
+                <div className="archived-search-box">
+                  <div className="archived-search-icon-badge">
+                    <Search size={16} />
+                  </div>
+                  <input
+                    type="text"
+                    className="archived-search-input"
+                    placeholder="Search Archived template by name…"
+                    value={archivedQuery}
+                    onChange={(e) => {
+                      setArchivedQuery(e.target.value);
+                      setArchivedPage(1);
+                    }}
+                    aria-label="Search Archived template by name"
+                  />
+                  {archivedQuery && (
+                    <button
+                      type="button"
+                      className="archived-search-clear-btn"
+                      onClick={() => {
+                        setArchivedQuery("");
+                        setArchivedPage(1);
+                      }}
+                      aria-label="Clear search"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Filter Button: Frame 73 (102px x 46px) */}
+                <div className="archived-filter-btn-wrap" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    className={`archived-filter-btn ${isArchivedFilterOpen || activeArchivedFiltersCount > 0 ? "active" : ""}`}
+                    onClick={() => setIsArchivedFilterOpen(!isArchivedFilterOpen)}
+                    aria-label="Filter archived templates"
+                    aria-expanded={isArchivedFilterOpen}
+                  >
+                    <SlidersHorizontal size={18} />
+                    <span>Filter</span>
+                    {activeArchivedFiltersCount > 0 && (
+                      <span className="archived-filter-badge">{activeArchivedFiltersCount}</span>
+                    )}
+                  </button>
+                  <ArchivedFilterPopover
+                    isOpen={isArchivedFilterOpen}
+                    onClose={() => setIsArchivedFilterOpen(false)}
+                    categories={archivedCategories}
+                    filters={archivedFilters}
+                    onChange={(f) => {
+                      setArchivedFilters(f);
+                      setArchivedPage(1);
+                    }}
+                    onReset={() => {
+                      setArchivedFilters({ category: "all", type: "all", sort: "newest" });
+                      setArchivedPage(1);
+                    }}
+                  />
+                </div>
+
+                {/* View Toggle: Buttons (86px x 46px) */}
+                <div className="archived-view-toggle-wrap" role="group" aria-label="View mode">
+                  <button
+                    type="button"
+                    className={`archived-view-btn ${archivedView === "grid" ? "active" : ""}`}
+                    onClick={() => setArchivedView("grid")}
+                    title="Grid view"
+                    aria-label="Grid view"
+                    aria-pressed={archivedView === "grid"}
+                  >
+                    <LayoutGrid size={18} />
+                  </button>
+                  <button
+                    type="button"
+                    className={`archived-view-btn ${archivedView === "list" ? "active" : ""}`}
+                    onClick={() => setArchivedView("list")}
+                    title="List view"
+                    aria-label="List view"
+                    aria-pressed={archivedView === "list"}
+                  >
+                    <List size={18} />
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Right Controls in Tabs Row for Project Templates (Frame 2147225169 in Figma) */}
             {tab === "projects" && (
@@ -1682,81 +1823,54 @@ function TemplatesContent() {
 
           {/* ── TAB 5: ARCHIVED TEMPLATES ── */}
           {tab === "archived" && (
-            <div>
-              {loading ? (
-                <div className="templates-recent-grid">
-                  {[1, 2].map((i) => (
-                    <div key={i} className="template-fig-card-skeleton skeleton-shimmer" />
-                  ))}
-                </div>
-              ) : archivedTemplates.length === 0 ? (
-                <div className="templates-empty-state">
-                  <Trash2 size={48} color="#CBD5E1" />
-                  <h3>No archived templates</h3>
-                  <p>Archived templates will appear here with the option to restore them.</p>
-                </div>
-              ) : (
-                <div className="template-table-wrap">
-                  <table className="template-table">
-                    <thead>
-                      <tr>
-                        <th>TEMPLATE NAME</th>
-                        <th>CATEGORY</th>
-                        <th>TYPE</th>
-                        <th>ARCHIVED BY</th>
-                        <th>ARCHIVED DATE</th>
-                        <th>ACTIONS</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {archivedTemplates.map((t) => (
-                        <tr key={t.id}>
-                          <td>
-                            <div className="template-name-cell">
-                              <TemplateCoverImage
-                                src={t.imageUrl || fallbackImages.Residential}
-                                alt={t.name}
-                                fallbackSrc={fallbackImages.Residential}
-                              />
-                              <div className="info">
-                                <h4>{t.name}</h4>
-                                <p>{t.description || "Archived template"}</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td>{t.category}</td>
-                          <td>{renderBadge({ templateType: t.templateType })}</td>
-                          <td>{t.archivedBy || "Admin"}</td>
-                          <td>{t.archivedOn || "Recently"}</td>
-                          <td>
-                            <div style={{ display: "flex", gap: 8 }}>
-                              <button
-                                type="button"
-                                className="template-import-btn"
-                                style={{ height: 32, padding: "0 10px", fontSize: 12 }}
-                                onClick={() => handleRestore(t)}
-                              >
-                                <RotateCcw size={13} />
-                                <span>Restore</span>
-                              </button>
-                              <button
-                                type="button"
-                                className="template-import-btn"
-                                style={{ height: 32, padding: "0 10px", fontSize: 12, color: "#EF4444" }}
-                                onClick={() => handleDeletePermanently(t)}
-                              >
-                                <Trash2 size={13} />
-                                <span>Delete</span>
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
+            <ArchivedTemplatesView
+              items={archivedTemplates}
+              total={archivedTotal}
+              loading={loading}
+              page={archivedPage}
+              pageSize={archivedPageSize}
+              totalPages={archivedTotalPages}
+              view={archivedView}
+              hasSearchOrFilters={Boolean(archivedQuery || activeArchivedFiltersCount > 0)}
+              onPageChange={(p) => setArchivedPage(p)}
+              onPageSizeChange={(sz) => {
+                setArchivedPageSize(sz);
+                setArchivedPage(1);
+              }}
+              onRestore={async (item) => {
+                try {
+                  if (item.rawType === "boq" || item.templateType.includes("BOQ")) {
+                    await restoreBoqTemplate(item.id);
+                  } else {
+                    await restoreProjectTemplate(item.id);
+                  }
+                  setNotice(`Template "${item.name}" restored to library.`);
+                  await loadArchived();
+                  loadOverview();
+                } catch (err: unknown) {
+                  setNotice(err instanceof Error ? err.message : "Failed to restore template.");
+                }
+              }}
+              onDeletePermanently={async (item) => {
+                try {
+                  if (item.rawType === "boq" || item.templateType.includes("BOQ")) {
+                    await deleteBoqTemplate(item.id, true);
+                  } else {
+                    await deleteProjectTemplatePermanently(item.id);
+                  }
+                  setNotice(`Template "${item.name}" permanently deleted.`);
+                  await loadArchived();
+                  loadOverview();
+                } catch (err: unknown) {
+                  setNotice(err instanceof Error ? err.message : "Failed to delete template.");
+                }
+              }}
+              onClearFilters={() => {
+                setArchivedQuery("");
+                setArchivedFilters({ category: "all", type: "all", sort: "newest" });
+                setArchivedPage(1);
+              }}
+            />
           )}
         </div>
       </div>

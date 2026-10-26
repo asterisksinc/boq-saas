@@ -1,6 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./templates-overview.css";
+import "./boq-structure-redesign.css";
+import "./boq-costing-redesign.css";
+import "./boq-rules-redesign.css";
+import "./boq-usage-redesign.css";
+import "./boq-versions-redesign.css";
+import "./boq-activity-redesign.css";
 import { PermissionsProvider } from "@/components/PermissionsProvider";
 
 export const metadata: Metadata = {

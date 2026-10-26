@@ -421,6 +421,53 @@ export async function deleteProjectTemplatePermanently(id: string) {
   });
 }
 
+export interface ArchivedTemplateRecord {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  subcategory: string;
+  templateType: string;
+  version: string;
+  archivedBy: string;
+  archivedByRole: string;
+  archivedByAvatarUrl?: string | null;
+  archivedOn: string;
+  archivedRelative: string;
+  archivedTimestamp?: number;
+  usedIn: string;
+  useCount: number;
+  imageUrl?: string | null;
+  rawType: "project" | "boq";
+}
+
+export async function listArchivedTemplates(params?: {
+  search?: string;
+  category?: string;
+  type?: string;
+  sort?: string;
+  page?: number;
+  pageSize?: number;
+}) {
+  const p = new URLSearchParams();
+  if (params?.search) p.set("search", params.search);
+  if (params?.category) p.set("category", params.category);
+  if (params?.type) p.set("type", params.type);
+  if (params?.sort) p.set("sort", params.sort);
+  if (params?.page) p.set("page", String(params.page));
+  if (params?.pageSize) p.set("pageSize", String(params.pageSize));
+  const qs = p.toString();
+  return fetchApi<{
+    items: ArchivedTemplateRecord[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+    categories: string[];
+    types: string[];
+  }>(`/api/v1/archived-templates${qs ? `?${qs}` : ""}`);
+}
+
 export async function useProjectTemplate(id: string, payload: Record<string, unknown>) {
   return fetchApi<Record<string, unknown>>(`/api/v1/project-templates/${id}/use`, {
     method: 'POST',

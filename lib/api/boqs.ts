@@ -1,5 +1,6 @@
 import { getApiErrorMessage, parseApiResponse } from "./auth";
 import type { Boq, BoqDetail, BoqTemplate, PaginatedResponse } from "../types";
+import type { TemplateActivityFilterParams, TemplateActivityResponse } from "./templates";
 
 async function fetchApi<T>(path: string, options: RequestInit = {}): Promise<T> {
     const response = await fetch(path, {
@@ -151,6 +152,76 @@ export async function getBoqTemplate(id: string): Promise<any> {
     return fetchApi(`/api/v1/boq-templates/${id}`);
 }
 
+export async function getBoqTemplateUsage(
+    id: string,
+    params?: {
+        search?: string;
+        range?: string;
+        fromDate?: string;
+        toDate?: string;
+        status?: string;
+        type?: string;
+        version?: string;
+        page?: number;
+        pageSize?: number;
+        exportFormat?: string;
+    }
+): Promise<any> {
+    const sp = new URLSearchParams();
+    if (params?.search) sp.set("search", params.search);
+    if (params?.range) sp.set("range", params.range);
+    if (params?.fromDate) sp.set("fromDate", params.fromDate);
+    if (params?.toDate) sp.set("toDate", params.toDate);
+    if (params?.status) sp.set("status", params.status);
+    if (params?.type) sp.set("type", params.type);
+    if (params?.version) sp.set("version", params.version);
+    if (params?.page) sp.set("page", String(params.page));
+    if (params?.pageSize) sp.set("pageSize", String(params.pageSize));
+    if (params?.exportFormat) sp.set("export", params.exportFormat);
+    const q = sp.toString();
+    return fetchApi(`/api/v1/boq-templates/${id}/usage${q ? `?${q}` : ""}`);
+}
+
+export async function getBoqTemplateVersions(
+    id: string,
+    params?: {
+        search?: string;
+        status?: string;
+        page?: number;
+        pageSize?: number;
+    }
+): Promise<any> {
+    const sp = new URLSearchParams();
+    if (params?.search) sp.set("search", params.search);
+    if (params?.status) sp.set("status", params.status);
+    if (params?.page) sp.set("page", String(params.page));
+    if (params?.pageSize) sp.set("pageSize", String(params.pageSize));
+    const q = sp.toString();
+    return fetchApi(`/api/v1/boq-templates/${id}/versions${q ? `?${q}` : ""}`);
+}
+
+export async function getBoqTemplateVersionDetail(
+    id: string,
+    versionId: string
+): Promise<any> {
+    return fetchApi(`/api/v1/boq-templates/${id}/versions/${encodeURIComponent(versionId)}`);
+}
+
+export async function getBoqTemplateActivity(
+    id: string,
+    params?: TemplateActivityFilterParams
+): Promise<TemplateActivityResponse> {
+    const sp = new URLSearchParams();
+    if (params?.search) sp.set("search", params.search);
+    if (params?.category && params.category !== "all") sp.set("category", params.category);
+    if (params?.dateRange && params.dateRange !== "all") sp.set("dateRange", params.dateRange);
+    if (params?.sort) sp.set("sort", params.sort);
+    if (params?.page) sp.set("page", String(params.page));
+    if (params?.pageSize) sp.set("pageSize", String(params.pageSize));
+    const q = sp.toString();
+    return fetchApi<TemplateActivityResponse>(`/api/v1/boq-templates/${id}/activity${q ? `?${q}` : ""}`);
+}
+
 export async function createBoqTemplate(input: {
     boqId?: string;
     name: string;
@@ -181,6 +252,10 @@ export async function updateBoqTemplate(id: string, input: Record<string, any>):
 
 export async function deleteBoqTemplate(id: string, permanent = false): Promise<any> {
     return fetchApi(`/api/v1/boq-templates/${id}${permanent ? "?permanent=true" : ""}`, { method: "DELETE" });
+}
+
+export async function restoreBoqTemplate(id: string): Promise<any> {
+    return fetchApi(`/api/v1/boq-templates/${id}/restore`, { method: "POST" });
 }
 
 export async function duplicateBoqTemplate(id: string): Promise<any> {
