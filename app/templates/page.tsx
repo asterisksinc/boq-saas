@@ -350,7 +350,7 @@ function TemplatesContent() {
       itemType: "BOQ",
       badgeLabel: "BOQ TEMPLATE",
       badgeClass: "badge-boq",
-      subtitle: `${b.sections ?? 12} Sections • ${b.items ?? 86} Items`,
+      subtitle: `${b.sections ?? 0} Sections • ${b.items ?? 0} Items`,
       useCount: b.useCount ?? 0,
       imageUrl: b.imageUrl || getTemplateCover({ name: b.name, businessType: b.category }),
       raw: b,
@@ -385,8 +385,8 @@ function TemplatesContent() {
     try {
       const data = await getTemplatesOverview();
       setOverview(data);
-    } catch {
-      // Keep existing overview or fallback
+    } catch (err: unknown) {
+      setNotice(err instanceof Error ? err.message : "Failed to load template overview.");
     }
   };
 
@@ -436,45 +436,24 @@ function TemplatesContent() {
   const loadDocTemplates = async () => {
     try {
       const r = await fetch("/api/v1/proposals?status=all&sourceType=template", { credentials: "include" });
-      if (r.ok) {
-        const b = await r.json();
-        const items = (b.data?.items || []).map((item: any) => ({
-          id: item.id,
-          name: item.projectName || "Standard Proposal Template",
-          description: `Document layout with ${item.scopeItems?.length || 4} scope sections`,
-          category: "Proposal",
-          type: "DOCUMENT TEMPLATE",
-          useCount: item.viewCount || 8,
-          updatedAt: item.updatedAt || new Date().toISOString(),
-          imageUrl: fallbackImages.Commercial,
-        }));
-        setDocTemplates(items);
-      } else {
-        setDocTemplates([
-          {
-            id: "doc-1",
-            name: "BOQ (Detailed) Template",
-            description: "Standard detailed BOQ export format with client signoff blocks",
-            category: "BOQ Layout",
-            type: "DOCUMENT TEMPLATE",
-            useCount: 36,
-            updatedAt: new Date().toISOString(),
-            imageUrl: fallbackImages.Residential,
-          },
-          {
-            id: "doc-2",
-            name: "Invoice Standard Layout",
-            description: "GST-compliant commercial tax invoice layout with milestones",
-            category: "Invoice",
-            type: "DOCUMENT TEMPLATE",
-            useCount: 24,
-            updatedAt: new Date().toISOString(),
-            imageUrl: fallbackImages.Commercial,
-          },
-        ]);
+      const b = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        throw new Error(b?.error?.message || b?.message || "Failed to load document templates.");
       }
-    } catch {
-      // Ignored
+      const items = (b.data?.items || []).map((item: any) => ({
+        id: item.id,
+        name: item.name || item.projectName || "Unnamed document template",
+        description: item.description || "",
+        category: item.category || "Proposal",
+        type: item.type || "DOCUMENT TEMPLATE",
+        useCount: item.viewCount ?? item.useCount ?? 0,
+        updatedAt: item.updatedAt || item.createdAt || "",
+        imageUrl: item.imageUrl || null,
+      }));
+      setDocTemplates(items);
+    } catch (err: unknown) {
+      setDocTemplates([]);
+      setNotice(err instanceof Error ? err.message : "Failed to load document templates.");
     }
   };
 
@@ -632,46 +611,25 @@ function TemplatesContent() {
 
   const renderProjectCategoryBadge = (t: { businessType?: string; projectType?: string; category?: string; name?: string }) => {
     const raw = (t.businessType || t.category || "").toLowerCase();
-    const name = (t.name || "").toLowerCase();
+    const category = t.businessType || t.category || "—";
 
-    let category = "RESIDENTIAL";
     let badgeClass = "badge-residential";
 
-    if (raw.includes("villa") || name.includes("villa")) {
-      category = "VILLA";
+    if (raw.includes("villa")) {
       badgeClass = "badge-villa";
-    } else if (raw.includes("commercial") || name.includes("commercial") || name.includes("office")) {
-      category = "COMMERCIAL";
+    } else if (raw.includes("commercial")) {
       badgeClass = "badge-commercial";
-    } else if (raw.includes("retail") || name.includes("retail") || name.includes("store")) {
-      category = "RETAIL";
+    } else if (raw.includes("retail")) {
       badgeClass = "badge-retail";
-    } else if (raw.includes("hospitality") || name.includes("hotel") || name.includes("restaurant")) {
-      category = "HOSPITALITY";
+    } else if (raw.includes("hospitality")) {
       badgeClass = "badge-hospitality";
-    } else {
-      category = "RESIDENTIAL";
-      badgeClass = "badge-residential";
     }
 
-    return <span className={`template-fig-badge ${badgeClass}`}>{category}</span>;
+    return <span className={`template-fig-badge ${badgeClass}`}>{category.toUpperCase()}</span>;
   };
 
   const renderProjectSubtypeBadge = (t: { projectType?: string; businessType?: string; name?: string }) => {
-    let sub = t.projectType;
-    if (!sub || sub === "Standard") {
-      const n = (t.name || "").toLowerCase();
-      if (n.includes("3bhk") || n.includes("3 bhk")) sub = "3BHK";
-      else if (n.includes("2bhk") || n.includes("2 bhk")) sub = "2BHK";
-      else if (n.includes("1bhk") || n.includes("1 bhk")) sub = "1BHK";
-      else if (n.includes("villa")) sub = "Villa";
-      else if (n.includes("office")) sub = "Office";
-      else if (n.includes("retail") || n.includes("store")) sub = "Store";
-      else if (n.includes("hotel") || n.includes("restaurant")) sub = "Hotel";
-      else sub = t.businessType || "Residential";
-    }
-
-    return <span className="template-subtype-pill">{sub}</span>;
+    return <span className="template-subtype-pill">{t.projectType || "—"}</span>;
   };
 
   const renderCardMeta = (t: ProjectTemplate) => {
@@ -702,13 +660,7 @@ function TemplatesContent() {
   };
 
   const renderStatusPill = (t: ProjectTemplate) => {
-    let rawStatus = (t.status || "").toLowerCase();
-    if (!rawStatus) {
-      const n = (t.name || "").toLowerCase();
-      if (n.includes("2bhk") || n.includes("1bhk")) rawStatus = "active";
-      else if (n.includes("restaurant") || n.includes("review")) rawStatus = "needs_review";
-      else rawStatus = "draft";
-    }
+    const rawStatus = (t.status || "").toLowerCase();
 
     if (rawStatus === "active") {
       return <span className="template-status-pill status-active">ACTIVE</span>;
@@ -716,7 +668,10 @@ function TemplatesContent() {
     if (rawStatus.includes("review")) {
       return <span className="template-status-pill status-review">Needs Review</span>;
     }
-    return <span className="template-status-pill status-draft">DRAFT</span>;
+    if (rawStatus === "draft") {
+      return <span className="template-status-pill status-draft">DRAFT</span>;
+    }
+    return <span className="template-status-pill status-draft">—</span>;
   };
 
   const getTemplateVersion = (t: ProjectTemplate): string => {
@@ -727,16 +682,7 @@ function TemplatesContent() {
       if (s.includes(".")) return `v${s}`;
       return `v${s}.0`;
     }
-    const n = (t.name || "").toLowerCase();
-    if (n.includes("3bhk")) return "v3.2";
-    if (n.includes("2bhk")) return "v2.1";
-    if (n.includes("1bhk")) return "v1.8";
-    if (n.includes("villa")) return "v2.4";
-    if (n.includes("office")) return "v2.0";
-    if (n.includes("retail") || n.includes("store")) return "v1.6";
-    if (n.includes("restaurant")) return "v1.5";
-    if (n.includes("hotel")) return "v1.7";
-    return "v1.0";
+    return "—";
   };
 
   const formatUpdatedDateTime = (dateStr?: string | null) => {
@@ -1778,47 +1724,54 @@ function TemplatesContent() {
 
           {/* ── TAB 4: DOCUMENT TEMPLATES ── */}
           {tab === "documents" && (
-            <div className="templates-recent-grid">
-              {docTemplates.map((t) => (
-                <div
-                  key={t.id}
-                  className="template-fig-card"
-                  onClick={() => router.push("/proposals")}
-                >
-                  <div className="template-fig-card-img-wrap">
-                    <TemplateCoverImage
-                      src={getTemplateCover(t)}
-                      alt={t.name}
-                      fallbackSrc={fallbackImages.Commercial}
-                    />
-                  </div>
-                  <div className="template-fig-card-info">
-                    <div className="template-fig-card-title-col">
-                      <h3 className="template-fig-card-title" title={t.name}>{t.name}</h3>
-                      <p className="template-fig-card-subtitle">{t.description}</p>
+            docTemplates.length > 0 ? (
+              <div className="templates-recent-grid">
+                {docTemplates.map((t) => (
+                  <div
+                    key={t.id}
+                    className="template-fig-card"
+                    onClick={() => router.push("/proposals")}
+                  >
+                    <div className="template-fig-card-img-wrap">
+                      <TemplateCoverImage
+                        src={getTemplateCover(t)}
+                        alt={t.name}
+                        fallbackSrc={fallbackImages.Commercial}
+                      />
                     </div>
-                    <span className="template-fig-badge badge-doc">DOCUMENT TEMPLATE</span>
+                    <div className="template-fig-card-info">
+                      <div className="template-fig-card-title-col">
+                        <h3 className="template-fig-card-title" title={t.name}>{t.name}</h3>
+                        <p className="template-fig-card-subtitle">{t.description || "No description available."}</p>
+                      </div>
+                      <span className="template-fig-badge badge-doc">DOCUMENT TEMPLATE</span>
+                    </div>
+                    <div className="template-fig-divider" />
+                    <div className="template-fig-card-footer">
+                      <span className="template-fig-card-usage">
+                        Used {t.useCount} Times
+                      </span>
+                      <button
+                        type="button"
+                        className="template-fig-card-menu-btn"
+                        aria-label="View Document Template"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push("/proposals");
+                        }}
+                      >
+                        <Eye size={18} />
+                      </button>
+                    </div>
                   </div>
-                  <div className="template-fig-divider" />
-                  <div className="template-fig-card-footer">
-                    <span className="template-fig-card-usage">
-                      Used {t.useCount} Times
-                    </span>
-                    <button
-                      type="button"
-                      className="template-fig-card-menu-btn"
-                      aria-label="View Document Template"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        router.push("/proposals");
-                      }}
-                    >
-                      <Eye size={18} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="templates-empty" style={{ padding: "48px 20px", textAlign: "center" }}>
+                <h3>No document templates found</h3>
+                <p>No document templates are available for this workspace.</p>
+              </div>
+            )
           )}
 
           {/* ── TAB 5: ARCHIVED TEMPLATES ── */}

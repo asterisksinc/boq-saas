@@ -54,12 +54,43 @@ describe("Client Dashboard Navigation & Screen Structure", () => {
             "app/client/settings/page.tsx",
             "app/client/help/page.tsx",
             "app/client/dashboard/page.tsx",
+            "app/client/boq-dashboard/page.tsx",
         ];
 
         for (const screen of expectedScreens) {
             const p = join(process.cwd(), screen);
             expect(existsSync(p), `Missing required client screen: ${screen}`).toBe(true);
         }
+    });
+
+    it("verifies the client dashboard is the single overview destination", () => {
+        const overviewPath = join(process.cwd(), "app", "client", "dashboard", "page.tsx");
+        const railPath = join(process.cwd(), "components", "client", "ClientDashboardRail.tsx");
+
+        const overviewCode = readFileSync(overviewPath, "utf-8");
+        const railCode = readFileSync(railPath, "utf-8");
+
+        expect(railCode).toContain('route: "/client/dashboard"');
+        expect(railCode).toContain('icon: "dashboard-overview-active"');
+        expect(railCode).not.toContain('route: "/client/boq-dashboard"');
+        expect(railCode).not.toContain('label: "BOQ Dashboard"');
+        expect(railCode).toContain('navigate("/client/dashboard")');
+
+        // Client Dashboard Overview features
+        expect(overviewCode).toContain('ClientDashboardRail current="/client/dashboard"');
+        expect(overviewCode).toContain('DashboardHeader title="Overview" hideNew={true}');
+        expect(overviewCode).toContain("Analytics");
+        expect(overviewCode).toContain("Total Project");
+        expect(overviewCode).toContain("Active Project");
+        expect(overviewCode).toContain("Total Est. Value");
+        expect(overviewCode).toContain("Gross Margin");
+        expect(overviewCode).toContain("Projects &amp; BOQ");
+        expect(overviewCode).toContain("Quick Actions");
+        expect(overviewCode).toContain("No analytics data yet");
+        expect(overviewCode).toContain("No projects or BOQ yet");
+        expect(overviewCode).toContain("No BOQ available");
+        expect(overviewCode).toContain("fig-dashboard-art");
+
     });
 
     it("verifies DashboardHeader supports optional hideNew property without breaking internal dashboard usage", () => {
@@ -338,4 +369,3 @@ describe("Client API Client Library Methods", () => {
         expect(typeof addClientApprovalComment).toBe("function");
     });
 });
-

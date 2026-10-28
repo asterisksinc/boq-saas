@@ -3,27 +3,59 @@
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-    Building2,
-    User,
-    MapPin,
-    Calendar,
-    FileCheck2,
+    Activity,
     FileSpreadsheet,
-    TrendingUp,
     Receipt,
+    FileCheck2,
     MessageSquare,
-    ArrowRight,
     Loader2,
     AlertCircle,
-    CheckCircle2,
 } from "lucide-react";
 import { ClientOnboardingLayout } from "@/components/client/ClientOnboardingLayout";
 import {
     getClientProject,
     getClientDashboard,
+    getClientOnboarding,
     updateClientOnboarding,
     type ClientProjectDetails,
 } from "@/lib/api/client";
+
+function formatStatus(status?: string): string {
+    if (!status) return "Active";
+    const clean = status.trim().toLowerCase();
+    if (clean === "active") return "Active";
+    return status
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+const featureCards = [
+    {
+        title: "Review Project Updates",
+        icon: <Activity size={18} color="#2563EB" strokeWidth={2} />,
+        className: "client-welcome-card-1",
+    },
+    {
+        title: "Review and Approve BOQs",
+        icon: <FileSpreadsheet size={18} color="#2563EB" strokeWidth={2} />,
+        className: "client-welcome-card-2",
+    },
+    {
+        title: "Access Invoices and Payment Information",
+        icon: <Receipt size={18} color="#2563EB" strokeWidth={2} />,
+        className: "client-welcome-card-3",
+    },
+    {
+        title: "Review and Sign Documents",
+        icon: <FileCheck2 size={18} color="#2563EB" strokeWidth={2} />,
+        className: "client-welcome-card-4",
+    },
+    {
+        title: "Stay Connected With Your Project Team",
+        icon: <MessageSquare size={18} color="#2563EB" strokeWidth={2} />,
+        className: "client-welcome-card-5",
+    },
+];
 
 function OnboardingWelcomeContent() {
     const router = useRouter();
@@ -36,17 +68,23 @@ function OnboardingWelcomeContent() {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
+        let isMounted = true;
+
         async function fetchDetails() {
             setLoading(true);
             setError(null);
             try {
-                if (queryProjectId) {
-                    const res = await getClientProject(queryProjectId);
-                    setProject(res.project);
+                let activeProject: ClientProjectDetails | null = null;
+                let targetProjectId = queryProjectId;
+
+                if (targetProjectId) {
+                    const res = await getClientProject(targetProjectId);
+                    activeProject = res.project;
                 } else {
                     const dash = await getClientDashboard();
                     if (dash?.project?.id) {
-                        setProject({
+                        targetProjectId = dash.project.id;
+                        activeProject = {
                             id: dash.project.id,
                             projectCode: dash.project.projectCode,
                             name: dash.project.name,
@@ -56,30 +94,55 @@ function OnboardingWelcomeContent() {
                             projectType: dash.project.projectType,
                             companyName: dash.project.companyName,
                             projectManager: dash.project.projectManager,
-                        });
-                    } else {
-                        setError("No project active for your client account.");
+                        };
                     }
                 }
+
+                if (!activeProject) {
+                    if (isMounted) setError("No project active for your client account.");
+                    return;
+                }
+
+                // Check if onboarding is already completed for this project
+                try {
+                    const onboardingRes = await getClientOnboarding(activeProject.id);
+                    if (
+                        onboardingRes?.onboarding?.status === "completed" ||
+                        onboardingRes?.onboarding?.currentStep === "dashboard"
+                    ) {
+                        router.push(`/client/dashboard?projectId=${encodeURIComponent(activeProject.id)}`);
+                        return;
+                    }
+                } catch {
+                    // Non-blocking: proceed with rendering welcome screen
+                }
+
+                if (isMounted) {
+                    setProject(activeProject);
+                }
             } catch (err: any) {
-                setError(err.message || "Failed to load project details.");
+                if (isMounted) setError(err.message || "Failed to load project details.");
             } finally {
-                setLoading(false);
+                if (isMounted) setLoading(false);
             }
         }
 
         fetchDetails();
-    }, [queryProjectId]);
+
+        return () => {
+            isMounted = false;
+        };
+    }, [queryProjectId, router]);
 
     async function handleGetStarted() {
-        if (!project) return;
+        if (!project || submitting) return;
         setSubmitting(true);
         try {
             await updateClientOnboarding(project.id, "documents");
             router.push(`/client/onboarding/documents?projectId=${encodeURIComponent(project.id)}`);
         } catch (err: any) {
-            // Even if onboarding state fails, proceed to documents
             console.warn("Could not record onboarding step:", err);
+            // Even if onboarding state persistence reports an error, proceed to documents
             router.push(`/client/onboarding/documents?projectId=${encodeURIComponent(project.id)}`);
         } finally {
             setSubmitting(false);
@@ -88,7 +151,7 @@ function OnboardingWelcomeContent() {
 
     if (loading) {
         return (
-            <div style={{ textAlign: "center", padding: "80px 0" }}>
+            <div className="client-welcome-loading-state" style={{ textAlign: "center", padding: "120px 0", width: "100%" }}>
                 <Loader2 className="animate-spin" size={36} color="#2563EB" style={{ margin: "0 auto 16px auto" }} />
                 <h3 style={{ fontSize: "16px", color: "#1E293B", fontWeight: 500 }}>
                     Loading your project workspace...
@@ -99,7 +162,7 @@ function OnboardingWelcomeContent() {
 
     if (error || !project) {
         return (
-            <div style={{ maxWidth: "600px", margin: "40px auto", textAlign: "center", padding: "40px 20px" }}>
+            <div className="client-welcome-error-state" style={{ maxWidth: "596px", margin: "64px auto", textAlign: "center", padding: "40px 20px" }}>
                 <div
                     style={{
                         width: "56px",
@@ -125,11 +188,11 @@ function OnboardingWelcomeContent() {
                     onClick={() => router.push("/login")}
                     style={{
                         padding: "10px 20px",
-                        borderRadius: "8px",
+                        borderRadius: "6px",
                         backgroundColor: "#2563EB",
                         color: "#ffffff",
                         fontSize: "14px",
-                        fontWeight: 600,
+                        fontWeight: 500,
                         border: "none",
                         cursor: "pointer",
                     }}
@@ -142,315 +205,97 @@ function OnboardingWelcomeContent() {
 
     return (
         <ClientOnboardingLayout activeStep="welcome" completedSteps={[]} projectId={project.id}>
-            <div style={{ maxWidth: "780px" }}>
-                {/* Company Eyebrow */}
-                <div
-                    style={{
-                        fontSize: "12px",
-                        fontWeight: 700,
-                        letterSpacing: "0.08em",
-                        color: "#2563EB",
-                        textTransform: "uppercase",
-                        marginBottom: "10px",
-                    }}
-                >
-                    {project.companyName || "MERIDIAN BUILD CO."}
-                </div>
-
-                {/* Welcome Heading */}
-                <h1
-                    style={{
-                        fontSize: "30px",
-                        fontWeight: 700,
-                        color: "#0F172A",
-                        lineHeight: 1.25,
-                        letterSpacing: "-0.02em",
-                        margin: "0 0 10px 0",
-                    }}
-                >
+            {/* Frame 2147225026: Header Block */}
+            <div className="client-welcome-header-block">
+                {project.companyName && (
+                    <div className="client-welcome-company-eyebrow">
+                        {project.companyName}
+                    </div>
+                )}
+                <h1 className="client-welcome-title">
                     Welcome, {project.clientName || "Client"}
                 </h1>
-
-                {/* Subtitle */}
-                <p
-                    style={{
-                        fontSize: "15px",
-                        color: "#64748B",
-                        lineHeight: 1.6,
-                        margin: "0 0 28px 0",
-                    }}
-                >
-                    You have been added to the following project. Review the details below and proceed to complete your onboarding.
+                <p className="client-welcome-subtitle">
+                    Welcome to your project portal. This is your central place to stay updated, review project information, approve BOQs, manage invoices, and access important documents.
                 </p>
+            </div>
 
-                {/* Project Info Card */}
-                <div
-                    style={{
-                        backgroundColor: "#ffffff",
-                        borderRadius: "16px",
-                        border: "1px solid #E2E8F0",
-                        boxShadow: "0 4px 20px rgba(0, 0, 0, 0.04)",
-                        padding: "28px",
-                        marginBottom: "32px",
-                    }}
-                >
-                    {/* Project Title & Status Badges */}
-                    <div
-                        style={{
-                            display: "flex",
-                            alignItems: "flex-start",
-                            justifyContent: "space-between",
-                            flexWrap: "wrap",
-                            gap: "12px",
-                            paddingBottom: "20px",
-                            borderBottom: "1px solid #F1F5F9",
-                        }}
-                    >
-                        <div>
-                            <h2
-                                style={{
-                                    fontSize: "20px",
-                                    fontWeight: 700,
-                                    color: "#0F172A",
-                                    margin: "0 0 6px 0",
-                                }}
-                            >
-                                {project.name}
-                            </h2>
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                <span
-                                    style={{
-                                        fontSize: "12px",
-                                        fontWeight: 600,
-                                        color: "#64748B",
-                                        backgroundColor: "#F1F5F9",
-                                        padding: "3px 8px",
-                                        borderRadius: "6px",
-                                    }}
-                                >
-                                    {project.projectCode || "PRJ-001"}
-                                </span>
-                                {project.projectType && (
-                                    <span style={{ fontSize: "13px", color: "#64748B" }}>
-                                        • {project.projectType}
-                                    </span>
-                                )}
-                            </div>
+            {/* Frame 2147225032: Content Column Sections */}
+            <div className="client-welcome-content-sections">
+                {/* Frame 2147225027: YOUR PROJECT Card */}
+                <div className="client-welcome-project-card">
+                    <div className="client-welcome-project-title-block">
+                        <div className="client-welcome-project-label">YOUR PROJECT</div>
+                        <h2 className="client-welcome-project-name">
+                            {project.name || "Untitled Project"}
+                        </h2>
+                    </div>
+
+                    <div className="client-welcome-project-rows">
+                        {/* Row 1: Project Manager */}
+                        <div className="client-welcome-detail-row">
+                            <span className="client-welcome-row-label">Project Manager</span>
+                            <span className="client-welcome-row-value">
+                                {project.projectManager || "Assigned Manager"}
+                            </span>
                         </div>
 
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        {/* Row 2: Company */}
+                        <div className="client-welcome-detail-row">
+                            <span className="client-welcome-row-label">Company</span>
+                            <span className="client-welcome-row-value">
+                                {project.companyName || "Organization"}
+                            </span>
+                        </div>
+
+                        {/* Row 3: Project Status */}
+                        <div className="client-welcome-detail-row">
+                            <span className="client-welcome-row-label">Project Status</span>
                             <span
-                                style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: "6px",
-                                    padding: "6px 12px",
-                                    borderRadius: "999px",
-                                    backgroundColor: "#ECFDF5",
-                                    color: "#059669",
-                                    fontSize: "12px",
-                                    fontWeight: 600,
-                                }}
+                                className={`client-welcome-status-badge ${
+                                    (project.status || "").toLowerCase() === "active"
+                                        ? "status-active"
+                                        : "status-other"
+                                }`}
                             >
-                                <span
-                                    style={{
-                                        width: "6px",
-                                        height: "6px",
-                                        borderRadius: "50%",
-                                        backgroundColor: "#10B981",
-                                    }}
-                                />
-                                {project.status ? project.status.toUpperCase() : "ACTIVE"}
+                                {formatStatus(project.status)}
                             </span>
                         </div>
                     </div>
+                </div>
 
-                    {/* Metadata Grid */}
-                    <div
-                        style={{
-                            display: "grid",
-                            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                            gap: "16px",
-                            padding: "20px 0",
-                            borderBottom: "1px solid #F1F5F9",
-                        }}
-                    >
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                {/* Frame 2147225506: HERE'S WHAT YOU CAN DO */}
+                <div className="client-welcome-features-block">
+                    <div className="client-welcome-features-label">HERE&apos;S WHAT YOU CAN DO</div>
+                    <div className="client-welcome-features-list">
+                        {featureCards.map((card, idx) => (
                             <div
-                                style={{
-                                    width: "36px",
-                                    height: "36px",
-                                    borderRadius: "8px",
-                                    backgroundColor: "#EFF6FF",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                }}
+                                key={idx}
+                                className={`client-welcome-feature-card ${card.className}`}
                             >
-                                <User size={18} color="#2563EB" />
+                                <div className="client-welcome-feature-icon-box" aria-hidden="true">
+                                    {card.icon}
+                                </div>
+                                <span className="client-welcome-feature-text">{card.title}</span>
                             </div>
-                            <div>
-                                <div style={{ fontSize: "11px", color: "#64748B", textTransform: "uppercase", fontWeight: 600 }}>
-                                    Project Manager
-                                </div>
-                                <div style={{ fontSize: "14px", fontWeight: 600, color: "#1E293B" }}>
-                                    {project.projectManager || "Assigned Manager"}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                            <div
-                                style={{
-                                    width: "36px",
-                                    height: "36px",
-                                    borderRadius: "8px",
-                                    backgroundColor: "#EFF6FF",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                }}
-                            >
-                                <Building2 size={18} color="#2563EB" />
-                            </div>
-                            <div>
-                                <div style={{ fontSize: "11px", color: "#64748B", textTransform: "uppercase", fontWeight: 600 }}>
-                                    Company
-                                </div>
-                                <div style={{ fontSize: "14px", fontWeight: 600, color: "#1E293B" }}>
-                                    {project.companyName || "Meridian Build Co."}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                            <div
-                                style={{
-                                    width: "36px",
-                                    height: "36px",
-                                    borderRadius: "8px",
-                                    backgroundColor: "#EFF6FF",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                }}
-                            >
-                                <MapPin size={18} color="#2563EB" />
-                            </div>
-                            <div>
-                                <div style={{ fontSize: "11px", color: "#64748B", textTransform: "uppercase", fontWeight: 600 }}>
-                                    Location
-                                </div>
-                                <div style={{ fontSize: "14px", fontWeight: 600, color: "#1E293B" }}>
-                                    {project.location || "Site Location"}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* What you can do section */}
-                    <div style={{ paddingTop: "20px" }}>
-                        <h4
-                            style={{
-                                fontSize: "13px",
-                                fontWeight: 700,
-                                textTransform: "uppercase",
-                                letterSpacing: "0.04em",
-                                color: "#475569",
-                                margin: "0 0 14px 0",
-                            }}
-                        >
-                            What you can do in your client portal:
-                        </h4>
-
-                        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                            {[
-                                {
-                                    icon: <FileCheck2 size={18} color="#2563EB" />,
-                                    title: "Review & Sign Contracts",
-                                    desc: "Access project agreements, scope definitions, and electronically sign contracts.",
-                                },
-                                {
-                                    icon: <FileSpreadsheet size={18} color="#2563EB" />,
-                                    title: "View Bill of Quantities (BOQ)",
-                                    desc: "Inspect detailed itemized cost breakdowns, specifications, and scope items.",
-                                },
-                                {
-                                    icon: <TrendingUp size={18} color="#2563EB" />,
-                                    title: "Track Project Progress",
-                                    desc: "Monitor live milestones, delivery dates, and real-time updates.",
-                                },
-                                {
-                                    icon: <Receipt size={18} color="#2563EB" />,
-                                    title: "Review Invoices & Payments",
-                                    desc: "Track billing schedules, commercial invoices, and payment statuses.",
-                                },
-                                {
-                                    icon: <MessageSquare size={18} color="#2563EB" />,
-                                    title: "Direct Team Communication",
-                                    desc: "Connect directly with your project manager and commercial team.",
-                                },
-                            ].map((item, idx) => (
-                                <div
-                                    key={idx}
-                                    style={{
-                                        display: "flex",
-                                        alignItems: "flex-start",
-                                        gap: "12px",
-                                        padding: "10px 14px",
-                                        borderRadius: "10px",
-                                        backgroundColor: "#F8FAFC",
-                                        border: "1px solid #F1F5F9",
-                                    }}
-                                >
-                                    <div style={{ marginTop: "2px", flexShrink: 0 }}>{item.icon}</div>
-                                    <div>
-                                        <div style={{ fontSize: "14px", fontWeight: 600, color: "#1E293B" }}>
-                                            {item.title}
-                                        </div>
-                                        <div style={{ fontSize: "13px", color: "#64748B", marginTop: "2px" }}>
-                                            {item.desc}
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                        ))}
                     </div>
                 </div>
 
-                {/* Primary Action Button */}
-                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                {/* Frame 2147225031: Bottom Action Buttons */}
+                <div className="client-welcome-actions-row">
+                    <div className="client-welcome-btn-back-spacer" aria-hidden="true" />
                     <button
                         type="button"
+                        className="client-welcome-btn-get-started"
                         onClick={handleGetStarted}
                         disabled={submitting}
-                        style={{
-                            padding: "14px 28px",
-                            borderRadius: "10px",
-                            backgroundColor: "#2563EB",
-                            color: "#ffffff",
-                            fontSize: "15px",
-                            fontWeight: 600,
-                            border: "none",
-                            cursor: submitting ? "not-allowed" : "pointer",
-                            opacity: submitting ? 0.75 : 1,
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            boxShadow: "0 4px 12px rgba(37, 99, 235, 0.25)",
-                            transition: "all 0.15s ease",
-                        }}
+                        aria-label="Get Started"
                     >
                         {submitting ? (
-                            <>
-                                <Loader2 className="animate-spin" size={18} />
-                                <span>Starting Onboarding...</span>
-                            </>
+                            <Loader2 className="animate-spin" size={16} color="#FFFFFF" />
                         ) : (
-                            <>
-                                <span>Get Started</span>
-                                <ArrowRight size={18} />
-                            </>
+                            "Get Started"
                         )}
                     </button>
                 </div>
@@ -463,7 +308,7 @@ export default function ClientOnboardingWelcomePage() {
     return (
         <Suspense
             fallback={
-                <div style={{ textAlign: "center", padding: "80px 0" }}>
+                <div className="client-welcome-loading-state" style={{ textAlign: "center", padding: "120px 0", width: "100%" }}>
                     <Loader2 className="animate-spin" size={36} color="#2563EB" style={{ margin: "0 auto 16px auto" }} />
                 </div>
             }

@@ -2,12 +2,25 @@
 
 import { SettingsNavItem, SettingsTab } from "@/lib/settings/types";
 
-interface SettingsNavigationProps {
-    activeTab: SettingsTab;
-    onSelectTab: (tab: SettingsTab) => void;
+export interface NavItem {
+    key: string;
+    label: string;
 }
 
-const navItems: SettingsNavItem[] = [
+export const CLIENT_SETTINGS_NAV_ITEMS: NavItem[] = [
+    { key: "profile", label: "My Profile" },
+    { key: "notifications", label: "Notifications" },
+    { key: "security", label: "Security & Sessions" },
+    { key: "preferences", label: "Preferences" },
+];
+
+export interface SettingsNavigationProps {
+    activeTab: string;
+    onSelectTab: (tab: any) => void;
+    items?: NavItem[];
+}
+
+const defaultNavItems: SettingsNavItem[] = [
     { key: "overview", label: "Overview" },
     { key: "profile", label: "My Profile" },
     { key: "organization", label: "Organization" },
@@ -23,11 +36,14 @@ const navItems: SettingsNavItem[] = [
 export default function SettingsNavigation({
     activeTab,
     onSelectTab,
+    items,
 }: SettingsNavigationProps) {
+    const navItemsToRender = items || defaultNavItems;
+
     return (
         <nav className="settings-nav-bar" aria-label="Settings navigation">
             <div className="settings-nav-tabs">
-                {navItems.map((item) => {
+                {navItemsToRender.map((item) => {
                     const isActive = activeTab === item.key;
                     return (
                         <button

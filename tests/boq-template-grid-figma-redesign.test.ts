@@ -139,12 +139,12 @@ describe("Templates - Project Templates - BOQ Template - Grid View Figma Redesig
   it("6. Verifies BOQ Template Card Dynamic Data Binding", () => {
     // Dynamic fields in Card JSX
     expect(boqGridCode).toContain("{template.name}");
-    expect(boqGridCode).toContain("{template.sections || 18} Sections • {template.items || 186} Items");
+    expect(boqGridCode).toContain("{template.sections ?? 0} Sections • {template.items ?? 0} Items");
     expect(boqGridCode).toContain("{categoryTag}");
     expect(boqGridCode).toContain("{subCategoryTag && <span className=\"boq-tag-pill\">{subCategoryTag}</span>}");
-    expect(boqGridCode).toContain("{template.status ? template.status.toUpperCase() : \"ACTIVE\"}");
+    expect(boqGridCode).toContain("{template.status ? template.status.toUpperCase() : \"—\"}");
     expect(boqGridCode).toContain("{mappingPercent}% Mapped");
-    expect(boqGridCode).toContain("{template.version || \"v3.2\"} • Used {template.useCount ?? 42} Times");
+    expect(boqGridCode).toContain("{template.version || \"—\"} • Used {template.useCount ?? 0} Times");
 
     // Action menu options
     expect(boqGridCode).toContain("Use Template");

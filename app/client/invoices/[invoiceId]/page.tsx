@@ -8,14 +8,13 @@ import {
     CheckCircle2,
     CreditCard,
     Download,
-    FileDown,
     Loader2,
     Receipt,
-    RefreshCw,
     X,
 } from "lucide-react";
 import ClientDashboardRail from "@/components/client/ClientDashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
+import "@/app/client/client-redesign.css";
 import {
     getClientInvoice,
     payClientInvoice,
@@ -121,14 +120,14 @@ export default function ClientInvoiceDetailPage({
 
     if (loading) {
         return (
-            <main className="fig-dashboard" style={{ background: "#edf2f9" }}>
-                <div className="fig-dashboard-glow" />
+            <main className="client-redesign-shell">
+                <div className="client-bg-glow" />
                 <ClientDashboardRail current="/client/invoices" />
-                <div className="fig-dashboard-main">
+                <div className="client-main-area">
                     <DashboardHeader title="Invoices" hideNew={true} />
                     <div style={{ textAlign: "center", padding: "100px 20px" }}>
                         <Loader2 className="animate-spin" size={36} color="#2563EB" style={{ margin: "0 auto 12px auto" }} />
-                        <div style={{ color: "#64748b", fontSize: "14px" }}>Loading invoice details...</div>
+                        <div style={{ color: "#64748b", fontSize: "14px", fontFamily: "Urbanist, sans-serif" }}>Loading invoice details...</div>
                     </div>
                 </div>
             </main>
@@ -137,14 +136,14 @@ export default function ClientInvoiceDetailPage({
 
     if (error || !invoice) {
         return (
-            <main className="fig-dashboard" style={{ background: "#edf2f9" }}>
-                <div className="fig-dashboard-glow" />
+            <main className="client-redesign-shell">
+                <div className="client-bg-glow" />
                 <ClientDashboardRail current="/client/invoices" />
-                <div className="fig-dashboard-main">
+                <div className="client-main-area">
                     <DashboardHeader title="Invoices" hideNew={true} />
-                    <div style={{ maxWidth: "500px", margin: "60px auto", padding: "32px", background: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", textAlign: "center" }}>
+                    <div className="client-surface-card" style={{ maxWidth: "500px", margin: "60px auto", padding: "32px", textAlign: "center" }}>
                         <Receipt size={40} color="#94a3b8" style={{ margin: "0 auto 12px auto" }} />
-                        <h3 style={{ fontSize: "18px", fontWeight: 700, color: "#0f172a", marginBottom: "6px" }}>
+                        <h3 style={{ fontSize: "18px", fontWeight: 700, color: "#0f172a", marginBottom: "6px", fontFamily: "Urbanist, sans-serif" }}>
                             Invoice Not Found
                         </h3>
                         <p style={{ fontSize: "13px", color: "#64748b", marginBottom: "20px" }}>
@@ -153,16 +152,7 @@ export default function ClientInvoiceDetailPage({
                         <button
                             type="button"
                             onClick={() => router.push("/client/invoices")}
-                            style={{
-                                padding: "8px 18px",
-                                borderRadius: "8px",
-                                background: "#2563eb",
-                                color: "#ffffff",
-                                fontSize: "13px",
-                                fontWeight: 600,
-                                border: "none",
-                                cursor: "pointer",
-                            }}
+                            className="client-btn-primary client-btn-compact"
                         >
                             Return to Invoices
                         </button>
@@ -188,474 +178,311 @@ export default function ClientInvoiceDetailPage({
         : "14 Palm Grove Road, Bengaluru, Karnataka 560001";
 
     return (
-        <main className="fig-dashboard" style={{ background: "#edf2f9" }}>
-            <div className="fig-dashboard-glow" />
+        <main className="client-redesign-shell">
+            <div className="client-bg-glow" />
 
             <ClientDashboardRail current="/client/invoices" />
 
-            <div className="fig-dashboard-main">
+            <div className="client-main-area">
                 <DashboardHeader title="Invoices" hideNew={true} />
 
-                <section style={{ padding: "24px 36px" }}>
-                    {/* Top Navigation Row matching Reference 3 */}
-                    <div
-                        style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            marginBottom: "24px",
-                        }}
-                    >
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div className="client-content-workspace">
+                    {/* Top Sub-Bar matching Frame 2147225068 */}
+                    <div className="client-invoice-header-row">
+                        <div className="client-invoice-header-left">
                             <button
                                 type="button"
                                 onClick={() => router.push("/client/invoices")}
                                 aria-label="Back to Invoices"
-                                style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: "8px",
-                                    background: "none",
-                                    border: "none",
-                                    cursor: "pointer",
-                                    padding: "4px",
-                                    color: "#0f172a",
-                                    fontSize: "18px",
-                                    fontWeight: 700,
-                                }}
+                                className="client-btn-icon"
                             >
                                 <ArrowLeft size={18} />
-                                <span>{invoice.invoiceNumber}</span>
                             </button>
+                            <h2 className="client-invoice-header-code">
+                                {invoice.invoiceNumber}
+                            </h2>
                         </div>
 
                         {isPayable && (
                             <button
                                 type="button"
                                 onClick={() => setPayModalOpen(true)}
-                                style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: "6px",
-                                    padding: "9px 20px",
-                                    borderRadius: "8px",
-                                    background: "#2563eb",
-                                    color: "#ffffff",
-                                    fontSize: "13px",
-                                    fontWeight: 600,
-                                    border: "none",
-                                    cursor: "pointer",
-                                    boxShadow: "0 1px 2px rgba(37, 99, 235, 0.2)",
-                                }}
+                                className="client-invoice-pay-btn"
                             >
                                 Pay Invoice
                             </button>
                         )}
                     </div>
 
-                    {/* Two-Column Layout matching Reference 3 */}
-                    <div
-                        style={{
-                            display: "grid",
-                            gridTemplateColumns: "1fr 360px",
-                            gap: "24px",
-                            alignItems: "start",
-                        }}
-                    >
-                        {/* Left Column: Invoice Details */}
-                        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-                            {/* Card 1: INVOICE INFORMATION */}
-                            <div
-                                style={{
-                                    background: "#ffffff",
-                                    borderRadius: "12px",
-                                    border: "1px solid #e2e8f0",
-                                    padding: "20px 24px",
-                                    boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
-                                }}
-                            >
-                                <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: "16px" }}>
-                                    INVOICE INFORMATION
-                                </div>
-                                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px" }}>
-                                    <div>
-                                        <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "4px" }}>Invoice Number</div>
-                                        <div style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a" }}>{invoice.invoiceNumber}</div>
-                                    </div>
-                                    <div>
-                                        <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "4px" }}>Issue Date</div>
-                                        <div style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a" }}>{formatDate(invoice.issueDate)}</div>
-                                    </div>
-                                    <div>
-                                        <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "4px" }}>Due Date</div>
-                                        <div style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a" }}>{formatDate(invoice.dueDate)}</div>
-                                    </div>
-                                    <div>
-                                        <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "4px" }}>Status</div>
-                                        <div style={{ fontSize: "14px", fontWeight: 600, color: isPaid ? "#16a34a" : "#d97706" }}>
-                                            {isPaid ? "Paid in Full" : "Payment Pending"}
+                    {/* Main Two-Column Layout (Frame 2147225223) */}
+                    <div className="client-invoice-detail-grid">
+                        {/* Left Column: 5 Detail Cards (Frame 2147225457, ~843px) */}
+                        <div className="client-invoice-detail-column">
+                            {/* Card 1: INVOICE INFORMATION (Frame 2147225222) */}
+                            <div className="client-invoice-panel-card">
+                                <h3 className="client-invoice-section-heading">INVOICE INFORMATION</h3>
+                                <div className="client-invoice-inner-card">
+                                    <div className="client-invoice-info-grid-4">
+                                        <div className="client-invoice-kv-item">
+                                            <span className="client-invoice-kv-label">Invoice Number</span>
+                                            <span className="client-invoice-kv-value">{invoice.invoiceNumber}</span>
+                                        </div>
+                                        <div className="client-invoice-kv-item">
+                                            <span className="client-invoice-kv-label">Issue Date</span>
+                                            <span className="client-invoice-kv-value">{formatDate(invoice.issueDate)}</span>
+                                        </div>
+                                        <div className="client-invoice-kv-item">
+                                            <span className="client-invoice-kv-label">Due Date</span>
+                                            <span className="client-invoice-kv-value">{formatDate(invoice.dueDate)}</span>
+                                        </div>
+                                        <div className="client-invoice-kv-item">
+                                            <span className="client-invoice-kv-label">Status</span>
+                                            <span className={`client-invoice-status-pill ${isPaid ? "paid" : "pending"}`}>
+                                                {isPaid ? "PAID" : "PAYMENT PENDING"}
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Card 2: BILL TO */}
-                            <div
-                                style={{
-                                    background: "#ffffff",
-                                    borderRadius: "12px",
-                                    border: "1px solid #e2e8f0",
-                                    padding: "20px 24px",
-                                    boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
-                                }}
-                            >
-                                <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: "16px" }}>
-                                    BILL TO
-                                </div>
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
-                                    <div>
-                                        <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "4px" }}>Client Name</div>
-                                        <div style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a", marginBottom: "12px" }}>
-                                            {invoice.clientName}
+                            {/* Card 2: BILL TO (Frame 2147225071) */}
+                            <div className="client-invoice-panel-card">
+                                <h3 className="client-invoice-section-heading">BILL TO</h3>
+                                <div className="client-invoice-inner-card">
+                                    <div className="client-invoice-info-grid-2">
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                                            <div className="client-invoice-kv-item">
+                                                <span className="client-invoice-kv-label">Client Name</span>
+                                                <span className="client-invoice-kv-value">{invoice.clientName}</span>
+                                            </div>
+                                            <div className="client-invoice-kv-item">
+                                                <span className="client-invoice-kv-label">Email</span>
+                                                <span className="client-invoice-kv-value" style={{ fontWeight: 500, color: "#334155" }}>
+                                                    {invoice.clientEmail || "arjun@riverside.dev"}
+                                                </span>
+                                            </div>
                                         </div>
-                                        <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "4px" }}>Email</div>
-                                        <div style={{ fontSize: "14px", color: "#334155" }}>
-                                            {invoice.clientEmail || "arjun@riverside.dev"}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "4px" }}>Company</div>
-                                        <div style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a", marginBottom: "12px" }}>
-                                            {invoice.companyName || "Riverside Developments"}
-                                        </div>
-                                        <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "4px" }}>Billing Address</div>
-                                        <div style={{ fontSize: "13px", color: "#334155", lineHeight: 1.5 }}>
-                                            {billingAddressText}
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                                            <div className="client-invoice-kv-item">
+                                                <span className="client-invoice-kv-label">Company</span>
+                                                <span className="client-invoice-kv-value">{invoice.companyName || "Riverside Developments"}</span>
+                                            </div>
+                                            <div className="client-invoice-kv-item">
+                                                <span className="client-invoice-kv-label">Billing Address</span>
+                                                <span className="client-invoice-kv-value" style={{ fontWeight: 400, color: "#475569", lineHeight: 1.5 }}>
+                                                    {billingAddressText}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Card 3: PROJECT DETAILS */}
-                            <div
-                                style={{
-                                    background: "#ffffff",
-                                    borderRadius: "12px",
-                                    border: "1px solid #e2e8f0",
-                                    padding: "20px 24px",
-                                    boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
-                                }}
-                            >
-                                <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: "16px" }}>
-                                    PROJECT DETAILS
-                                </div>
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
-                                    <div>
-                                        <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "4px" }}>Project</div>
-                                        <div style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a", marginBottom: "12px" }}>
-                                            {invoice.projectName}
+                            {/* Card 3: PROJECT DETAILS (Frame 2147225223) */}
+                            <div className="client-invoice-panel-card">
+                                <h3 className="client-invoice-section-heading">PROJECT DETAILS</h3>
+                                <div className="client-invoice-inner-card">
+                                    <div className="client-invoice-info-grid-2">
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                                            <div className="client-invoice-kv-item">
+                                                <span className="client-invoice-kv-label">Project</span>
+                                                <span className="client-invoice-kv-value">{invoice.projectName}</span>
+                                            </div>
+                                            <div className="client-invoice-kv-item">
+                                                <span className="client-invoice-kv-label">Related BOQ</span>
+                                                <div>
+                                                    <Link href="/client/boq" className="client-invoice-kv-link">
+                                                        {invoice.relatedBoqNumber || "BOQ-0071"}
+                                                    </Link>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "4px" }}>Related BOQ</div>
-                                        <div>
-                                            <Link
-                                                href="/client/boq"
-                                                style={{ fontSize: "14px", fontWeight: 600, color: "#2563eb", textDecoration: "none" }}
-                                            >
-                                                {invoice.relatedBoqNumber || "BOQ-0071"}
-                                            </Link>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "4px" }}>Project code</div>
-                                        <div style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a" }}>
-                                            {invoice.projectCode || "PRJ-0091"}
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                                            <div className="client-invoice-kv-item">
+                                                <span className="client-invoice-kv-label">Project code</span>
+                                                <span className="client-invoice-kv-value">{invoice.projectCode || "PRJ-0091"}</span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Card 4: INVOICE ITEMS */}
-                            <div
-                                style={{
-                                    background: "#ffffff",
-                                    borderRadius: "12px",
-                                    border: "1px solid #e2e8f0",
-                                    padding: "20px 24px",
-                                    boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
-                                }}
-                            >
-                                <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: "16px" }}>
-                                    INVOICE ITEMS
-                                </div>
-                                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
-                                    <thead>
-                                        <tr style={{ borderBottom: "1px solid #e2e8f0" }}>
-                                            <th style={{ padding: "10px 0", fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em" }}>DESCRIPTION</th>
-                                            <th style={{ padding: "10px 12px", fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em", textAlign: "center", width: "60px" }}>QTY</th>
-                                            <th style={{ padding: "10px 12px", fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em", textAlign: "right", width: "110px" }}>RATE</th>
-                                            <th style={{ padding: "10px 0", fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em", textAlign: "right", width: "110px" }}>AMOUNT</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {invoice.items && invoice.items.length > 0 ? (
-                                            invoice.items.map((item, idx) => (
-                                                <tr key={item.id || idx} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                                                    <td style={{ padding: "14px 0", fontSize: "13px", color: "#334155" }}>
-                                                        {item.description}
-                                                    </td>
-                                                    <td style={{ padding: "14px 12px", fontSize: "13px", color: "#64748b", textAlign: "center" }}>
-                                                        {item.quantity}
-                                                    </td>
-                                                    <td style={{ padding: "14px 12px", fontSize: "13px", color: "#64748b", textAlign: "right" }}>
-                                                        {item.rate > 0 ? formatCompact(item.rate, invoice.currency) : "As agreed"}
-                                                    </td>
-                                                    <td style={{ padding: "14px 0", fontSize: "13px", fontWeight: 600, color: "#0f172a", textAlign: "right" }}>
-                                                        {formatCompact(item.amount || item.quantity * item.rate, invoice.currency)}
-                                                    </td>
+                            {/* Card 4: INVOICE ITEMS (Frame 2147225224) */}
+                            <div className="client-invoice-panel-card">
+                                <h3 className="client-invoice-section-heading">INVOICE ITEMS</h3>
+                                <div className="client-invoice-inner-card" style={{ padding: "12px" }}>
+                                    <div className="client-invoice-table-wrap">
+                                        <table className="client-invoice-detail-table">
+                                            <thead className="client-invoice-detail-thead">
+                                                <tr>
+                                                    <th className="client-invoice-detail-th" style={{ textAlign: "left" }}>DESCRIPTION</th>
+                                                    <th className="client-invoice-detail-th" style={{ textAlign: "center", width: "54px" }}>QTY</th>
+                                                    <th className="client-invoice-detail-th" style={{ textAlign: "right", width: "96px" }}>RATE</th>
+                                                    <th className="client-invoice-detail-th" style={{ textAlign: "right", width: "84px" }}>AMOUNT</th>
                                                 </tr>
-                                            ))
-                                        ) : (
-                                            <tr>
-                                                <td style={{ padding: "14px 0", fontSize: "13px", color: "#334155" }}>Standard fit-out services</td>
-                                                <td style={{ padding: "14px 12px", fontSize: "13px", color: "#64748b", textAlign: "center" }}>1</td>
-                                                <td style={{ padding: "14px 12px", fontSize: "13px", color: "#64748b", textAlign: "right" }}>As agreed</td>
-                                                <td style={{ padding: "14px 0", fontSize: "13px", fontWeight: 600, color: "#0f172a", textAlign: "right" }}>
-                                                    {formatCompact(invoice.totalAmount, invoice.currency)}
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
+                                            </thead>
+                                            <tbody>
+                                                {invoice.items && invoice.items.length > 0 ? (
+                                                    invoice.items.map((item, idx) => (
+                                                        <tr key={item.id || idx} className="client-invoice-detail-tr">
+                                                            <td className="client-invoice-detail-td client-invoice-detail-td-desc">
+                                                                {item.description}
+                                                            </td>
+                                                            <td className="client-invoice-detail-td client-invoice-detail-td-qty">
+                                                                {item.quantity}
+                                                            </td>
+                                                            <td className="client-invoice-detail-td client-invoice-detail-td-rate">
+                                                                {item.rate > 0 ? formatCompact(item.rate, invoice.currency) : "As agreed"}
+                                                            </td>
+                                                            <td className="client-invoice-detail-td client-invoice-detail-td-amount">
+                                                                {formatCompact(item.amount || item.quantity * item.rate, invoice.currency)}
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                                ) : (
+                                                    <tr className="client-invoice-detail-tr">
+                                                        <td className="client-invoice-detail-td client-invoice-detail-td-desc">
+                                                            Standard fit-out services
+                                                        </td>
+                                                        <td className="client-invoice-detail-td client-invoice-detail-td-qty">1</td>
+                                                        <td className="client-invoice-detail-td client-invoice-detail-td-rate">As agreed</td>
+                                                        <td className="client-invoice-detail-td client-invoice-detail-td-amount">
+                                                            {formatCompact(invoice.totalAmount, invoice.currency)}
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
                             </div>
 
-                            {/* Card 5: TERMS & CONDITIONS matching Reference 3 */}
-                            <div
-                                style={{
-                                    background: "#ffffff",
-                                    borderRadius: "12px",
-                                    border: "1px solid #e2e8f0",
-                                    padding: "20px 24px",
-                                    boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
-                                }}
-                            >
-                                <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: "16px" }}>
-                                    TERMS &amp; CONDITIONS
-                                </div>
-                                <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                                    <div>
-                                        <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a", marginBottom: "6px" }}>
-                                            Payment Terms
+                            {/* Card 5: TERMS & CONDITIONS (Frame 2147225225) */}
+                            <div className="client-invoice-panel-card">
+                                <h3 className="client-invoice-section-heading">TERMS &amp; CONDITIONS</h3>
+                                <div className="client-invoice-inner-card">
+                                    <div style={{ display: "flex", flexDirection: "column", gap: "16px", width: "100%" }}>
+                                        <div className="client-invoice-terms-block">
+                                            <h4 className="client-invoice-terms-subtitle">Payment Terms</h4>
+                                            <ul className="client-invoice-terms-list">
+                                                <li>Payment is due within 15 days from the invoice issue date.</li>
+                                                <li>100% payment due upon invoice issuance.</li>
+                                            </ul>
                                         </div>
-                                        <ul style={{ margin: 0, paddingLeft: "18px", fontSize: "13px", color: "#475569", lineHeight: 1.6 }}>
-                                            <li>Payment is due within 15 days from the invoice issue date.</li>
-                                            <li>100% payment due upon invoice issuance.</li>
-                                        </ul>
-                                    </div>
-                                    <div>
-                                        <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a", marginBottom: "6px" }}>
-                                            Payment Conditions
+                                        <div className="client-invoice-terms-block">
+                                            <h4 className="client-invoice-terms-subtitle">Payment Conditions</h4>
+                                            <ul className="client-invoice-terms-list">
+                                                <li>Payment must be made by the invoice due date.</li>
+                                                <li>Applicable taxes are included as specified in the invoice.</li>
+                                                <li>Payment will be considered complete after successful receipt of funds.</li>
+                                                <li>Any discrepancy regarding the invoice should be raised with the project team.</li>
+                                            </ul>
                                         </div>
-                                        <ul style={{ margin: 0, paddingLeft: "18px", fontSize: "13px", color: "#475569", lineHeight: 1.6 }}>
-                                            <li>Payment must be made by the invoice due date.</li>
-                                            <li>Applicable taxes are included as specified in the invoice.</li>
-                                            <li>Payment will be considered complete after successful receipt of funds.</li>
-                                            <li>Any discrepancy regarding the invoice should be raised with the project team.</li>
-                                        </ul>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Right Column: INVOICE SUMMARY matching Reference 3 */}
-                        <div
-                            style={{
-                                background: "#ffffff",
-                                borderRadius: "12px",
-                                border: "1px solid #e2e8f0",
-                                padding: "20px 24px",
-                                boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
-                                position: "sticky",
-                                top: "20px",
-                            }}
-                        >
-                            <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: "20px" }}>
-                                INVOICE SUMMARY
-                            </div>
+                        {/* Right Column: INVOICE SUMMARY (Frame 2147225071, ~467px) */}
+                        <div className="client-invoice-panel-card" style={{ position: "sticky", top: "16px" }}>
+                            <h3 className="client-invoice-section-heading">INVOICE SUMMARY</h3>
+                            <div className="client-invoice-inner-card">
+                                <div className="client-invoice-summary-box" style={{ marginTop: 0, paddingTop: 0 }}>
+                                    <div className="client-invoice-summary-row">
+                                        <span className="client-invoice-summary-label">Subtotal</span>
+                                        <span className="client-invoice-summary-val">
+                                            {formatMoney(invoice.subtotal, invoice.currency)}
+                                        </span>
+                                    </div>
+                                    <div className="client-invoice-summary-row">
+                                        <span className="client-invoice-summary-label">Discount</span>
+                                        <span className="client-invoice-summary-val">₹0</span>
+                                    </div>
+                                    <div className="client-invoice-summary-row">
+                                        <span className="client-invoice-summary-label">Tax / GST</span>
+                                        <span className="client-invoice-summary-val">
+                                            {formatMoney(invoice.taxAmount, invoice.currency)}
+                                        </span>
+                                    </div>
+                                    <div className="client-invoice-summary-divider" />
+                                    <div className="client-invoice-summary-row">
+                                        <span className="client-invoice-summary-total-label">Grand Total</span>
+                                        <span className="client-invoice-summary-total-val" style={{ fontSize: "16px" }}>
+                                            {formatMoney(invoice.totalAmount, invoice.currency)}
+                                        </span>
+                                    </div>
+                                </div>
 
-                            <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "20px" }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#64748b" }}>
-                                    <span>Subtotal</span>
-                                    <span style={{ fontWeight: 600, color: "#0f172a" }}>
-                                        {formatMoney(invoice.subtotal, invoice.currency)}
-                                    </span>
+                                {/* Highlighted Payment Status Card (Frame 2147225183) */}
+                                <div className="client-invoice-payment-status-card">
+                                    <div className="client-invoice-payment-status-row">
+                                        <span className="client-invoice-kv-label" style={{ fontWeight: 600, textTransform: "uppercase" }}>
+                                            PAYMENT STATUS
+                                        </span>
+                                        <span className={`client-invoice-status-pill ${isPaid ? "paid" : "pending"}`}>
+                                            {isPaid ? "PAID" : "PAYMENT PENDING"}
+                                        </span>
+                                    </div>
+                                    <div className="client-invoice-payment-status-row">
+                                        <span className="client-invoice-kv-label">Amount Due</span>
+                                        <span className="client-invoice-kv-value" style={{ fontWeight: 700 }}>
+                                            {formatMoney(invoice.outstanding, invoice.currency)}
+                                        </span>
+                                    </div>
+                                    <div className="client-invoice-payment-status-row">
+                                        <span className="client-invoice-kv-label">Due Date</span>
+                                        <span className="client-invoice-kv-value" style={{ fontWeight: 500, fontSize: "13px" }}>
+                                            {formatDate(invoice.dueDate)}
+                                        </span>
+                                    </div>
                                 </div>
-                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#64748b" }}>
-                                    <span>Discount</span>
-                                    <span style={{ fontWeight: 600, color: "#0f172a" }}>₹0</span>
-                                </div>
-                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#64748b" }}>
-                                    <span>Tax / GST</span>
-                                    <span style={{ fontWeight: 600, color: "#0f172a" }}>
-                                        {formatMoney(invoice.taxAmount, invoice.currency)}
-                                    </span>
-                                </div>
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        justifyContent: "space-between",
-                                        fontSize: "15px",
-                                        fontWeight: 700,
-                                        color: "#2563eb",
-                                        borderTop: "1px solid #e2e8f0",
-                                        paddingTop: "12px",
-                                        marginTop: "4px",
-                                    }}
-                                >
-                                    <span>Grand Total</span>
-                                    <span>{formatMoney(invoice.totalAmount, invoice.currency)}</span>
-                                </div>
-                            </div>
 
-                            {/* Inner Highlight Card */}
-                            <div
-                                style={{
-                                    background: "#f8fafc",
-                                    borderRadius: "10px",
-                                    border: "1px solid #e2e8f0",
-                                    padding: "16px",
-                                    marginBottom: "16px",
-                                }}
-                            >
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                                    <span style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>
-                                        PAYMENT STATUS
-                                    </span>
-                                    <span
-                                        style={{
-                                            fontSize: "11px",
-                                            fontWeight: 600,
-                                            padding: "3px 9px",
-                                            borderRadius: "999px",
-                                            backgroundColor: isPaid ? "#dcfce7" : "#fef3c7",
-                                            color: isPaid ? "#16a34a" : "#b45309",
-                                        }}
+                                {/* Primary Payment Action Button */}
+                                {isPayable ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setPayModalOpen(true)}
+                                        className="client-invoice-pay-btn"
+                                        style={{ width: "100%", justifyContent: "center" }}
                                     >
-                                        {isPaid ? "PAID" : "PAYMENT PENDING"}
-                                    </span>
-                                </div>
-                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#64748b", marginBottom: "8px" }}>
-                                    <span>Amount Due</span>
-                                    <span style={{ fontWeight: 600, color: "#0f172a" }}>
-                                        {formatMoney(invoice.outstanding, invoice.currency)}
-                                    </span>
-                                </div>
-                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#64748b" }}>
-                                    <span>Due Date</span>
-                                    <span style={{ fontWeight: 600, color: "#0f172a" }}>
-                                        {formatDate(invoice.dueDate)}
-                                    </span>
-                                </div>
-                            </div>
+                                        Pay Invoice
+                                    </button>
+                                ) : (
+                                    <div className="client-invoice-paid-badge">
+                                        <CheckCircle2 size={16} /> Paid in Full
+                                    </div>
+                                )}
 
-                            {/* Primary Payment Action matching Reference 3 */}
-                            {isPayable ? (
+                                {/* Secondary Action: Download PDF */}
                                 <button
                                     type="button"
-                                    onClick={() => setPayModalOpen(true)}
+                                    onClick={() => window.open(`/api/v1/client/invoices/${invoice.id}/pdf`, "_blank")}
+                                    className="client-btn-secondary"
                                     style={{
                                         width: "100%",
-                                        padding: "11px 0",
-                                        borderRadius: "8px",
-                                        background: "#2563eb",
-                                        color: "#ffffff",
-                                        fontSize: "14px",
-                                        fontWeight: 600,
-                                        border: "none",
-                                        cursor: "pointer",
-                                        boxShadow: "0 1px 2px rgba(37, 99, 235, 0.2)",
-                                        marginBottom: "8px",
-                                    }}
-                                >
-                                    Pay Invoice
-                                </button>
-                            ) : (
-                                <div
-                                    style={{
-                                        width: "100%",
-                                        padding: "10px 0",
-                                        borderRadius: "8px",
-                                        background: "#f0fdf4",
-                                        color: "#16a34a",
-                                        fontSize: "13px",
-                                        fontWeight: 600,
-                                        textAlign: "center",
-                                        border: "1px solid #bbf7d0",
-                                        marginBottom: "8px",
+                                        height: "42px",
                                         display: "flex",
                                         alignItems: "center",
                                         justifyContent: "center",
                                         gap: "6px",
+                                        fontWeight: 600,
+                                        fontSize: "13px",
                                     }}
                                 >
-                                    <CheckCircle2 size={16} /> Paid in Full
-                                </div>
-                            )}
-
-                            {/* Download PDF Secondary Action */}
-                            <button
-                                type="button"
-                                onClick={() => window.open(`/api/v1/client/invoices/${invoice.id}/pdf`, "_blank")}
-                                style={{
-                                    width: "100%",
-                                    padding: "9px 0",
-                                    borderRadius: "8px",
-                                    background: "#ffffff",
-                                    color: "#475569",
-                                    fontSize: "13px",
-                                    fontWeight: 600,
-                                    border: "1px solid #e2e8f0",
-                                    cursor: "pointer",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    gap: "6px",
-                                }}
-                            >
-                                <Download size={14} /> Download PDF
-                            </button>
+                                    <Download size={14} /> Download PDF
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </section>
+                </div>
             </div>
 
             {/* Pay Invoice Modal */}
             {payModalOpen && (
-                <div
-                    style={{
-                        position: "fixed",
-                        inset: 0,
-                        backgroundColor: "rgba(15, 23, 42, 0.4)",
-                        backdropFilter: "blur(4px)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        zIndex: 60,
-                        padding: "20px",
-                    }}
-                >
-                    <div
-                        style={{
-                            maxWidth: "480px",
-                            width: "100%",
-                            backgroundColor: "#ffffff",
-                            borderRadius: "14px",
-                            border: "1px solid #e2e8f0",
-                            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)",
-                            padding: "24px",
-                        }}
-                    >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                            <h3 style={{ fontSize: "17px", fontWeight: 700, color: "#0f172a", margin: 0 }}>
+                <div className="client-modal-backdrop">
+                    <div className="client-modal-card" style={{ maxWidth: "480px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", paddingBottom: "12px", borderBottom: "1px solid rgba(226, 232, 240, 0.8)" }}>
+                            <h3 style={{ fontSize: "17px", fontWeight: 700, color: "#0f172a", margin: 0, fontFamily: "Urbanist, sans-serif" }}>
                                 Pay Invoice {invoice.invoiceNumber}
                             </h3>
                             <button
@@ -667,21 +494,21 @@ export default function ClientInvoiceDetailPage({
                             </button>
                         </div>
 
-                        <div style={{ padding: "14px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0", marginBottom: "18px" }}>
+                        <div style={{ padding: "14px", background: "rgba(248, 250, 252, 0.8)", borderRadius: "8px", border: "1px solid rgba(226, 232, 240, 0.8)", marginBottom: "18px" }}>
                             <div style={{ fontSize: "12px", color: "#64748b" }}>Project</div>
                             <div style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a", marginTop: "2px" }}>
                                 {invoice.projectName}
                             </div>
-                            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "10px", paddingTop: "10px", borderTop: "1px solid #e2e8f0" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "10px", paddingTop: "10px", borderTop: "1px solid rgba(226, 232, 240, 0.8)" }}>
                                 <span style={{ fontSize: "13px", color: "#64748b" }}>Outstanding Balance:</span>
-                                <span style={{ fontSize: "16px", fontWeight: 700, color: "#2563eb" }}>
+                                <span style={{ fontSize: "17px", fontWeight: 700, color: "#2563eb", fontFamily: "Urbanist, sans-serif" }}>
                                     {formatMoney(invoice.outstanding, invoice.currency)}
                                 </span>
                             </div>
                         </div>
 
                         <div style={{ marginBottom: "20px" }}>
-                            <label style={{ fontSize: "13px", fontWeight: 600, color: "#334155", display: "block", marginBottom: "8px" }}>
+                            <label style={{ fontSize: "13px", fontWeight: 700, color: "#334155", display: "block", marginBottom: "8px" }}>
                                 Payment Method
                             </label>
                             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -698,8 +525,8 @@ export default function ClientInvoiceDetailPage({
                                             gap: "10px",
                                             padding: "10px 14px",
                                             borderRadius: "8px",
-                                            border: paymentMethod === m.key ? "1px solid #2563eb" : "1px solid #e2e8f0",
-                                            background: paymentMethod === m.key ? "#eff6ff" : "#ffffff",
+                                            border: paymentMethod === m.key ? "1.5px solid #2563eb" : "1px solid rgba(226, 232, 240, 0.8)",
+                                            background: paymentMethod === m.key ? "#eff6ff" : "rgba(255, 255, 255, 0.8)",
                                             cursor: "pointer",
                                             fontSize: "13px",
                                             fontWeight: 500,
@@ -711,6 +538,7 @@ export default function ClientInvoiceDetailPage({
                                             name="paymentMethodDetail"
                                             checked={paymentMethod === m.key}
                                             onChange={() => setPaymentMethod(m.key as any)}
+                                            style={{ accentColor: "#2563eb" }}
                                         />
                                         <span>{m.label}</span>
                                     </label>
@@ -719,7 +547,7 @@ export default function ClientInvoiceDetailPage({
                         </div>
 
                         {paymentMethod === "bank_transfer" && invoice.bankDetails && (
-                            <div style={{ background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0", padding: "12px", marginBottom: "18px", fontSize: "12px", color: "#475569" }}>
+                            <div style={{ background: "rgba(248, 250, 252, 0.8)", borderRadius: "8px", border: "1px solid rgba(226, 232, 240, 0.8)", padding: "12px", marginBottom: "18px", fontSize: "12px", color: "#475569" }}>
                                 <div style={{ fontWeight: 600, color: "#0f172a", marginBottom: "4px" }}>Design Studio Beneficiary Account</div>
                                 <div>Bank: <strong>{invoice.bankDetails.bankName || "HDFC Bank"}</strong></div>
                                 <div>Account #: <strong>{invoice.bankDetails.accountNumber || "50200084920194"}</strong></div>
@@ -736,17 +564,8 @@ export default function ClientInvoiceDetailPage({
                                 <button
                                     type="button"
                                     onClick={() => setPayModalOpen(false)}
-                                    style={{
-                                        flex: 1,
-                                        padding: "10px 16px",
-                                        borderRadius: "8px",
-                                        border: "1px solid #e2e8f0",
-                                        background: "#ffffff",
-                                        color: "#475569",
-                                        fontSize: "13px",
-                                        fontWeight: 600,
-                                        cursor: "pointer",
-                                    }}
+                                    className="client-btn-secondary"
+                                    style={{ flex: 1, padding: "10px 16px" }}
                                 >
                                     Cancel
                                 </button>
@@ -754,15 +573,10 @@ export default function ClientInvoiceDetailPage({
                                     type="button"
                                     disabled={paySubmitting}
                                     onClick={handleConfirmPayment}
+                                    className="client-btn-primary"
                                     style={{
                                         flex: 2,
                                         padding: "10px 16px",
-                                        borderRadius: "8px",
-                                        border: "none",
-                                        background: "#2563eb",
-                                        color: "#ffffff",
-                                        fontSize: "13px",
-                                        fontWeight: 600,
                                         cursor: paySubmitting ? "not-allowed" : "pointer",
                                         display: "inline-flex",
                                         alignItems: "center",

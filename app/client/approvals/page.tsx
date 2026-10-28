@@ -19,6 +19,7 @@ import {
 import ClientDashboardRail from "@/components/client/ClientDashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
 import ApprovalDetailDrawer from "@/components/client/ApprovalDetailDrawer";
+import "@/app/client/client-redesign.css";
 import {
     listClientApprovals,
     submitClientApprovalDecision,
@@ -67,50 +68,45 @@ function getDueDateDisplay(dueDateStr?: string | null): { text: string; subtext:
 function getStageBadgeStyle(stage?: string) {
     const s = (stage || "design").toLowerCase();
     if (s.includes("design")) {
-        return { bg: "#eff6ff", color: "#2563eb", label: stage?.toUpperCase() || "DESIGN" };
+        return { bg: "rgba(37, 99, 235, 0.12)", color: "#2563EB", label: stage?.toUpperCase() || "DESIGN" };
     }
     if (s.includes("construct") || s.includes("structure")) {
-        return { bg: "#fff7ed", color: "#c2410c", label: stage?.toUpperCase() || "CONSTRUCTION" };
+        return { bg: "rgba(194, 65, 12, 0.12)", color: "#C2410C", label: stage?.toUpperCase() || "CONSTRUCTION" };
     }
     if (s.includes("landscape") || s.includes("mep")) {
-        return { bg: "#f0fdf4", color: "#16a34a", label: stage?.toUpperCase() || "LANDSCAPE" };
+        return { bg: "rgba(22, 163, 74, 0.12)", color: "#16A34A", label: stage?.toUpperCase() || "LANDSCAPE" };
     }
-    return { bg: "#f1f5f9", color: "#475569", label: stage?.toUpperCase() || "STAGE" };
+    return { bg: "rgba(37, 99, 235, 0.12)", color: "#2563EB", label: stage?.toUpperCase() || "STAGE" };
 }
 
-function getStatusBadgeStyle(status: string) {
+function getStatusBadgeStyle(status: string): { className: string; label: string } {
     const s = status.toLowerCase();
     if (s === "approved") {
         return {
-            bg: "#dcfce7",
-            color: "#16a34a",
+            className: "approved",
             label: "APPROVED",
         };
     }
     if (["draft", "sent", "in_review", "pending", "yet_to_approve"].includes(s)) {
         return {
-            bg: "#f1f5f9",
-            color: "#475569",
+            className: "yet-to-approve",
             label: "YET-TO APPROVE",
         };
     }
     if (s === "changes_required" || s === "revision_requested") {
         return {
-            bg: "#fef3c7",
-            color: "#b45309",
+            className: "changes-required",
             label: "CHANGES REQUIRED",
         };
     }
     if (s === "rejected") {
         return {
-            bg: "#fee2e2",
-            color: "#dc2626",
+            className: "rejected",
             label: "REJECTED",
         };
     }
     return {
-        bg: "#f1f5f9",
-        color: "#64748b",
+        className: "yet-to-approve",
         label: status.replace("_", " ").toUpperCase(),
     };
 }
@@ -135,6 +131,7 @@ export default function ClientApprovalsPage() {
 
     // Filters and pagination
     const [searchQuery, setSearchQuery] = useState("");
+    const [statusFilter, setStatusFilter] = useState<string | null>(null);
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
     const [total, setTotal] = useState(0);
@@ -156,9 +153,14 @@ export default function ClientApprovalsPage() {
                 page,
                 pageSize,
                 search: searchQuery || undefined,
+                status: statusFilter === "overdue" ? undefined : (statusFilter || undefined),
             });
-            setApprovals(res.items || []);
-            setTotal(res.total ?? (res.items?.length || 0));
+            let items = res.items || [];
+            if (statusFilter === "overdue") {
+                items = items.filter((i) => i.isOverdue);
+            }
+            setApprovals(items);
+            setTotal(res.total ?? (items.length || 0));
             if (res.kpis) {
                 setKpis(res.kpis);
             }
@@ -167,7 +169,7 @@ export default function ClientApprovalsPage() {
         } finally {
             setLoading(false);
         }
-    }, [page, pageSize, searchQuery]);
+    }, [page, pageSize, searchQuery, statusFilter]);
 
     useEffect(() => {
         loadApprovals();
@@ -200,6 +202,15 @@ export default function ClientApprovalsPage() {
         }
     };
 
+    const handleToggleKpiFilter = (target: string | null) => {
+        if (statusFilter === target) {
+            setStatusFilter(null);
+        } else {
+            setStatusFilter(target);
+        }
+        setPage(1);
+    };
+
     const totalPages = Math.max(1, Math.ceil((total || approvals.length) / pageSize));
     const pageNumbers = Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
         if (totalPages <= 5) return i + 1;
@@ -208,12 +219,12 @@ export default function ClientApprovalsPage() {
     });
 
     return (
-        <main className="fig-dashboard" style={{ background: "#edf2f9" }}>
-            <div className="fig-dashboard-glow" />
+        <main className="client-redesign-shell">
+            <div className="client-bg-glow" />
 
             <ClientDashboardRail current="/client/approvals" />
 
-            <div className="fig-dashboard-main">
+            <div className="client-main-area">
                 <DashboardHeader
                     title="Approvals"
                     hideNew={true}
@@ -223,157 +234,105 @@ export default function ClientApprovalsPage() {
                     }}
                 />
 
-                <section style={{ padding: "28px 36px" }}>
-                    {/* 4 TOP KPI CARDS matching Reference 4 */}
-                    <div
-                        style={{
-                            display: "grid",
-                            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-                            gap: "20px",
-                            marginBottom: "28px",
-                        }}
-                    >
-                        {/* 1. Total Approvals */}
+                <section className="client-approvals-workspace" style={{ padding: "28px 36px" }}>
+                    {/* 4 TOP KPI CARDS (Frame 2147225138) */}
+                    <div className="client-approvals-kpi-row client-kpi-row">
+                        {/* 1. Total Approvals (Frame 93) */}
                         <div
-                            style={{
-                                background: "#ffffff",
-                                borderRadius: "12px",
-                                border: "1px solid #e2e8f0",
-                                padding: "20px 24px",
-                                boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
-                            }}
+                            className={`client-approvals-kpi-card client-kpi-card ${statusFilter === null ? "active" : ""}`}
+                            onClick={() => handleToggleKpiFilter(null)}
+                            title="Filter: All Approvals"
+                            role="button"
+                            tabIndex={0}
                         >
-                            <div style={{ fontSize: "13px", fontWeight: 500, color: "#64748b" }}>
+                            <div className="client-approvals-kpi-label client-kpi-label">
                                 Total Approvals
                             </div>
-                            <div style={{ fontSize: "28px", fontWeight: 700, color: "#0f172a", margin: "6px 0 8px 0" }}>
+                            <div className="client-approvals-kpi-val client-kpi-value">
                                 {kpis.total}
                             </div>
-                            <div
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "4px",
-                                    fontSize: "12px",
-                                    fontWeight: 500,
-                                    color: "#16a34a",
-                                }}
-                            >
-                                <ArrowUpRight size={14} />
-                                <span>{kpis.trends?.totalTrend || "13% vs last month"}</span>
+                            <div className="client-approvals-kpi-trend client-kpi-trend">
+                                <div className="client-approvals-kpi-trend-pill positive">
+                                    <ArrowUpRight size={14} color="#16a34a" />
+                                    <span>13%</span>
+                                </div>
+                                <span className="client-approvals-kpi-trend-text">vs last month</span>
                             </div>
                         </div>
 
-                        {/* 2. Overdue */}
+                        {/* 2. Overdue (Frame 2147225074) */}
                         <div
-                            style={{
-                                background: "#ffffff",
-                                borderRadius: "12px",
-                                border: "1px solid #e2e8f0",
-                                padding: "20px 24px",
-                                boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
-                            }}
+                            className={`client-approvals-kpi-card client-kpi-card ${statusFilter === "overdue" ? "active" : ""}`}
+                            onClick={() => handleToggleKpiFilter("overdue")}
+                            title="Filter: Overdue Approvals"
+                            role="button"
+                            tabIndex={0}
                         >
-                            <div style={{ fontSize: "13px", fontWeight: 500, color: "#64748b" }}>
+                            <div className="client-approvals-kpi-label client-kpi-label">
                                 Overdue
                             </div>
-                            <div style={{ fontSize: "28px", fontWeight: 700, color: "#0f172a", margin: "6px 0 8px 0" }}>
+                            <div className="client-approvals-kpi-val client-kpi-value">
                                 {kpis.overdue}
                             </div>
-                            <div
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "4px",
-                                    fontSize: "12px",
-                                    fontWeight: 500,
-                                    color: "#dc2626",
-                                }}
-                            >
-                                <ArrowUpRight size={14} />
-                                <span>{kpis.trends?.overdueTrend || "24% vs last month"}</span>
+                            <div className="client-approvals-kpi-trend client-kpi-trend">
+                                <div className="client-approvals-kpi-trend-pill negative">
+                                    <ArrowUpRight size={14} color="#dc2626" />
+                                    <span>24%</span>
+                                </div>
+                                <span className="client-approvals-kpi-trend-text">vs last month</span>
                             </div>
                         </div>
 
-                        {/* 3. In-Review */}
+                        {/* 3. In-Review (Frame 2147225075) */}
                         <div
-                            style={{
-                                background: "#ffffff",
-                                borderRadius: "12px",
-                                border: "1px solid #e2e8f0",
-                                padding: "20px 24px",
-                                boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
-                            }}
+                            className={`client-approvals-kpi-card client-kpi-card ${statusFilter === "in_review" ? "active" : ""}`}
+                            onClick={() => handleToggleKpiFilter("in_review")}
+                            title="Filter: In-Review Approvals"
+                            role="button"
+                            tabIndex={0}
                         >
-                            <div style={{ fontSize: "13px", fontWeight: 500, color: "#64748b" }}>
+                            <div className="client-approvals-kpi-label client-kpi-label">
                                 In-Review
                             </div>
-                            <div style={{ fontSize: "28px", fontWeight: 700, color: "#0f172a", margin: "6px 0 8px 0" }}>
+                            <div className="client-approvals-kpi-val client-kpi-value">
                                 {kpis.inReview}
                             </div>
-                            <div
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "4px",
-                                    fontSize: "12px",
-                                    fontWeight: 500,
-                                    color: "#16a34a",
-                                }}
-                            >
-                                <ArrowUpRight size={14} />
-                                <span>{kpis.trends?.inReviewTrend || "13% vs yesterday"}</span>
+                            <div className="client-approvals-kpi-trend client-kpi-trend">
+                                <div className="client-approvals-kpi-trend-pill positive">
+                                    <ArrowUpRight size={14} color="#16a34a" />
+                                    <span>13%</span>
+                                </div>
+                                <span className="client-approvals-kpi-trend-text">vs yesterday</span>
                             </div>
                         </div>
 
-                        {/* 4. Approved */}
+                        {/* 4. Approved (Frame 2147225078) */}
                         <div
-                            style={{
-                                background: "#ffffff",
-                                borderRadius: "12px",
-                                border: "1px solid #e2e8f0",
-                                padding: "20px 24px",
-                                boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
-                            }}
+                            className={`client-approvals-kpi-card client-kpi-card ${statusFilter === "approved" ? "active" : ""}`}
+                            onClick={() => handleToggleKpiFilter("approved")}
+                            title="Filter: Approved Approvals"
+                            role="button"
+                            tabIndex={0}
                         >
-                            <div style={{ fontSize: "13px", fontWeight: 500, color: "#64748b" }}>
+                            <div className="client-approvals-kpi-label client-kpi-label">
                                 Approved
                             </div>
-                            <div style={{ fontSize: "28px", fontWeight: 700, color: "#0f172a", margin: "6px 0 8px 0" }}>
+                            <div className="client-approvals-kpi-val client-kpi-value">
                                 {kpis.approved}
                             </div>
-                            <div
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "4px",
-                                    fontSize: "12px",
-                                    fontWeight: 500,
-                                    color: "#dc2626",
-                                }}
-                            >
-                                <ArrowDownRight size={14} />
-                                <span>{kpis.trends?.approvedTrend || "1 vs last month"}</span>
+                            <div className="client-approvals-kpi-trend client-kpi-trend">
+                                <div className="client-approvals-kpi-trend-pill negative">
+                                    <ArrowDownRight size={14} color="#ef4444" />
+                                    <span>1</span>
+                                </div>
+                                <span className="client-approvals-kpi-trend-text">vs last month</span>
                             </div>
                         </div>
                     </div>
 
-                    {/* Error State */}
+                    {/* Error State Banner */}
                     {error && (
-                        <div
-                            style={{
-                                padding: "14px 18px",
-                                borderRadius: "8px",
-                                backgroundColor: "#fef2f2",
-                                border: "1px solid #fecaca",
-                                color: "#b91c1c",
-                                marginBottom: "20px",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "10px",
-                                fontSize: "13px",
-                            }}
-                        >
+                        <div className="client-banner-error" style={{ marginBottom: "16px" }}>
                             <AlertCircle size={18} />
                             <span>{error}</span>
                             <button
@@ -396,432 +355,329 @@ export default function ClientApprovalsPage() {
                         </div>
                     )}
 
-                    {/* APPROVALS TABLE matching Reference 4 */}
-                    <div
-                        style={{
-                            background: "#ffffff",
-                            borderRadius: "12px",
-                            border: "1px solid #e2e8f0",
-                            boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
-                            overflow: "visible",
-                        }}
-                    >
-                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                            <thead>
-                                <tr style={{ background: "#edf2f7", borderBottom: "1px solid #e2e8f0" }}>
-                                    <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "11px", color: "#64748b", fontWeight: 700, letterSpacing: "0.04em" }}>
-                                        APPROVAL NAME
-                                    </th>
-                                    <th style={{ padding: "14px 16px", textAlign: "left", fontSize: "11px", color: "#64748b", fontWeight: 700, letterSpacing: "0.04em" }}>
-                                        STAGE
-                                    </th>
-                                    <th style={{ padding: "14px 16px", textAlign: "left", fontSize: "11px", color: "#64748b", fontWeight: 700, letterSpacing: "0.04em" }}>
-                                        REQUESTED BY
-                                    </th>
-                                    <th style={{ padding: "14px 16px", textAlign: "left", fontSize: "11px", color: "#64748b", fontWeight: 700, letterSpacing: "0.04em" }}>
-                                        STAGE
-                                    </th>
-                                    <th style={{ padding: "14px 16px", textAlign: "left", fontSize: "11px", color: "#64748b", fontWeight: 700, letterSpacing: "0.04em" }}>
-                                        DUE DATE
-                                    </th>
-                                    <th style={{ padding: "14px 16px", textAlign: "left", fontSize: "11px", color: "#64748b", fontWeight: 700, letterSpacing: "0.04em" }}>
-                                        REQUESTED DATE
-                                    </th>
-                                    <th style={{ padding: "14px 20px", textAlign: "right", fontSize: "11px", color: "#64748b", fontWeight: 700, letterSpacing: "0.04em" }}>
-                                        <span className="sr-only">ACTIONS</span>
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {loading ? (
+                    {/* APPROVALS TABLE CONTAINER (Frame 2147225067) */}
+                    <div className="client-approvals-table-card client-table-container">
+                        <div className="client-approvals-table-wrap" style={{ width: "100%" }}>
+                            <table className="client-approvals-table client-table">
+                                <thead className="client-approvals-thead">
                                     <tr>
-                                        <td colSpan={7} style={{ textAlign: "center", padding: "60px 16px" }}>
-                                            <Loader2 className="animate-spin" size={32} color="#2563EB" style={{ margin: "0 auto 10px auto" }} />
-                                            <div style={{ color: "#64748b", fontSize: "14px", fontWeight: 500 }}>
-                                                Loading approvals...
-                                            </div>
-                                        </td>
+                                        {/* Component 5: APPROVAL NAME (302px) */}
+                                        <th className="client-approvals-th" style={{ textAlign: "left", width: "302px" }}>
+                                            APPROVAL NAME
+                                        </th>
+
+                                        {/* Component 24: STAGE (171px) */}
+                                        <th className="client-approvals-th" style={{ textAlign: "left", width: "171px" }}>
+                                            STAGE
+                                        </th>
+
+                                        {/* Component 18: REQUESTED BY (196px) */}
+                                        <th className="client-approvals-th" style={{ textAlign: "left", width: "196px" }}>
+                                            REQUESTED BY
+                                        </th>
+
+                                        {/* Component 29: STATUS / STAGE (204px) */}
+                                        <th className="client-approvals-th" style={{ textAlign: "left", width: "204px" }}>
+                                            STATUS
+                                        </th>
+
+                                        {/* Component 25: DUE DATE (136px) */}
+                                        <th className="client-approvals-th" style={{ textAlign: "left", width: "136px" }}>
+                                            DUE DATE
+                                        </th>
+
+                                        {/* Component 28: REQUESTED DATE (216px) */}
+                                        <th className="client-approvals-th" style={{ textAlign: "left", width: "216px" }}>
+                                            REQUESTED DATE
+                                        </th>
+
+                                        {/* Component 23: ACTIONS (64px) */}
+                                        <th className="client-approvals-th" style={{ textAlign: "center", width: "64px" }}>
+                                            <span className="sr-only">ACTIONS</span>
+                                        </th>
                                     </tr>
-                                ) : approvals.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={7} style={{ textAlign: "center", padding: "64px 16px" }}>
-                                            <div style={{ maxWidth: "360px", margin: "0 auto" }}>
-                                                <CheckCircle2 size={42} color="#94a3b8" style={{ margin: "0 auto 12px auto" }} />
-                                                <h4 style={{ fontSize: "16px", fontWeight: 600, color: "#0f172a", marginBottom: "4px" }}>
-                                                    No Approvals Found
-                                                </h4>
-                                                <p style={{ fontSize: "13px", color: "#64748b", margin: 0 }}>
-                                                    {searchQuery ? "No approval requests match your search criteria." : "All approval requests are up to date."}
-                                                </p>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    approvals.map((appr) => {
-                                        const stageStyle = getStageBadgeStyle(appr.stage);
-                                        const statusStyle = getStatusBadgeStyle(appr.status);
-                                        const dueDateInfo = getDueDateDisplay(appr.dueDate);
-                                        const requesterName = appr.requestedBy?.name || "Rohit Sharma";
-                                        const requesterRole = appr.requestedBy?.role || "Manager";
-                                        const isPending = ["draft", "sent", "in_review", "pending", "yet_to_approve"].includes(
-                                            appr.status.toLowerCase()
-                                        );
-
-                                        return (
-                                            <tr
-                                                key={appr.id}
-                                                onClick={() => handleOpenDrawer(appr)}
-                                                style={{
-                                                    cursor: "pointer",
-                                                    borderBottom: "1px solid #f1f5f9",
-                                                    transition: "background-color 0.1s ease",
-                                                }}
-                                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8fafc")}
-                                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                                            >
-                                                {/* APPROVAL NAME */}
-                                                <td style={{ padding: "16px 20px" }}>
-                                                    <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a" }}>
-                                                        {appr.title}
-                                                    </div>
-                                                </td>
-
-                                                {/* STAGE (Design pill) */}
-                                                <td style={{ padding: "16px 16px" }}>
-                                                    <span
-                                                        style={{
-                                                            display: "inline-block",
-                                                            padding: "3px 10px",
-                                                            borderRadius: "999px",
-                                                            backgroundColor: stageStyle.bg,
-                                                            color: stageStyle.color,
-                                                            fontSize: "11px",
-                                                            fontWeight: 700,
-                                                            letterSpacing: "0.04em",
-                                                        }}
-                                                    >
-                                                        {stageStyle.label}
-                                                    </span>
-                                                </td>
-
-                                                {/* REQUESTED BY */}
-                                                <td style={{ padding: "16px 16px" }}>
-                                                    <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a" }}>
-                                                        {requesterName}
-                                                    </div>
-                                                    <div style={{ fontSize: "12px", color: "#64748b", fontStyle: "italic", marginTop: "1px" }}>
-                                                        {requesterRole}
-                                                    </div>
-                                                </td>
-
-                                                {/* STAGE / STATUS (Pill e.g. YET-TO APPROVE / APPROVED) */}
-                                                <td style={{ padding: "16px 16px" }}>
-                                                    <span
-                                                        style={{
-                                                            display: "inline-block",
-                                                            padding: "3px 10px",
-                                                            borderRadius: "999px",
-                                                            backgroundColor: statusStyle.bg,
-                                                            color: statusStyle.color,
-                                                            fontSize: "11px",
-                                                            fontWeight: 700,
-                                                            letterSpacing: "0.04em",
-                                                        }}
-                                                    >
-                                                        {statusStyle.label}
-                                                    </span>
-                                                </td>
-
-                                                {/* DUE DATE */}
-                                                <td style={{ padding: "16px 16px" }}>
-                                                    <div style={{ fontSize: "13px", color: "#0f172a", fontWeight: 500 }}>
-                                                        {dueDateInfo.text}
-                                                    </div>
-                                                    {dueDateInfo.subtext && (
-                                                        <div
-                                                            style={{
-                                                                fontSize: "12px",
-                                                                color: dueDateInfo.isOverdue ? "#dc2626" : "#64748b",
-                                                                fontWeight: dueDateInfo.isOverdue ? 600 : 400,
-                                                                marginTop: "1px",
-                                                            }}
+                                </thead>
+                                <tbody>
+                                    {loading ? (
+                                        <tr>
+                                            <td colSpan={7} style={{ textAlign: "center", padding: "64px 16px" }}>
+                                                <Loader2 className="animate-spin" size={32} color="#2563EB" style={{ margin: "0 auto 10px auto" }} />
+                                                <div style={{ color: "#64748b", fontSize: "14px", fontWeight: 500, fontFamily: "Urbanist, sans-serif" }}>
+                                                    Loading approvals...
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ) : approvals.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={7} style={{ textAlign: "center", padding: "64px 16px" }}>
+                                                <div style={{ maxWidth: "360px", margin: "0 auto" }}>
+                                                    <CheckCircle2 size={42} color="#94a3b8" style={{ margin: "0 auto 12px auto" }} />
+                                                    <h4 style={{ fontSize: "16px", fontWeight: 700, color: "#0f172a", marginBottom: "4px", fontFamily: "Urbanist, sans-serif" }}>
+                                                        No Approvals Found
+                                                    </h4>
+                                                    <p style={{ fontSize: "13px", color: "#64748b", margin: 0 }}>
+                                                        {searchQuery
+                                                            ? "No approval requests match your search criteria."
+                                                            : statusFilter
+                                                            ? `No approvals with status "${statusFilter}".`
+                                                            : "All approval requests are up to date."}
+                                                    </p>
+                                                    {statusFilter && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setStatusFilter(null)}
+                                                            className="client-btn-secondary client-btn-compact"
+                                                            style={{ marginTop: "14px" }}
                                                         >
-                                                            {dueDateInfo.subtext}
-                                                        </div>
+                                                            Clear Status Filter
+                                                        </button>
                                                     )}
-                                                </td>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        approvals.map((appr) => {
+                                            const stageStyle = getStageBadgeStyle(appr.stage);
+                                            const statusBadge = getStatusBadgeStyle(appr.status);
+                                            const dueDateInfo = getDueDateDisplay(appr.dueDate);
+                                            const requesterName = appr.requestedBy?.name || "Rohit Sharma";
+                                            const requesterRole = appr.requestedBy?.role || "Manager";
+                                            const isPending = ["draft", "sent", "in_review", "pending", "yet_to_approve"].includes(
+                                                appr.status.toLowerCase()
+                                            );
 
-                                                {/* REQUESTED DATE */}
-                                                <td style={{ padding: "16px 16px", fontSize: "13px", color: "#0f172a" }}>
-                                                    {formatDate(appr.requestedAt)}
-                                                </td>
-
-                                                {/* ACTIONS */}
-                                                <td
-                                                    style={{ padding: "16px 20px", textAlign: "right", position: "relative" }}
-                                                    onClick={(e) => e.stopPropagation()}
+                                            return (
+                                                <tr
+                                                    key={appr.id}
+                                                    onClick={() => handleOpenDrawer(appr)}
+                                                    className="client-approvals-tr"
                                                 >
-                                                    <button
-                                                        type="button"
-                                                        aria-label="Approval options"
-                                                        onClick={() => setActiveMenuId(activeMenuId === appr.id ? null : appr.id)}
-                                                        style={{
-                                                            background: "none",
-                                                            border: "none",
-                                                            color: "#64748b",
-                                                            cursor: "pointer",
-                                                            padding: "6px",
-                                                            borderRadius: "6px",
-                                                            display: "inline-flex",
-                                                            alignItems: "center",
-                                                            justifyContent: "center",
-                                                        }}
-                                                    >
-                                                        <MoreHorizontal size={18} />
-                                                    </button>
+                                                    {/* 1. APPROVAL NAME */}
+                                                    <td className="client-approvals-td">
+                                                        <div className="client-approvals-name">
+                                                            {appr.title}
+                                                        </div>
+                                                    </td>
 
-                                                    {/* Floating Action Menu Popover matching Reference 1 & 4 */}
-                                                    {activeMenuId === appr.id && (
-                                                        <div
-                                                            ref={menuRef}
+                                                    {/* 2. STAGE (DESIGN pill) */}
+                                                    <td className="client-approvals-td">
+                                                        <span
+                                                            className="client-approvals-stage-pill client-badge"
                                                             style={{
-                                                                position: "absolute",
-                                                                right: "20px",
-                                                                top: "calc(100% - 6px)",
-                                                                backgroundColor: "#ffffff",
-                                                                borderRadius: "8px",
-                                                                border: "1px solid #e2e8f0",
-                                                                boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)",
-                                                                zIndex: 40,
-                                                                minWidth: "160px",
-                                                                padding: "4px 0",
-                                                                textAlign: "left",
+                                                                backgroundColor: stageStyle.bg,
+                                                                color: stageStyle.color,
                                                             }}
                                                         >
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleOpenDrawer(appr)}
-                                                                style={{
-                                                                    display: "flex",
-                                                                    alignItems: "center",
-                                                                    gap: "8px",
-                                                                    width: "100%",
-                                                                    padding: "8px 14px",
-                                                                    background: "none",
-                                                                    border: "none",
-                                                                    fontSize: "13px",
-                                                                    color: "#0f172a",
-                                                                    cursor: "pointer",
-                                                                    fontWeight: 500,
-                                                                }}
-                                                            >
-                                                                <Eye size={15} color="#64748b" />
-                                                                View Approval
-                                                            </button>
+                                                            {stageStyle.label}
+                                                        </span>
+                                                    </td>
 
-                                                            {isPending && (
-                                                                <>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleQuickAction(appr, "approved")}
-                                                                        style={{
-                                                                            display: "flex",
-                                                                            alignItems: "center",
-                                                                            gap: "8px",
-                                                                            width: "100%",
-                                                                            padding: "8px 14px",
-                                                                            background: "none",
-                                                                            border: "none",
-                                                                            fontSize: "13px",
-                                                                            color: "#16a34a",
-                                                                            cursor: "pointer",
-                                                                            fontWeight: 500,
-                                                                        }}
-                                                                    >
-                                                                        <CheckCircle2 size={15} color="#16a34a" />
-                                                                        Approve
-                                                                    </button>
+                                                    {/* 3. REQUESTED BY (Stack: Name + Role) */}
+                                                    <td className="client-approvals-td">
+                                                        <div className="client-approvals-stack">
+                                                            <span className="client-approvals-primary-text">
+                                                                {requesterName}
+                                                            </span>
+                                                            <span className="client-approvals-secondary-text">
+                                                                {requesterRole}
+                                                            </span>
+                                                        </div>
+                                                    </td>
 
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleQuickAction(appr, "changes_required")}
-                                                                        style={{
-                                                                            display: "flex",
-                                                                            alignItems: "center",
-                                                                            gap: "8px",
-                                                                            width: "100%",
-                                                                            padding: "8px 14px",
-                                                                            background: "none",
-                                                                            border: "none",
-                                                                            fontSize: "13px",
-                                                                            color: "#b45309",
-                                                                            cursor: "pointer",
-                                                                            fontWeight: 500,
-                                                                        }}
-                                                                    >
-                                                                        <AlertCircle size={15} color="#b45309" />
-                                                                        Request Changes
-                                                                    </button>
+                                                    {/* 4. STATUS (YET-TO APPROVE / APPROVED pill) */}
+                                                    <td className="client-approvals-td">
+                                                        <span
+                                                            className={`client-approvals-status-pill client-badge ${statusBadge.className}`}
+                                                        >
+                                                            {statusBadge.label}
+                                                        </span>
+                                                    </td>
 
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleQuickAction(appr, "rejected")}
-                                                                        style={{
-                                                                            display: "flex",
-                                                                            alignItems: "center",
-                                                                            gap: "8px",
-                                                                            width: "100%",
-                                                                            padding: "8px 14px",
-                                                                            background: "none",
-                                                                            border: "none",
-                                                                            fontSize: "13px",
-                                                                            color: "#dc2626",
-                                                                            cursor: "pointer",
-                                                                            fontWeight: 500,
-                                                                        }}
-                                                                    >
-                                                                        <XCircle size={15} color="#dc2626" />
-                                                                        Reject
-                                                                    </button>
-                                                                </>
+                                                    {/* 5. DUE DATE (Stack: Date + relative subtext) */}
+                                                    <td className="client-approvals-td">
+                                                        <div className="client-approvals-stack">
+                                                            <span className="client-approvals-primary-text">
+                                                                {dueDateInfo.text}
+                                                            </span>
+                                                            {dueDateInfo.subtext && (
+                                                                <span
+                                                                    className={
+                                                                        dueDateInfo.isOverdue
+                                                                            ? "client-approvals-overdue-text"
+                                                                            : "client-approvals-secondary-text"
+                                                                    }
+                                                                >
+                                                                    {dueDateInfo.subtext}
+                                                                </span>
                                                             )}
                                                         </div>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                                                    </td>
 
-                    {/* PAGINATION BAR matching Reference 4 */}
-                    <div
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            marginTop: "24px",
-                            padding: "0 4px",
-                        }}
-                    >
-                        {/* Total Approvals */}
-                        <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a" }}>
-                            Total Approvals: {total > 0 ? total : "NA"}
+                                                    {/* 6. REQUESTED DATE */}
+                                                    <td className="client-approvals-td">
+                                                        <span className="client-approvals-primary-text">
+                                                            {formatDate(appr.requestedAt)}
+                                                        </span>
+                                                    </td>
+
+                                                    {/* 7. ACTIONS (Component 23) */}
+                                                    <td
+                                                        className="client-approvals-td"
+                                                        style={{ textAlign: "center", position: "relative" }}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            aria-label="Approval options"
+                                                            onClick={() => setActiveMenuId(activeMenuId === appr.id ? null : appr.id)}
+                                                            className="client-btn-icon"
+                                                            style={{ width: "32px", height: "32px" }}
+                                                        >
+                                                            <MoreHorizontal size={18} />
+                                                        </button>
+
+                                                        {/* Floating Action Menu Popover */}
+                                                        {activeMenuId === appr.id && (
+                                                            <div
+                                                                ref={menuRef}
+                                                                className="client-menu-popover"
+                                                                style={{
+                                                                    right: "8px",
+                                                                    top: "calc(100% - 4px)",
+                                                                    minWidth: "160px",
+                                                                    zIndex: 40,
+                                                                }}
+                                                            >
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleOpenDrawer(appr)}
+                                                                    className="client-menu-item"
+                                                                >
+                                                                    <Eye size={15} color="#64748b" />
+                                                                    View Approval
+                                                                </button>
+
+                                                                {isPending && (
+                                                                    <>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleQuickAction(appr, "approved")}
+                                                                            className="client-menu-item"
+                                                                            style={{ color: "#16a34a" }}
+                                                                        >
+                                                                            <CheckCircle2 size={15} color="#16a34a" />
+                                                                            Approve
+                                                                        </button>
+
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleQuickAction(appr, "changes_required")}
+                                                                            className="client-menu-item"
+                                                                            style={{ color: "#b45309" }}
+                                                                        >
+                                                                            <AlertCircle size={15} color="#b45309" />
+                                                                            Request Changes
+                                                                        </button>
+
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleQuickAction(appr, "rejected")}
+                                                                            className="client-menu-item"
+                                                                            style={{ color: "#dc2626" }}
+                                                                        >
+                                                                            <XCircle size={15} color="#dc2626" />
+                                                                            Reject
+                                                                        </button>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
 
-                        {/* Numeric Page Controls */}
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                            <button
-                                type="button"
-                                disabled={page <= 1}
-                                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                                aria-label="Previous page"
-                                style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    width: "32px",
-                                    height: "32px",
-                                    borderRadius: "6px",
-                                    border: "1px solid #cbd5e1",
-                                    background: "#ffffff",
-                                    color: page <= 1 ? "#cbd5e1" : "#475569",
-                                    cursor: page <= 1 ? "not-allowed" : "pointer",
-                                }}
-                            >
-                                <ChevronLeft size={16} />
-                            </button>
+                        {/* PAGINATION BAR (Frame 2147225166) */}
+                        <div className="client-approvals-pagination-bar client-pagination-bar">
+                            {/* Left: Total Approvals (Frame 2147225166 left) */}
+                            <div className="client-approvals-total-label">
+                                Total Approvals: {total > 0 ? total : "NA"}
+                            </div>
 
-                            {pageNumbers.map((p) => {
-                                const isActive = p === page;
-                                return (
-                                    <button
-                                        key={p}
-                                        type="button"
-                                        onClick={() => setPage(p)}
+                            {/* Center: Numeric Page Controls (Frame 2147225165) */}
+                            <div className="client-approvals-pagination-controls">
+                                <button
+                                    type="button"
+                                    disabled={page <= 1}
+                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                    aria-label="Previous page"
+                                    className="client-approvals-page-btn client-page-btn"
+                                >
+                                    <ChevronLeft size={16} />
+                                </button>
+
+                                {pageNumbers.map((p) => {
+                                    const isActive = p === page;
+                                    return (
+                                        <button
+                                            key={p}
+                                            type="button"
+                                            onClick={() => setPage(p)}
+                                            className={`client-approvals-page-btn client-page-btn ${isActive ? "active" : ""}`}
+                                        >
+                                            {p}
+                                        </button>
+                                    );
+                                })}
+
+                                <button
+                                    type="button"
+                                    disabled={page >= totalPages}
+                                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                                    aria-label="Next page"
+                                    className="client-approvals-page-btn client-page-btn"
+                                >
+                                    <ChevronRight size={16} />
+                                </button>
+                            </div>
+
+                            {/* Right: Show per Page Dropdown (Frame 2147225167) */}
+                            <div className="client-approvals-per-page">
+                                <span className="client-approvals-per-page-label">Show per Page:</span>
+                                <div style={{ position: "relative" }}>
+                                    <select
+                                        value={pageSize}
+                                        onChange={(e) => {
+                                            setPageSize(Number(e.target.value));
+                                            setPage(1);
+                                        }}
+                                        className="client-approvals-per-page-select"
                                         style={{
-                                            display: "inline-flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            width: "32px",
-                                            height: "32px",
-                                            borderRadius: "6px",
-                                            border: isActive ? "1.5px solid #2563eb" : "1px solid #cbd5e1",
-                                            background: "#ffffff",
-                                            color: isActive ? "#2563eb" : "#475569",
-                                            fontSize: "13px",
-                                            fontWeight: isActive ? 700 : 500,
-                                            cursor: "pointer",
+                                            appearance: "none",
+                                            paddingRight: "28px",
                                         }}
                                     >
-                                        {p}
-                                    </button>
-                                );
-                            })}
-
-                            <button
-                                type="button"
-                                disabled={page >= totalPages}
-                                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                                aria-label="Next page"
-                                style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    width: "32px",
-                                    height: "32px",
-                                    borderRadius: "6px",
-                                    border: "1px solid #cbd5e1",
-                                    background: "#ffffff",
-                                    color: page >= totalPages ? "#cbd5e1" : "#475569",
-                                    cursor: page >= totalPages ? "not-allowed" : "pointer",
-                                }}
-                            >
-                                <ChevronRight size={16} />
-                            </button>
-                        </div>
-
-                        {/* Show per Page */}
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                            <span style={{ fontSize: "13px", color: "#64748b" }}>Show per Page:</span>
-                            <div style={{ position: "relative" }}>
-                                <select
-                                    value={pageSize}
-                                    onChange={(e) => {
-                                        setPageSize(Number(e.target.value));
-                                        setPage(1);
-                                    }}
-                                    style={{
-                                        appearance: "none",
-                                        padding: "6px 28px 6px 12px",
-                                        borderRadius: "6px",
-                                        border: "1px solid #cbd5e1",
-                                        background: "#ffffff",
-                                        fontSize: "13px",
-                                        color: "#0f172a",
-                                        fontWeight: 600,
-                                        cursor: "pointer",
-                                        outline: "none",
-                                    }}
-                                >
-                                    <option value={10}>10</option>
-                                    <option value={20}>20</option>
-                                    <option value={50}>50</option>
-                                </select>
-                                <ChevronDown
-                                    size={14}
-                                    color="#64748b"
-                                    style={{ position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
-                                />
+                                        <option value={10}>10</option>
+                                        <option value={20}>20</option>
+                                        <option value={50}>50</option>
+                                    </select>
+                                    <ChevronDown
+                                        size={14}
+                                        color="#64748b"
+                                        style={{ position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
                 </section>
             </div>
 
-            {/* RIGHT-SIDE VIEW APPROVAL DRAWER matching Reference 5 */}
+            {/* RIGHT-SIDE VIEW APPROVAL DRAWER (Reference 5) */}
             <ApprovalDetailDrawer
                 approval={selectedApproval}
                 isOpen={drawerOpen}

@@ -1792,7 +1792,7 @@ async function getClientAccessibleProjectIds(admin: SupabaseClient, userEmail: s
   (projectsRes.data || []).forEach((r) => { if (r.id) ids.add(r.id); });
   (onboardRes.data || []).forEach((r) => { if (r.project_id) ids.add(r.project_id); });
 
-  if (ids.size === 0 && memberRes.data && memberRes.data.length > 0) {
+  if (memberRes.data && memberRes.data.length > 0) {
     const wsIds = memberRes.data.map((m) => m.workspace_id).filter(Boolean);
     const { data: wsProjects } = await admin.from("projects").select("id").in("workspace_id", wsIds).is("archived_at", null);
     (wsProjects || []).forEach((p) => ids.add(p.id));
@@ -1868,7 +1868,7 @@ async function getClientBoqsList(request: NextRequest, supabase: SupabaseClient,
 
   let query = admin
     .from("boqs")
-    .select("id, project_id, boq_number, version, status, grand_total, subtotal, markup_percent, tax_percent, created_at, updated_at", { count: "exact" })
+    .select("id, project_id, boq_number, version, status, markup_percent, tax_percent, created_at, updated_at", { count: "exact" })
     .in("project_id", targetProjectIds)
     .is("archived_at", null)
     .order("updated_at", { ascending: false })
@@ -1896,7 +1896,7 @@ async function getClientBoqsList(request: NextRequest, supabase: SupabaseClient,
   const rows = res.data ?? [];
   const boqIds = rows.map((r) => r.id);
 
-  const [projsRes, auditRes] = await Promise.all([
+  const [projsRes, auditRes, itemTotalsRes] = await Promise.all([
     admin.from("projects").select("id, name, area_sqft, project_value, progress, assigned_designer_id, created_by").in("id", targetProjectIds),
     boqIds.length > 0
       ? admin
@@ -1907,10 +1907,17 @@ async function getClientBoqsList(request: NextRequest, supabase: SupabaseClient,
           .in("action", ["client.boq.approved", "client.boq.revision_requested", "client.boq.rejected"])
           .order("created_at", { ascending: false })
       : Promise.resolve({ data: [] }),
+    boqIds.length > 0
+      ? admin.from("boq_items").select("boq_id, amount").in("boq_id", boqIds)
+      : Promise.resolve({ data: [] }),
   ]);
 
   const projs = projsRes.data || [];
   const projMap = new Map(projs.map((p) => [p.id, p]));
+  const totalMap = new Map<string, number>();
+  (itemTotalsRes.data || []).forEach((item) => {
+    totalMap.set(item.boq_id, (totalMap.get(item.boq_id) || 0) + (Number(item.amount) || 0));
+  });
 
   const designerIds = Array.from(new Set(projs.map((p) => p.assigned_designer_id || p.created_by).filter(Boolean)));
   const { data: designerProfiles } = designerIds.length > 0
@@ -2001,9 +2008,9 @@ async function getClientBoqsList(request: NextRequest, supabase: SupabaseClient,
         progress,
         roomsCount: roomMap.get(b.id) || 0,
         itemsCount: itemMap.get(b.id) || 0,
-        estimatedValue: Number(b.grand_total ?? b.subtotal ?? 0),
-        grandTotal: Number(b.grand_total ?? b.subtotal ?? 0),
-        subtotal: Number(b.subtotal ?? 0),
+        estimatedValue: totalMap.get(b.id) || 0,
+        grandTotal: totalMap.get(b.id) || 0,
+        subtotal: totalMap.get(b.id) || 0,
         date: new Date(b.created_at || b.updated_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
         updatedAt: b.updated_at,
       };
@@ -2025,7 +2032,7 @@ async function getClientBoqDetail(request: NextRequest, supabase: SupabaseClient
 
   const { data: boq, error: boqErr } = await admin
     .from("boqs")
-    .select("id, workspace_id, project_id, boq_number, version, status, markup_percent, tax_percent, subtotal, grand_total, created_at, updated_at")
+    .select("id, workspace_id, project_id, boq_number, version, status, markup_percent, tax_percent, created_at, updated_at")
     .eq("id", boqId)
     .is("archived_at", null)
     .maybeSingle();
@@ -2122,7 +2129,7 @@ async function getClientBoqDetail(request: NextRequest, supabase: SupabaseClient
     categories: catsByRoom.get(r.id) || [],
   }));
 
-  const computedSubtotal = items.reduce((sum, it) => sum + (Number(it.amount) || ((Number(it.quantity) || 0) * (Number(it.rate) || 0))), 0) || Number(boq.subtotal || 0);
+  const computedSubtotal = items.reduce((sum, it) => sum + (Number(it.amount) || ((Number(it.quantity) || 0) * (Number(it.rate) || 0))), 0);
   const markupPercent = Number(boq.markup_percent) || 0;
   const taxPercent = Number(boq.tax_percent) || 18;
   const markupAmount = Math.round(computedSubtotal * (markupPercent / 100));
@@ -2805,7 +2812,7 @@ async function createClientInvoice(request: Request, supabase: SupabaseClient, i
 
   const { data: boq, error: boqErr } = await admin
     .from("boqs")
-    .select("id, project_id, boq_number, grand_total, workspace_id, subtotal")
+    .select("id, project_id, boq_number, workspace_id")
     .eq("id", boqId)
     .maybeSingle();
 
@@ -2844,9 +2851,7 @@ async function createClientInvoice(request: Request, supabase: SupabaseClient, i
     });
   });
 
-  const subtotal = items.length > 0
-    ? items.reduce((s, it) => s + it.amount, 0)
-    : Number(boq.grand_total || 100000);
+  const subtotal = items.reduce((s, it) => s + it.amount, 0);
 
   const taxRate = 18;
   const taxAmount = Math.round(subtotal * taxRate / 100);

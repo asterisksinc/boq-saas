@@ -22,6 +22,7 @@ import {
     submitClientApprovalDecision,
     type ClientApprovalItem,
 } from "@/lib/api/client";
+import "@/app/client/client-redesign.css";
 
 function formatDate(dateStr?: string | null): string {
     if (!dateStr) return "—";
@@ -46,7 +47,6 @@ function getDueDateDisplay(dueDateStr?: string | null): { text: string; subtext:
     });
 
     const now = new Date();
-    // Normalize to midnight
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
     const diffDays = Math.ceil((dueDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
@@ -66,56 +66,20 @@ function getFileIcon(fileName: string) {
     const ext = fileName.split(".").pop()?.toLowerCase() || "";
     if (ext === "pdf") {
         return (
-            <div
-                style={{
-                    width: "36px",
-                    height: "36px",
-                    borderRadius: "8px",
-                    background: "#fef2f2",
-                    color: "#dc2626",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                }}
-            >
+            <div className="client-approval-drawer-file-icon-box pdf">
                 <FileText size={20} />
             </div>
         );
     }
     if (["xlsx", "xls", "csv"].includes(ext)) {
         return (
-            <div
-                style={{
-                    width: "36px",
-                    height: "36px",
-                    borderRadius: "8px",
-                    background: "#f0fdf4",
-                    color: "#16a34a",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                }}
-            >
+            <div className="client-approval-drawer-file-icon-box excel">
                 <FileSpreadsheet size={20} />
             </div>
         );
     }
     return (
-        <div
-            style={{
-                width: "36px",
-                height: "36px",
-                borderRadius: "8px",
-                background: "#f1f5f9",
-                color: "#475569",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-            }}
-        >
+        <div className="client-approval-drawer-file-icon-box other">
             <File size={20} />
         </div>
     );
@@ -125,34 +89,39 @@ function getStatusBadgeStyle(status: string) {
     const s = status.toLowerCase();
     if (s === "approved") {
         return {
-            bg: "#dcfce7",
+            slug: "approved",
+            bg: "rgba(22, 163, 74, 0.12)",
             color: "#16a34a",
             label: "Approved",
         };
     }
     if (["draft", "sent", "in_review", "pending", "yet_to_approve"].includes(s)) {
         return {
-            bg: "#f1f5f9",
+            slug: "yet-to-approve",
+            bg: "rgba(100, 116, 139, 0.12)",
             color: "#475569",
             label: "Yet-To Approve",
         };
     }
     if (s === "changes_required" || s === "revision_requested") {
         return {
-            bg: "#fef3c7",
-            color: "#b45309",
+            slug: "changes-required",
+            bg: "rgba(217, 119, 6, 0.12)",
+            color: "#d97706",
             label: "Changes Required",
         };
     }
     if (s === "rejected") {
         return {
-            bg: "#fee2e2",
+            slug: "rejected",
+            bg: "rgba(220, 38, 38, 0.12)",
             color: "#dc2626",
             label: "Rejected",
         };
     }
     return {
-        bg: "#f1f5f9",
+        slug: "yet-to-approve",
+        bg: "rgba(100, 116, 139, 0.12)",
         color: "#64748b",
         label: status.replace("_", " "),
     };
@@ -300,563 +269,330 @@ export default function ApprovalDetailDrawer({
 
     return (
         <div
-            style={{
-                position: "fixed",
-                inset: 0,
-                backgroundColor: "rgba(15, 23, 42, 0.4)",
-                backdropFilter: "blur(3px)",
-                zIndex: 60,
-                display: "flex",
-                justifyContent: "flex-end",
-            }}
+            className="client-approval-drawer-backdrop"
             onClick={onClose}
+            aria-modal="true"
+            role="dialog"
         >
-            {/* Drawer Container matching Reference 5 */}
+            {/* Drawer Container (Frame 2147225094) */}
             <div
-                style={{
-                    width: "100%",
-                    maxWidth: "620px",
-                    height: "100%",
-                    backgroundColor: "#ffffff",
-                    boxShadow: "-10px 0 25px -5px rgba(0, 0, 0, 0.15)",
-                    display: "flex",
-                    flexDirection: "column",
-                    position: "relative",
-                    overflow: "hidden",
-                }}
+                className="client-approval-drawer-card"
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Drawer Header */}
-                <div
-                    style={{
-                        padding: "20px 28px",
-                        borderBottom: "1px solid #e2e8f0",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        backgroundColor: "#ffffff",
-                    }}
-                >
-                    <h2 style={{ fontSize: "18px", fontWeight: 700, color: "#0f172a", margin: 0 }}>
+                {/* Drawer Header (Frame 2147225093) */}
+                <div className="client-approval-drawer-header">
+                    <h2 className="client-approval-drawer-title">
                         View Approval
                     </h2>
                     <button
                         type="button"
                         onClick={onClose}
                         aria-label="Close approval drawer"
-                        style={{
-                            background: "none",
-                            border: "none",
-                            padding: "6px",
-                            cursor: "pointer",
-                            color: "#64748b",
-                            borderRadius: "6px",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            transition: "background-color 0.15s ease",
-                        }}
+                        className="client-approval-drawer-close-btn"
                     >
                         <X size={20} />
                     </button>
                 </div>
 
-                {/* Scrollable Content Body */}
-                <div
-                    style={{
-                        flex: 1,
-                        overflowY: "auto",
-                        padding: "24px 28px",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "24px",
-                    }}
-                >
-                    {/* Main Approval Card matching Reference 5 */}
-                    <div
-                        style={{
-                            background: "#ffffff",
-                            borderRadius: "12px",
-                            border: "1px solid #e2e8f0",
-                            padding: "24px",
-                            boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
-                        }}
-                    >
-                        {/* Title & Requester */}
-                        <div>
-                            <h3 style={{ fontSize: "18px", fontWeight: 700, color: "#0f172a", margin: 0 }}>
+                {/* Inner White Main Container (Frame 2147225027) */}
+                <div className="client-approval-drawer-main">
+                    {/* Upper Scrollable Content Body (Frame 2147225497) */}
+                    <div className="client-approval-drawer-content-scroll">
+                        {/* Header Identity (Frame 2147225066 & Frame 2147225070) */}
+                        <div className="client-approval-drawer-meta-header">
+                            <h3 className="client-approval-drawer-req-title">
                                 {currentApproval.title}
                             </h3>
-                            <div style={{ fontSize: "13px", color: "#64748b", marginTop: "4px" }}>
+                            <div className="client-approval-drawer-req-sub">
                                 {requesterSubtitle}
                             </div>
                         </div>
 
-                        {/* Metadata 2x2 Grid */}
-                        <div
-                            style={{
-                                display: "grid",
-                                gridTemplateColumns: "1fr 1fr",
-                                gap: "20px",
-                                marginTop: "24px",
-                                paddingBottom: "24px",
-                                borderBottom: "1px solid #f1f5f9",
-                            }}
-                        >
-                            <div>
-                                <div style={{ fontSize: "12px", color: "#64748b" }}>Project Name</div>
-                                <div style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a", marginTop: "4px" }}>
-                                    {currentApproval.projectName}
-                                </div>
-                            </div>
-
-                            <div>
-                                <div style={{ fontSize: "12px", color: "#64748b" }}>Due Date</div>
-                                <div style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a", marginTop: "4px" }}>
-                                    {dueDateInfo.text}{" "}
-                                    {dueDateInfo.subtext && (
-                                        <span
-                                            style={{
-                                                color: dueDateInfo.isOverdue ? "#dc2626" : "#2563eb",
-                                                fontWeight: 500,
-                                                fontSize: "13px",
-                                                marginLeft: "4px",
-                                            }}
-                                        >
-                                            {dueDateInfo.subtext}
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div>
-                                <div style={{ fontSize: "12px", color: "#64748b" }}>Stage</div>
-                                <div style={{ marginTop: "6px" }}>
-                                    <span
-                                        style={{
-                                            display: "inline-block",
-                                            padding: "3px 10px",
-                                            borderRadius: "999px",
-                                            backgroundColor: "#e0f2fe",
-                                            color: "#0369a1",
-                                            fontSize: "11px",
-                                            fontWeight: 700,
-                                            textTransform: "uppercase",
-                                            letterSpacing: "0.04em",
-                                        }}
-                                    >
-                                        {currentApproval.stage || "Design"}
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div>
-                                <div style={{ fontSize: "12px", color: "#64748b" }}>Status</div>
-                                <div style={{ marginTop: "6px" }}>
-                                    <span
-                                        style={{
-                                            display: "inline-block",
-                                            padding: "3px 10px",
-                                            borderRadius: "999px",
-                                            backgroundColor: statusBadge.bg,
-                                            color: statusBadge.color,
-                                            fontSize: "11px",
-                                            fontWeight: 700,
-                                            textTransform: "uppercase",
-                                            letterSpacing: "0.04em",
-                                        }}
-                                    >
-                                        {statusBadge.label}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Description */}
-                        <div style={{ marginTop: "20px" }}>
-                            <div style={{ fontSize: "12px", fontWeight: 700, color: "#475569", textTransform: "uppercase", marginBottom: "8px" }}>
-                                Description
-                            </div>
-                            <p
-                                style={{
-                                    fontSize: "13px",
-                                    lineHeight: 1.6,
-                                    color: "#334155",
-                                    margin: 0,
-                                }}
-                            >
-                                {currentApproval.description ||
-                                    "Please review and verify the stage deliverables and architectural specifications for this milestone. Ensure all design parameters align with the agreed BOQ scope."}
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Attachments Section matching Reference 5 */}
-                    <div>
-                        <div
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                marginBottom: "12px",
-                            }}
-                        >
-                            <h4 style={{ fontSize: "14px", fontWeight: 700, color: "#0f172a", margin: 0 }}>
-                                Attachments
-                            </h4>
-                            <span
-                                style={{
-                                    fontSize: "11px",
-                                    fontWeight: 600,
-                                    padding: "2px 8px",
-                                    borderRadius: "999px",
-                                    background: "#f1f5f9",
-                                    color: "#64748b",
-                                }}
-                            >
-                                {attachmentsList.length} Files
-                            </span>
-                        </div>
-
-                        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                            {attachmentsList.map((att, idx) => (
-                                <div
-                                    key={idx}
-                                    style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        padding: "12px 16px",
-                                        borderRadius: "10px",
-                                        border: "1px solid #e2e8f0",
-                                        background: "#ffffff",
-                                        gap: "14px",
-                                        transition: "border-color 0.15s ease",
-                                    }}
-                                >
-                                    {getFileIcon(att.name)}
-
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div
-                                            style={{
-                                                fontSize: "13px",
-                                                fontWeight: 600,
-                                                color: "#0f172a",
-                                                overflow: "hidden",
-                                                textOverflow: "ellipsis",
-                                                whiteSpace: "nowrap",
-                                            }}
-                                        >
-                                            {att.name}
-                                        </div>
-                                        <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>
-                                            {att.size || "2.4 MB"} · Updated on {formatDate(att.updatedAt || currentApproval.requestedAt)}
-                                        </div>
+                        {/* Nested White Information Card (Frame 2147225027 nested) */}
+                        <div className="client-approval-drawer-info-card">
+                            {/* Row 1: Project Name & Due Date (Frame 2147225128) */}
+                            <div className="client-approval-drawer-info-row">
+                                <div className="client-approval-drawer-info-cell cell-narrow">
+                                    <div className="client-approval-drawer-info-label">Project Name</div>
+                                    <div className="client-approval-drawer-info-val">
+                                        {currentApproval.projectName}
                                     </div>
-
-                                    <a
-                                        href={att.url && att.url !== "#" ? att.url : "#"}
-                                        download={att.name}
-                                        onClick={(e) => {
-                                            if (!att.url || att.url === "#") {
-                                                e.preventDefault();
-                                                alert(`Downloading ${att.name}...`);
-                                            }
-                                        }}
-                                        aria-label={`Download ${att.name}`}
-                                        style={{
-                                            display: "inline-flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            width: "32px",
-                                            height: "32px",
-                                            borderRadius: "6px",
-                                            color: "#475569",
-                                            background: "#f8fafc",
-                                            border: "1px solid #e2e8f0",
-                                            cursor: "pointer",
-                                            textDecoration: "none",
-                                        }}
-                                    >
-                                        <Download size={15} />
-                                    </a>
                                 </div>
-                            ))}
-                        </div>
-                    </div>
 
-                    {/* Formal Client Decision Bar (if pending) */}
-                    {isPending && !confirmAction && (
-                        <div
-                            style={{
-                                background: "#f8fafc",
-                                borderRadius: "10px",
-                                border: "1px solid #e2e8f0",
-                                padding: "16px",
-                            }}
-                        >
-                            <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a", marginBottom: "8px" }}>
-                                Authorize This Request
-                            </div>
-                            <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "14px" }}>
-                                Record your formal client authorization or request specific adjustments from the team.
-                            </div>
-                            <div style={{ display: "flex", gap: "8px" }}>
-                                <button
-                                    type="button"
-                                    onClick={() => setConfirmAction("approved")}
-                                    style={{
-                                        flex: 1,
-                                        padding: "8px 12px",
-                                        borderRadius: "6px",
-                                        border: "none",
-                                        background: "#16a34a",
-                                        color: "#ffffff",
-                                        fontSize: "13px",
-                                        fontWeight: 600,
-                                        cursor: "pointer",
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        gap: "6px",
-                                    }}
-                                >
-                                    <CheckCircle2 size={15} /> Approve
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setConfirmAction("changes_required")}
-                                    style={{
-                                        padding: "8px 12px",
-                                        borderRadius: "6px",
-                                        border: "1px solid #cbd5e1",
-                                        background: "#ffffff",
-                                        color: "#b45309",
-                                        fontSize: "13px",
-                                        fontWeight: 600,
-                                        cursor: "pointer",
-                                    }}
-                                >
-                                    Request Changes
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setConfirmAction("rejected")}
-                                    style={{
-                                        padding: "8px 12px",
-                                        borderRadius: "6px",
-                                        border: "1px solid #fecaca",
-                                        background: "#ffffff",
-                                        color: "#dc2626",
-                                        fontSize: "13px",
-                                        fontWeight: 600,
-                                        cursor: "pointer",
-                                    }}
-                                >
-                                    Reject
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Decision Confirmation Modal banner */}
-                    {confirmAction && (
-                        <div
-                            style={{
-                                background: confirmAction === "approved" ? "#f0fdf4" : "#fef2f2",
-                                border: confirmAction === "approved" ? "1px solid #bbf7d0" : "1px solid #fecaca",
-                                borderRadius: "10px",
-                                padding: "16px",
-                            }}
-                        >
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                                {confirmAction === "approved" ? (
-                                    <CheckCircle2 size={16} color="#16a34a" />
-                                ) : (
-                                    <AlertTriangle size={16} color="#dc2626" />
-                                )}
-                                <div
-                                    style={{
-                                        fontSize: "13px",
-                                        fontWeight: 700,
-                                        color: confirmAction === "approved" ? "#15803d" : "#b91c1c",
-                                        textTransform: "uppercase",
-                                    }}
-                                >
-                                    Confirm Decision: {confirmAction.replace("_", " ")}
+                                <div className="client-approval-drawer-info-cell">
+                                    <div className="client-approval-drawer-info-label">Due Date</div>
+                                    <div className="client-approval-drawer-info-val">
+                                        {dueDateInfo.text}{" "}
+                                        {dueDateInfo.subtext && (
+                                            <span
+                                                style={{
+                                                    color: dueDateInfo.isOverdue ? "#DC2626" : "#2563EB",
+                                                    fontWeight: 600,
+                                                    fontSize: "13px",
+                                                    marginLeft: "6px",
+                                                }}
+                                            >
+                                                {dueDateInfo.subtext}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 
-                            {decisionError && (
-                                <div style={{ fontSize: "12px", color: "#b91c1c", marginBottom: "8px" }}>
-                                    {decisionError}
+                            {/* Row 2: Stage & Status (Frame 2147225129) */}
+                            <div className="client-approval-drawer-info-row">
+                                <div className="client-approval-drawer-info-cell cell-narrow">
+                                    <div className="client-approval-drawer-info-label">Stage</div>
+                                    <div>
+                                        <span className="client-approval-drawer-info-pill stage">
+                                            {currentApproval.stage || "Design"}
+                                        </span>
+                                    </div>
                                 </div>
-                            )}
 
-                            <textarea
-                                rows={2}
-                                placeholder="Add comments or instructions (optional)..."
-                                value={decisionReason}
-                                onChange={(e) => setDecisionReason(e.target.value)}
-                                style={{
-                                    width: "100%",
-                                    padding: "8px 12px",
-                                    borderRadius: "6px",
-                                    border: "1px solid #cbd5e1",
-                                    fontSize: "13px",
-                                    boxSizing: "border-box",
-                                    marginBottom: "12px",
-                                    outline: "none",
-                                    background: "#ffffff",
-                                }}
-                            />
+                                <div className="client-approval-drawer-info-cell">
+                                    <div className="client-approval-drawer-info-label">Status</div>
+                                    <div>
+                                        <span className={`client-approval-drawer-info-pill status-${statusBadge.slug}`}>
+                                            {statusBadge.label}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
 
-                            <div style={{ display: "flex", gap: "8px" }}>
-                                <button
-                                    type="button"
-                                    disabled={submittingDecision}
-                                    onClick={handleConfirmDecision}
-                                    style={{
-                                        padding: "8px 16px",
-                                        borderRadius: "6px",
-                                        border: "none",
-                                        background: confirmAction === "approved" ? "#16a34a" : "#dc2626",
-                                        color: "#ffffff",
-                                        fontSize: "13px",
-                                        fontWeight: 600,
-                                        cursor: submittingDecision ? "not-allowed" : "pointer",
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        gap: "6px",
-                                    }}
-                                >
-                                    {submittingDecision && <Loader2 className="animate-spin" size={14} />}
-                                    Confirm &amp; Submit
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setConfirmAction(null)}
-                                    style={{
-                                        padding: "8px 14px",
-                                        borderRadius: "6px",
-                                        border: "1px solid #cbd5e1",
-                                        background: "#ffffff",
-                                        color: "#475569",
-                                        fontSize: "13px",
-                                        fontWeight: 500,
-                                        cursor: "pointer",
-                                    }}
-                                >
-                                    Cancel
-                                </button>
+                            {/* Row 3: Description (Frame 2147225000) */}
+                            <div className="client-approval-drawer-desc-block">
+                                <div className="client-approval-drawer-info-label">Description</div>
+                                <p className="client-approval-drawer-desc-val">
+                                    {currentApproval.description ||
+                                        "Please review and verify the stage deliverables and architectural specifications for this milestone. Ensure all design parameters align with the agreed BOQ scope."}
+                                </p>
                             </div>
                         </div>
-                    )}
 
-                    {/* Feedback & Discussion History */}
-                    {currentApproval.comments && currentApproval.comments.length > 0 && (
-                        <div>
-                            <h4 style={{ fontSize: "13px", fontWeight: 700, color: "#475569", textTransform: "uppercase", marginBottom: "10px" }}>
-                                Feedback &amp; Notes ({currentApproval.comments.length})
-                            </h4>
-                            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                                {currentApproval.comments.map((c) => (
-                                    <div
-                                        key={c.id}
-                                        style={{
-                                            padding: "10px 14px",
-                                            background: "#f8fafc",
-                                            borderRadius: "8px",
-                                            border: "1px solid #e2e8f0",
-                                        }}
-                                    >
-                                        <div style={{ display: "flex", justifyContent: "space-between", color: "#64748b", fontSize: "11px", marginBottom: "4px" }}>
-                                            <span>{c.author_id ? "Client Feedback" : "Team Update"}</span>
-                                            <span>{formatDate(c.createdAt || c.created_at)}</span>
+                        {/* Attachments Card (Frame 2147225067) */}
+                        <div className="client-approval-drawer-attach-card">
+                            <div className="client-approval-drawer-attach-header">
+                                <h4 className="client-approval-drawer-attach-title">
+                                    Attachments
+                                </h4>
+                                <span className="client-approval-drawer-attach-pill">
+                                    {attachmentsList.length} Files
+                                </span>
+                            </div>
+
+                            <div className="client-approval-drawer-file-list">
+                                {attachmentsList.map((att, idx) => (
+                                    <div key={idx} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                                        <div className="client-approval-drawer-file-row">
+                                            <div className="client-approval-drawer-file-left">
+                                                {getFileIcon(att.name)}
+
+                                                <div className="client-approval-drawer-file-info">
+                                                    <div className="client-approval-drawer-file-name" title={att.name}>
+                                                        {att.name}
+                                                    </div>
+                                                    <div className="client-approval-drawer-file-meta">
+                                                        <span>{att.size || "2.4 MB"}</span>
+                                                        <span>·</span>
+                                                        <span>Updated on {formatDate(att.updatedAt || currentApproval.requestedAt)}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <a
+                                                href={att.url && att.url !== "#" ? att.url : "#"}
+                                                download={att.name}
+                                                onClick={(e) => {
+                                                    if (!att.url || att.url === "#") {
+                                                        e.preventDefault();
+                                                        alert(`Downloading ${att.name}...`);
+                                                    }
+                                                }}
+                                                aria-label={`Download ${att.name}`}
+                                                className="client-btn-icon"
+                                                style={{
+                                                    width: "32px",
+                                                    height: "32px",
+                                                    textDecoration: "none",
+                                                }}
+                                            >
+                                                <Download size={18} />
+                                            </a>
                                         </div>
-                                        <div style={{ fontSize: "13px", color: "#0f172a", lineHeight: 1.5 }}>
-                                            {c.body}
-                                        </div>
+                                        {idx < attachmentsList.length - 1 && (
+                                            <hr className="client-approval-drawer-file-divider" />
+                                        )}
                                     </div>
                                 ))}
-                                <div ref={commentsEndRef} />
                             </div>
                         </div>
-                    )}
-                </div>
 
-                {/* Bottom Pinned Feedback Input matching Reference 5 */}
-                <div
-                    style={{
-                        padding: "16px 28px",
-                        borderTop: "1px solid #e2e8f0",
-                        backgroundColor: "#ffffff",
-                    }}
-                >
-                    <div
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            borderRadius: "10px",
-                            border: "1px solid #cbd5e1",
-                            padding: "6px 8px 6px 14px",
-                            backgroundColor: "#ffffff",
-                        }}
-                    >
-                        <input
-                            type="text"
-                            placeholder="Add a Feedback..."
-                            value={commentInput}
-                            onChange={(e) => setCommentInput(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && handleSendFeedback()}
-                            style={{
-                                flex: 1,
-                                border: "none",
-                                outline: "none",
-                                fontSize: "13px",
-                                color: "#0f172a",
-                                background: "transparent",
-                            }}
-                        />
+                        {/* Formal Client Decision Bar (if pending) */}
+                        {isPending && !confirmAction && (
+                            <div className="client-approval-drawer-decision-card">
+                                <div>
+                                    <div style={{ fontSize: "14px", fontWeight: 600, color: "#0F172A", fontFamily: "Urbanist, sans-serif" }}>
+                                        Authorize This Request
+                                    </div>
+                                    <div style={{ fontSize: "12px", color: "#64748B", marginTop: "2px" }}>
+                                        Record your formal client authorization or request specific adjustments from the team.
+                                    </div>
+                                </div>
+                                <div className="client-approval-drawer-decision-actions">
+                                    <button
+                                        type="button"
+                                        onClick={() => setConfirmAction("approved")}
+                                        className="client-approval-drawer-action-btn approve"
+                                    >
+                                        <CheckCircle2 size={16} /> Approve
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setConfirmAction("changes_required")}
+                                        className="client-approval-drawer-action-btn request-changes"
+                                    >
+                                        Request Changes
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setConfirmAction("rejected")}
+                                        className="client-approval-drawer-action-btn reject"
+                                    >
+                                        Reject
+                                    </button>
+                                </div>
+                            </div>
+                        )}
 
-                        {/* Paperclip attachment icon button */}
-                        <button
-                            type="button"
-                            onClick={() => alert("File attachment upload will be supported in the next update.")}
-                            aria-label="Attach file"
-                            style={{
-                                background: "none",
-                                border: "none",
-                                padding: "6px",
-                                color: "#64748b",
-                                cursor: "pointer",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                            }}
-                        >
-                            <Paperclip size={18} />
-                        </button>
+                        {/* Decision Confirmation Form */}
+                        {confirmAction && (
+                            <div
+                                style={{
+                                    background: confirmAction === "approved" ? "rgba(240, 253, 244, 0.95)" : "rgba(254, 242, 242, 0.95)",
+                                    border: confirmAction === "approved" ? "1px solid #BBF7D0" : "1px solid #FECACA",
+                                    borderRadius: "14px",
+                                    padding: "16px",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: "10px",
+                                }}
+                            >
+                                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                    {confirmAction === "approved" ? (
+                                        <CheckCircle2 size={18} color="#16A34A" />
+                                    ) : (
+                                        <AlertTriangle size={18} color="#DC2626" />
+                                    )}
+                                    <div
+                                        style={{
+                                            fontSize: "14px",
+                                            fontWeight: 600,
+                                            color: confirmAction === "approved" ? "#15803D" : "#B91C1C",
+                                            fontFamily: "Urbanist, sans-serif",
+                                            textTransform: "capitalize",
+                                        }}
+                                    >
+                                        Confirm Decision: {confirmAction.replace("_", " ")}
+                                    </div>
+                                </div>
 
-                        {/* Blue Send button */}
+                                {decisionError && (
+                                    <div style={{ fontSize: "12px", color: "#B91C1C" }}>
+                                        {decisionError}
+                                    </div>
+                                )}
+
+                                <textarea
+                                    rows={2}
+                                    placeholder="Add comments or instructions (optional)..."
+                                    value={decisionReason}
+                                    onChange={(e) => setDecisionReason(e.target.value)}
+                                    className="client-input"
+                                    style={{
+                                        width: "100%",
+                                        padding: "8px 12px",
+                                        fontSize: "13px",
+                                        borderRadius: "8px",
+                                    }}
+                                />
+
+                                <div className="client-approval-drawer-decision-actions">
+                                    <button
+                                        type="button"
+                                        disabled={submittingDecision}
+                                        onClick={handleConfirmDecision}
+                                        className={`client-approval-drawer-action-btn ${confirmAction === "approved" ? "approve" : "reject"}`}
+                                    >
+                                        {submittingDecision && <Loader2 className="animate-spin" size={14} />}
+                                        Confirm &amp; Submit
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setConfirmAction(null)}
+                                        className="client-approval-drawer-action-btn cancel"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Feedback & Notes History */}
+                        {currentApproval.comments && currentApproval.comments.length > 0 && (
+                            <div className="client-approval-drawer-comments-card">
+                                <div style={{ fontSize: "14px", fontWeight: 600, color: "#0F172A", fontFamily: "Urbanist, sans-serif" }}>
+                                    Feedback &amp; Notes ({currentApproval.comments.length})
+                                </div>
+                                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                                    {currentApproval.comments.map((c) => (
+                                        <div key={c.id} className="client-approval-drawer-comment-bubble">
+                                            <div style={{ display: "flex", justifyContent: "space-between", color: "#64748B", fontSize: "11px" }}>
+                                                <span style={{ fontWeight: 600 }}>{c.author_id ? "Client Feedback" : "Team Update"}</span>
+                                                <span>{formatDate(c.createdAt || c.created_at)}</span>
+                                            </div>
+                                            <div style={{ fontSize: "13px", color: "#0F172A", lineHeight: 1.4 }}>
+                                                {c.body}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <div ref={commentsEndRef} />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Bottom Pinned Feedback Input (Frame 2147225069) */}
+                    <div className="client-approval-drawer-feedback-card">
+                        <div className="client-approval-drawer-feedback-input-box">
+                            <input
+                                type="text"
+                                placeholder="Add a Feedback..."
+                                value={commentInput}
+                                onChange={(e) => setCommentInput(e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && handleSendFeedback()}
+                                className="client-approval-drawer-feedback-input"
+                                aria-label="Add a Feedback input"
+                            />
+
+                            {/* Paperclip attachment icon button */}
+                            <button
+                                type="button"
+                                onClick={() => alert("File attachment upload will be supported in the next update.")}
+                                aria-label="Attach file"
+                                className="client-approval-drawer-attach-icon-btn"
+                            >
+                                <Paperclip size={18} />
+                            </button>
+                        </div>
+
+                        {/* Send button (Frame Buttons & Send text) */}
                         <button
                             type="button"
                             disabled={submittingComment || !commentInput.trim()}
                             onClick={handleSendFeedback}
-                            style={{
-                                padding: "8px 18px",
-                                borderRadius: "8px",
-                                border: "none",
-                                background: commentInput.trim() ? "#2563eb" : "#94a3b8",
-                                color: "#ffffff",
-                                fontSize: "13px",
-                                fontWeight: 600,
-                                cursor: commentInput.trim() && !submittingComment ? "pointer" : "not-allowed",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "6px",
-                                transition: "background-color 0.15s ease",
-                            }}
+                            className="client-approval-drawer-send-btn"
+                            aria-label="Send feedback"
                         >
                             {submittingComment ? <Loader2 className="animate-spin" size={14} /> : null}
                             Send

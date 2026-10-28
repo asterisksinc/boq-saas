@@ -1357,7 +1357,7 @@
 }
 
 .activities-tasks-kpi-trend.negative {
-    color: #DC2626;
+    color: #EF4444;
 }
 
 /* Tasks KPI Card Skeleton */
@@ -1784,7 +1784,7 @@
     border: 1px solid #DBEAFE;
 }
 
-.activities-task-assignee-avatar.unassigned {
+.activities-task-assignee-avatar[data-unassigned="true"] {
     background: #F1F5F9;
     color: #94A3B8;
     border: 1px solid #E2E8F0;
@@ -4474,5 +4474,3 @@
         width: 100%;
     }
 }
-
-

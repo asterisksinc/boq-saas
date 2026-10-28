@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import ClientDashboardRail from "@/components/client/ClientDashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
+import "@/app/client/client-redesign.css";
 import {
     createClientInvoice,
     getClientBoq,
@@ -209,152 +210,78 @@ export default function ClientCreateInvoicePage() {
     const invoiceCodeDisplay = createdInvoiceNumber || (selectedBoq ? `INV-0091` : "INV-0091");
 
     return (
-        <main className="fig-dashboard" style={{ background: "#edf2f9" }}>
-            <div className="fig-dashboard-glow" />
+        <main className="client-redesign-shell">
+            <div className="client-bg-glow" />
 
             <ClientDashboardRail current="/client/invoices" />
 
-            <div className="fig-dashboard-main">
+            <div className="client-main-area">
                 <DashboardHeader title="Invoices" hideNew={true} />
 
                 <section style={{ padding: "28px 36px" }}>
-                    {/* Top sub-bar matching Reference 2 */}
-                    <div
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            marginBottom: "24px",
-                        }}
-                    >
-                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    {/* Top sub-bar matching Frame 2147225068 */}
+                    <div className="client-invoice-header-row" style={{ marginBottom: "24px" }}>
+                        <div className="client-invoice-header-left">
                             <button
                                 type="button"
                                 onClick={() => router.push("/client/invoices")}
                                 aria-label="Go back to invoices list"
-                                style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    width: "36px",
-                                    height: "36px",
-                                    borderRadius: "8px",
-                                    border: "1px solid #e2e8f0",
-                                    background: "#ffffff",
-                                    color: "#0f172a",
-                                    cursor: "pointer",
-                                    boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
-                                }}
+                                className="client-btn-icon"
+                                style={{ width: "38px", height: "38px" }}
                             >
                                 <ArrowLeft size={18} />
                             </button>
-                            <h2 style={{ fontSize: "18px", fontWeight: 700, color: "#0f172a", margin: 0 }}>
+                            <h2 className="client-invoice-header-code">
                                 {invoiceCodeDisplay}
                             </h2>
                         </div>
 
-                        <button
-                            type="button"
-                            disabled={submitting || !selectedBoq}
-                            onClick={handleCreateAndInitiatePay}
-                            style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "8px",
-                                padding: "9px 20px",
-                                borderRadius: "8px",
-                                border: "none",
-                                background: selectedBoq ? "#2563eb" : "#94a3b8",
-                                color: "#ffffff",
-                                fontSize: "14px",
-                                fontWeight: 600,
-                                cursor: selectedBoq && !submitting ? "pointer" : "not-allowed",
-                                boxShadow: selectedBoq ? "0 1px 2px rgba(37, 99, 235, 0.2)" : "none",
-                                transition: "all 0.15s ease",
-                            }}
-                        >
-                            {submitting && <Loader2 className="animate-spin" size={16} />}
-                            Pay Invoice
-                        </button>
+                        <div className="client-invoice-header-actions">
+                            <button
+                                type="button"
+                                disabled={submitting || !selectedBoq}
+                                onClick={handleCreateAndInitiatePay}
+                                className="client-invoice-pay-btn"
+                                style={{
+                                    opacity: selectedBoq && !submitting ? 1 : 0.6,
+                                    cursor: selectedBoq && !submitting ? "pointer" : "not-allowed",
+                                }}
+                            >
+                                {submitting && <Loader2 className="animate-spin" size={16} />}
+                                Pay Invoice
+                            </button>
+                        </div>
                     </div>
 
                     {/* Error Banner */}
                     {error && (
-                        <div
-                            style={{
-                                padding: "12px 16px",
-                                borderRadius: "8px",
-                                backgroundColor: "#fef2f2",
-                                border: "1px solid #fecaca",
-                                color: "#b91c1c",
-                                marginBottom: "20px",
-                                fontSize: "13px",
-                            }}
-                        >
+                        <div className="client-banner-error" style={{ marginBottom: "20px" }}>
                             {error}
                         </div>
                     )}
 
-                    {/* 2-Column Layout matching Reference 2 */}
-                    <div
-                        style={{
-                            display: "grid",
-                            gridTemplateColumns: "1fr 1fr",
-                            gap: "24px",
-                            alignItems: "start",
-                        }}
-                    >
-                        {/* LEFT COLUMN: INVOICE INFORMATION */}
-                        <div>
-                            <div
-                                style={{
-                                    fontSize: "12px",
-                                    fontWeight: 700,
-                                    color: "#64748b",
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.05em",
-                                    marginBottom: "12px",
-                                }}
-                            >
+                    {/* 2-Column Layout matching Frame 2147225223 */}
+                    <div className="client-invoice-grid">
+                        {/* LEFT COLUMN: INVOICE INFORMATION matching Frame 2147225221 */}
+                        <div className="client-invoice-panel-card">
+                            <h3 className="client-invoice-section-heading">
                                 INVOICE INFORMATION
-                            </div>
+                            </h3>
 
-                            <div
-                                style={{
-                                    background: "#ffffff",
-                                    borderRadius: "12px",
-                                    border: "1px solid #e2e8f0",
-                                    padding: "24px",
-                                    boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
-                                }}
-                            >
+                            <div className="client-invoice-inner-card">
                                 {/* Select BOQ */}
-                                <div style={{ marginBottom: "20px", position: "relative" }}>
-                                    <label
-                                        style={{
-                                            display: "block",
-                                            fontSize: "13px",
-                                            fontWeight: 600,
-                                            color: "#0f172a",
-                                            marginBottom: "8px",
-                                        }}
-                                    >
-                                        Select BOQ <span style={{ color: "#ef4444" }}>*</span>
+                                <div className="client-invoice-field-group" style={{ position: "relative" }}>
+                                    <label className="client-invoice-field-label">
+                                        Select BOQ <span className="client-invoice-field-required">*</span>
                                     </label>
 
-                                    {/* Dropdown trigger */}
+                                    {/* Dropdown trigger matching Frame 12 */}
                                     <div
                                         onClick={() => setBoqDropdownOpen(!boqDropdownOpen)}
+                                        className="client-invoice-input-control"
                                         style={{
-                                            display: "flex",
-                                            alignItems: "center",
                                             justifyContent: "space-between",
-                                            padding: "10px 14px",
-                                            borderRadius: "8px",
-                                            border: "1px solid #cbd5e1",
-                                            background: "#ffffff",
                                             cursor: "pointer",
-                                            transition: "border-color 0.15s ease",
                                         }}
                                     >
                                         <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
@@ -375,18 +302,17 @@ export default function ClientCreateInvoicePage() {
                                     {/* Dropdown list */}
                                     {boqDropdownOpen && (
                                         <div
+                                            className="client-surface-card"
                                             style={{
                                                 position: "absolute",
                                                 top: "calc(100% + 4px)",
                                                 left: 0,
                                                 right: 0,
-                                                background: "#ffffff",
-                                                borderRadius: "8px",
-                                                border: "1px solid #cbd5e1",
-                                                boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
+                                                boxShadow: "0 10px 25px -5px rgba(0,0,0,0.12)",
                                                 zIndex: 30,
                                                 maxHeight: "260px",
                                                 overflowY: "auto",
+                                                borderRadius: "8px",
                                             }}
                                         >
                                             <div style={{ padding: "8px", borderBottom: "1px solid #f1f5f9" }}>
@@ -396,21 +322,14 @@ export default function ClientCreateInvoicePage() {
                                                     value={boqSearchQuery}
                                                     onChange={(e) => setBoqSearchQuery(e.target.value)}
                                                     onClick={(e) => e.stopPropagation()}
-                                                    style={{
-                                                        width: "100%",
-                                                        padding: "6px 10px",
-                                                        fontSize: "13px",
-                                                        border: "1px solid #e2e8f0",
-                                                        borderRadius: "6px",
-                                                        outline: "none",
-                                                        boxSizing: "border-box",
-                                                    }}
+                                                    className="client-input"
+                                                    style={{ width: "100%", padding: "7px 10px", fontSize: "13px" }}
                                                 />
                                             </div>
 
                                             {loadingBoqs ? (
                                                 <div style={{ padding: "20px", textAlign: "center", color: "#64748b", fontSize: "13px" }}>
-                                                    <Loader2 className="animate-spin" size={18} style={{ margin: "0 auto 6px auto" }} />
+                                                    <Loader2 className="animate-spin" size={18} style={{ margin: "0 auto 6px auto", color: "#2563EB" }} />
                                                     Loading BOQs...
                                                 </div>
                                             ) : filteredBoqs.length === 0 ? (
@@ -429,7 +348,8 @@ export default function ClientCreateInvoicePage() {
                                                             display: "flex",
                                                             alignItems: "center",
                                                             justifyContent: "space-between",
-                                                            background: selectedBoq?.id === b.id ? "#eff6ff" : "#ffffff",
+                                                            background: selectedBoq?.id === b.id ? "#eff6ff" : "transparent",
+                                                            transition: "background 0.15s ease",
                                                         }}
                                                     >
                                                         <div>
@@ -440,7 +360,7 @@ export default function ClientCreateInvoicePage() {
                                                                 Status: {b.status} · {b.itemsCount || 0} items
                                                             </div>
                                                         </div>
-                                                        <div style={{ fontSize: "13px", fontWeight: 700, color: "#0f172a" }}>
+                                                        <div style={{ fontSize: "13px", fontWeight: 700, color: "#2563eb" }}>
                                                             {formatCompactMoney(b.grandTotal)}
                                                         </div>
                                                     </div>
@@ -450,31 +370,13 @@ export default function ClientCreateInvoicePage() {
                                     )}
                                 </div>
 
-                                {/* Issue Date & Due Date columns */}
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                                    <div>
-                                        <label
-                                            style={{
-                                                display: "block",
-                                                fontSize: "13px",
-                                                fontWeight: 600,
-                                                color: "#0f172a",
-                                                marginBottom: "8px",
-                                            }}
-                                        >
-                                            Issue Date <span style={{ color: "#ef4444" }}>*</span>
+                                {/* Issue Date & Due Date columns matching Frame 2147225454 */}
+                                <div className="client-invoice-date-row">
+                                    <div className="client-invoice-field-group">
+                                        <label className="client-invoice-field-label">
+                                            Issue Date <span className="client-invoice-field-required">*</span>
                                         </label>
-                                        <div
-                                            style={{
-                                                display: "flex",
-                                                alignItems: "center",
-                                                padding: "9px 12px",
-                                                borderRadius: "8px",
-                                                border: "1px solid #cbd5e1",
-                                                background: "#ffffff",
-                                                gap: "8px",
-                                            }}
-                                        >
+                                        <div className="client-invoice-input-control">
                                             <input
                                                 type="date"
                                                 value={issueDate}
@@ -487,35 +389,18 @@ export default function ClientCreateInvoicePage() {
                                                     width: "100%",
                                                     background: "transparent",
                                                     cursor: "pointer",
+                                                    fontFamily: "Urbanist, sans-serif",
                                                 }}
                                             />
                                             <Calendar size={16} color="#64748b" style={{ flexShrink: 0, pointerEvents: "none" }} />
                                         </div>
                                     </div>
 
-                                    <div>
-                                        <label
-                                            style={{
-                                                display: "block",
-                                                fontSize: "13px",
-                                                fontWeight: 600,
-                                                color: "#0f172a",
-                                                marginBottom: "8px",
-                                            }}
-                                        >
-                                            Due Date <span style={{ color: "#ef4444" }}>*</span>
+                                    <div className="client-invoice-field-group">
+                                        <label className="client-invoice-field-label">
+                                            Due Date <span className="client-invoice-field-required">*</span>
                                         </label>
-                                        <div
-                                            style={{
-                                                display: "flex",
-                                                alignItems: "center",
-                                                padding: "9px 12px",
-                                                borderRadius: "8px",
-                                                border: "1px solid #cbd5e1",
-                                                background: "#ffffff",
-                                                gap: "8px",
-                                            }}
-                                        >
+                                        <div className="client-invoice-input-control">
                                             <input
                                                 type="date"
                                                 value={dueDate}
@@ -528,6 +413,7 @@ export default function ClientCreateInvoicePage() {
                                                     width: "100%",
                                                     background: "transparent",
                                                     cursor: "pointer",
+                                                    fontFamily: "Urbanist, sans-serif",
                                                 }}
                                             />
                                             <Calendar size={16} color="#64748b" style={{ flexShrink: 0, pointerEvents: "none" }} />
@@ -537,40 +423,20 @@ export default function ClientCreateInvoicePage() {
                             </div>
                         </div>
 
-                        {/* RIGHT COLUMN: INVOICE PREVIEW */}
-                        <div>
-                            <div
-                                style={{
-                                    fontSize: "12px",
-                                    fontWeight: 700,
-                                    color: "#64748b",
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.05em",
-                                    marginBottom: "12px",
-                                }}
-                            >
+                        {/* RIGHT COLUMN: INVOICE PREVIEW matching Frame 2147225071 */}
+                        <div className="client-invoice-panel-card">
+                            <h3 className="client-invoice-section-heading">
                                 INVOICE PREVIEW
-                            </div>
+                            </h3>
 
-                            <div
-                                style={{
-                                    background: "#ffffff",
-                                    borderRadius: "12px",
-                                    border: "1px solid #e2e8f0",
-                                    padding: "24px",
-                                    minHeight: "440px",
-                                    boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
-                                    display: "flex",
-                                    flexDirection: "column",
-                                }}
-                            >
+                            <div className="client-invoice-inner-card" style={{ minHeight: "440px" }}>
                                 {loadingDetail ? (
                                     <div style={{ margin: "auto", textAlign: "center", padding: "40px 0", color: "#64748b" }}>
                                         <Loader2 className="animate-spin" size={28} color="#2563eb" style={{ margin: "0 auto 10px auto" }} />
                                         <div style={{ fontSize: "14px", fontWeight: 500 }}>Generating invoice preview...</div>
                                     </div>
                                 ) : !selectedBoq ? (
-                                    // Clean empty state matching Reference 2
+                                    // Clean empty state
                                     <div
                                         style={{
                                             margin: "auto",
@@ -584,7 +450,7 @@ export default function ClientCreateInvoicePage() {
                                                 width: "56px",
                                                 height: "56px",
                                                 borderRadius: "12px",
-                                                background: "#f1f5f9",
+                                                background: "rgba(241, 245, 249, 0.8)",
                                                 display: "flex",
                                                 alignItems: "center",
                                                 justifyContent: "center",
@@ -594,16 +460,16 @@ export default function ClientCreateInvoicePage() {
                                         >
                                             <FileText size={28} />
                                         </div>
-                                        <h4 style={{ fontSize: "15px", fontWeight: 600, color: "#475569", margin: "0 0 6px 0" }}>
+                                        <h4 style={{ fontSize: "16px", fontWeight: 700, color: "#334155", margin: "0 0 6px 0", fontFamily: "Urbanist, sans-serif" }}>
                                             No BOQ Selected
                                         </h4>
-                                        <p style={{ fontSize: "13px", color: "#94a3b8", margin: 0, maxWidth: "260px" }}>
+                                        <p style={{ fontSize: "13px", color: "#64748b", margin: 0, maxWidth: "260px" }}>
                                             Select a BOQ and set dates on the left to preview your invoice here.
                                         </p>
                                     </div>
                                 ) : (
                                     // Populated live preview
-                                    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                                    <div style={{ display: "flex", flexDirection: "column", gap: "20px", width: "100%" }}>
                                         {/* Invoice header */}
                                         <div
                                             style={{
@@ -611,14 +477,14 @@ export default function ClientCreateInvoicePage() {
                                                 justifyContent: "space-between",
                                                 alignItems: "flex-start",
                                                 paddingBottom: "16px",
-                                                borderBottom: "1px solid #f1f5f9",
+                                                borderBottom: "1px solid rgba(226, 232, 240, 0.8)",
                                             }}
                                         >
                                             <div>
                                                 <div style={{ fontSize: "11px", fontWeight: 700, color: "#2563eb", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                                                     TAX INVOICE (DRAFT)
                                                 </div>
-                                                <div style={{ fontSize: "18px", fontWeight: 700, color: "#0f172a", marginTop: "4px" }}>
+                                                <div style={{ fontSize: "18px", fontWeight: 700, color: "#0f172a", marginTop: "4px", fontFamily: "Urbanist, sans-serif" }}>
                                                     {invoiceCodeDisplay}
                                                 </div>
                                                 <div style={{ fontSize: "13px", color: "#64748b", marginTop: "2px" }}>
@@ -628,7 +494,7 @@ export default function ClientCreateInvoicePage() {
 
                                             <div style={{ textAlign: "right" }}>
                                                 <div style={{ fontSize: "12px", color: "#64748b" }}>Total Payable</div>
-                                                <div style={{ fontSize: "20px", fontWeight: 700, color: "#0f172a", marginTop: "2px" }}>
+                                                <div style={{ fontSize: "22px", fontWeight: 700, color: "#2563eb", marginTop: "2px", fontFamily: "Urbanist, sans-serif" }}>
                                                     {formatFullMoney(previewTotal)}
                                                 </div>
                                             </div>
@@ -640,61 +506,62 @@ export default function ClientCreateInvoicePage() {
                                                 display: "grid",
                                                 gridTemplateColumns: "1fr 1fr",
                                                 gap: "12px",
-                                                background: "#f8fafc",
+                                                background: "rgba(248, 250, 252, 0.8)",
                                                 borderRadius: "8px",
                                                 padding: "12px 14px",
+                                                border: "1px solid rgba(226, 232, 240, 0.6)",
                                             }}
                                         >
                                             <div>
-                                                <div style={{ fontSize: "11px", color: "#64748b", textTransform: "uppercase" }}>Project</div>
+                                                <div style={{ fontSize: "11px", color: "#64748b", textTransform: "uppercase", fontWeight: 600 }}>Project</div>
                                                 <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a", marginTop: "2px" }}>
                                                     {selectedBoq.projectName}
                                                 </div>
                                             </div>
                                             <div>
-                                                <div style={{ fontSize: "11px", color: "#64748b", textTransform: "uppercase" }}>Issue Date</div>
+                                                <div style={{ fontSize: "11px", color: "#64748b", textTransform: "uppercase", fontWeight: 600 }}>Issue Date</div>
                                                 <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a", marginTop: "2px" }}>
                                                     {formatDate(issueDate)}
                                                 </div>
                                             </div>
                                             <div>
-                                                <div style={{ fontSize: "11px", color: "#64748b", textTransform: "uppercase" }}>Due Date</div>
+                                                <div style={{ fontSize: "11px", color: "#64748b", textTransform: "uppercase", fontWeight: 600 }}>Due Date</div>
                                                 <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a", marginTop: "2px" }}>
                                                     {formatDate(dueDate)}
                                                 </div>
                                             </div>
                                             <div>
-                                                <div style={{ fontSize: "11px", color: "#64748b", textTransform: "uppercase" }}>Status</div>
-                                                <div style={{ fontSize: "13px", fontWeight: 600, color: "#b45309", marginTop: "2px" }}>
+                                                <div style={{ fontSize: "11px", color: "#64748b", textTransform: "uppercase", fontWeight: 600 }}>Status</div>
+                                                <div style={{ fontSize: "13px", fontWeight: 700, color: "#b45309", marginTop: "2px" }}>
                                                     Pending Payment
                                                 </div>
                                             </div>
                                         </div>
 
                                         {/* Items preview table */}
-                                        <div style={{ overflowX: "auto" }}>
-                                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                                        <div className="client-table-container" style={{ borderRadius: "8px" }}>
+                                            <table className="client-table" style={{ fontSize: "13px" }}>
                                                 <thead>
-                                                    <tr style={{ borderBottom: "1px solid #e2e8f0", background: "#f8fafc" }}>
-                                                        <th style={{ textAlign: "left", padding: "8px 10px", color: "#64748b", fontWeight: 600, fontSize: "11px" }}>ITEM</th>
-                                                        <th style={{ textAlign: "center", padding: "8px 10px", color: "#64748b", fontWeight: 600, fontSize: "11px" }}>QTY</th>
-                                                        <th style={{ textAlign: "right", padding: "8px 10px", color: "#64748b", fontWeight: 600, fontSize: "11px" }}>RATE</th>
-                                                        <th style={{ textAlign: "right", padding: "8px 10px", color: "#64748b", fontWeight: 600, fontSize: "11px" }}>AMOUNT</th>
+                                                    <tr>
+                                                        <th style={{ textAlign: "left" }}>ITEM</th>
+                                                        <th style={{ textAlign: "center" }}>QTY</th>
+                                                        <th style={{ textAlign: "right" }}>RATE</th>
+                                                        <th style={{ textAlign: "right" }}>AMOUNT</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     {previewItems.slice(0, 6).map((item, idx) => (
-                                                        <tr key={idx} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                                                            <td style={{ padding: "8px 10px", color: "#0f172a", fontWeight: 500 }}>
+                                                        <tr key={idx}>
+                                                            <td style={{ color: "#0f172a", fontWeight: 500 }}>
                                                                 {item.description}
                                                             </td>
-                                                            <td style={{ padding: "8px 10px", textAlign: "center", color: "#64748b" }}>
+                                                            <td style={{ textAlign: "center", color: "#64748b" }}>
                                                                 {item.quantity} {item.unit}
                                                             </td>
-                                                            <td style={{ padding: "8px 10px", textAlign: "right", color: "#64748b" }}>
+                                                            <td style={{ textAlign: "right", color: "#64748b" }}>
                                                                 {formatCompactMoney(item.rate)}
                                                             </td>
-                                                            <td style={{ padding: "8px 10px", textAlign: "right", fontWeight: 600, color: "#0f172a" }}>
+                                                            <td style={{ textAlign: "right", fontWeight: 600, color: "#0f172a" }}>
                                                                 {formatCompactMoney(item.amount)}
                                                             </td>
                                                         </tr>
@@ -708,14 +575,14 @@ export default function ClientCreateInvoicePage() {
                                                     )}
                                                     {previewItems.length === 0 && (
                                                         <tr>
-                                                            <td style={{ padding: "8px 10px", color: "#0f172a" }}>
+                                                            <td style={{ color: "#0f172a" }}>
                                                                 Full BOQ Execution Milestone
                                                             </td>
-                                                            <td style={{ padding: "8px 10px", textAlign: "center", color: "#64748b" }}>1</td>
-                                                            <td style={{ padding: "8px 10px", textAlign: "right", color: "#64748b" }}>
+                                                            <td style={{ textAlign: "center", color: "#64748b" }}>1</td>
+                                                            <td style={{ textAlign: "right", color: "#64748b" }}>
                                                                 {formatCompactMoney(previewSubtotal)}
                                                             </td>
-                                                            <td style={{ padding: "8px 10px", textAlign: "right", fontWeight: 600, color: "#0f172a" }}>
+                                                            <td style={{ textAlign: "right", fontWeight: 600, color: "#0f172a" }}>
                                                                 {formatCompactMoney(previewSubtotal)}
                                                             </td>
                                                         </tr>
@@ -724,40 +591,20 @@ export default function ClientCreateInvoicePage() {
                                             </table>
                                         </div>
 
-                                        {/* Totals */}
-                                        <div
-                                            style={{
-                                                marginLeft: "auto",
-                                                width: "240px",
-                                                display: "flex",
-                                                flexDirection: "column",
-                                                gap: "6px",
-                                                paddingTop: "12px",
-                                                borderTop: "1px solid #e2e8f0",
-                                                fontSize: "13px",
-                                            }}
-                                        >
-                                            <div style={{ display: "flex", justifyContent: "space-between", color: "#64748b" }}>
-                                                <span>Subtotal</span>
-                                                <span style={{ fontWeight: 500, color: "#0f172a" }}>{formatFullMoney(previewSubtotal)}</span>
+                                        {/* Financial Summary Hierarchy matching Frame 2147225151, 2147225152, Rectangle 30, 2147225153 */}
+                                        <div className="client-invoice-summary-box">
+                                            <div className="client-invoice-summary-row">
+                                                <span className="client-invoice-summary-label">Subtotal</span>
+                                                <span className="client-invoice-summary-val">{formatFullMoney(previewSubtotal)}</span>
                                             </div>
-                                            <div style={{ display: "flex", justifyContent: "space-between", color: "#64748b" }}>
-                                                <span>Tax (GST 18%)</span>
-                                                <span style={{ fontWeight: 500, color: "#0f172a" }}>{formatFullMoney(previewTax)}</span>
+                                            <div className="client-invoice-summary-row">
+                                                <span className="client-invoice-summary-label">GST (18%)</span>
+                                                <span className="client-invoice-summary-val">{formatFullMoney(previewTax)}</span>
                                             </div>
-                                            <div
-                                                style={{
-                                                    display: "flex",
-                                                    justifyContent: "space-between",
-                                                    fontSize: "14px",
-                                                    fontWeight: 700,
-                                                    color: "#0f172a",
-                                                    paddingTop: "6px",
-                                                    borderTop: "1px solid #e2e8f0",
-                                                }}
-                                            >
-                                                <span>Total Amount</span>
-                                                <span style={{ color: "#2563eb" }}>{formatFullMoney(previewTotal)}</span>
+                                            <hr className="client-invoice-summary-divider" />
+                                            <div className="client-invoice-summary-row">
+                                                <span className="client-invoice-summary-total-label">Total Amount</span>
+                                                <span className="client-invoice-summary-total-val">{formatFullMoney(previewTotal)}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -770,34 +617,12 @@ export default function ClientCreateInvoicePage() {
 
             {/* PAYMENT CONFIRMATION MODAL */}
             {payModalOpen && createdInvoiceId && (
-                <div
-                    style={{
-                        position: "fixed",
-                        inset: 0,
-                        backgroundColor: "rgba(15, 23, 42, 0.6)",
-                        backdropFilter: "blur(4px)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        zIndex: 60,
-                        padding: "20px",
-                    }}
-                >
-                    <div
-                        style={{
-                            maxWidth: "480px",
-                            width: "100%",
-                            backgroundColor: "#ffffff",
-                            borderRadius: "16px",
-                            border: "1px solid #e2e8f0",
-                            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)",
-                            overflow: "hidden",
-                        }}
-                    >
+                <div className="client-modal-backdrop">
+                    <div className="client-modal-card" style={{ maxWidth: "480px" }}>
                         <div
                             style={{
                                 padding: "20px 24px",
-                                borderBottom: "1px solid #e2e8f0",
+                                borderBottom: "1px solid rgba(226, 232, 240, 0.8)",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "space-between",
@@ -819,7 +644,7 @@ export default function ClientCreateInvoicePage() {
                                     <Receipt size={18} />
                                 </div>
                                 <div>
-                                    <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#0f172a", margin: 0 }}>
+                                    <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#0f172a", margin: 0, fontFamily: "Urbanist, sans-serif" }}>
                                         Complete Payment
                                     </h3>
                                     <div style={{ fontSize: "12px", color: "#64748b" }}>
@@ -843,7 +668,7 @@ export default function ClientCreateInvoicePage() {
                             {paySuccess ? (
                                 <div style={{ textAlign: "center", padding: "24px 0" }}>
                                     <CheckCircle2 size={48} color="#16a34a" style={{ margin: "0 auto 12px auto" }} />
-                                    <h4 style={{ fontSize: "18px", fontWeight: 700, color: "#0f172a", margin: "0 0 6px 0" }}>
+                                    <h4 style={{ fontSize: "18px", fontWeight: 700, color: "#0f172a", margin: "0 0 6px 0", fontFamily: "Urbanist, sans-serif" }}>
                                         Payment Successful!
                                     </h4>
                                     <p style={{ fontSize: "13px", color: "#64748b", margin: 0 }}>
@@ -854,21 +679,21 @@ export default function ClientCreateInvoicePage() {
                                 <div>
                                     <div
                                         style={{
-                                            background: "#f8fafc",
+                                            background: "rgba(248, 250, 252, 0.8)",
                                             borderRadius: "10px",
                                             padding: "16px",
                                             marginBottom: "20px",
-                                            border: "1px solid #e2e8f0",
+                                            border: "1px solid rgba(226, 232, 240, 0.8)",
                                         }}
                                     >
                                         <div style={{ fontSize: "12px", color: "#64748b" }}>Total Amount to Pay</div>
-                                        <div style={{ fontSize: "24px", fontWeight: 800, color: "#0f172a", marginTop: "4px" }}>
+                                        <div style={{ fontSize: "24px", fontWeight: 800, color: "#0f172a", marginTop: "4px", fontFamily: "Urbanist, sans-serif" }}>
                                             {formatFullMoney(createdInvoiceTotal)}
                                         </div>
                                     </div>
 
                                     <div style={{ marginBottom: "20px" }}>
-                                        <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#475569", marginBottom: "8px", textTransform: "uppercase" }}>
+                                        <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#475569", marginBottom: "8px", textTransform: "uppercase" }}>
                                             Select Payment Channel
                                         </label>
                                         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -886,8 +711,8 @@ export default function ClientCreateInvoicePage() {
                                                         gap: "12px",
                                                         padding: "12px 14px",
                                                         borderRadius: "8px",
-                                                        border: paymentMethod === method.id ? "1.5px solid #2563eb" : "1px solid #e2e8f0",
-                                                        backgroundColor: paymentMethod === method.id ? "#eff6ff" : "#ffffff",
+                                                        border: paymentMethod === method.id ? "1.5px solid #2563eb" : "1px solid rgba(226, 232, 240, 0.8)",
+                                                        backgroundColor: paymentMethod === method.id ? "#eff6ff" : "rgba(255, 255, 255, 0.8)",
                                                         cursor: "pointer",
                                                     }}
                                                 >
@@ -911,13 +736,10 @@ export default function ClientCreateInvoicePage() {
                                         type="button"
                                         disabled={paySubmitting}
                                         onClick={handleConfirmPayment}
+                                        className="client-btn-primary"
                                         style={{
                                             width: "100%",
                                             padding: "12px",
-                                            borderRadius: "8px",
-                                            border: "none",
-                                            backgroundColor: "#2563eb",
-                                            color: "#ffffff",
                                             fontSize: "14px",
                                             fontWeight: 600,
                                             cursor: paySubmitting ? "not-allowed" : "pointer",
@@ -925,7 +747,6 @@ export default function ClientCreateInvoicePage() {
                                             alignItems: "center",
                                             justifyContent: "center",
                                             gap: "8px",
-                                            boxShadow: "0 2px 4px rgba(37, 99, 235, 0.25)",
                                         }}
                                     >
                                         {paySubmitting ? <Loader2 className="animate-spin" size={16} /> : <CreditCard size={16} />}
@@ -938,17 +759,13 @@ export default function ClientCreateInvoicePage() {
                                             setPayModalOpen(false);
                                             router.push(`/client/invoices/${createdInvoiceId}`);
                                         }}
+                                        className="client-btn-secondary"
                                         style={{
                                             width: "100%",
                                             marginTop: "8px",
                                             padding: "10px",
-                                            borderRadius: "8px",
-                                            border: "1px solid #e2e8f0",
-                                            backgroundColor: "#ffffff",
-                                            color: "#64748b",
                                             fontSize: "13px",
                                             fontWeight: 500,
-                                            cursor: "pointer",
                                         }}
                                     >
                                         Skip and View Invoice

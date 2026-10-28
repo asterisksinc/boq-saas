@@ -241,6 +241,7 @@ export default function ActivitiesPage() {
     const [createTask, setCreateTask] = useState(false);
     const [taskDetail, setTaskDetail] = useState<ActivityTask | null>(null);
     const [taskForm, setTaskForm] = useState<TaskForm>(blankTask);
+    const [isSubmittingTask, setIsSubmittingTask] = useState(false);
     const [taskProjects, setTaskProjects] = useState<Array<{ id: string; name: string; projectCode: string | null }>>([]);
     const [taskStages, setTaskStages] = useState<ActivityStage[]>([]);
     const [taskError, setTaskError] = useState("");
@@ -300,15 +301,7 @@ export default function ActivitiesPage() {
     };
 
     const approverOptions = useMemo(() => {
-        const list = teamMembers.map(m => ({ id: m.id, name: m.name, role: m.role || "Team" }));
-        if (list.length === 0) {
-            list.push(
-                { id: "appr-1", name: "Anand Rathi", role: "Principal Architect" },
-                { id: "appr-2", name: "Priya Sharma", role: "Lead PM" },
-                { id: "appr-3", name: "Rajesh Kumar", role: "Site Supervisor" },
-            );
-        }
-        return list;
+        return teamMembers.map(m => ({ id: m.id, name: m.name, role: m.role || "Team" }));
     }, [teamMembers]);
 
     const handleApprovalFileSelect = (files: FileList | null) => {
@@ -1195,6 +1188,7 @@ export default function ActivitiesPage() {
 
     const handleTaskSubmit = async (e: FormEvent) => {
         e.preventDefault();
+        if (isSubmittingTask) return;
         setTaskError("");
         if (!taskForm.name.trim() || !taskForm.projectId || !taskForm.stageId) {
             setTaskError("Task Name, Project, and Stage are required.");
@@ -1223,64 +1217,30 @@ export default function ActivitiesPage() {
             sanitizedPayload.dueDate = null;
         }
 
+        setIsSubmittingTask(true);
         try {
-            let savedTask: ActivityTask | null = null;
-            if (isUuid(taskForm.projectId) && isUuid(taskForm.stageId)) {
-                try {
-                    if (taskDetail) {
-                        savedTask = await updateActivityTask(taskDetail.id, sanitizedPayload);
-                    } else {
-                        savedTask = await createActivityTask(sanitizedPayload);
-                    }
-                } catch {
-                    // Handled below if backend database validation fails on unseeded IDs
-                }
+            if (!isUuid(taskForm.projectId) || !isUuid(taskForm.stageId)) {
+                throw new Error("Select a valid project and stage.");
             }
 
-            if (savedTask) {
-                const mapped = mapTask(savedTask);
-                if (!mapped.project && taskProjects.length) {
-                    const p = taskProjects.find(pr => pr.id === mapped.projectId);
-                    if (p) mapped.project = { name: p.name, projectCode: p.projectCode };
-                }
-                if (!mapped.stage && taskStages.length) {
-                    const s = taskStages.find(st => st.id === mapped.stageId);
-                    if (s) mapped.stage = { name: s.name, color: s.color };
-                }
-                setTasks(prev => {
-                    const exists = prev.some(t => t.id === mapped.id);
-                    if (exists) return prev.map(t => t.id === mapped.id ? mapped : t);
-                    return [mapped, ...prev];
-                });
-                loadTasks();
-            } else {
-                const selectedProject = taskProjects.find(p => p.id === taskForm.projectId);
-                const selectedStage = taskStages.find(s => s.id === taskForm.stageId);
-                const newTask: ActivityTask = {
-                    id: taskDetail ? taskDetail.id : `task-${Date.now()}`,
-                    projectId: taskForm.projectId,
-                    stageId: taskForm.stageId,
-                    name: taskForm.name.trim(),
-                    description: taskForm.description?.trim() || null,
-                    assignedTo: null,
-                    ownerId: taskForm.ownerId || null,
-                    dueDate: taskForm.dueDate || null,
-                    priority: taskForm.priority || "medium",
-                    status: taskForm.status || "not_started",
-                    attachments: taskAttachments.map(a => ({ name: a.name, size: a.size, type: a.type })),
-                    createdBy: taskDetail ? taskDetail.createdBy : "user-current",
-                    createdAt: taskDetail ? taskDetail.createdAt : new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
-                    project: selectedProject ? { name: selectedProject.name, projectCode: selectedProject.projectCode } : undefined,
-                    stage: selectedStage ? { name: selectedStage.name, color: selectedStage.color } : undefined,
-                };
-
-                if (taskDetail) {
-                    setTasks(prev => prev.map(t => t.id === taskDetail.id ? newTask : t));
-                } else {
-                    setTasks(prev => [newTask, ...prev]);
-                }
+            const savedTask = taskDetail
+                ? await updateActivityTask(taskDetail.id, sanitizedPayload)
+                : await createActivityTask(sanitizedPayload);
+            const mapped = mapTask(savedTask);
+            if (!mapped.project && taskProjects.length) {
+                const p = taskProjects.find(pr => pr.id === mapped.projectId);
+                if (p) mapped.project = { name: p.name, projectCode: p.projectCode };
             }
+            if (!mapped.stage && taskStages.length) {
+                const s = taskStages.find(st => st.id === mapped.stageId);
+                if (s) mapped.stage = { name: s.name, color: s.color };
+            }
+            setTasks(prev => {
+                const exists = prev.some(t => t.id === mapped.id);
+                if (exists) return prev.map(t => t.id === mapped.id ? mapped : t);
+                return [mapped, ...prev];
+            });
+            await loadTasks();
 
             setCreateTask(false);
             setTaskDetail(null);
@@ -1290,6 +1250,8 @@ export default function ActivitiesPage() {
             setNotice(taskDetail ? "Task updated successfully." : "Task created successfully.");
         } catch (e: any) {
             setTaskError(e.message || "Could not save task");
+        } finally {
+            setIsSubmittingTask(false);
         }
     };
 
@@ -1325,64 +1287,27 @@ export default function ActivitiesPage() {
         }
 
         try {
-            let savedApproval: ActivityApproval | null = null;
-            if (isUuid(approvalForm.projectId) && isUuid(approvalForm.stageId)) {
-                try {
-                    if (approvalDetail) {
-                        savedApproval = await updateActivityApproval(approvalDetail.id, sanitizedPayload);
-                    } else {
-                        savedApproval = await createActivityApproval(sanitizedPayload);
-                    }
-                } catch {
-                    // Handled below if backend database validation fails on unseeded IDs
-                }
+            if (!isUuid(approvalForm.projectId) || !isUuid(approvalForm.stageId)) {
+                throw new Error("Select a valid project and stage.");
             }
-
-            if (savedApproval) {
-                const mapped = mapApproval(savedApproval);
-                if (!mapped.project && approvalProjects.length) {
-                    const p = approvalProjects.find(pr => pr.id === mapped.projectId);
-                    if (p) mapped.project = { name: p.name, projectCode: p.projectCode };
-                }
-                if (!mapped.stage && approvalStages.length) {
-                    const s = approvalStages.find(st => st.id === mapped.stageId);
-                    if (s) mapped.stage = { name: s.name, color: s.color };
-                }
-                setApprovals(prev => {
-                    const exists = prev.some(a => a.id === mapped.id);
-                    if (exists) return prev.map(a => a.id === mapped.id ? mapped : a);
-                    return [mapped, ...prev];
-                });
-                loadApprovals();
-            } else {
-                const selectedProject = approvalProjects.find(p => p.id === approvalForm.projectId);
-                const selectedStage = approvalStages.find(s => s.id === approvalForm.stageId);
-                const newApproval: ActivityApproval = {
-                    id: approvalDetail ? approvalDetail.id : `approval-${Date.now()}`,
-                    projectId: approvalForm.projectId,
-                    stageId: approvalForm.stageId,
-                    name: approvalForm.name.trim(),
-                    description: approvalForm.description?.trim() || null,
-                    approverId: approvalForm.approverId || null,
-                    approverName: approvalForm.approverName || "Anand Rathi",
-                    dueDate: approvalForm.dueDate,
-                    status: approvalForm.status || "draft",
-                    attachments: approvalAttachments.map(a => ({ name: a.name, size: a.size, type: a.type })),
-                    requestedBy: "user-current",
-                    requestedAt: new Date().toISOString(),
-                    decidedAt: null,
-                    createdAt: approvalDetail ? approvalDetail.createdAt : new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
-                    project: selectedProject ? { name: selectedProject.name, projectCode: selectedProject.projectCode } : undefined,
-                    stage: selectedStage ? { name: selectedStage.name, color: selectedStage.color } : undefined,
-                };
-
-                if (approvalDetail) {
-                    setApprovals(prev => prev.map(a => a.id === approvalDetail.id ? newApproval : a));
-                } else {
-                    setApprovals(prev => [newApproval, ...prev]);
-                }
+            const savedApproval = approvalDetail
+                ? await updateActivityApproval(approvalDetail.id, sanitizedPayload)
+                : await createActivityApproval(sanitizedPayload);
+            const mapped = mapApproval(savedApproval);
+            if (!mapped.project && approvalProjects.length) {
+                const p = approvalProjects.find(pr => pr.id === mapped.projectId);
+                if (p) mapped.project = { name: p.name, projectCode: p.projectCode };
             }
+            if (!mapped.stage && approvalStages.length) {
+                const s = approvalStages.find(st => st.id === mapped.stageId);
+                if (s) mapped.stage = { name: s.name, color: s.color };
+            }
+            setApprovals(prev => {
+                const exists = prev.some(a => a.id === mapped.id);
+                if (exists) return prev.map(a => a.id === mapped.id ? mapped : a);
+                return [mapped, ...prev];
+            });
+            await loadApprovals();
 
             setCreateApproval(false);
             setApprovalDetail(null);
@@ -1410,61 +1335,53 @@ export default function ActivitiesPage() {
     const deleteTask = async (id: string) => {
         if (!confirm("Are you sure you want to delete this task?")) return;
         try {
+            if (!isUuid(id)) throw new Error("This task is not persisted.");
+            await deleteActivityTask(id);
             setTasks(prev => prev.filter(t => t.id !== id));
             setSelectedTaskIds(prev => prev.filter(x => x !== id));
-            if (isUuid(id)) {
-                await deleteActivityTask(id);
-            }
             setNotice("Task deleted.");
-        } catch {
-            setNotice("Could not delete task");
-            loadTasks();
+        } catch (e) {
+            setNotice(e instanceof Error ? e.message : "Could not delete task");
         }
     };
 
     const handleUpdateTaskStatus = async (taskId: string, newStatus: "not_started" | "in_progress" | "completed" | "blocked") => {
         try {
-            setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus, updatedAt: new Date().toISOString() } : t));
-            if (isUuid(taskId)) {
-                await updateActivityTask(taskId, { status: newStatus });
-            }
+            if (!isUuid(taskId)) throw new Error("This task is not persisted.");
+            await updateActivityTask(taskId, { status: newStatus });
+            await loadTasks();
             setNotice(`Task status updated to ${newStatus.replace("_", " ")}.`);
-        } catch {
-            setNotice("Could not update task status");
-            loadTasks();
+        } catch (e) {
+            setNotice(e instanceof Error ? e.message : "Could not update task status");
         }
     };
 
     const handleBulkComplete = async () => {
         if (!selectedTaskIds.length) return;
         const idsToUpdate = [...selectedTaskIds];
-        setTasks(prev => prev.map(t => idsToUpdate.includes(t.id) ? { ...t, status: "completed", updatedAt: new Date().toISOString() } : t));
-        setSelectedTaskIds([]);
         try {
-            await Promise.all(
-                idsToUpdate.filter(id => isUuid(id)).map(id => updateActivityTask(id, { status: "completed" }))
-            );
+            if (idsToUpdate.some(id => !isUuid(id))) throw new Error("One or more selected tasks are not persisted.");
+            await Promise.all(idsToUpdate.map(id => updateActivityTask(id, { status: "completed" })));
+            setSelectedTaskIds([]);
+            await loadTasks();
             setNotice(`${idsToUpdate.length} task(s) marked as completed.`);
-        } catch {
-            setNotice("Some tasks could not be updated");
-            loadTasks();
+        } catch (e) {
+            setNotice(e instanceof Error ? e.message : "Some tasks could not be updated");
         }
     };
 
     const handleBulkDelete = async () => {
         if (!selectedTaskIds.length) return;
         if (!confirm(`Are you sure you want to delete ${selectedTaskIds.length} selected task(s)?`)) return;
-        const idsToDelete = [...selectedTaskIds];
-        setTasks(prev => prev.filter(t => !idsToDelete.includes(t.id)));
-        setSelectedTaskIds([]);
         try {
-            await Promise.all(
-                idsToDelete.filter(id => isUuid(id)).map(id => deleteActivityTask(id))
-            );
+            const idsToDelete = [...selectedTaskIds];
+            if (idsToDelete.some(id => !isUuid(id))) throw new Error("One or more selected tasks are not persisted.");
+            await Promise.all(idsToDelete.map(id => deleteActivityTask(id)));
+            setTasks(prev => prev.filter(t => !idsToDelete.includes(t.id)));
+            setSelectedTaskIds([]);
             setNotice(`${idsToDelete.length} task(s) deleted.`);
-        } catch {
-            setNotice("Some tasks could not be deleted");
-            loadTasks();
+        } catch (e) {
+            setNotice(e instanceof Error ? e.message : "Some tasks could not be deleted");
         }
     };
 
@@ -1491,16 +1408,19 @@ export default function ActivitiesPage() {
     const deleteApproval = async (id: string) => {
         if (!confirm("Are you sure you want to delete this approval?")) return;
         try {
-            setApprovals(prev => prev.filter(a => a.id !== id));
-            if (isUuid(id)) {
-                await fetch(`/api/v1/activities/approvals/${id}`, {
-                    method: "DELETE",
-                    credentials: "include",
-                });
+            if (!isUuid(id)) throw new Error("This approval is not persisted.");
+            const response = await fetch(`/api/v1/activities/approvals/${id}`, {
+                method: "DELETE",
+                credentials: "include",
+            });
+            if (!response.ok) {
+                const payload = await response.json().catch(() => ({}));
+                throw new Error(payload.error?.message || payload.message || "Could not delete approval");
             }
+            setApprovals(prev => prev.filter(a => a.id !== id));
             setNotice("Approval deleted.");
-        } catch {
-            setNotice("Could not delete approval");
+        } catch (e) {
+            setNotice(e instanceof Error ? e.message : "Could not delete approval");
         }
     };
 
@@ -1685,7 +1605,10 @@ export default function ActivitiesPage() {
                 </td>
                 <td className="col-assignee">
                     <div className="activities-task-assignee-cell task-assignee-cell">
-                        <div className={`activities-task-assignee-avatar task-assignee-avatar ${!initials ? "unassigned" : ""}`}>
+                        <div
+                            className="activities-task-assignee-avatar task-assignee-avatar"
+                            data-unassigned={!initials ? "true" : "false"}
+                        >
                             {initials || "—"}
                         </div>
                         <span className="activities-task-assignee-name task-assignee-name" title={assigneeName}>{assigneeName}</span>
@@ -2186,7 +2109,7 @@ export default function ActivitiesPage() {
                         </div>
 
                         {/* Frame 2147225067: Attachments Card */}
-                        <div className="view-task-attachments-card">
+                        <div className="view-task-attachments-card view-task-attachments-section">
                             <div className="view-task-card-header">
                                 <span className="view-task-card-title">Attachments</span>
                                 <span className="view-task-count-pill">
@@ -3036,8 +2959,9 @@ export default function ActivitiesPage() {
                             <button
                                 type="submit"
                                 className="activities-task-btn-submit activity-task-btn-submit"
+                                disabled={isSubmittingTask}
                             >
-                                {taskDetail ? "Save Changes" : "Create Task"}
+                                {isSubmittingTask ? "Saving..." : taskDetail ? "Save Changes" : "Create Task"}
                             </button>
                         </div>
                     </form>
@@ -3443,7 +3367,7 @@ export default function ActivitiesPage() {
                                         <input
                                             type="text"
                                             className="activities-stage-search-input activities-task-search-input"
-                                            placeholder="Search task by name…"
+                                            placeholder="Search task by name..."
                                             value={taskQuery}
                                             onChange={e => {
                                                 setTaskQuery(e.target.value);

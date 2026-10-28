@@ -4,9 +4,13 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { AlertCircle, CheckCircle2, Clock, Loader2, ArrowRight } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 import { ClientAuthLayout } from "@/components/client/ClientAuthLayout";
-import { inspectClientInvite, acceptClientInvite, type ClientInvitationDetails } from "@/lib/api/client";
+import {
+    inspectClientInvite,
+    acceptClientInvite,
+    type ClientInvitationDetails,
+} from "@/lib/api/client";
 
 export default function ClientInvitationPage() {
     const params = useParams<{ token: string }>();
@@ -16,6 +20,8 @@ export default function ClientInvitationPage() {
     const [submitting, setSubmitting] = useState(false);
     const [invite, setInvite] = useState<ClientInvitationDetails | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [isExpired, setIsExpired] = useState(false);
+    const [isRevoked, setIsRevoked] = useState(false);
     const [currentUser, setCurrentUser] = useState<{ email: string; id: string } | null>(null);
     const [mismatchedAccount, setMismatchedAccount] = useState(false);
 
@@ -31,6 +37,8 @@ export default function ClientInvitationPage() {
         async function init() {
             setLoading(true);
             setError(null);
+            setIsExpired(false);
+            setIsRevoked(false);
 
             // 1. Check if user is currently signed in
             try {
@@ -52,8 +60,19 @@ export default function ClientInvitationPage() {
             try {
                 const inviteData = await inspectClientInvite(token);
                 setInvite(inviteData);
+                if (inviteData.status === "expired" || (inviteData.expiresAt && new Date(inviteData.expiresAt).getTime() <= Date.now())) {
+                    setIsExpired(true);
+                } else if (inviteData.status === "revoked") {
+                    setIsRevoked(true);
+                }
             } catch (err: any) {
-                setError(err.message || "Failed to load invitation. The link may be invalid or expired.");
+                const msg = err.message || "Failed to load invitation. The link may be invalid or expired.";
+                setError(msg);
+                if (/expired/i.test(msg)) {
+                    setIsExpired(true);
+                } else if (/revoked/i.test(msg)) {
+                    setIsRevoked(true);
+                }
             } finally {
                 setLoading(false);
             }
@@ -87,6 +106,7 @@ export default function ClientInvitationPage() {
         // If user is signed in with correct account, accept invite directly
         if (currentUser && currentUser.email.toLowerCase() === invite.email.toLowerCase()) {
             setSubmitting(true);
+            setError(null);
             try {
                 const res = await acceptClientInvite(token);
                 router.push(
@@ -110,322 +130,252 @@ export default function ClientInvitationPage() {
         router.push(`/client/create-account?token=${encodeURIComponent(token)}`);
     }
 
+    // Dynamic description text matching Figma reference:
+    // "Alex Morgan from Meridian Build Co. has invited you to collaborate on this project."
+    const descriptionText = (() => {
+        if (!invite) return "";
+        if (invite.inviterName && invite.companyName) {
+            return `${invite.inviterName} from ${invite.companyName} has invited you to collaborate on this project.`;
+        }
+        if (invite.inviterName) {
+            return `${invite.inviterName} has invited you to collaborate on this project.`;
+        }
+        if (invite.companyName) {
+            return `${invite.companyName} has invited you to collaborate on this project.`;
+        }
+        return "You have been invited to collaborate on this project.";
+    })();
+
     return (
         <ClientAuthLayout>
             {loading ? (
-                <div style={{ textAlign: "center", padding: "60px 0" }}>
-                    <Loader2
-                        className="animate-spin"
-                        size={36}
-                        color="#2563EB"
-                        style={{ margin: "0 auto 16px auto" }}
-                    />
-                    <h3 style={{ fontSize: "16px", color: "#1E293B", fontWeight: 500 }}>
-                        Validating your project invitation...
-                    </h3>
+                /* 1. Loading State */
+                <div className="client-invite-frame">
+                    <div className="client-invite-header-group">
+                        <div className="client-invite-logo-wrap">
+                            <Image
+                                src="/assets/boq-logo-small.svg"
+                                alt="BOQ"
+                                width={32}
+                                height={32}
+                                className="client-invite-logo"
+                                priority
+                            />
+                        </div>
+                        <div className="client-invite-title-block">
+                            <p className="client-invite-eyebrow">PROJECT INVITATION</p>
+                        </div>
+                    </div>
+                    <div className="client-invite-loading-box">
+                        <Loader2 className="animate-spin" size={32} color="#2563EB" />
+                        <p className="client-invite-status-copy">Validating your project invitation...</p>
+                    </div>
+                </div>
+            ) : isRevoked ? (
+                /* 2. Revoked State */
+                <div className="client-invite-frame">
+                    <div className="client-invite-header-group">
+                        <div className="client-invite-logo-wrap">
+                            <Image
+                                src="/assets/boq-logo-small.svg"
+                                alt="BOQ"
+                                width={32}
+                                height={32}
+                                className="client-invite-logo"
+                                priority
+                            />
+                        </div>
+                        <div className="client-invite-title-block">
+                            <p className="client-invite-eyebrow">PROJECT INVITATION</p>
+                            <div className="client-invite-text-block">
+                                <h1 className="client-invite-heading">Invitation Revoked</h1>
+                                <p className="client-invite-description">
+                                    This invitation has been revoked by the project team. If you believe this is an error, please contact your project manager.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="client-invite-buttons">
+                        <Link href="/login" className="client-invite-btn-secondary">
+                            Return to Sign In
+                        </Link>
+                    </div>
+                </div>
+            ) : isExpired ? (
+                /* 3. Expired State */
+                <div className="client-invite-frame">
+                    <div className="client-invite-header-group">
+                        <div className="client-invite-logo-wrap">
+                            <Image
+                                src="/assets/boq-logo-small.svg"
+                                alt="BOQ"
+                                width={32}
+                                height={32}
+                                className="client-invite-logo"
+                                priority
+                            />
+                        </div>
+                        <div className="client-invite-title-block">
+                            <p className="client-invite-eyebrow">PROJECT INVITATION</p>
+                            <div className="client-invite-text-block">
+                                <h1 className="client-invite-heading">Invitation Expired</h1>
+                                <p className="client-invite-description">
+                                    {invite?.projectName
+                                        ? `This invitation to collaborate on ${invite.projectName} has expired. Please contact ${invite.inviterName || invite.companyName || "the project team"} to request a new invitation.`
+                                        : "This invitation link has expired. Please contact the project administrator to request a new invitation."}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="client-invite-buttons">
+                        <Link href="/login" className="client-invite-btn-primary">
+                            Sign In to Existing Account
+                        </Link>
+                    </div>
                 </div>
             ) : error && !invite ? (
-                <div style={{ textAlign: "center", padding: "40px 0" }}>
-                    <div
-                        style={{
-                            width: "56px",
-                            height: "56px",
-                            borderRadius: "16px",
-                            backgroundColor: "#FEF2F2",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            margin: "0 auto 20px auto",
-                        }}
-                    >
-                        <AlertCircle size={28} color="#EF4444" />
+                /* 4. Invalid or Not Found State */
+                <div className="client-invite-frame">
+                    <div className="client-invite-header-group">
+                        <div className="client-invite-logo-wrap">
+                            <Image
+                                src="/assets/boq-logo-small.svg"
+                                alt="BOQ"
+                                width={32}
+                                height={32}
+                                className="client-invite-logo"
+                                priority
+                            />
+                        </div>
+                        <div className="client-invite-title-block">
+                            <p className="client-invite-eyebrow">PROJECT INVITATION</p>
+                            <div className="client-invite-text-block">
+                                <h1 className="client-invite-heading">Invitation Not Available</h1>
+                                <p className="client-invite-description">
+                                    {error}
+                                </p>
+                            </div>
+                        </div>
                     </div>
-                    <h2 style={{ fontSize: "22px", fontWeight: 700, color: "#0F172A", marginBottom: "8px" }}>
-                        Invitation Not Available
-                    </h2>
-                    <p style={{ fontSize: "14px", color: "#64748B", lineHeight: 1.6, marginBottom: "28px" }}>
-                        {error}
-                    </p>
-                    <Link
-                        href="/login"
-                        style={{
-                            display: "inline-block",
-                            padding: "12px 24px",
-                            borderRadius: "10px",
-                            backgroundColor: "#2563EB",
-                            color: "#ffffff",
-                            fontWeight: 600,
-                            fontSize: "14px",
-                            textDecoration: "none",
-                        }}
-                    >
-                        Return to Sign In
-                    </Link>
+                    <div className="client-invite-buttons">
+                        <Link href="/login" className="client-invite-btn-primary">
+                            Return to Sign In
+                        </Link>
+                    </div>
                 </div>
             ) : invite?.status === "accepted" ? (
-                <div style={{ textAlign: "center", padding: "40px 0" }}>
-                    <div
-                        style={{
-                            width: "56px",
-                            height: "56px",
-                            borderRadius: "16px",
-                            backgroundColor: "#ECFDF5",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            margin: "0 auto 20px auto",
-                        }}
-                    >
-                        <CheckCircle2 size={28} color="#059669" />
+                /* 5. Already Accepted State */
+                <div className="client-invite-frame">
+                    <div className="client-invite-header-group">
+                        <div className="client-invite-logo-wrap">
+                            <Image
+                                src="/assets/boq-logo-small.svg"
+                                alt="BOQ"
+                                width={32}
+                                height={32}
+                                className="client-invite-logo"
+                                priority
+                            />
+                        </div>
+                        <div className="client-invite-title-block">
+                            <p className="client-invite-eyebrow">PROJECT INVITATION</p>
+                            <div className="client-invite-text-block">
+                                <h1 className="client-invite-heading">Invitation Already Accepted</h1>
+                                <p className="client-invite-description">
+                                    This invitation for {invite.projectName} has already been accepted. You can view your project workspace in the client dashboard.
+                                </p>
+                            </div>
+                        </div>
                     </div>
-                    <h2 style={{ fontSize: "22px", fontWeight: 700, color: "#0F172A", marginBottom: "8px" }}>
-                        Invitation Already Accepted
-                    </h2>
-                    <p style={{ fontSize: "14px", color: "#64748B", lineHeight: 1.6, marginBottom: "28px" }}>
-                        This invitation for <strong>{invite.projectName}</strong> has already been accepted.
-                        You can sign in to view your project dashboard.
-                    </p>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                        <Link
-                            href="/client/dashboard"
-                            style={{
-                                display: "inline-block",
-                                padding: "14px 24px",
-                                borderRadius: "10px",
-                                backgroundColor: "#2563EB",
-                                color: "#ffffff",
-                                fontWeight: 600,
-                                fontSize: "14px",
-                                textDecoration: "none",
-                                textAlign: "center",
-                            }}
-                        >
+                    <div className="client-invite-buttons">
+                        <Link href="/client/dashboard" className="client-invite-btn-primary">
                             Go to Client Dashboard
                         </Link>
-                        <Link
-                            href="/login"
-                            style={{
-                                display: "inline-block",
-                                padding: "12px 24px",
-                                borderRadius: "10px",
-                                border: "1px solid #E2E8F0",
-                                backgroundColor: "#ffffff",
-                                color: "#334155",
-                                fontWeight: 600,
-                                fontSize: "14px",
-                                textDecoration: "none",
-                                textAlign: "center",
-                            }}
-                        >
+                        <Link href="/login" className="client-invite-btn-secondary">
                             Sign In with Different Account
                         </Link>
                     </div>
                 </div>
-            ) : invite?.status === "expired" ? (
-                <div style={{ textAlign: "center", padding: "40px 0" }}>
-                    <div
-                        style={{
-                            width: "56px",
-                            height: "56px",
-                            borderRadius: "16px",
-                            backgroundColor: "#FFFBEB",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            margin: "0 auto 20px auto",
-                        }}
-                    >
-                        <Clock size={28} color="#D97706" />
-                    </div>
-                    <h2 style={{ fontSize: "22px", fontWeight: 700, color: "#0F172A", marginBottom: "8px" }}>
-                        Invitation Expired
-                    </h2>
-                    <p style={{ fontSize: "14px", color: "#64748B", lineHeight: 1.6, marginBottom: "28px" }}>
-                        This invitation link for <strong>{invite.projectName}</strong> expired on{" "}
-                        {new Date(invite.expiresAt).toLocaleDateString()}. Please contact{" "}
-                        <strong>{invite.inviterName || "the project manager"}</strong> to request a new invitation.
-                    </p>
-                    <Link
-                        href="/login"
-                        style={{
-                            display: "inline-block",
-                            padding: "12px 24px",
-                            borderRadius: "10px",
-                            backgroundColor: "#2563EB",
-                            color: "#ffffff",
-                            fontWeight: 600,
-                            fontSize: "14px",
-                            textDecoration: "none",
-                        }}
-                    >
-                        Sign In to Existing Account
-                    </Link>
-                </div>
             ) : invite ? (
-                <div>
-                    {/* Top small logo matching screenshot 1 */}
-                    <div style={{ marginBottom: "28px" }}>
-                        <div
-                            style={{
-                                width: "40px",
-                                height: "40px",
-                                borderRadius: "10px",
-                                backgroundColor: "#2563EB",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                boxShadow: "0 4px 10px rgba(37, 99, 235, 0.25)",
-                            }}
-                        >
+                /* 6. Active Valid Invitation State (Figma Frame 21) */
+                <div className="client-invite-frame">
+                    {/* Frame 3 (Logo & Header group) */}
+                    <div className="client-invite-header-group">
+                        {/* Logo: 32 x 32 px */}
+                        <div className="client-invite-logo-wrap">
                             <Image
                                 src="/assets/boq-logo-small.svg"
                                 alt="BOQ"
-                                width={24}
-                                height={24}
-                                style={{ objectFit: "contain" }}
+                                width={32}
+                                height={32}
+                                className="client-invite-logo"
+                                priority
                             />
+                        </div>
+
+                        {/* Frame 2147225498 */}
+                        <div className="client-invite-title-block">
+                            {/* PROJECT INVITATION */}
+                            <p className="client-invite-eyebrow">PROJECT INVITATION</p>
+
+                            {/* Frame 3 (Heading + Description) */}
+                            <div className="client-invite-text-block">
+                                {/* You're invited to [Project Name] */}
+                                <h1 className="client-invite-heading">
+                                    You&apos;re invited to {invite.projectName}
+                                </h1>
+
+                                {/* Dynamic Description */}
+                                <p className="client-invite-description">
+                                    {descriptionText}
+                                </p>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Uppercase Eyebrow */}
-                    <div
-                        style={{
-                            fontSize: "12px",
-                            fontWeight: 700,
-                            letterSpacing: "0.08em",
-                            color: "#2563EB",
-                            textTransform: "uppercase",
-                            marginBottom: "12px",
-                        }}
-                    >
-                        PROJECT INVITATION
-                    </div>
-
-                    {/* Main Heading */}
-                    <h1
-                        style={{
-                            fontSize: "28px",
-                            fontWeight: 700,
-                            color: "#0F172A",
-                            lineHeight: 1.25,
-                            letterSpacing: "-0.02em",
-                            margin: "0 0 16px 0",
-                        }}
-                    >
-                        You&apos;re invited to {invite.projectName}
-                    </h1>
-
-                    {/* Subtitle / Description */}
-                    <p
-                        style={{
-                            fontSize: "15px",
-                            color: "#475569",
-                            lineHeight: 1.6,
-                            margin: "0 0 32px 0",
-                        }}
-                    >
-                        {invite.inviterName || "A team member"} has invited you to collaborate on{" "}
-                        <strong style={{ color: "#1E293B" }}>{invite.projectName}</strong> by{" "}
-                        <strong style={{ color: "#1E293B" }}>{invite.companyName}</strong>. Review project
-                        documents, track progress, and communicate with your team.
-                    </p>
-
-                    {/* Account mismatch alert if signed in as someone else */}
+                    {/* Account mismatch notice */}
                     {mismatchedAccount && currentUser && (
-                        <div
-                            style={{
-                                padding: "14px 16px",
-                                borderRadius: "10px",
-                                backgroundColor: "#FFFBEB",
-                                border: "1px solid #FDE68A",
-                                color: "#92400E",
-                                fontSize: "13px",
-                                lineHeight: 1.5,
-                                marginBottom: "20px",
-                                display: "flex",
-                                alignItems: "flex-start",
-                                gap: "10px",
-                            }}
-                        >
-                            <AlertCircle size={18} style={{ flexShrink: 0, marginTop: "2px" }} />
+                        <div className="client-invite-alert-warning" role="alert">
+                            <AlertCircle size={18} className="client-alert-icon" />
                             <div>
-                                You are signed in as <strong>{currentUser.email}</strong>, but this invitation
-                                was sent to <strong>{invite.email}</strong>. Please sign out to accept this invitation
-                                with the intended email.
+                                You are currently signed in as <strong>{currentUser.email}</strong>, but this invitation was sent to <strong>{invite.email}</strong>. Please switch accounts or sign out to continue.
                             </div>
                         </div>
                     )}
 
+                    {/* Error message */}
                     {error && (
-                        <div
-                            style={{
-                                padding: "12px 16px",
-                                borderRadius: "8px",
-                                backgroundColor: "#FEF2F2",
-                                border: "1px solid #FCA5A5",
-                                color: "#B91C1C",
-                                fontSize: "13px",
-                                marginBottom: "20px",
-                            }}
-                        >
-                            {error}
+                        <div className="client-invite-alert-error" role="alert">
+                            <AlertCircle size={18} className="client-alert-icon" />
+                            <span>{error}</span>
                         </div>
                     )}
 
-                    {/* Action buttons */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                    {/* Frame 2147225499 (Buttons) */}
+                    <div className="client-invite-buttons">
+                        {/* Accept Invitation */}
                         <button
                             type="button"
                             onClick={handleAccept}
                             disabled={submitting}
-                            style={{
-                                width: "100%",
-                                padding: "14px 20px",
-                                borderRadius: "10px",
-                                border: "none",
-                                backgroundColor: "#2563EB",
-                                color: "#ffffff",
-                                fontSize: "15px",
-                                fontWeight: 600,
-                                cursor: submitting ? "not-allowed" : "pointer",
-                                opacity: submitting ? 0.75 : 1,
-                                transition: "all 0.15s ease",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                gap: "8px",
-                            }}
+                            className="client-invite-btn-primary"
+                            aria-label="Accept Invitation"
                         >
                             {submitting ? (
                                 <>
-                                    <Loader2 className="animate-spin" size={18} />
+                                    <Loader2 className="animate-spin" size={16} aria-hidden="true" />
                                     <span>Accepting Invitation...</span>
                                 </>
                             ) : (
-                                <>
-                                    <span>Accept Invitation</span>
-                                    <ArrowRight size={16} />
-                                </>
+                                <span>Accept Invitation</span>
                             )}
                         </button>
 
+                        {/* Sign In */}
                         <Link
                             href={`/login?next=${encodeURIComponent(`/client/invitation/${token}`)}`}
-                            style={{
-                                width: "100%",
-                                padding: "13px 20px",
-                                borderRadius: "10px",
-                                border: "1px solid #E2E8F0",
-                                backgroundColor: "#ffffff",
-                                color: "#1E293B",
-                                fontSize: "15px",
-                                fontWeight: 600,
-                                textDecoration: "none",
-                                textAlign: "center",
-                                display: "block",
-                                boxSizing: "border-box",
-                                transition: "all 0.15s ease",
-                            }}
+                            className="client-invite-btn-secondary"
+                            aria-label="Sign In"
                         >
                             Sign In
                         </Link>

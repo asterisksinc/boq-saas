@@ -174,15 +174,15 @@ export default function BoqTemplateGrid({
             (t) => !["active", "draft", "archived", "published", "v1.0", "v2.0", "v3.0", "v3.2"].includes(t.toLowerCase())
           ) || [];
           
-          const categoryTag = template.projectType || rawTags[0] || "Residential";
+          const categoryTag = template.projectType || rawTags[0] || "—";
           const subCategoryTag = template.category && template.category.toLowerCase() !== categoryTag.toLowerCase()
             ? template.category
-            : rawTags[1] || "Interior";
+            : rawTags[1] || "";
 
-          const statusNormalized = (template.status || "active").toLowerCase();
+          const statusNormalized = (template.status || "").toLowerCase();
           const statusClass = statusNormalized === "active" ? "status-active" : statusNormalized === "draft" ? "status-draft" : "status-archived";
 
-          const mappingPercent = Math.min(100, Math.max(0, template.costMapping ?? 98));
+          const mappingPercent = Math.min(100, Math.max(0, template.costMapping ?? 0));
 
           return (
             <div
@@ -213,14 +213,14 @@ export default function BoqTemplateGrid({
                       {template.name}
                     </h4>
                     <p className="boq-card-meta target-card-meta">
-                      {template.sections || 18} Sections • {template.items || 186} Items
+                      {template.sections ?? 0} Sections • {template.items ?? 0} Items
                     </p>
                   </div>
 
                   {/* Right: Status Pill & Category Tags */}
                   <div className="boq-card-badges-wrap">
                     <span className={`boq-status-pill target-status-pill ${statusClass}`}>
-                      {template.status ? template.status.toUpperCase() : "ACTIVE"}
+                      {template.status ? template.status.toUpperCase() : "—"}
                     </span>
                     <div className="boq-card-tags-row boq-tags-row">
                       <span className="boq-tag-pill">{categoryTag}</span>
@@ -252,7 +252,7 @@ export default function BoqTemplateGrid({
               {/* 5. Footer (Frame 2147225074) */}
               <div className="boq-card-footer target-card-footer">
                 <span className="boq-card-used target-card-used">
-                  {template.version || "v3.2"} • Used {template.useCount ?? 42} Times
+                {template.version || "—"} • Used {template.useCount ?? 0} Times
                 </span>
 
                 <div style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>

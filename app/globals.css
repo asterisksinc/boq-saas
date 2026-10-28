@@ -53543,160 +53543,274 @@ textarea {
    CLIENT INVITATION, AUTHENTICATION & ONBOARDING FLOW
    ========================================================================== */
 
+/* Page Shell (Figma Reference: 1440 x 900 viewport, #F2F3F2 background) */
 .client-auth-shell {
     min-height: 100vh;
     background: #f2f3f2;
     padding: 16px;
     display: grid;
-    grid-template-columns: 42% 1fr;
+    grid-template-columns: minmax(0, 599px) minmax(0, 793px);
+    justify-content: center;
     gap: 16px;
     box-sizing: border-box;
     font-family: var(--font-sans, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1024px) {
     .client-auth-shell {
         grid-template-columns: 1fr;
         padding: 12px;
+        gap: 16px;
     }
 }
 
+/* Left Branding Panel (Figma Frame 2: 599 x 868 px, border-radius 20px) */
 .client-branding-panel {
+    width: 100%;
+    max-width: 599px;
+    min-height: calc(100vh - 32px);
+    height: 868px;
     border-radius: 20px;
-    background: linear-gradient(180deg, #1068eb 0%, #2575fc 35%, #e0efff 100%);
-    padding: 48px 36px 36px;
+    background: #f8fafc;
+    position: relative;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    text-align: center;
+    justify-content: flex-end;
+    padding: 0 0 50px;
     box-sizing: border-box;
-    position: relative;
-    overflow: hidden;
-    min-height: calc(100vh - 32px);
+    text-align: center;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1024px) {
     .client-branding-panel {
-        min-height: auto;
-        padding: 36px 20px;
+        height: auto;
+        min-height: 480px;
+        padding: 40px 24px;
+        justify-content: center;
     }
 }
 
-.client-branding-logo-box {
-    width: 80px;
-    height: 80px;
+@media (max-width: 768px) {
+    .client-branding-panel {
+        display: none;
+    }
+}
+
+/* Layered Blurred Shapes (Figma Ellipse 3, 2, 1) */
+.client-branding-glows {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.client-glow-ellipse-3 {
+    position: absolute;
+    width: 1900px;
+    height: 1838px;
+    left: calc(50% - 950px);
+    bottom: -586px;
     background: #2563eb;
-    border-radius: 18px;
-    display: grid;
-    place-items: center;
-    box-shadow: 0 12px 24px rgba(37, 99, 235, 0.25);
-    margin-bottom: 24px;
+    filter: blur(92px);
+    border-radius: 50%;
+}
+
+.client-glow-ellipse-2 {
+    position: absolute;
+    width: 1402px;
+    height: 1307px;
+    left: calc(50% - 701px);
+    bottom: -586px;
+    background: #60a5fa;
+    filter: blur(92px);
+    border-radius: 50%;
+}
+
+.client-glow-ellipse-1 {
+    position: absolute;
+    width: 1020px;
+    height: 1094px;
+    left: calc(50% - 510px);
+    bottom: -586px;
+    background: #f8fafc;
+    filter: blur(92px);
+    border-radius: 50%;
+}
+
+/* Branding Content Box (Figma Frame 17: 448 x 286 px) */
+.client-branding-content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    width: 448px;
+    max-width: calc(100% - 48px);
+    box-sizing: border-box;
+}
+
+/* Logo Tile (Figma Frame 16: 92 x 92 px, border-radius 16px, background #365EFB) */
+.client-branding-logo-box {
+    width: 92px;
+    height: 92px;
+    background: #365efb;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    box-shadow: none;
 }
 
 .client-branding-logo-box img {
-    width: 44px;
-    height: 44px;
+    width: 92px;
+    height: 92px;
     object-fit: contain;
 }
 
+/* Title & Copy (Figma Frame 18: Inter 600 28px/120% and Inter 500 14px/140%) */
 .client-branding-title {
-    font-size: clamp(1.75rem, 2.3vw, 2.4rem);
-    font-weight: 700;
-    color: #0f172a;
-    line-height: 1.2;
-    letter-spacing: -0.03em;
-    max-width: 380px;
-    margin: 0 0 14px;
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-style: normal;
+    font-weight: 600;
+    font-size: 28px;
+    line-height: 120%;
+    text-align: center;
+    color: #1a1d1b;
+    margin: 0;
+    max-width: 448px;
 }
 
 .client-branding-copy {
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-style: normal;
+    font-weight: 500;
     font-size: 14px;
+    line-height: 140%;
+    text-align: center;
     color: #475569;
-    line-height: 1.6;
-    max-width: 380px;
-    margin: 0 0 28px;
+    margin: 0;
+    max-width: 448px;
 }
 
+/* Carousel Indicators (Figma Frame 20: 3 dots 6x6px with 8px gap) */
 .client-branding-dots {
     display: flex;
+    flex-direction: row;
+    align-items: flex-start;
     gap: 8px;
-    align-items: center;
-    justify-content: center;
+    width: 34px;
+    height: 6px;
+    margin: 0;
 }
 
 .client-branding-dots span {
-    width: 7px;
-    height: 7px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
-    background: #94a3b8;
+    background: #365efb;
+    opacity: 0.2;
     display: inline-block;
 }
 
 .client-branding-dots span.active {
-    background: #2563eb;
+    opacity: 1;
+    background: #365efb;
 }
 
+/* Right Content Panel (Figma Frame 9: 793 x 868 px, border-radius 20px, background #FFFFFF) */
 .client-content-panel {
+    width: 100%;
+    max-width: 793px;
+    min-height: calc(100vh - 32px);
+    height: 868px;
     background: #ffffff;
     border-radius: 20px;
-    padding: 44px 48px;
+    padding: 102px 172px 24px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    align-items: flex-start;
     box-sizing: border-box;
-    min-height: calc(100vh - 32px);
+    gap: 40px;
+}
+
+@media (max-width: 1280px) {
+    .client-content-panel {
+        padding: 64px 48px 24px;
+    }
+}
+
+@media (max-width: 1024px) {
+    .client-content-panel {
+        height: auto;
+        min-height: auto;
+        padding: 48px 32px 24px;
+    }
 }
 
 @media (max-width: 640px) {
     .client-content-panel {
-        padding: 28px 20px;
+        padding: 32px 20px 20px;
+        border-radius: 16px;
     }
 }
 
 .client-panel-inner {
     width: 100%;
-    max-width: 440px;
-    margin: auto;
+    max-width: 449px;
+    margin: 0 auto;
     display: flex;
     flex-direction: column;
+    justify-content: center;
     align-items: flex-start;
     text-align: left;
+    flex: 1;
 }
 
 .client-mini-logo {
-    width: 40px;
-    height: 40px;
-    margin-bottom: 18px;
+    width: 32px;
+    height: 32px;
+    margin-bottom: 20px;
 }
 
 .client-mini-logo img {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
     object-fit: contain;
 }
 
 .client-eyebrow {
+    font-family: var(--font-sans, Inter, sans-serif);
     color: #2563eb;
     font-weight: 700;
-    font-size: 12px;
-    letter-spacing: 0.08em;
+    font-size: 16px;
+    line-height: 20px;
+    letter-spacing: normal;
     text-transform: uppercase;
     margin-bottom: 8px;
 }
 
 .client-title {
-    font-size: 26px;
-    font-weight: 700;
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 36px;
+    letter-spacing: -0.005em;
     color: #0f172a;
-    line-height: 1.25;
-    margin: 0 0 10px;
+    margin: 0 0 8px;
 }
 
 .client-subtitle {
-    font-size: 14px;
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-size: 18px;
+    font-weight: 500;
     color: #475569;
-    line-height: 1.55;
+    line-height: 28px;
     margin: 0 0 28px;
 }
 
@@ -53800,13 +53914,16 @@ textarea {
     opacity: 1;
 }
 
-.client-btn-primary {
+/* Primary Button (Figma Frame 2147225499: height 48px, background #2563EB, radius 6px, Inter 500 14px/20px) */
+.client-btn-primary,
+.client-invite-btn-primary {
     background: #2563eb;
     color: #ffffff;
     height: 48px;
-    border-radius: 8px;
-    font-weight: 600;
+    border-radius: 6px;
+    font-weight: 500;
     font-size: 14px;
+    line-height: 20px;
     width: 100%;
     border: none;
     cursor: pointer;
@@ -53814,75 +53931,295 @@ textarea {
     align-items: center;
     justify-content: center;
     gap: 8px;
-    transition: background-color 0.15s, transform 0.1s;
+    padding: 14px 20px;
+    transition: background-color 0.15s ease, transform 0.1s ease;
     text-decoration: none;
     box-sizing: border-box;
+    font-family: var(--font-sans, Inter, sans-serif);
 }
 
-.client-btn-primary:hover:not(:disabled) {
+.client-btn-primary:hover:not(:disabled),
+.client-invite-btn-primary:hover:not(:disabled) {
     background: #1d4ed8;
 }
 
-.client-btn-primary:active:not(:disabled) {
+.client-btn-primary:active:not(:disabled),
+.client-invite-btn-primary:active:not(:disabled) {
+    background: #1e40af;
     transform: scale(0.99);
 }
 
-.client-btn-primary:disabled {
-    opacity: 0.65;
+.client-btn-primary:focus-visible,
+.client-invite-btn-primary:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+}
+
+.client-btn-primary:disabled,
+.client-invite-btn-primary:disabled {
+    opacity: 0.7;
     cursor: not-allowed;
 }
 
-.client-btn-secondary {
+/* Secondary Button (Figma Frame 2147225499: height 48px, border 1px solid #E2E8F0, radius 6px, Inter 500 14px/20px) */
+.client-btn-secondary,
+.client-invite-btn-secondary {
     background: #ffffff;
     border: 1px solid #e2e8f0;
     color: #0f172a;
     height: 48px;
-    border-radius: 8px;
-    font-weight: 600;
+    border-radius: 6px;
+    font-weight: 500;
     font-size: 14px;
+    line-height: 20px;
     width: 100%;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    transition: background-color 0.15s, border-color 0.15s;
+    padding: 14px 20px;
+    transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
     text-decoration: none;
     box-sizing: border-box;
-    margin-top: 10px;
+    font-family: var(--font-sans, Inter, sans-serif);
 }
 
-.client-btn-secondary:hover:not(:disabled) {
+.client-btn-secondary:hover:not(:disabled),
+.client-invite-btn-secondary:hover:not(:disabled) {
     background: #f8fafc;
     border-color: #cbd5e1;
 }
 
+.client-btn-secondary:active:not(:disabled),
+.client-invite-btn-secondary:active:not(:disabled) {
+    background: #f1f5f9;
+    transform: scale(0.99);
+}
+
+.client-btn-secondary:focus-visible,
+.client-invite-btn-secondary:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+}
+
+/* Footer Container (Figma Frame 14: gap 24px, max-width 449px) */
+.client-footer-wrap {
+    width: 100%;
+    max-width: 449px;
+    margin: auto auto 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 24px;
+    box-sizing: border-box;
+}
+
+/* Divider (Figma Rectangle 8: 1px solid #E2E8F0) */
+.client-divider {
+    width: 100%;
+    height: 1px;
+    background: #e2e8f0;
+}
+
+/* Footer Bottom Row (Figma Frame 12: Inter 400 12px/16px #475569) */
 .client-footer {
-    border-top: 1px solid #f1f5f9;
-    padding-top: 18px;
-    margin-top: 24px;
+    width: 100%;
+    border-top: none;
+    padding-top: 0;
+    margin-top: 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
     font-size: 12px;
-    color: #64748b;
-    width: 100%;
+    line-height: 16px;
+    color: #475569;
     box-sizing: border-box;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-family: var(--font-sans, Inter, sans-serif);
 }
 
+.client-footer-copy {
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-weight: 400;
+    font-size: 12px;
+    line-height: 16px;
+    color: #475569;
+}
+
+/* Footer Links (Figma Frame 15: gap 16px, Inter 500 12px/16px #475569) */
 .client-footer-links {
     display: flex;
     gap: 16px;
+    align-items: center;
 }
 
 .client-footer-links a {
-    color: #64748b;
+    color: #475569;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 16px;
     text-decoration: none;
+    transition: color 0.15s ease;
 }
 
 .client-footer-links a:hover {
     color: #0f172a;
     text-decoration: underline;
+}
+
+/* Specific Client Invitation Page Frame (Figma Frame 21) */
+.client-invite-frame {
+    width: 100%;
+    max-width: 449px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 40px;
+    box-sizing: border-box;
+}
+
+/* Frame 3 (Logo & Header group) */
+.client-invite-header-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+    width: 100%;
+}
+
+.client-invite-logo-wrap {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.client-invite-logo {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+}
+
+/* Frame 2147225498 */
+.client-invite-title-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+}
+
+.client-invite-eyebrow {
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-style: normal;
+    font-weight: 700;
+    font-size: 16px;
+    line-height: 20px;
+    color: #2563eb;
+    margin: 0;
+    letter-spacing: normal;
+    text-transform: uppercase;
+}
+
+/* Frame 3 (Dynamic Heading & Description) */
+.client-invite-text-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+}
+
+.client-invite-heading {
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-style: normal;
+    font-weight: 600;
+    font-size: 28px;
+    line-height: 36px;
+    letter-spacing: -0.005em;
+    color: #0f172a;
+    margin: 0;
+    word-break: break-word;
+}
+
+.client-invite-description {
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-style: normal;
+    font-weight: 500;
+    font-size: 18px;
+    line-height: 28px;
+    color: #475569;
+    margin: 0;
+    word-break: break-word;
+}
+
+/* Frame 2147225499 (Buttons) */
+.client-invite-buttons {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    width: 100%;
+}
+
+/* Alerts */
+.client-invite-alert-warning {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 6px;
+    background-color: #fffbeb;
+    border: 1px solid #fde68a;
+    color: #92400e;
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-size: 13px;
+    line-height: 18px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    box-sizing: border-box;
+}
+
+.client-invite-alert-error {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 6px;
+    background-color: #fef2f2;
+    border: 1px solid #fca5a5;
+    color: #b91c1c;
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-size: 13px;
+    line-height: 18px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    box-sizing: border-box;
+}
+
+.client-alert-icon {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.client-invite-loading-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 40px 0;
+    width: 100%;
+}
+
+.client-invite-status-copy {
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-size: 15px;
+    font-weight: 500;
+    color: #475569;
+    margin: 0;
 }
 
 /* Screen 3 Success Box */
@@ -53898,7 +54235,7 @@ textarea {
 }
 
 /* ==========================================================================
-   CLIENT ONBOARDING SHELL & HEADER (SCREENS 4 & 5)
+   CLIENT ONBOARDING SHELL & HEADER (FIGMA SCREEN 4 & 5)
    ========================================================================== */
 
 .client-onboarding-shell {
@@ -53909,46 +54246,117 @@ textarea {
     font-family: var(--font-sans, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
 }
 
+/* Header (Figma Frame 45: 88px height, 1px dashed #E2E8F0, padding 24px 44px) */
 .client-onboarding-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px 48px;
-    border-bottom: 1px dashed #cbd5e1;
+    height: 88px;
+    padding: 24px 44px;
+    border-bottom: 1px dashed #e2e8f0;
     background: #ffffff;
+    box-sizing: border-box;
+    width: 100%;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
     .client-onboarding-header {
-        padding: 14px 20px;
+        height: auto;
+        padding: 16px 20px;
     }
 }
 
+.client-onboarding-logo-frame {
+    display: flex;
+    align-items: center;
+    width: 102px;
+    height: 40px;
+}
+
+.client-onboarding-logo-frame img {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+}
+
+/* Figma Frame 12: Language / Option Selector (102x36px, border 1px solid #E2E8F0, radius 4px) */
+.client-onboarding-header .lang-pill {
+    box-sizing: border-box;
+    width: 102px;
+    height: 36px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 8px 12px;
+    gap: 8px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    cursor: pointer;
+    color: #0f172a;
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 400;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.client-onboarding-header .lang-pill:hover {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+}
+
+.client-onboarding-header .lang-pill img.lang-globe {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+.client-onboarding-header .lang-pill img.lang-arrow {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+/* Figma Frame 2147225025: Body Container */
 .client-onboarding-body {
-    display: grid;
-    grid-template-columns: 280px 1fr;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
     flex: 1;
-    min-height: calc(100vh - 65px);
+    min-height: calc(100vh - 88px);
+    width: 100%;
 }
 
 @media (max-width: 860px) {
     .client-onboarding-body {
-        grid-template-columns: 1fr;
+        flex-direction: column;
     }
 }
 
+/* Figma Frame 2147225024: Stepper Sidebar (300px width, 1px dashed #E2E8F0, padding 64px 30px, gap 24px) */
 .client-onboarding-sidebar {
-    padding: 40px 32px;
-    border-right: 1px dashed #cbd5e1;
+    box-sizing: border-box;
+    width: 300px;
+    min-width: 300px;
+    padding: 64px 30px;
+    border-right: 1px dashed #e2e8f0;
     display: flex;
     flex-direction: column;
-    gap: 36px;
+    align-items: flex-start;
+    gap: 24px;
+    flex-shrink: 0;
+    align-self: stretch;
+    background: #ffffff;
 }
 
 @media (max-width: 860px) {
     .client-onboarding-sidebar {
+        width: 100%;
+        min-width: auto;
         border-right: none;
-        border-bottom: 1px dashed #cbd5e1;
+        border-bottom: 1px dashed #e2e8f0;
         padding: 24px 20px;
         flex-direction: row;
         justify-content: space-around;
@@ -53956,46 +54364,75 @@ textarea {
     }
 }
 
+/* Figma Frame 2147225020: Step Item (width 238px, height 37px, gap 8px) */
 .client-step-item {
+    box-sizing: border-box;
     display: flex;
+    flex-direction: row;
     align-items: flex-start;
-    gap: 12px;
+    gap: 8px;
+    width: 238px;
+    min-height: 37px;
     position: relative;
 }
 
+@media (max-width: 860px) {
+    .client-step-item {
+        width: auto;
+        min-height: auto;
+    }
+}
+
+/* 20x20px Indicator Circle */
 .client-step-circle {
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
     border-radius: 50%;
-    display: grid;
-    place-items: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
     margin-top: 1px;
+    box-sizing: border-box;
+    z-index: 1;
 }
 
 .client-step-circle.active {
-    border: 2px solid #22c55e;
+    background: #22c55e;
+    border: none;
+    color: #ffffff;
+}
+
+.client-step-circle.active .client-step-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
     background: #ffffff;
 }
 
 .client-step-circle.completed {
     background: #22c55e;
-    border: 2px solid #22c55e;
+    border: none;
     color: #ffffff;
 }
 
 .client-step-circle.pending {
-    border: 2px solid #cbd5e1;
-    background: #ffffff;
+    background: #94a3b8;
+    border: none;
+    color: #ffffff;
 }
 
+/* Figma Rectangles 60 & 61: Connector line (width 2px, height 36px, left 9px, background #94A3B8, radius 51px) */
 .client-step-line {
     position: absolute;
-    left: 10px;
-    top: 28px;
-    bottom: -32px;
     width: 2px;
-    border-left: 1px dashed #cbd5e1;
+    height: 36px;
+    left: 9px;
+    top: 24px;
+    background: #94a3b8;
+    border-radius: 51px;
+    border-left: none;
+    z-index: 0;
 }
 
 @media (max-width: 860px) {
@@ -54007,40 +54444,417 @@ textarea {
 .client-step-info {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    align-items: flex-start;
+    gap: 6px;
+    flex-grow: 1;
+    min-width: 0;
 }
 
+/* Title: Inter 500 14px/120% */
 .client-step-title {
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-style: normal;
+    font-weight: 500;
     font-size: 14px;
-    font-weight: 700;
+    line-height: 120%;
     color: #0f172a;
+    margin: 0;
 }
 
 .client-step-title.muted {
-    color: #64748b;
-    font-weight: 600;
-}
-
-.client-step-desc {
-    font-size: 12px;
     color: #94a3b8;
-    line-height: 1.4;
 }
 
+/* Description: Inter 500 12px/120% */
+.client-step-desc {
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748b;
+    margin: 0;
+}
+
+.client-step-desc.muted {
+    color: #94a3b8;
+}
+
+/* Figma Frame 27: Main Content Area (padding 64px 334px 64px 160px, gap 40px) */
 .client-onboarding-main {
-    padding: 44px 56px 60px;
-    max-width: 760px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 64px 160px;
+    gap: 40px;
     width: 100%;
     box-sizing: border-box;
+    background: #ffffff;
 }
 
-@media (max-width: 640px) {
+@media (min-width: 1440px) {
     .client-onboarding-main {
-        padding: 28px 20px;
+        padding: 64px 334px 64px 160px;
     }
 }
 
-/* Screen 4 Project Card */
+@media (max-width: 1200px) {
+    .client-onboarding-main {
+        padding: 48px 48px;
+    }
+}
+
+@media (max-width: 768px) {
+    .client-onboarding-main {
+        padding: 32px 20px;
+        gap: 28px;
+    }
+}
+
+/* ==========================================================================
+   CLIENT WELCOME FLOW SPECIFIC COMPONENTS (FIGMA SCREEN 4)
+   ========================================================================== */
+
+/* Frame 2147225026: Header Block (gap 8px, max-width 596px) */
+.client-welcome-header-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+    max-width: 596px;
+    box-sizing: border-box;
+}
+
+/* Company Eyebrow: Inter 500 16px/20px #2563EB */
+.client-welcome-company-eyebrow {
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-style: normal;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 20px;
+    color: #2563eb;
+    margin: 0;
+    word-break: break-word;
+}
+
+/* Heading: Inter 600 28px/36px #0F172A, letter-spacing -0.005em */
+.client-welcome-title {
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-style: normal;
+    font-weight: 600;
+    font-size: 28px;
+    line-height: 36px;
+    letter-spacing: -0.005em;
+    color: #0f172a;
+    margin: 0;
+    word-break: break-word;
+}
+
+/* Description: Inter 500 16px/140% #475569 */
+.client-welcome-subtitle {
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-style: normal;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 140%;
+    color: #475569;
+    margin: 0;
+}
+
+/* Frame 2147225032: Content Column Sections (gap 24px, max-width 596px) */
+.client-welcome-content-sections {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 24px;
+    width: 100%;
+    max-width: 596px;
+    box-sizing: border-box;
+}
+
+/* Frame 2147225027: YOUR PROJECT Card (background #F2F3F2, border 1px solid #E2E8F0, radius 20px, padding 24px) */
+.client-welcome-project-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 24px;
+    gap: 24px;
+    width: 100%;
+    max-width: 596px;
+    background: #f2f3f2;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+}
+
+/* Frame 2147225500: Project Title Block */
+.client-welcome-project-title-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+}
+
+/* "YOUR PROJECT": Inter 500 14px/20px #2563EB */
+.client-welcome-project-label {
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    color: #2563eb;
+    margin: 0;
+}
+
+/* Project Name: Urbanist 600 18px/120% #0F172A */
+.client-welcome-project-name {
+    font-family: 'Urbanist', var(--font-sans, sans-serif);
+    font-style: normal;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 120%;
+    color: #0f172a;
+    margin: 0;
+    word-break: break-word;
+}
+
+/* Frame 2147225502: Detail Rows Container (gap 8px) */
+.client-welcome-project-rows {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+}
+
+/* Detail Row (Frame 2147225074/2147225501/2147225502: white, radius 6px, padding 16px, height ~51px) */
+.client-welcome-detail-row {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    gap: 4px;
+    width: 100%;
+    min-height: 51px;
+    background: #ffffff;
+    border-radius: 6px;
+}
+
+/* Row Label: Urbanist 500 14px/120% #64748B */
+.client-welcome-row-label {
+    font-family: 'Urbanist', var(--font-sans, sans-serif);
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748b;
+}
+
+/* Row Value: Urbanist 600 16px/120% #0F172A */
+.client-welcome-row-value {
+    font-family: 'Urbanist', var(--font-sans, sans-serif);
+    font-style: normal;
+    font-weight: 600;
+    font-size: 16px;
+    line-height: 120%;
+    color: #0f172a;
+    text-align: right;
+    word-break: break-word;
+}
+
+/* Frame 2147225014: Status Badge (Urbanist 500 12px/120%, padding 2px 6px, radius 9999px) */
+.client-welcome-status-badge {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 2px 6px;
+    gap: 10px;
+    border-radius: 9999px;
+    font-family: 'Urbanist', var(--font-sans, sans-serif);
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+}
+
+.client-welcome-status-badge.status-active {
+    background: rgba(22, 163, 74, 0.12);
+    color: #16a34a;
+}
+
+.client-welcome-status-badge.status-other {
+    background: rgba(37, 99, 235, 0.12);
+    color: #2563eb;
+}
+
+/* Frame 2147225506: HERE'S WHAT YOU CAN DO (gap 8px) */
+.client-welcome-features-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+    max-width: 596px;
+    box-sizing: border-box;
+}
+
+/* "HERE'S WHAT YOU CAN DO": Inter 500 14px/20px #94A3B8 */
+.client-welcome-features-label {
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    color: #94a3b8;
+    margin: 0;
+}
+
+/* Frame 2147225504: Feature Cards Grid (flex-wrap, gap 8px) */
+.client-welcome-features-list {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    align-content: flex-start;
+    padding: 0px;
+    gap: 8px;
+    width: 100%;
+}
+
+/* Feature Card (white, border 1px solid #E2E8F0, radius 6px, height 51px, padding 16px 16px 16px 8px, gap 12px) */
+.client-welcome-feature-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 16px 16px 16px 8px;
+    gap: 12px;
+    min-height: 51px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Exact Figma card desktop widths */
+.client-welcome-card-1 { min-width: 219px; }
+.client-welcome-card-2 { min-width: 239px; }
+.client-welcome-card-3 { min-width: 328px; }
+.client-welcome-card-4 { min-width: 248px; }
+.client-welcome-card-5 { min-width: 319px; }
+
+@media (max-width: 600px) {
+    .client-welcome-feature-card {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+}
+
+/* Frame 26: 34x34px, background #F1F5F9, radius 8px, blue icon */
+.client-welcome-feature-icon-box {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    gap: 10px;
+    width: 34px;
+    height: 34px;
+    background: #f1f5f9;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+/* Card Text: Urbanist 500 14px/120% #0F172A */
+.client-welcome-feature-text {
+    font-family: 'Urbanist', var(--font-sans, sans-serif);
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0f172a;
+    margin: 0;
+    white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+    .client-welcome-feature-text {
+        white-space: normal;
+    }
+}
+
+/* Frame 2147225031: Actions Row (gap 68px, height 48px) */
+.client-welcome-actions-row {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0px;
+    gap: 68px;
+    width: 100%;
+    max-width: 596px;
+    min-height: 48px;
+}
+
+/* Hidden Back Button Spacer (Figma opacity: 0) */
+.client-welcome-btn-back-spacer {
+    box-sizing: border-box;
+    width: 73px;
+    height: 48px;
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+}
+
+/* Get Started Button (Figma: width 118px, height 48px, background #2563EB, radius 6px, Inter 500 14px/20px #FFFFFF) */
+.client-welcome-btn-get-started {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px 20px;
+    gap: 8px;
+    width: 118px;
+    height: 48px;
+    background: #2563eb;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    color: #ffffff;
+    transition: background-color 0.15s ease, transform 0.1s ease;
+    text-decoration: none;
+}
+
+.client-welcome-btn-get-started:hover:not(:disabled) {
+    background: #1d4ed8;
+}
+
+.client-welcome-btn-get-started:active:not(:disabled) {
+    background: #1e40af;
+    transform: scale(0.99);
+}
+
+.client-welcome-btn-get-started:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* Legacy Screen 4 compatibility classes */
 .client-project-card {
     background: #f8fafc;
     border: 1px solid #e2e8f0;
@@ -54084,7 +54898,6 @@ textarea {
     border-radius: 9999px;
 }
 
-/* Screen 4 Actions */
 .client-action-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -54125,140 +54938,462 @@ textarea {
     flex-shrink: 0;
 }
 
-/* Screen 5 Document Cards */
-.client-doc-container {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 16px;
-    padding: 20px;
+
+/* ==========================================================================
+   CLIENT DOCUMENTS ONBOARDING STEP (FIGMA SCREEN 5: Review & Sign Documents)
+   ========================================================================== */
+
+/* Frame 2147225026: Header Block (width 596px, gap 8px) */
+.client-docs-header-block {
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    margin-bottom: 32px;
+    align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+    max-width: 596px;
+    box-sizing: border-box;
 }
 
-.client-doc-card {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 20px;
-}
-
-.client-doc-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 20px;
-}
-
-.client-doc-meta {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-}
-
-.client-doc-icon {
-    width: 44px;
-    height: 44px;
-    border-radius: 8px;
-    background: #eff6ff;
-    color: #2563eb;
-    display: grid;
-    place-items: center;
-    flex-shrink: 0;
-}
-
-.client-doc-title {
-    font-size: 16px;
-    font-weight: 700;
+/* Heading: Inter 600 28px/36px #0F172A, letter-spacing -0.005em */
+.client-docs-title {
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-style: normal;
+    font-weight: 600;
+    font-size: 28px;
+    line-height: 36px;
+    letter-spacing: -0.005em;
     color: #0f172a;
+    margin: 0;
+    word-break: break-word;
+}
+
+/* Description: Inter 500 16px/140% #475569 */
+.client-docs-subtitle {
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-style: normal;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 140%;
+    color: #475569;
     margin: 0;
 }
 
-.client-doc-ref {
-    font-size: 13px;
-    color: #64748b;
-    font-weight: 500;
-    margin-top: 2px;
-}
-
-.badge-awaiting-signature {
-    background: #fef3c7;
-    color: #d97706;
-    padding: 4px 12px;
-    border-radius: 9999px;
-    font-size: 12px;
-    font-weight: 600;
-}
-
-.badge-signed {
-    background: #dcfce7;
-    color: #16a34a;
-    padding: 4px 12px;
-    border-radius: 9999px;
-    font-size: 12px;
-    font-weight: 600;
-}
-
-.client-doc-actions {
+/* Frame 2147225032: Content Column Sections (gap 24px, max-width 596px) */
+.client-docs-content-sections {
     display: flex;
-    gap: 12px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 24px;
+    width: 100%;
+    max-width: 596px;
+    box-sizing: border-box;
 }
 
-@media (max-width: 520px) {
-    .client-doc-actions {
-        flex-direction: column;
-    }
+/* Frame 2147225027: Outer Document Container (background #F2F3F2, border 1px solid #E2E8F0, radius 20px, padding 24px, gap 18px) */
+.client-docs-container,
+.client-doc-container {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 24px;
+    gap: 18px;
+    width: 100%;
+    max-width: 596px;
+    background: #f2f3f2;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
 }
 
-.client-btn-outline {
+/* Frame 2147225027 / 2147225503: Inner Document Card (background #FFFFFF, border 1px solid #E2E8F0, radius 20px, padding 24px, gap 18px) */
+.client-doc-card-figma,
+.client-doc-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 24px;
+    gap: 18px;
+    width: 100%;
     background: #ffffff;
     border: 1px solid #e2e8f0;
-    color: #1e293b;
-    font-weight: 600;
-    font-size: 13px;
-    padding: 10px 22px;
-    border-radius: 8px;
-    cursor: pointer;
+    border-radius: 20px;
+}
+
+/* Frame 2147225508: Top Row of Document Card (height 56px, gap 18px, space-between) */
+.client-doc-top-row,
+.client-doc-header {
+    box-sizing: border-box;
     display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 18px;
+    width: 100%;
+    min-height: 56px;
+    margin-bottom: 0;
+}
+
+/* Frame 2147225507: Left Group (icon + texts, gap 18px) */
+.client-doc-left-group,
+.client-doc-meta {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 18px;
+    flex: 1;
+    min-width: 0;
+}
+
+/* Frame 26: 56x56px Icon Container (background #F1F5F9, radius 8px, padding 12px) */
+.client-doc-icon-box,
+.client-doc-icon {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
     align-items: center;
     justify-content: center;
+    padding: 12px;
+    width: 56px;
+    height: 56px;
+    background: #f1f5f9;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+/* Frame 2: Title and Reference Meta Stack (gap 6px) */
+.client-doc-meta-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
     gap: 6px;
-    transition: all 0.15s;
+    flex: 1;
+    min-width: 0;
+}
+
+/* Document Title: Inter 600 18px/120% #0F172A, letter-spacing -0.005em */
+.client-doc-title-text,
+.client-doc-title {
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-style: normal;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 120%;
+    letter-spacing: -0.005em;
+    color: #0f172a;
+    margin: 0;
+    word-break: break-word;
+}
+
+/* Document Reference: Inter 500 16px/140% #475569 */
+.client-doc-ref-text,
+.client-doc-ref {
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-style: normal;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 140%;
+    color: #475569;
+    margin: 0;
+    word-break: break-word;
+}
+
+/* Frame 2147225014: Status Badge (Urbanist 500 14px/120%, padding 4px 8px, height 25px, radius 9999px) */
+.client-doc-status-badge {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 4px 8px;
+    gap: 10px;
+    min-height: 25px;
+    border-radius: 9999px;
+    font-family: 'Urbanist', var(--font-sans, sans-serif);
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* Awaiting Signature: rgba(245, 158, 11, 0.12), color #F59E0B */
+.client-doc-status-badge.status-awaiting,
+.badge-awaiting-signature {
+    background: rgba(245, 158, 11, 0.12);
+    color: #f59e0b;
+}
+
+/* Signed: rgba(22, 163, 74, 0.12), color #16A34A */
+.client-doc-status-badge.status-signed,
+.badge-signed {
+    background: rgba(22, 163, 74, 0.12);
+    color: #16a34a;
+}
+
+.client-doc-status-badge.status-other {
+    background: rgba(148, 163, 184, 0.15);
+    color: #475569;
+}
+
+/* Frame 2147225509: Bottom Button Row of Document Card (height 48px, gap 18px) */
+.client-doc-buttons-row,
+.client-doc-actions {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    min-height: 48px;
+}
+
+/* View Document Button: height 48px, width ~240px, border 1px solid #E2E8F0, radius 6px, Inter 500 14px/20px #0F172A */
+.client-doc-btn-view,
+.client-btn-outline {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px 20px;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+    height: 48px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    color: #0f172a;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
     text-decoration: none;
 }
 
+.client-doc-btn-view:hover,
 .client-btn-outline:hover {
     background: #f8fafc;
     border-color: #cbd5e1;
 }
 
+/* Sign Document Button: height 48px, width ~238px, background #2563EB, radius 6px, Inter 500 14px/20px #FFFFFF */
+.client-doc-btn-sign,
 .client-btn-solid {
-    background: #2563eb;
-    border: 1px solid #2563eb;
-    color: #ffffff;
-    font-weight: 600;
-    font-size: 13px;
-    padding: 10px 22px;
-    border-radius: 8px;
-    cursor: pointer;
+    box-sizing: border-box;
     display: flex;
-    align-items: center;
+    flex-direction: row;
     justify-content: center;
-    gap: 6px;
-    transition: all 0.15s;
+    align-items: center;
+    padding: 14px 20px;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+    height: 48px;
+    background: #2563eb;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    color: #ffffff;
+    transition: background-color 0.15s ease, transform 0.1s ease;
     text-decoration: none;
 }
 
+.client-doc-btn-sign:hover,
 .client-btn-solid:hover {
     background: #1d4ed8;
-    border-color: #1d4ed8;
+}
+
+.client-doc-btn-sign:active,
+.client-btn-solid:active {
+    background: #1e40af;
+    transform: scale(0.99);
 }
 
 .client-btn-solid:disabled {
     background: #94a3b8;
     border-color: #94a3b8;
     cursor: not-allowed;
+}
+
+
+/* Download Button on Signed Document Card (Frame 2147225509): 239x48px, #FFFFFF, border 1px solid #E2E8F0, radius 6px, Inter 500 14px #0F172A */
+.client-doc-btn-download {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px 20px;
+    gap: 8px;
+    width: 239px;
+    height: 48px;
+    flex: 1;
+    min-width: 0;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    text-align: center;
+    color: #0f172a;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+    text-decoration: none;
+}
+
+.client-doc-btn-download:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+.client-doc-btn-download:active {
+    background: #f1f5f9;
+}
+
+/* When document is already signed */
+.client-doc-btn-signed {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px 20px;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+    height: 48px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    cursor: default;
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    color: #16a34a;
+}
+
+/* Frame 2147225031: Actions Row (gap 68px, height 48px) */
+.client-docs-actions-row {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0px;
+    gap: 68px;
+    width: 100%;
+    max-width: 596px;
+    min-height: 48px;
+}
+
+/* Hidden Back Button Spacer (Figma opacity: 0) */
+.client-docs-btn-back-spacer {
+    box-sizing: border-box;
+    width: 73px;
+    height: 48px;
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+}
+
+/* Continue to Dashboard Button (Figma: width 195px, height 48px, background #2563EB, radius 6px, Inter 500 14px/20px #FFFFFF) */
+.client-docs-btn-continue {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px 20px;
+    gap: 8px;
+    width: 195px;
+    height: 48px;
+    background: #2563eb;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-sans, Inter, sans-serif);
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    color: #ffffff;
+    transition: background-color 0.15s ease, transform 0.1s ease;
+    text-decoration: none;
+}
+
+.client-docs-btn-continue:hover:not(:disabled) {
+    background: #1d4ed8;
+}
+
+.client-docs-btn-continue:active:not(:disabled) {
+    background: #1e40af;
+    transform: scale(0.99);
+}
+
+.client-docs-btn-continue:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* Empty State Card */
+.client-docs-empty-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 40px 24px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    width: 100%;
+}
+
+@media (max-width: 600px) {
+    .client-doc-top-row,
+    .client-doc-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .client-doc-buttons-row,
+    .client-doc-actions {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .client-doc-btn-view,
+    .client-doc-btn-sign,
+    .client-doc-btn-signed,
+    .client-doc-btn-download {
+        width: 100%;
+    }
+
+    .client-docs-actions-row {
+        gap: 16px;
+    }
+
+    .client-docs-btn-continue {
+        width: 100%;
+    }
 }
 
 
@@ -58102,4 +59237,638 @@ textarea {
 .workspace-client-btn-primary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+
+
+
+/* ─── Client Welcome Flow: Sign Document & Add Signature Modals (Figma Specs) ─── */
+
+.client-sign-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+.client-sign-modal-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 16px;
+    gap: 16px;
+    width: 100%;
+    max-width: 400px;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.2), 0 0 1px rgba(0, 0, 0, 0.1);
+    border-radius: 16px;
+    position: relative;
+}
+
+/* Header Row: Frame 2147225093 */
+.client-sign-modal-header {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0px;
+    gap: 24px;
+    width: 100%;
+    height: 24px;
+}
+
+.client-sign-modal-title {
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 120%;
+    color: #0F172A;
+    margin: 0;
+}
+
+.client-sign-modal-close {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    color: #0F172A;
+    border-radius: 4px;
+    transition: opacity 0.15s ease;
+}
+
+.client-sign-modal-close:hover {
+    opacity: 0.7;
+}
+
+/* Inner Card: Frame 2147225091 */
+.client-sign-inner-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 16px;
+    gap: 16px;
+    width: 100%;
+    background: #FFFFFF;
+    border-radius: 14px;
+}
+
+/* Modal 1: Document Table Cell */
+.client-sign-doc-cell {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 14px;
+    gap: 12px;
+    width: 100%;
+    height: 70px;
+    background: #FFFFFF;
+    border: 1px solid #EBEBEB;
+    border-radius: 12px;
+}
+
+.client-sign-doc-icon-circle {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    width: 40px;
+    height: 40px;
+    background: #F2F3F2;
+    border-radius: 48px;
+    flex-shrink: 0;
+}
+
+.client-sign-doc-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 6px;
+    flex: 1;
+    overflow: hidden;
+}
+
+.client-sign-doc-name {
+    font-family: 'Urbanist', sans-serif;
+    font-weight: 600;
+    font-size: 16px;
+    line-height: 120%;
+    color: #0F172A;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    margin: 0;
+}
+
+.client-sign-doc-ref {
+    font-family: 'Urbanist', sans-serif;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+    margin: 0;
+}
+
+.client-sign-disclaimer {
+    font-family: 'Urbanist', sans-serif;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 140%;
+    color: #64748B;
+    margin: 0;
+    width: 100%;
+}
+
+.client-sign-checkbox-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0px;
+    gap: 8px;
+    width: 100%;
+    cursor: pointer;
+    user-select: none;
+}
+
+.client-sign-checkbox-input {
+    width: 20px;
+    height: 20px;
+    box-sizing: border-box;
+    background: #FFFFFF;
+    border: 1.5px solid #EBEBEB;
+    border-radius: 4px;
+    accent-color: #2563EB;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.client-sign-checkbox-label {
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 140%;
+    color: #64748B;
+    margin: 0;
+}
+
+/* Modal Actions: Frame 2147225069 */
+.client-sign-actions-row {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    height: 46px;
+}
+
+.client-sign-btn-cancel {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px;
+    width: 71px;
+    height: 46px;
+    background: #FFFFFF;
+    border-radius: 6px;
+    border: 1px solid #E2E8F0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.client-sign-btn-cancel:hover {
+    background: #F8FAFC;
+}
+
+.client-sign-btn-primary {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px;
+    width: 119px;
+    height: 46px;
+    background: #2563EB;
+    border-radius: 6px;
+    border: none;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #FFFFFF;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.client-sign-btn-primary:hover:not(:disabled) {
+    background: #1D4ED8;
+}
+
+.client-sign-btn-primary:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+/* Modal 2: Add Signature Tabs */
+.client-sign-tab-container {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 6px;
+    gap: 6px;
+    width: 100%;
+    height: 46px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+}
+
+.client-sign-tab-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    height: 34px;
+    border: none;
+    border-radius: 4px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    cursor: pointer;
+    background: transparent;
+    color: #64748B;
+    transition: all 0.15s ease;
+}
+
+.client-sign-tab-btn.active {
+    background: #EFF6FF;
+    color: #2563EB;
+}
+
+/* Modal 2: Draw and Type Frames */
+.client-sign-draw-label {
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    color: #0F172A;
+    margin: 0 0 8px 0;
+    width: 100%;
+}
+
+.client-sign-canvas-frame {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    padding: 0;
+    width: 100%;
+    height: 142px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+}
+
+.client-sign-canvas-frame canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: crosshair;
+    touch-action: none;
+}
+
+.client-sign-type-input {
+    width: 100%;
+    box-sizing: border-box;
+    height: 38px;
+    padding: 8px 12px;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    color: #0F172A;
+    outline: none;
+    margin-bottom: 10px;
+}
+
+.client-sign-type-input:focus {
+    border-color: #2563EB;
+}
+
+.client-sign-type-preview {
+    box-sizing: border-box;
+    width: 100%;
+    height: 94px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 16px;
+    text-align: center;
+}
+
+.client-sign-cursive-text {
+    font-family: 'Dancing Script', 'Caveat', 'Brush Script MT', cursive, sans-serif;
+    font-size: 28px;
+    color: #0F172A;
+    letter-spacing: 0.5px;
+    word-break: break-word;
+}
+
+.client-sign-cursive-placeholder {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    color: #94A3B8;
+}
+
+.client-sign-btn-clear {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px;
+    width: 63px;
+    height: 46px;
+    background: #FFFFFF;
+    border-radius: 6px;
+    border: 1px solid #E2E8F0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.client-sign-btn-clear:hover {
+    background: #F8FAFC;
+}
+
+.client-sign-right-btn-group {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+    width: 206px;
+    height: 46px;
+}
+
+.client-sign-error-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: #FEF2F2;
+    border: 1px solid #FECACA;
+    color: #B91C1C;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: 4px;
+}
+
+@media (max-width: 480px) {
+    .client-sign-modal-card {
+        padding: 12px;
+        border-radius: 12px;
+    }
+
+    .client-sign-inner-card {
+        padding: 12px;
+    }
+
+    .client-sign-actions-row {
+        gap: 8px;
+    }
+
+    .client-sign-right-btn-group {
+        gap: 8px;
+        width: auto;
+    }
+
+    .client-sign-btn-cancel,
+    .client-sign-btn-primary,
+    .client-sign-btn-clear {
+        padding: 10px 12px;
+    }
+}
+
+
+
+/* ─── Confirm Signature (Frame 2147225093) & Document Signed Success (Frame 2147225094) ─── */
+
+.client-sign-preview-frame {
+    width: 100%;
+    max-width: 336px;
+    height: 118px;
+    box-sizing: border-box;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.client-sign-btn-back {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px;
+    width: 59px;
+    height: 46px;
+    background: #FFFFFF;
+    border-radius: 6px;
+    border: 1px solid #E2E8F0;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.client-sign-btn-back:hover:not(:disabled) {
+    background: #F8FAFC;
+}
+
+.client-sign-btn-confirm {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px;
+    width: 123px;
+    height: 46px;
+    background: #2563EB;
+    border-radius: 6px;
+    border: none;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #FFFFFF;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.client-sign-btn-confirm:hover:not(:disabled) {
+    background: #1D4ED8;
+}
+
+.client-sign-btn-confirm:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Modal 5 Success Dialog: Frame 2147225094 */
+.client-sign-modal-card.client-sign-success-modal {
+    max-width: 420px;
+    min-height: 314px;
+}
+
+.client-sign-success-panel {
+    width: 100%;
+    max-width: 388px;
+    height: 180px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+    gap: 16px;
+    background: #FFFFFF;
+    border-radius: 14px;
+}
+
+.client-sign-success-icon-box {
+    width: 68px;
+    height: 68px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    gap: 10px;
+    background: rgba(22, 163, 74, 0.12);
+    border-radius: 100px;
+}
+
+.client-sign-success-text-box {
+    width: 100%;
+    max-width: 320px;
+    height: 48px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+}
+
+.client-sign-success-title {
+    width: 143px;
+    height: 22px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 120%;
+    color: #0F172A;
+    margin: 0;
+}
+
+.client-sign-success-subtitle {
+    width: 320px;
+    height: 20px;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 140%;
+    text-align: center;
+    color: #64748B;
+    margin: 0;
+}
+
+.client-sign-btn-done {
+    width: 100%;
+    max-width: 388px;
+    height: 46px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px;
+    gap: 6px;
+    background: #2563EB;
+    border-radius: 6px;
+    border: none;
+    font-family: 'Urbanist', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #FFFFFF;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.client-sign-btn-done:hover {
+    background: #1D4ED8;
 }

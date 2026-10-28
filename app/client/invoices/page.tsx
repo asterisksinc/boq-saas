@@ -16,6 +16,8 @@ import {
     Receipt,
     RefreshCw,
     X,
+    CheckCircle2,
+    AlertCircle,
 } from "lucide-react";
 import ClientDashboardRail from "@/components/client/ClientDashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
@@ -26,6 +28,7 @@ import {
     type ClientInvoiceListItem,
     type ClientProjectDetails,
 } from "@/lib/api/client";
+import "@/app/client/client-redesign.css";
 
 function formatCompactMoney(value: number, currency = "INR"): string {
     if (value === null || value === undefined || isNaN(value)) return "₹0";
@@ -157,12 +160,12 @@ export default function ClientInvoicesPage() {
     const activeProjectName = projects[0]?.name || "your projects";
 
     return (
-        <main className="fig-dashboard" style={{ background: "#edf2f9" }}>
-            <div className="fig-dashboard-glow" />
+        <main className="client-redesign-shell">
+            <div className="client-bg-glow" />
 
             <ClientDashboardRail current="/client/invoices" />
 
-            <div className="fig-dashboard-main">
+            <div className="client-main-area">
                 <DashboardHeader
                     title="Invoices"
                     hideNew={true}
@@ -172,36 +175,23 @@ export default function ClientInvoicesPage() {
                     }}
                 />
 
-                <section style={{ padding: "28px 36px" }}>
+                <section style={{ display: "flex", flexDirection: "column", gap: "20px", width: "100%" }}>
                     {/* Page Title & Subtitle matching Reference 1 */}
-                    <div style={{ marginBottom: "22px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
-                        <div>
-                            <h2 style={{ fontSize: "20px", fontWeight: 700, color: "#0f172a", margin: 0, letterSpacing: "-0.01em" }}>
+                    <div className="client-page-header-row">
+                        <div className="client-title-group">
+                            <h1 className="client-page-title" style={{ fontSize: "20px" }}>
                                 Invoices
-                            </h2>
-                            <p style={{ fontSize: "14px", color: "#64748b", margin: "4px 0 0 0" }}>
+                            </h1>
+                            <p className="client-page-subtitle">
                                 {total} {total === 1 ? "Invoice" : "Invoices"} under {activeProjectName}
                             </p>
                         </div>
 
-                        <div style={{ display: "flex", gap: "10px" }}>
+                        <div className="client-header-actions">
                             <button
                                 type="button"
                                 onClick={() => router.push("/client/invoices/new")}
-                                style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: "6px",
-                                    padding: "8px 16px",
-                                    borderRadius: "8px",
-                                    background: "#2563eb",
-                                    color: "#ffffff",
-                                    fontSize: "13px",
-                                    fontWeight: 600,
-                                    border: "none",
-                                    cursor: "pointer",
-                                    boxShadow: "0 1px 2px rgba(37, 99, 235, 0.2)",
-                                }}
+                                className="client-btn-primary client-btn-compact"
                             >
                                 <Plus size={15} /> Select BOQ Invoice
                             </button>
@@ -210,446 +200,276 @@ export default function ClientInvoicesPage() {
 
                     {/* Error Banner */}
                     {error && (
-                        <div
-                            style={{
-                                padding: "14px 18px",
-                                borderRadius: "8px",
-                                backgroundColor: "#fef2f2",
-                                border: "1px solid #fecaca",
-                                color: "#b91c1c",
-                                marginBottom: "20px",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                fontSize: "13px",
-                            }}
-                        >
-                            <span>{error}</span>
-                            <button
-                                type="button"
-                                onClick={loadInvoices}
-                                style={{
-                                    background: "none",
-                                    border: "none",
-                                    color: "#b91c1c",
-                                    fontWeight: 600,
-                                    cursor: "pointer",
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: "4px",
-                                }}
-                            >
-                                <RefreshCw size={14} /> Retry
+                        <div className="client-banner-error">
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                <AlertCircle size={16} />
+                                <span>{error}</span>
+                            </div>
+                            <button type="button" onClick={loadInvoices}>
+                                <RefreshCw size={14} style={{ marginRight: "4px" }} /> Retry
                             </button>
                         </div>
                     )}
 
-                    {/* Invoices Table Container matching Reference 1 */}
-                    <div
-                        style={{
-                            background: "#ffffff",
-                            borderRadius: "12px",
-                            border: "1px solid #e2e8f0",
-                            overflow: "visible",
-                            boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
-                        }}
-                    >
-                        <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
-                            <thead>
-                                <tr style={{ background: "#edf2fa", borderBottom: "1px solid #e2e8f0" }}>
-                                    <th style={{ padding: "14px 18px", fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em" }}>ID</th>
-                                    <th style={{ padding: "14px 14px", fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em" }}>TYPE</th>
-                                    <th style={{ padding: "14px 16px", fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em" }}>PROJECT</th>
-                                    <th style={{ padding: "14px 16px", fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em" }}>CLIENT</th>
-                                    <th style={{ padding: "14px 16px", fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em" }}>MILESTONE</th>
-                                    <th style={{ padding: "14px 14px", fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em" }}>STATUS</th>
-                                    <th style={{ padding: "14px 16px", fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em" }}>AMOUNT</th>
-                                    <th style={{ padding: "14px 16px", fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em" }}>ISSUED</th>
-                                    <th style={{ padding: "14px 16px", fontSize: "11px", fontWeight: 700, color: "#64748b", letterSpacing: "0.04em" }}>DUE</th>
-                                    <th style={{ padding: "14px 16px", fontSize: "11px", fontWeight: 700, color: "#64748b", width: "48px" }} />
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {loading ? (
+                    {/* Invoices Table Container matching Reference 1 & Frame 2147225067 */}
+                    <div className="client-table-container client-invoices-table-card">
+                        <div className="client-table-scroll client-invoices-table-scroll">
+                            <table className="client-table client-invoices-table">
+                                <thead>
                                     <tr>
-                                        <td colSpan={10} style={{ textAlign: "center", padding: "56px 16px" }}>
-                                            <Loader2 className="animate-spin" size={32} color="#2563EB" style={{ margin: "0 auto 8px auto" }} />
-                                            <div style={{ color: "#64748b", fontSize: "14px" }}>Loading invoices...</div>
-                                        </td>
+                                        <th className="col-id">ID</th>
+                                        <th className="col-type">TYPE</th>
+                                        <th className="col-project">PROJECT</th>
+                                        <th className="col-client">CLIENT</th>
+                                        <th className="col-milestone">MILESTONE</th>
+                                        <th className="col-status">STATUS</th>
+                                        <th className="col-amount">AMOUNT</th>
+                                        <th className="col-issued">ISSUED</th>
+                                        <th className="col-due">DUE</th>
+                                        <th className="col-actions">ACTIONS</th>
                                     </tr>
-                                ) : invoices.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={10} style={{ textAlign: "center", padding: "64px 16px" }}>
-                                            <div style={{ maxWidth: "360px", margin: "0 auto" }}>
-                                                <Receipt size={42} color="#94a3b8" style={{ margin: "0 auto 12px auto" }} />
-                                                <h4 style={{ fontSize: "16px", fontWeight: 600, color: "#0f172a", marginBottom: "4px" }}>
-                                                    No Invoices Found
-                                                </h4>
-                                                <p style={{ fontSize: "13px", color: "#64748b", margin: 0 }}>
-                                                    {searchQuery
-                                                        ? "No invoices match the search query."
-                                                        : "No commercial statements have been issued for your project yet."}
-                                                </p>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    invoices.map((inv) => {
-                                        const typeBadge = (() => {
-                                            const docType = (inv.documentType || "invoice").toLowerCase();
-                                            if (docType === "pro_forma" || docType === "pro-forma") {
-                                                return { label: "PRO-FORMA", bg: "#f1f5f9", color: "#475569" };
-                                            }
-                                            if (docType === "quote") {
-                                                return { label: "QUOTE", bg: "#fae8ff", color: "#9333ea" };
-                                            }
-                                            return { label: "INVOICE", bg: "#e0edff", color: "#2563eb" };
-                                        })();
+                                </thead>
+                                <tbody>
+                                    {loading ? (
+                                        <tr>
+                                            <td colSpan={10} style={{ textAlign: "center", padding: "56px 16px" }}>
+                                                <div className="client-loading-card" style={{ padding: "20px" }}>
+                                                    <Loader2 className="animate-spin" size={32} color="#2563EB" />
+                                                    <span>Loading invoices...</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ) : invoices.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={10} style={{ textAlign: "center", padding: "64px 16px" }}>
+                                                <div className="client-empty-card" style={{ border: "none" }}>
+                                                    <Receipt size={42} color="#94A3B8" style={{ margin: "0 auto 12px auto" }} />
+                                                    <h4 className="client-empty-title">
+                                                        No Invoices Found
+                                                    </h4>
+                                                    <p className="client-empty-desc">
+                                                        {searchQuery
+                                                            ? "No invoices match the search query."
+                                                            : "No commercial statements have been issued for your project yet."}
+                                                    </p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        invoices.map((inv) => {
+                                            const typeBadge = (() => {
+                                                const docType = (inv.documentType || "invoice").toLowerCase();
+                                                if (docType === "pro_forma" || docType === "pro-forma") {
+                                                    return { label: "PRO-FORMA", className: "client-badge-pending type-pro-forma" };
+                                                }
+                                                if (docType === "quote") {
+                                                    return { label: "QUOTE", className: "client-badge-purple type-quote" };
+                                                }
+                                                return { label: "INVOICE", className: "client-badge-info type-invoice" };
+                                            })();
 
-                                        const statusBadge = (() => {
-                                            const st = (inv.status || "pending").toLowerCase();
-                                            if (st === "paid" || st === "accepted") {
-                                                return { label: st.toUpperCase(), bg: "#dcfce7", color: "#16a34a" };
-                                            }
-                                            if (st === "sent") {
-                                                return { label: "SENT", bg: "#e0edff", color: "#2563eb" };
-                                            }
-                                            if (st === "pending") {
-                                                return { label: "PENDING", bg: "#f1f5f9", color: "#64748b" };
-                                            }
-                                            if (st === "overdue") {
-                                                return { label: "OVERDUE", bg: "#fee2e2", color: "#dc2626" };
-                                            }
-                                            return { label: st.toUpperCase(), bg: "#f1f5f9", color: "#64748b" };
-                                        })();
+                                            const statusBadge = (() => {
+                                                const st = (inv.status || "pending").toLowerCase();
+                                                if (st === "paid" || st === "accepted") {
+                                                    return {
+                                                        label: st.toUpperCase(),
+                                                        className: st === "paid" ? "client-badge-success status-paid" : "client-badge-success status-accepted",
+                                                    };
+                                                }
+                                                if (st === "sent") {
+                                                    return { label: "SENT", className: "client-badge-info status-sent" };
+                                                }
+                                                if (st === "pending" || st === "draft") {
+                                                    return {
+                                                        label: st.toUpperCase(),
+                                                        className: st === "draft" ? "client-badge-pending status-draft" : "client-badge-pending status-pending",
+                                                    };
+                                                }
+                                                if (st === "overdue") {
+                                                    return { label: "OVERDUE", className: "client-badge-danger status-overdue" };
+                                                }
+                                                return { label: st.toUpperCase(), className: "client-badge-pending status-pending" };
+                                            })();
 
-                                        const isMenuOpen = activeMenuId === inv.id;
+                                            const isMenuOpen = activeMenuId === inv.id;
 
-                                        return (
-                                            <tr
-                                                key={inv.id}
-                                                onClick={() => router.push(`/client/invoices/${inv.id}`)}
-                                                style={{
-                                                    cursor: "pointer",
-                                                    borderBottom: "1px solid #f1f5f9",
-                                                    transition: "background 0.15s ease",
-                                                }}
-                                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8fafc")}
-                                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                                            >
-                                                {/* ID */}
-                                                <td style={{ padding: "14px 18px", fontSize: "13px", fontWeight: 500, color: "#64748b" }}>
-                                                    {inv.invoiceNumber}
-                                                </td>
-
-                                                {/* TYPE */}
-                                                <td style={{ padding: "14px 14px" }}>
-                                                    <span
-                                                        style={{
-                                                            fontSize: "11px",
-                                                            fontWeight: 600,
-                                                            padding: "3px 9px",
-                                                            borderRadius: "999px",
-                                                            backgroundColor: typeBadge.bg,
-                                                            color: typeBadge.color,
-                                                            letterSpacing: "0.02em",
-                                                        }}
-                                                    >
-                                                        {typeBadge.label}
-                                                    </span>
-                                                </td>
-
-                                                {/* PROJECT */}
-                                                <td style={{ padding: "14px 16px", fontSize: "13px", fontWeight: 600, color: "#0f172a" }}>
-                                                    {inv.projectName}
-                                                </td>
-
-                                                {/* CLIENT */}
-                                                <td style={{ padding: "14px 16px", fontSize: "13px", color: "#475569" }}>
-                                                    {inv.clientName}
-                                                </td>
-
-                                                {/* MILESTONE */}
-                                                <td style={{ padding: "14px 16px", fontSize: "13px", color: "#64748b" }}>
-                                                    {inv.milestone || "—"}
-                                                </td>
-
-                                                {/* STATUS */}
-                                                <td style={{ padding: "14px 14px" }}>
-                                                    <span
-                                                        style={{
-                                                            fontSize: "11px",
-                                                            fontWeight: 600,
-                                                            padding: "3px 9px",
-                                                            borderRadius: "999px",
-                                                            backgroundColor: statusBadge.bg,
-                                                            color: statusBadge.color,
-                                                            letterSpacing: "0.02em",
-                                                        }}
-                                                    >
-                                                        {statusBadge.label}
-                                                    </span>
-                                                </td>
-
-                                                {/* AMOUNT */}
-                                                <td style={{ padding: "14px 16px", fontSize: "13px", fontWeight: 600, color: "#0f172a" }}>
-                                                    {formatCompactMoney(inv.totalAmount, inv.currency)}
-                                                </td>
-
-                                                {/* ISSUED */}
-                                                <td style={{ padding: "14px 16px", fontSize: "13px", color: "#64748b" }}>
-                                                    {formatDate(inv.issueDate)}
-                                                </td>
-
-                                                {/* DUE */}
-                                                <td style={{ padding: "14px 16px", fontSize: "13px", color: "#64748b" }}>
-                                                    {formatDate(inv.dueDate)}
-                                                </td>
-
-                                                {/* ACTIONS */}
-                                                <td
-                                                    style={{ padding: "14px 16px", position: "relative", textAlign: "right" }}
-                                                    onClick={(e) => e.stopPropagation()}
+                                            return (
+                                                <tr
+                                                    key={inv.id}
+                                                    onClick={() => router.push(`/client/invoices/${inv.id}`)}
                                                 >
-                                                    <button
-                                                        type="button"
-                                                        aria-label="Actions"
-                                                        onClick={() => setActiveMenuId(isMenuOpen ? null : inv.id)}
-                                                        style={{
-                                                            background: "transparent",
-                                                            border: "none",
-                                                            color: "#94a3b8",
-                                                            cursor: "pointer",
-                                                            padding: "4px 6px",
-                                                            borderRadius: "4px",
-                                                            display: "inline-flex",
-                                                            alignItems: "center",
-                                                            justifyContent: "center",
-                                                        }}
+                                                    {/* ID */}
+                                                    <td className="muted-cell col-id">
+                                                        {inv.invoiceNumber}
+                                                    </td>
+
+                                                    {/* TYPE */}
+                                                    <td className="col-type">
+                                                        <span className={`client-badge client-inv-type-pill ${typeBadge.className}`}>
+                                                            {typeBadge.label}
+                                                        </span>
+                                                    </td>
+
+                                                    {/* PROJECT */}
+                                                    <td className="bold-cell col-project">
+                                                        {inv.projectName}
+                                                    </td>
+
+                                                    {/* CLIENT */}
+                                                    <td className="col-client">
+                                                        {inv.clientName}
+                                                    </td>
+
+                                                    {/* MILESTONE */}
+                                                    <td className="muted-cell col-milestone">
+                                                        {inv.milestone || "—"}
+                                                    </td>
+
+                                                    {/* STATUS */}
+                                                    <td className="col-status">
+                                                        <span className={`client-badge client-inv-status-pill ${statusBadge.className}`}>
+                                                            {statusBadge.label}
+                                                        </span>
+                                                    </td>
+
+                                                    {/* AMOUNT */}
+                                                    <td className="bold-cell col-amount">
+                                                        {formatCompactMoney(inv.totalAmount, inv.currency)}
+                                                    </td>
+
+                                                    {/* ISSUED */}
+                                                    <td className="muted-cell col-issued">
+                                                        {formatDate(inv.issueDate)}
+                                                    </td>
+
+                                                    {/* DUE */}
+                                                    <td className="muted-cell col-due">
+                                                        {formatDate(inv.dueDate)}
+                                                    </td>
+
+                                                    {/* ACTIONS */}
+                                                    <td
+                                                        className="actions-cell col-actions"
+                                                        onClick={(e) => e.stopPropagation()}
                                                     >
-                                                        <MoreHorizontal size={18} />
-                                                    </button>
-
-                                                    {/* Floating Action Menu matching Reference 1 */}
-                                                    {isMenuOpen && (
-                                                        <div
-                                                            ref={menuRef}
-                                                            style={{
-                                                                position: "absolute",
-                                                                top: "38px",
-                                                                right: "16px",
-                                                                width: "160px",
-                                                                background: "#ffffff",
-                                                                borderRadius: "8px",
-                                                                border: "1px solid #e2e8f0",
-                                                                boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
-                                                                zIndex: 30,
-                                                                padding: "4px 0",
-                                                                textAlign: "left",
-                                                            }}
+                                                        <button
+                                                            type="button"
+                                                            className="client-btn-icon"
+                                                            aria-label="Actions"
+                                                            onClick={() => setActiveMenuId(isMenuOpen ? null : inv.id)}
                                                         >
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    setActiveMenuId(null);
-                                                                    router.push(`/client/invoices/${inv.id}`);
-                                                                }}
-                                                                style={{
-                                                                    width: "100%",
-                                                                    padding: "8px 14px",
-                                                                    fontSize: "13px",
-                                                                    fontWeight: 500,
-                                                                    color: "#334155",
-                                                                    background: "none",
-                                                                    border: "none",
-                                                                    textAlign: "left",
-                                                                    cursor: "pointer",
-                                                                    display: "flex",
-                                                                    alignItems: "center",
-                                                                    gap: "8px",
-                                                                }}
-                                                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8fafc")}
-                                                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                                                            >
-                                                                <Eye size={14} color="#64748b" /> View Invoice
-                                                            </button>
+                                                            <MoreHorizontal size={18} />
+                                                        </button>
 
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    setActiveMenuId(null);
-                                                                    window.open(`/api/v1/client/invoices/${inv.id}/pdf`, "_blank");
-                                                                }}
-                                                                style={{
-                                                                    width: "100%",
-                                                                    padding: "8px 14px",
-                                                                    fontSize: "13px",
-                                                                    fontWeight: 500,
-                                                                    color: "#334155",
-                                                                    background: "none",
-                                                                    border: "none",
-                                                                    textAlign: "left",
-                                                                    cursor: "pointer",
-                                                                    display: "flex",
-                                                                    alignItems: "center",
-                                                                    gap: "8px",
-                                                                }}
-                                                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8fafc")}
-                                                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                                                            >
-                                                                <Download size={14} color="#64748b" /> Download PDF
-                                                            </button>
-
-                                                            {inv.status !== "paid" && (inv.outstanding > 0 || !inv.totalPaid) && (
+                                                        {/* Floating Action Menu matching Reference 1 */}
+                                                        {isMenuOpen && (
+                                                            <div ref={menuRef} className="client-menu-popover" style={{ width: "160px" }}>
                                                                 <button
                                                                     type="button"
+                                                                    className="client-menu-item"
                                                                     onClick={() => {
                                                                         setActiveMenuId(null);
-                                                                        setPayingInvoice(inv);
+                                                                        router.push(`/client/invoices/${inv.id}`);
                                                                     }}
-                                                                    style={{
-                                                                        width: "100%",
-                                                                        padding: "8px 14px",
-                                                                        fontSize: "13px",
-                                                                        fontWeight: 600,
-                                                                        color: "#2563eb",
-                                                                        background: "none",
-                                                                        border: "none",
-                                                                        textAlign: "left",
-                                                                        cursor: "pointer",
-                                                                        display: "flex",
-                                                                        alignItems: "center",
-                                                                        gap: "8px",
-                                                                        borderTop: "1px solid #f1f5f9",
-                                                                    }}
-                                                                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#eff6ff")}
-                                                                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                                                                 >
-                                                                    <CreditCard size={14} color="#2563eb" /> Pay Invoice
+                                                                    <Eye size={14} color="#64748B" /> View Invoice
                                                                 </button>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
 
-                    {/* Pagination Bar matching Reference 1 */}
-                    <div
-                        style={{
-                            marginTop: "20px",
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            fontSize: "13px",
-                            color: "#64748b",
-                            flexWrap: "wrap",
-                            gap: "12px",
-                        }}
-                    >
-                        {/* Total invoices */}
-                        <div style={{ fontWeight: 500 }}>
-                            Total Invoices: {total}
+                                                                <button
+                                                                    type="button"
+                                                                    className="client-menu-item"
+                                                                    onClick={() => {
+                                                                        setActiveMenuId(null);
+                                                                        window.open(`/api/v1/client/invoices/${inv.id}/pdf`, "_blank");
+                                                                    }}
+                                                                >
+                                                                    <Download size={14} color="#64748B" /> Download PDF
+                                                                </button>
+
+                                                                {inv.status !== "paid" && (inv.outstanding > 0 || !inv.totalPaid) && (
+                                                                    <button
+                                                                        type="button"
+                                                                        className="client-menu-item"
+                                                                        style={{ color: "#2563EB", fontWeight: 600, borderTop: "1px solid #F1F5F9" }}
+                                                                        onClick={() => {
+                                                                            setActiveMenuId(null);
+                                                                            setPayingInvoice(inv);
+                                                                        }}
+                                                                    >
+                                                                        <CreditCard size={14} color="#2563EB" /> Pay Invoice
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
 
-                        {/* Numeric Page Controls */}
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                            <button
-                                type="button"
-                                disabled={page <= 1}
-                                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                                aria-label="Previous page"
-                                style={{
-                                    width: "32px",
-                                    height: "32px",
-                                    borderRadius: "6px",
-                                    border: "1px solid #e2e8f0",
-                                    background: "#ffffff",
-                                    color: page <= 1 ? "#cbd5e1" : "#475569",
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    cursor: page <= 1 ? "not-allowed" : "pointer",
-                                }}
-                            >
-                                <ChevronLeft size={16} />
-                            </button>
+                        {/* Pagination Bar matching Reference 1 & Frame 2147225166 */}
+                        <div className="client-pagination-bar client-invoices-pagination-bar">
+                            {/* Total invoices */}
+                            <div className="client-invoices-pagination-total">
+                                Total Invoices: {total}
+                            </div>
 
-                            {pageNumbers.map((pNum) => {
-                                const isActive = pNum === page;
-                                return (
-                                    <button
-                                        key={pNum}
-                                        type="button"
-                                        onClick={() => setPage(pNum)}
-                                        style={{
-                                            width: "32px",
-                                            height: "32px",
-                                            borderRadius: "6px",
-                                            border: isActive ? "1px solid #2563eb" : "1px solid #e2e8f0",
-                                            background: isActive ? "#ffffff" : "#ffffff",
-                                            color: isActive ? "#2563eb" : "#475569",
-                                            fontWeight: isActive ? 700 : 500,
-                                            boxShadow: isActive ? "0 0 0 1px #2563eb" : "none",
-                                            cursor: "pointer",
-                                        }}
-                                    >
-                                        {pNum}
-                                    </button>
-                                );
-                            })}
+                            {/* Numeric Page Controls */}
+                            <div className="client-pagination-controls client-invoices-pagination-controls">
+                                <button
+                                    type="button"
+                                    className="client-page-btn client-invoices-page-btn"
+                                    disabled={page <= 1}
+                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                    aria-label="Previous page"
+                                >
+                                    <ChevronLeft size={16} />
+                                </button>
 
-                            <button
-                                type="button"
-                                disabled={page >= totalPages}
-                                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                                aria-label="Next page"
-                                style={{
-                                    width: "32px",
-                                    height: "32px",
-                                    borderRadius: "6px",
-                                    border: "1px solid #e2e8f0",
-                                    background: "#ffffff",
-                                    color: page >= totalPages ? "#cbd5e1" : "#475569",
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    cursor: page >= totalPages ? "not-allowed" : "pointer",
-                                }}
-                            >
-                                <ChevronRight size={16} />
-                            </button>
-                        </div>
+                                {pageNumbers.map((pNum) => {
+                                    const isActive = pNum === page;
+                                    return (
+                                        <button
+                                            key={pNum}
+                                            type="button"
+                                            onClick={() => setPage(pNum)}
+                                            className={`client-page-btn client-invoices-page-btn ${isActive ? "active" : ""}`}
+                                        >
+                                            {pNum}
+                                        </button>
+                                    );
+                                })}
 
-                        {/* Show Per Page */}
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                            <span>Show per Page:</span>
-                            <select
-                                value={pageSize}
-                                onChange={(e) => {
-                                    setPageSize(Number(e.target.value));
-                                    setPage(1);
-                                }}
-                                style={{
-                                    padding: "5px 10px",
-                                    borderRadius: "6px",
-                                    border: "1px solid #e2e8f0",
-                                    background: "#ffffff",
-                                    fontSize: "13px",
-                                    color: "#334155",
-                                    outline: "none",
-                                    cursor: "pointer",
-                                }}
-                            >
-                                <option value={10}>10</option>
-                                <option value={20}>20</option>
-                                <option value={50}>50</option>
-                            </select>
+                                <button
+                                    type="button"
+                                    className="client-page-btn client-invoices-page-btn"
+                                    disabled={page >= totalPages}
+                                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                                    aria-label="Next page"
+                                >
+                                    <ChevronRight size={16} />
+                                </button>
+                            </div>
+
+                            {/* Show Per Page */}
+                            <div className="client-invoices-per-page">
+                                <span>Show per Page:</span>
+                                <select
+                                    className="client-input"
+                                    value={pageSize}
+                                    onChange={(e) => {
+                                        setPageSize(Number(e.target.value));
+                                        setPage(1);
+                                    }}
+                                >
+                                    <option value={10}>10</option>
+                                    <option value={20}>20</option>
+                                    <option value={50}>50</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -657,141 +477,114 @@ export default function ClientInvoicesPage() {
 
             {/* Pay Invoice Modal */}
             {payingInvoice && (
-                <div
-                    style={{
-                        position: "fixed",
-                        inset: 0,
-                        backgroundColor: "rgba(15, 23, 42, 0.4)",
-                        backdropFilter: "blur(4px)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        zIndex: 60,
-                        padding: "20px",
-                    }}
-                >
-                    <div
-                        style={{
-                            maxWidth: "460px",
-                            width: "100%",
-                            backgroundColor: "#ffffff",
-                            borderRadius: "14px",
-                            border: "1px solid #e2e8f0",
-                            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)",
-                            padding: "24px",
-                        }}
-                    >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                            <h3 style={{ fontSize: "17px", fontWeight: 700, color: "#0f172a", margin: 0 }}>
-                                Pay Invoice {payingInvoice.invoiceNumber}
-                            </h3>
+                <div className="client-modal-backdrop" onClick={() => !paymentSubmitting && setPayingInvoice(null)}>
+                    <div className="client-modal-card" onClick={(e) => e.stopPropagation()}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 600, color: "#0F172A" }}>
+                                    Pay Invoice {payingInvoice.invoiceNumber}
+                                </h3>
+                                <p style={{ margin: "4px 0 0 0", fontSize: "14px", color: "#64748B" }}>
+                                    {payingInvoice.projectName} · Due: {formatDate(payingInvoice.dueDate)}
+                                </p>
+                            </div>
                             <button
                                 type="button"
+                                className="client-btn-icon"
                                 onClick={() => setPayingInvoice(null)}
-                                style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer" }}
+                                disabled={paymentSubmitting}
                             >
-                                <X size={20} />
+                                <X size={18} />
                             </button>
                         </div>
 
-                        <div style={{ padding: "14px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0", marginBottom: "18px" }}>
-                            <div style={{ fontSize: "12px", color: "#64748b" }}>Project</div>
-                            <div style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a", marginTop: "2px" }}>
-                                {payingInvoice.projectName}
-                            </div>
-                            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "10px", paddingTop: "10px", borderTop: "1px solid #e2e8f0" }}>
-                                <span style={{ fontSize: "13px", color: "#64748b" }}>Amount Due:</span>
-                                <span style={{ fontSize: "16px", fontWeight: 700, color: "#2563eb" }}>
-                                    {formatCompactMoney(payingInvoice.outstanding || payingInvoice.totalAmount, payingInvoice.currency)}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div style={{ marginBottom: "20px" }}>
-                            <label style={{ fontSize: "13px", fontWeight: 600, color: "#334155", display: "block", marginBottom: "8px" }}>
-                                Select Payment Method
-                            </label>
-                            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                                {[
-                                    { key: "bank_transfer", label: "Bank Transfer (NEFT / RTGS / IMPS)" },
-                                    { key: "upi", label: "Instant UPI / QR" },
-                                    { key: "card", label: "Debit / Credit Card" },
-                                ].map((m) => (
-                                    <label
-                                        key={m.key}
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "10px",
-                                            padding: "10px 14px",
-                                            borderRadius: "8px",
-                                            border: paymentMethod === m.key ? "1px solid #2563eb" : "1px solid #e2e8f0",
-                                            background: paymentMethod === m.key ? "#eff6ff" : "#ffffff",
-                                            cursor: "pointer",
-                                            fontSize: "13px",
-                                            fontWeight: 500,
-                                            color: paymentMethod === m.key ? "#1d4ed8" : "#334155",
-                                        }}
-                                    >
-                                        <input
-                                            type="radio"
-                                            name="paymentMethod"
-                                            checked={paymentMethod === m.key}
-                                            onChange={() => setPaymentMethod(m.key as any)}
-                                        />
-                                        <span>{m.label}</span>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-
                         {paymentSuccess ? (
-                            <div style={{ padding: "12px", background: "#f0fdf4", color: "#15803d", borderRadius: "8px", textAlign: "center", fontWeight: 600, fontSize: "14px" }}>
-                                ✓ Payment Confirmed &amp; Recorded!
+                            <div style={{ padding: "32px 16px", textAlign: "center" }}>
+                                <CheckCircle2 size={48} color="#16A34A" style={{ margin: "0 auto 12px auto" }} />
+                                <h4 style={{ fontSize: "17px", fontWeight: 700, color: "#0F172A", margin: "0 0 6px 0" }}>
+                                    Payment Successful!
+                                </h4>
+                                <p style={{ fontSize: "14px", color: "#64748B", margin: 0 }}>
+                                    Your payment for {formatCompactMoney(payingInvoice.outstanding || payingInvoice.totalAmount, payingInvoice.currency)} has been recorded.
+                                </p>
                             </div>
                         ) : (
-                            <div style={{ display: "flex", gap: "10px" }}>
-                                <button
-                                    type="button"
-                                    onClick={() => setPayingInvoice(null)}
+                            <>
+                                <div
                                     style={{
-                                        flex: 1,
-                                        padding: "10px 16px",
-                                        borderRadius: "8px",
-                                        border: "1px solid #e2e8f0",
-                                        background: "#ffffff",
-                                        color: "#475569",
-                                        fontSize: "13px",
-                                        fontWeight: 600,
-                                        cursor: "pointer",
-                                    }}
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="button"
-                                    disabled={paymentSubmitting}
-                                    onClick={handleConfirmPayment}
-                                    style={{
-                                        flex: 2,
-                                        padding: "10px 16px",
-                                        borderRadius: "8px",
-                                        border: "none",
-                                        background: "#2563eb",
-                                        color: "#ffffff",
-                                        fontSize: "13px",
-                                        fontWeight: 600,
-                                        cursor: paymentSubmitting ? "not-allowed" : "pointer",
-                                        display: "inline-flex",
+                                        padding: "16px",
+                                        borderRadius: "6px",
+                                        backgroundColor: "#F8FAFC",
+                                        border: "1px solid #E2E8F0",
+                                        display: "flex",
+                                        justifyContent: "space-between",
                                         alignItems: "center",
-                                        justifyContent: "center",
-                                        gap: "6px",
                                     }}
                                 >
-                                    {paymentSubmitting ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
-                                    Confirm Payment
-                                </button>
-                            </div>
+                                    <span style={{ fontSize: "14px", color: "#64748B" }}>Amount to Pay</span>
+                                    <span style={{ fontSize: "20px", fontWeight: 700, color: "#0F172A" }}>
+                                        {formatCompactMoney(payingInvoice.outstanding || payingInvoice.totalAmount, payingInvoice.currency)}
+                                    </span>
+                                </div>
+
+                                <div>
+                                    <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#0F172A", marginBottom: "8px" }}>
+                                        Select Payment Method
+                                    </label>
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
+                                        {[
+                                            { id: "bank_transfer", label: "NEFT / RTGS" },
+                                            { id: "upi", label: "UPI" },
+                                            { id: "card", label: "Credit Card" },
+                                        ].map((m) => (
+                                            <button
+                                                key={m.id}
+                                                type="button"
+                                                onClick={() => setPaymentMethod(m.id as any)}
+                                                style={{
+                                                    padding: "12px 10px",
+                                                    borderRadius: "6px",
+                                                    border: paymentMethod === m.id ? "1.5px solid #2563EB" : "1px solid #E2E8F0",
+                                                    backgroundColor: paymentMethod === m.id ? "#EFF6FF" : "#FFFFFF",
+                                                    color: paymentMethod === m.id ? "#2563EB" : "#334155",
+                                                    fontSize: "13px",
+                                                    fontWeight: 600,
+                                                    cursor: "pointer",
+                                                    transition: "all 0.15s ease",
+                                                }}
+                                            >
+                                                {m.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "12px" }}>
+                                    <button
+                                        type="button"
+                                        className="client-btn-secondary"
+                                        onClick={() => setPayingInvoice(null)}
+                                        disabled={paymentSubmitting}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="client-btn-primary"
+                                        onClick={handleConfirmPayment}
+                                        disabled={paymentSubmitting}
+                                    >
+                                        {paymentSubmitting ? (
+                                            <>
+                                                <Loader2 size={16} className="animate-spin" />
+                                                <span>Processing...</span>
+                                            </>
+                                        ) : (
+                                            <span>Confirm & Pay Now</span>
+                                        )}
+                                    </button>
+                                </div>
+                            </>
                         )}
                     </div>
                 </div>

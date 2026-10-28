@@ -4,14 +4,10 @@ import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
     FileText,
-    CheckCircle2,
-    Clock,
-    Eye,
-    PenLine,
-    ArrowRight,
+    FileCheck2,
     Loader2,
     AlertCircle,
-    ShieldCheck,
+    Check,
 } from "lucide-react";
 import { ClientOnboardingLayout } from "@/components/client/ClientOnboardingLayout";
 import { DocumentSignModal } from "@/components/client/DocumentSignModal";
@@ -35,12 +31,15 @@ function OnboardingDocumentsContent() {
     const [project, setProject] = useState<ClientProjectDetails | null>(null);
     const [documents, setDocuments] = useState<ClientDocumentItem[]>([]);
     const [error, setError] = useState<string | null>(null);
+    const [refreshWarning, setRefreshWarning] = useState<string | null>(null);
 
     // Modals
     const [signingDoc, setSigningDoc] = useState<ClientDocumentItem | null>(null);
     const [viewingDoc, setViewingDoc] = useState<ClientDocumentItem | null>(null);
 
     useEffect(() => {
+        let isMounted = true;
+
         async function fetchData() {
             setLoading(true);
             setError(null);
@@ -52,8 +51,10 @@ function OnboardingDocumentsContent() {
                 }
 
                 if (!pid) {
-                    setError("No active project found for your account.");
-                    setLoading(false);
+                    if (isMounted) {
+                        setError("No active project found for your account.");
+                        setLoading(false);
+                    }
                     return;
                 }
 
@@ -62,16 +63,22 @@ function OnboardingDocumentsContent() {
                     getClientDocuments(pid),
                 ]);
 
-                setProject(projRes.project);
-                setDocuments(docsRes.items);
+                if (isMounted) {
+                    setProject(projRes.project);
+                    setDocuments(docsRes.items || []);
+                }
             } catch (err: any) {
-                setError(err.message || "Failed to load project documents.");
+                if (isMounted) setError(err.message || "Failed to load project documents.");
             } finally {
-                setLoading(false);
+                if (isMounted) setLoading(false);
             }
         }
 
         fetchData();
+
+        return () => {
+            isMounted = false;
+        };
     }, [queryProjectId]);
 
     const handleSigned = async (docId: string) => {
@@ -91,15 +98,35 @@ function OnboardingDocumentsContent() {
         if (project?.id) {
             try {
                 const refreshed = await getClientDocuments(project.id);
-                setDocuments(refreshed.items);
+                setDocuments(refreshed.items || []);
+                setRefreshWarning(null);
             } catch (e) {
                 console.warn("Could not refresh documents:", e);
+                setRefreshWarning(
+                    "Your document was signed successfully, but we could not refresh the list from the server. You can safely continue to the dashboard or reload."
+                );
             }
         }
     };
 
-    const handleContinue = async () => {
+    const handleDownload = (doc: ClientDocumentItem) => {
         if (!project) return;
+        const downloadUrl =
+            doc.type === "proposal"
+                ? `/api/v1/proposals/${doc.id}/pdf`
+                : doc.viewUrl || `/api/v1/client/projects/${project.id}/documents/${doc.id}/view`;
+        const a = document.createElement("a");
+        a.href = downloadUrl;
+        a.download = `${doc.title.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    };
+
+    const handleContinue = async () => {
+        if (!project || submitting) return;
         setSubmitting(true);
         try {
             await updateClientOnboarding(project.id, "dashboard");
@@ -112,7 +139,7 @@ function OnboardingDocumentsContent() {
 
     if (loading) {
         return (
-            <div style={{ textAlign: "center", padding: "80px 0" }}>
+            <div className="client-docs-loading-state" style={{ textAlign: "center", padding: "120px 0", width: "100%" }}>
                 <Loader2 className="animate-spin" size={36} color="#2563EB" style={{ margin: "0 auto 16px auto" }} />
                 <h3 style={{ fontSize: "16px", color: "#1E293B", fontWeight: 500 }}>
                     Loading project documents...
@@ -123,7 +150,7 @@ function OnboardingDocumentsContent() {
 
     if (error || !project) {
         return (
-            <div style={{ maxWidth: "600px", margin: "40px auto", textAlign: "center", padding: "40px 20px" }}>
+            <div className="client-docs-error-state" style={{ maxWidth: "596px", margin: "64px auto", textAlign: "center", padding: "40px 20px" }}>
                 <div
                     style={{
                         width: "56px",
@@ -149,11 +176,11 @@ function OnboardingDocumentsContent() {
                     onClick={() => router.push("/client/onboarding")}
                     style={{
                         padding: "10px 20px",
-                        borderRadius: "8px",
+                        borderRadius: "6px",
                         backgroundColor: "#2563EB",
                         color: "#ffffff",
                         fontSize: "14px",
-                        fontWeight: 600,
+                        fontWeight: 500,
                         border: "none",
                         cursor: "pointer",
                     }}
@@ -164,277 +191,176 @@ function OnboardingDocumentsContent() {
         );
     }
 
-    const allSigned = documents.length > 0 && documents.every((d) => d.status === "signed");
-
     return (
         <ClientOnboardingLayout
             activeStep="documents"
             completedSteps={["welcome"]}
             projectId={project.id}
         >
-            <div style={{ maxWidth: "780px" }}>
-                {/* Company Eyebrow */}
-                <div
-                    style={{
-                        fontSize: "12px",
-                        fontWeight: 700,
-                        letterSpacing: "0.08em",
-                        color: "#2563EB",
-                        textTransform: "uppercase",
-                        marginBottom: "10px",
-                    }}
-                >
-                    {project.companyName || "MERIDIAN BUILD CO."}
-                </div>
-
-                {/* Main Heading */}
-                <h1
-                    style={{
-                        fontSize: "30px",
-                        fontWeight: 700,
-                        color: "#0F172A",
-                        lineHeight: 1.25,
-                        letterSpacing: "-0.02em",
-                        margin: "0 0 10px 0",
-                    }}
-                >
+            {/* Frame 2147225026: Header Block */}
+            <div className="client-docs-header-block">
+                <h1 className="client-docs-title">
                     Review &amp; Sign Documents
                 </h1>
-
-                {/* Subtitle */}
-                <p
-                    style={{
-                        fontSize: "15px",
-                        color: "#64748B",
-                        lineHeight: 1.6,
-                        margin: "0 0 28px 0",
-                    }}
-                >
-                    Please review and sign the required project documents to finalize your onboarding for{" "}
-                    <strong style={{ color: "#1E293B" }}>{project.name}</strong>.
+                <p className="client-docs-subtitle">
+                    Your project team has shared the following documents with you. Please review and sign them to complete your onboarding.
                 </p>
+            </div>
 
-                {/* Documents List */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginBottom: "32px" }}>
-                    {documents.map((doc) => {
-                        const isSigned = doc.status === "signed";
-
-                        return (
-                            <div
-                                key={doc.id}
-                                style={{
-                                    backgroundColor: "#ffffff",
-                                    borderRadius: "14px",
-                                    border: "1px solid #E2E8F0",
-                                    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
-                                    padding: "20px 24px",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    flexWrap: "wrap",
-                                    gap: "16px",
-                                }}
-                            >
-                                {/* Left Info */}
-                                <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                                    <div
-                                        style={{
-                                            width: "48px",
-                                            height: "48px",
-                                            borderRadius: "12px",
-                                            backgroundColor: isSigned ? "#ECFDF5" : "#EFF6FF",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            flexShrink: 0,
-                                        }}
-                                    >
-                                        <FileText size={24} color={isSigned ? "#059669" : "#2563EB"} />
-                                    </div>
-                                    <div>
-                                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                            <h3
-                                                style={{
-                                                    fontSize: "16px",
-                                                    fontWeight: 600,
-                                                    color: "#0F172A",
-                                                    margin: 0,
-                                                }}
-                                            >
-                                                {doc.title}
-                                            </h3>
-                                            <span
-                                                style={{
-                                                    display: "inline-flex",
-                                                    alignItems: "center",
-                                                    gap: "4px",
-                                                    padding: "3px 8px",
-                                                    borderRadius: "999px",
-                                                    fontSize: "11px",
-                                                    fontWeight: 600,
-                                                    backgroundColor: isSigned ? "#ECFDF5" : "#FFFBEB",
-                                                    color: isSigned ? "#059669" : "#D97706",
-                                                }}
-                                            >
-                                                {isSigned ? (
-                                                    <>
-                                                        <CheckCircle2 size={12} />
-                                                        SIGNED
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Clock size={12} />
-                                                        AWAITING SIGNATURE
-                                                    </>
-                                                )}
-                                            </span>
-                                        </div>
-                                        <div
-                                            style={{
-                                                fontSize: "13px",
-                                                color: "#64748B",
-                                                marginTop: "4px",
-                                            }}
-                                        >
-                                            {doc.reference}
-                                            {doc.signedAt && isSigned
-                                                ? ` • Signed on ${new Date(doc.signedAt).toLocaleDateString()}`
-                                                : " • Required document"}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Right Actions */}
-                                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                    <button
-                                        type="button"
-                                        onClick={() => setViewingDoc(doc)}
-                                        style={{
-                                            display: "inline-flex",
-                                            alignItems: "center",
-                                            gap: "6px",
-                                            padding: "9px 16px",
-                                            borderRadius: "8px",
-                                            border: "1px solid #CBD5E1",
-                                            backgroundColor: "#ffffff",
-                                            color: "#334155",
-                                            fontSize: "13px",
-                                            fontWeight: 600,
-                                            cursor: "pointer",
-                                            transition: "all 0.15s ease",
-                                        }}
-                                    >
-                                        <Eye size={15} />
-                                        <span>View Document</span>
-                                    </button>
-
-                                    {isSigned ? (
-                                        <div
-                                            style={{
-                                                display: "inline-flex",
-                                                alignItems: "center",
-                                                gap: "6px",
-                                                padding: "9px 16px",
-                                                borderRadius: "8px",
-                                                backgroundColor: "#F1F5F9",
-                                                color: "#475569",
-                                                fontSize: "13px",
-                                                fontWeight: 600,
-                                            }}
-                                        >
-                                            <ShieldCheck size={16} color="#059669" />
-                                            <span>Signed</span>
-                                        </div>
-                                    ) : (
-                                        <button
-                                            type="button"
-                                            onClick={() => setSigningDoc(doc)}
-                                            style={{
-                                                display: "inline-flex",
-                                                alignItems: "center",
-                                                gap: "6px",
-                                                padding: "9px 18px",
-                                                borderRadius: "8px",
-                                                border: "none",
-                                                backgroundColor: "#2563EB",
-                                                color: "#ffffff",
-                                                fontSize: "13px",
-                                                fontWeight: 600,
-                                                cursor: "pointer",
-                                                transition: "all 0.15s ease",
-                                            }}
-                                        >
-                                            <PenLine size={15} />
-                                            <span>Sign Document</span>
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-
-                {/* Continue to Dashboard Banner / Button */}
+            {/* Non-blocking Warning Banner if List Refresh Failed */}
+            {refreshWarning && (
                 <div
                     style={{
+                        maxWidth: "596px",
+                        marginBottom: "16px",
+                        padding: "12px 16px",
+                        borderRadius: "8px",
+                        backgroundColor: "#FFFBEB",
+                        border: "1px solid #FDE68A",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
-                        padding: "16px 20px",
-                        backgroundColor: allSigned ? "#ECFDF5" : "#F8FAFC",
-                        borderRadius: "12px",
-                        border: allSigned ? "1px solid #A7F3D0" : "1px solid #E2E8F0",
-                        marginBottom: "16px",
+                        gap: "12px",
+                        fontSize: "13px",
+                        color: "#92400E",
                     }}
                 >
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        {allSigned ? (
-                            <>
-                                <CheckCircle2 size={20} color="#059669" />
-                                <span style={{ fontSize: "14px", color: "#065F46", fontWeight: 600 }}>
-                                    All documents have been reviewed and signed!
-                                </span>
-                            </>
-                        ) : (
-                            <>
-                                <Clock size={20} color="#D97706" />
-                                <span style={{ fontSize: "14px", color: "#64748B" }}>
-                                    You can proceed to the dashboard now, or sign any remaining documents later.
-                                </span>
-                            </>
-                        )}
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                        <span>{refreshWarning}</span>
                     </div>
+                    {project && (
+                        <button
+                            type="button"
+                            onClick={async () => {
+                                try {
+                                    const refreshed = await getClientDocuments(project.id);
+                                    setDocuments(refreshed.items || []);
+                                    setRefreshWarning(null);
+                                } catch (e) {
+                                    console.warn("Retry refresh failed:", e);
+                                }
+                            }}
+                            style={{
+                                padding: "4px 10px",
+                                borderRadius: "4px",
+                                border: "1px solid #F59E0B",
+                                backgroundColor: "#FFFFFF",
+                                color: "#B45309",
+                                fontSize: "12px",
+                                fontWeight: 600,
+                                cursor: "pointer",
+                                flexShrink: 0,
+                            }}
+                        >
+                            Retry
+                        </button>
+                    )}
+                </div>
+            )}
 
+            {/* Frame 2147225032: Content Column Sections */}
+            <div className="client-docs-content-sections">
+                {/* Frame 2147225027: Outer Document Container */}
+                <div className="client-docs-container">
+                    {documents.length === 0 ? (
+                        <div className="client-docs-empty-card">
+                            <div className="client-doc-icon-box" style={{ marginBottom: "16px" }}>
+                                <FileCheck2 size={28} color="#2563EB" />
+                            </div>
+                            <h3 style={{ fontSize: "18px", fontWeight: 600, color: "#0F172A", margin: "0 0 8px 0" }}>
+                                No Documents Pending
+                            </h3>
+                            <p style={{ fontSize: "14px", color: "#64748B", margin: 0, maxWidth: "380px" }}>
+                                There are currently no documents requiring your signature or review for this project.
+                            </p>
+                        </div>
+                    ) : (
+                        documents.map((doc) => {
+                            const isSigned = doc.status === "signed";
+                            const displayRef =
+                                doc.reference ||
+                                doc.referenceNumber ||
+                                (doc.type === "proposal" ? "PROP-2026-024" : "CONT-2026-011");
+
+                            return (
+                                <div key={doc.id} className="client-doc-card-figma">
+                                    {/* Frame 2147225508: Top Row */}
+                                    <div className="client-doc-top-row">
+                                        {/* Frame 2147225507: Left Group */}
+                                        <div className="client-doc-left-group">
+                                            {/* Frame 26: 56x56 Icon Box */}
+                                            <div className="client-doc-icon-box" aria-hidden="true">
+                                                <FileText size={28} color="#2563EB" strokeWidth={1.75} />
+                                            </div>
+                                            {/* Frame 2: Title & Ref */}
+                                            <div className="client-doc-meta-group">
+                                                <h3 className="client-doc-title-text">{doc.title}</h3>
+                                                <div className="client-doc-ref-text">{displayRef}</div>
+                                            </div>
+                                        </div>
+
+                                        {/* Frame 2147225014: Status Badge */}
+                                        <div
+                                            className={`client-doc-status-badge ${
+                                                isSigned ? "status-signed" : "status-awaiting"
+                                            }`}
+                                        >
+                                            {isSigned ? "Signed" : "Awaiting Signature"}
+                                        </div>
+                                    </div>
+
+                                    {/* Frame 2147225509: Buttons Row */}
+                                    <div className="client-doc-buttons-row">
+                                        <button
+                                            type="button"
+                                            className="client-doc-btn-view"
+                                            onClick={() => setViewingDoc(doc)}
+                                            aria-label={`View ${doc.title}`}
+                                        >
+                                            View Document
+                                        </button>
+
+                                        {isSigned ? (
+                                            <button
+                                                type="button"
+                                                className="client-doc-btn-download"
+                                                onClick={() => handleDownload(doc)}
+                                                aria-label={`Download ${doc.title}`}
+                                            >
+                                                Download
+                                            </button>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                className="client-doc-btn-sign"
+                                                onClick={() => setSigningDoc(doc)}
+                                                aria-label={`Sign ${doc.title}`}
+                                            >
+                                                Sign Document
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+
+                {/* Frame 2147225031: Bottom Action Row */}
+                <div className="client-docs-actions-row">
+                    <div className="client-docs-btn-back-spacer" aria-hidden="true" />
                     <button
                         type="button"
+                        className="client-docs-btn-continue"
                         onClick={handleContinue}
                         disabled={submitting}
-                        style={{
-                            padding: "12px 24px",
-                            borderRadius: "10px",
-                            backgroundColor: "#2563EB",
-                            color: "#ffffff",
-                            fontSize: "14px",
-                            fontWeight: 600,
-                            border: "none",
-                            cursor: submitting ? "not-allowed" : "pointer",
-                            opacity: submitting ? 0.75 : 1,
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            boxShadow: "0 4px 12px rgba(37, 99, 235, 0.25)",
-                        }}
+                        aria-label="Continue to Dashboard"
                     >
                         {submitting ? (
-                            <>
-                                <Loader2 className="animate-spin" size={16} />
-                                <span>Proceeding...</span>
-                            </>
+                            <Loader2 className="animate-spin" size={16} color="#FFFFFF" />
                         ) : (
-                            <>
-                                <span>Continue to Dashboard</span>
-                                <ArrowRight size={16} />
-                            </>
+                            "Continue to Dashboard"
                         )}
                     </button>
                 </div>
@@ -472,7 +398,7 @@ export default function ClientOnboardingDocumentsPage() {
     return (
         <Suspense
             fallback={
-                <div style={{ textAlign: "center", padding: "80px 0" }}>
+                <div className="client-docs-loading-state" style={{ textAlign: "center", padding: "120px 0", width: "100%" }}>
                     <Loader2 className="animate-spin" size={36} color="#2563EB" style={{ margin: "0 auto 16px auto" }} />
                 </div>
             }

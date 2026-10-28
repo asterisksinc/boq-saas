@@ -4,8 +4,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { X, FileText, Check, Loader2, AlertCircle } from "lucide-react";
 import { signClientDocument, type ClientDocumentItem } from "@/lib/api/client";
 
-type SigningStep = "acknowledgement" | "create-signature" | "confirm-signature" | "success";
-type SignatureMode = "draw" | "type";
+export type SigningStep = "acknowledgement" | "create-signature" | "confirm-signature" | "success";
+export type SignatureMode = "draw" | "type";
 
 export type DocumentSignModalProps = {
     projectId: string;
@@ -67,7 +67,6 @@ export function DocumentSignModal({
 
     useEffect(() => {
         if (step === "create-signature" && mode === "draw") {
-            // Small tick to ensure canvas is mounted
             const timer = setTimeout(initCanvas, 50);
             return () => clearTimeout(timer);
         }
@@ -108,15 +107,15 @@ export function DocumentSignModal({
         const pos = getCanvasPos(e);
         lastPosRef.current = pos;
 
-        ctx.strokeStyle = "#0f172a";
-        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = "#0F172A";
+        ctx.lineWidth = 3;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
 
         // Draw a single dot in case of tap
         ctx.beginPath();
-        ctx.arc(pos.x, pos.y, 1.25, 0, Math.PI * 2);
-        ctx.fillStyle = "#0f172a";
+        ctx.arc(pos.x, pos.y, 1.5, 0, Math.PI * 2);
+        ctx.fillStyle = "#0F172A";
         ctx.fill();
 
         setIsCanvasEmpty(false);
@@ -168,9 +167,10 @@ export function DocumentSignModal({
         } else {
             setTypedName("");
         }
+        setError("");
     };
 
-    // Advancing from Modal 2/3 to Modal 4 (Confirm)
+    // Validating signature draft and proceeding from Add Signature to Confirm Signature
     const handleProceedToConfirm = () => {
         setError("");
         if (mode === "draw") {
@@ -178,19 +178,31 @@ export function DocumentSignModal({
                 setError("Please draw your signature before continuing.");
                 return;
             }
-            setStep("confirm-signature");
         } else {
             if (!typedName.trim()) {
                 setError("Please type your name before continuing.");
                 return;
             }
-            setStep("confirm-signature");
         }
+        setStep("confirm-signature");
     };
 
-    // Submitting from Modal 4 (Confirm & Sign)
+    // Submitting signature from Confirm Signature to backend API
     const handleConfirmAndSign = async () => {
         setError("");
+
+        if (mode === "draw") {
+            if (isCanvasEmpty || !drawDataUrl) {
+                setError("Please draw your signature before submitting.");
+                return;
+            }
+        } else {
+            if (!typedName.trim()) {
+                setError("Please type your name before submitting.");
+                return;
+            }
+        }
+
         setIsSubmitting(true);
 
         const signer = typedName.trim() || initialSignerName.trim() || "Authorized Client";
@@ -205,7 +217,7 @@ export function DocumentSignModal({
                 signatureText: signer,
             });
 
-            // Transition directly to Modal 5 (Success)
+            // Transition to Modal 5 (Success) only after server confirms success
             setStep("success");
         } catch (err: any) {
             setError(err.message || "Failed to submit signature. Please try again.");
@@ -215,20 +227,14 @@ export function DocumentSignModal({
     };
 
     const docReference = document.referenceNumber || document.reference || document.id;
+    const isDraftEmpty = mode === "draw" ? isCanvasEmpty || !drawDataUrl : !typedName.trim();
+    const isSubmitDisabled = isDraftEmpty || isSubmitting;
+
+    const isSuccessStep = step === "success";
 
     return (
         <div
-            style={{
-                position: "fixed",
-                inset: 0,
-                zIndex: 100,
-                backgroundColor: "rgba(15, 23, 42, 0.45)",
-                backdropFilter: "blur(8px)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "16px",
-            }}
+            className="client-sign-backdrop"
             role="dialog"
             aria-modal="true"
             aria-labelledby="modal-header-title"
@@ -237,246 +243,110 @@ export function DocumentSignModal({
             }}
         >
             <div
-                style={{
-                    backgroundColor: "#ffffff",
-                    borderRadius: "18px",
-                    width: "100%",
-                    maxWidth: "460px",
-                    boxShadow: "0 20px 40px -12px rgba(0, 0, 0, 0.2), 0 0 1px rgba(0, 0, 0, 0.1)",
-                    overflow: "hidden",
-                    padding: "24px",
-                    position: "relative",
-                }}
+                className={`client-sign-modal-card ${
+                    isSuccessStep ? "client-sign-success-modal" : ""
+                }`}
             >
-                {/* Close Button at top-right (unless submitting) */}
-                <button
-                    type="button"
-                    onClick={onClose}
-                    disabled={isSubmitting}
-                    aria-label="Close dialog"
+                {/* Header Row: Frame 2147225093 */}
+                <div
+                    className="client-sign-modal-header"
                     style={{
-                        position: "absolute",
-                        top: "20px",
-                        right: "20px",
-                        background: "none",
-                        border: "none",
-                        color: "#64748b",
-                        cursor: isSubmitting ? "not-allowed" : "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        padding: "4px",
-                        borderRadius: "6px",
-                        zIndex: 10,
+                        width: isSuccessStep ? "100%" : "100%",
+                        maxWidth: isSuccessStep ? "388px" : "368px",
                     }}
                 >
-                    <X size={18} />
-                </button>
+                    <h2 id="modal-header-title" className="client-sign-modal-title">
+                        {step === "acknowledgement" && "Sign Document"}
+                        {step === "create-signature" && "Add Signature"}
+                        {step === "confirm-signature" && "Confirm Signature"}
+                        {step === "success" && (
+                            <span style={{ opacity: 0 }}>Proposal Created</span>
+                        )}
+                    </h2>
+                    {!isSubmitting && (
+                        <button
+                            type="button"
+                            className="client-sign-modal-close"
+                            onClick={onClose}
+                            aria-label="Close dialog"
+                        >
+                            <X size={20} />
+                        </button>
+                    )}
+                </div>
 
                 {/* MODAL 1: Sign Document — Acknowledgement */}
                 {step === "acknowledgement" && (
-                    <div>
-                        <h2
-                            id="modal-header-title"
-                            style={{
-                                fontSize: "17px",
-                                fontWeight: 700,
-                                color: "#0f172a",
-                                margin: "0 0 18px 0",
-                            }}
-                        >
-                            Sign Document
-                        </h2>
-
-                        {/* Document Information Card */}
-                        <div
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "12px",
-                                padding: "14px 16px",
-                                backgroundColor: "#ffffff",
-                                border: "1px solid #e2e8f0",
-                                borderRadius: "12px",
-                                marginBottom: "18px",
-                            }}
-                        >
-                            <div
-                                style={{
-                                    width: "38px",
-                                    height: "38px",
-                                    borderRadius: "8px",
-                                    backgroundColor: "#f8fafc",
-                                    border: "1px solid #f1f5f9",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    flexShrink: 0,
-                                }}
-                            >
-                                <FileText size={20} color="#64748b" />
+                    <div className="client-sign-inner-card">
+                        {/* Document Information Table Cell */}
+                        <div className="client-sign-doc-cell">
+                            <div className="client-sign-doc-icon-circle" aria-hidden="true">
+                                <FileText size={20} color="#64748B" />
                             </div>
-                            <div style={{ overflow: "hidden" }}>
-                                <div
-                                    style={{
-                                        fontSize: "14px",
-                                        fontWeight: 600,
-                                        color: "#0f172a",
-                                        whiteSpace: "nowrap",
-                                        overflow: "hidden",
-                                        textOverflow: "ellipsis",
-                                    }}
-                                >
-                                    {document.title}
-                                </div>
-                                <div style={{ fontSize: "12px", color: "#64748b", marginTop: "2px" }}>
-                                    {docReference}
-                                </div>
+                            <div className="client-sign-doc-info">
+                                <h3 className="client-sign-doc-name">{document.title}</h3>
+                                <p className="client-sign-doc-ref">{docReference}</p>
                             </div>
                         </div>
 
                         {/* Acknowledgement Text */}
-                        <p
-                            style={{
-                                fontSize: "13px",
-                                color: "#475569",
-                                lineHeight: 1.55,
-                                margin: "0 0 16px 0",
-                            }}
-                        >
+                        <p className="client-sign-disclaimer">
                             By signing this document, you confirm that you have reviewed and agreed to its contents.
                         </p>
 
                         {/* Checkbox with Label */}
-                        <label
-                            style={{
-                                display: "flex",
-                                alignItems: "flex-start",
-                                gap: "10px",
-                                cursor: "pointer",
-                                fontSize: "13px",
-                                color: "#1e293b",
-                                userSelect: "none",
-                                marginBottom: "24px",
-                            }}
-                        >
+                        <label className="client-sign-checkbox-row">
                             <input
                                 type="checkbox"
+                                className="client-sign-checkbox-input"
                                 checked={acknowledged}
                                 onChange={(e) => setAcknowledged(e.target.checked)}
-                                style={{
-                                    width: "16px",
-                                    height: "16px",
-                                    accentColor: "#2563eb",
-                                    marginTop: "2px",
-                                    cursor: "pointer",
-                                }}
                             />
-                            <span>I have reviewed this document and agree to sign it.</span>
+                            <span className="client-sign-checkbox-label">
+                                I have reviewed this document and agree to sign it.
+                            </span>
                         </label>
+                    </div>
+                )}
 
-                        {/* Footer Actions */}
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                style={{
-                                    padding: "9px 18px",
-                                    borderRadius: "8px",
-                                    border: "1px solid #e2e8f0",
-                                    backgroundColor: "#ffffff",
-                                    color: "#334155",
-                                    fontSize: "13px",
-                                    fontWeight: 500,
-                                    cursor: "pointer",
-                                }}
-                            >
-                                Cancel
-                            </button>
+                {step === "acknowledgement" && (
+                    <div className="client-sign-actions-row">
+                        <button
+                            type="button"
+                            className="client-sign-btn-cancel"
+                            onClick={onClose}
+                        >
+                            Cancel
+                        </button>
 
-                            <button
-                                type="button"
-                                disabled={!acknowledged}
-                                onClick={() => setStep("create-signature")}
-                                style={{
-                                    padding: "9px 18px",
-                                    borderRadius: "8px",
-                                    border: "none",
-                                    backgroundColor: "#2563eb",
-                                    color: "#ffffff",
-                                    fontSize: "13px",
-                                    fontWeight: 600,
-                                    cursor: acknowledged ? "pointer" : "not-allowed",
-                                    opacity: acknowledged ? 1 : 0.45,
-                                    transition: "opacity 0.15s ease",
-                                }}
-                            >
-                                Add Signature
-                            </button>
-                        </div>
+                        <button
+                            type="button"
+                            className="client-sign-btn-primary"
+                            disabled={!acknowledged}
+                            onClick={() => setStep("create-signature")}
+                        >
+                            Add Signature
+                        </button>
                     </div>
                 )}
 
                 {/* MODAL 2 & 3: Add Signature — Draw Mode & Type Mode */}
                 {step === "create-signature" && (
-                    <div>
-                        <h2
-                            id="modal-header-title"
-                            style={{
-                                fontSize: "17px",
-                                fontWeight: 700,
-                                color: "#0f172a",
-                                margin: "0 0 16px 0",
-                            }}
-                        >
-                            Add Signature
-                        </h2>
-
+                    <div className="client-sign-inner-card">
                         {/* Segmented Mode Selector */}
-                        <div
-                            style={{
-                                display: "flex",
-                                padding: "3px",
-                                backgroundColor: "#ffffff",
-                                border: "1px solid #e2e8f0",
-                                borderRadius: "10px",
-                                marginBottom: "16px",
-                            }}
-                        >
+                        <div className="client-sign-tab-container">
                             <button
                                 type="button"
+                                className={`client-sign-tab-btn ${mode === "draw" ? "active" : ""}`}
                                 onClick={() => setMode("draw")}
-                                style={{
-                                    flex: 1,
-                                    padding: "8px 0",
-                                    border: "none",
-                                    borderRadius: "7px",
-                                    fontSize: "13px",
-                                    fontWeight: mode === "draw" ? 600 : 500,
-                                    backgroundColor: mode === "draw" ? "#eff6ff" : "transparent",
-                                    color: mode === "draw" ? "#2563eb" : "#64748b",
-                                    cursor: "pointer",
-                                    transition: "all 0.15s ease",
-                                }}
                             >
                                 Draw
                             </button>
 
                             <button
                                 type="button"
+                                className={`client-sign-tab-btn ${mode === "type" ? "active" : ""}`}
                                 onClick={() => setMode("type")}
-                                style={{
-                                    flex: 1,
-                                    padding: "8px 0",
-                                    border: "none",
-                                    borderRadius: "7px",
-                                    fontSize: "13px",
-                                    fontWeight: mode === "type" ? 600 : 500,
-                                    backgroundColor: mode === "type" ? "#eff6ff" : "transparent",
-                                    color: mode === "type" ? "#2563eb" : "#64748b",
-                                    cursor: "pointer",
-                                    transition: "all 0.15s ease",
-                                }}
                             >
                                 Type
                             </button>
@@ -484,44 +354,20 @@ export function DocumentSignModal({
 
                         {/* DRAW MODE CONTENT */}
                         {mode === "draw" && (
-                            <div>
-                                <div
-                                    style={{
-                                        fontSize: "13px",
-                                        color: "#334155",
-                                        fontWeight: 500,
-                                        marginBottom: "8px",
-                                    }}
-                                >
+                            <div style={{ width: "100%" }}>
+                                <div className="client-sign-draw-label">
                                     Draw your signature below.
                                 </div>
 
-                                <div
-                                    style={{
-                                        border: "1px solid #e2e8f0",
-                                        borderRadius: "12px",
-                                        backgroundColor: "#ffffff",
-                                        overflow: "hidden",
-                                        position: "relative",
-                                        height: "150px",
-                                        marginBottom: "20px",
-                                    }}
-                                >
+                                <div className="client-sign-canvas-frame">
                                     <canvas
                                         ref={canvasRef}
-                                        width={500}
-                                        height={200}
+                                        width={672}
+                                        height={284}
                                         onPointerDown={handlePointerDown}
                                         onPointerMove={handlePointerMove}
                                         onPointerUp={handlePointerUp}
                                         onPointerCancel={handlePointerUp}
-                                        style={{
-                                            width: "100%",
-                                            height: "100%",
-                                            display: "block",
-                                            cursor: "crosshair",
-                                            touchAction: "none",
-                                        }}
                                     />
                                 </div>
                             </div>
@@ -529,54 +375,23 @@ export function DocumentSignModal({
 
                         {/* TYPE MODE CONTENT */}
                         {mode === "type" && (
-                            <div>
-                                <div style={{ marginBottom: "12px" }}>
-                                    <input
-                                        type="text"
-                                        placeholder="Type your name here"
-                                        value={typedName}
-                                        onChange={(e) => setTypedName(e.target.value)}
-                                        style={{
-                                            width: "100%",
-                                            boxSizing: "border-box",
-                                            padding: "11px 14px",
-                                            borderRadius: "9px",
-                                            border: "1px solid #e2e8f0",
-                                            fontSize: "14px",
-                                            color: "#0f172a",
-                                            outline: "none",
-                                        }}
-                                    />
-                                </div>
+                            <div style={{ width: "100%" }}>
+                                <input
+                                    type="text"
+                                    className="client-sign-type-input"
+                                    placeholder="Type your name here"
+                                    value={typedName}
+                                    onChange={(e) => setTypedName(e.target.value)}
+                                    autoFocus
+                                />
 
-                                <div
-                                    style={{
-                                        border: "1px solid #e2e8f0",
-                                        borderRadius: "12px",
-                                        backgroundColor: "#ffffff",
-                                        height: "115px",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        padding: "12px 16px",
-                                        marginBottom: "20px",
-                                        textAlign: "center",
-                                    }}
-                                >
+                                <div className="client-sign-type-preview">
                                     {typedName.trim() ? (
-                                        <span
-                                            style={{
-                                                fontFamily: "'Dancing Script', 'Caveat', 'Brush Script MT', cursive, sans-serif",
-                                                fontSize: "30px",
-                                                color: "#0f172a",
-                                                letterSpacing: "0.5px",
-                                                wordBreak: "break-word",
-                                            }}
-                                        >
+                                        <span className="client-sign-cursive-text">
                                             {typedName}
                                         </span>
                                     ) : (
-                                        <span style={{ fontSize: "13px", color: "#94a3b8" }}>
+                                        <span className="client-sign-cursive-placeholder">
                                             Your signature preview will appear here
                                         </span>
                                     )}
@@ -585,316 +400,155 @@ export function DocumentSignModal({
                         )}
 
                         {error && (
-                            <div
-                                style={{
-                                    fontSize: "12px",
-                                    color: "#b91c1c",
-                                    marginBottom: "14px",
-                                }}
-                            >
-                                {error}
+                            <div className="client-sign-error-banner">
+                                <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                                <span>{error}</span>
                             </div>
                         )}
+                    </div>
+                )}
 
-                        {/* Footer Actions */}
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                {step === "create-signature" && (
+                    <div className="client-sign-actions-row" style={{ justifyContent: "space-between" }}>
+                        <button
+                            type="button"
+                            className="client-sign-btn-clear"
+                            onClick={handleClear}
+                            disabled={isSubmitting}
+                        >
+                            Clear
+                        </button>
+
+                        <div className="client-sign-right-btn-group">
                             <button
                                 type="button"
-                                onClick={handleClear}
-                                style={{
-                                    padding: "9px 18px",
-                                    borderRadius: "8px",
-                                    border: "1px solid #e2e8f0",
-                                    backgroundColor: "#ffffff",
-                                    color: "#334155",
-                                    fontSize: "13px",
-                                    fontWeight: 500,
-                                    cursor: "pointer",
-                                }}
+                                className="client-sign-btn-cancel"
+                                onClick={() => setStep("acknowledgement")}
+                                disabled={isSubmitting}
                             >
-                                Clear
+                                Cancel
                             </button>
 
-                            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                <button
-                                    type="button"
-                                    onClick={() => setStep("acknowledgement")}
-                                    style={{
-                                        padding: "9px 18px",
-                                        borderRadius: "8px",
-                                        border: "1px solid #e2e8f0",
-                                        backgroundColor: "#ffffff",
-                                        color: "#334155",
-                                        fontSize: "13px",
-                                        fontWeight: 500,
-                                        cursor: "pointer",
-                                    }}
-                                >
-                                    Cancel
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={handleProceedToConfirm}
-                                    disabled={mode === "draw" ? isCanvasEmpty : !typedName.trim()}
-                                    style={{
-                                        padding: "9px 18px",
-                                        borderRadius: "8px",
-                                        border: "none",
-                                        backgroundColor: "#2563eb",
-                                        color: "#ffffff",
-                                        fontSize: "13px",
-                                        fontWeight: 600,
-                                        cursor:
-                                            (mode === "draw" ? !isCanvasEmpty : !!typedName.trim())
-                                                ? "pointer"
-                                                : "not-allowed",
-                                        opacity:
-                                            (mode === "draw" ? !isCanvasEmpty : !!typedName.trim())
-                                                ? 1
-                                                : 0.45,
-                                        transition: "opacity 0.15s ease",
-                                    }}
-                                >
-                                    Add Signature
-                                </button>
-                            </div>
+                            <button
+                                type="button"
+                                className="client-sign-btn-primary"
+                                onClick={handleProceedToConfirm}
+                                disabled={isDraftEmpty}
+                            >
+                                Add Signature
+                            </button>
                         </div>
                     </div>
                 )}
 
-                {/* MODAL 4: Confirm Signature */}
+                {/* MODAL 4: Confirm Signature (Figma Reference 1) */}
                 {step === "confirm-signature" && (
-                    <div>
-                        <h2
-                            id="modal-header-title"
-                            style={{
-                                fontSize: "17px",
-                                fontWeight: 700,
-                                color: "#0f172a",
-                                margin: "0 0 16px 0",
-                            }}
-                        >
-                            Confirm Signature
-                        </h2>
-
-                        {/* Document Information Card */}
-                        <div
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "12px",
-                                padding: "14px 16px",
-                                backgroundColor: "#ffffff",
-                                border: "1px solid #e2e8f0",
-                                borderRadius: "12px",
-                                marginBottom: "16px",
-                            }}
-                        >
-                            <div
-                                style={{
-                                    width: "38px",
-                                    height: "38px",
-                                    borderRadius: "8px",
-                                    backgroundColor: "#f8fafc",
-                                    border: "1px solid #f1f5f9",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    flexShrink: 0,
-                                }}
-                            >
-                                <FileText size={20} color="#64748b" />
+                    <div className="client-sign-inner-card" style={{ height: "auto", minHeight: "236px" }}>
+                        {/* Document Information Table Cell */}
+                        <div className="client-sign-doc-cell">
+                            <div className="client-sign-doc-icon-circle" aria-hidden="true">
+                                <FileText size={20} color="#64748B" />
                             </div>
-                            <div style={{ overflow: "hidden" }}>
-                                <div
-                                    style={{
-                                        fontSize: "14px",
-                                        fontWeight: 600,
-                                        color: "#0f172a",
-                                        whiteSpace: "nowrap",
-                                        overflow: "hidden",
-                                        textOverflow: "ellipsis",
-                                    }}
-                                >
-                                    {document.title}
-                                </div>
-                                <div style={{ fontSize: "12px", color: "#64748b", marginTop: "2px" }}>
-                                    {docReference}
-                                </div>
+                            <div className="client-sign-doc-info">
+                                <h3 className="client-sign-doc-name">{document.title}</h3>
+                                <p className="client-sign-doc-ref">{docReference}</p>
                             </div>
                         </div>
 
-                        {/* Signature Preview Panel */}
-                        <div
-                            style={{
-                                border: "1px solid #e2e8f0",
-                                borderRadius: "12px",
-                                backgroundColor: "#ffffff",
-                                height: "135px",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                padding: "12px 16px",
-                                marginBottom: "20px",
-                            }}
-                        >
+                        {/* Signature Preview Panel: Frame 13 (336x118px) */}
+                        <div className="client-sign-preview-frame">
                             {mode === "draw" && drawDataUrl ? (
                                 <img
                                     src={drawDataUrl}
                                     alt="Your drawn signature"
                                     style={{
-                                        maxHeight: "100px",
+                                        maxHeight: "88px",
                                         maxWidth: "100%",
                                         objectFit: "contain",
                                     }}
                                 />
-                            ) : (
-                                <span
-                                    style={{
-                                        fontFamily: "'Dancing Script', 'Caveat', 'Brush Script MT', cursive, sans-serif",
-                                        fontSize: "30px",
-                                        color: "#0f172a",
-                                        wordBreak: "break-word",
-                                    }}
-                                >
+                            ) : mode === "type" && typedName.trim() ? (
+                                <span className="client-sign-cursive-text">
                                     {typedName}
+                                </span>
+                            ) : (
+                                <span style={{ fontFamily: "Inter, sans-serif", fontSize: "14px", color: "#64748B" }}>
+                                    Your signature preview will appear here
                                 </span>
                             )}
                         </div>
 
                         {error && (
-                            <div
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "8px",
-                                    padding: "10px 12px",
-                                    borderRadius: "8px",
-                                    backgroundColor: "#fef2f2",
-                                    border: "1px solid #fecaca",
-                                    color: "#b91c1c",
-                                    fontSize: "13px",
-                                    marginBottom: "16px",
-                                }}
-                            >
-                                <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                            <div className="client-sign-error-banner">
+                                <AlertCircle size={15} style={{ flexShrink: 0 }} />
                                 <span>{error}</span>
                             </div>
                         )}
-
-                        {/* Footer Actions */}
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                            <button
-                                type="button"
-                                onClick={() => setStep("create-signature")}
-                                disabled={isSubmitting}
-                                style={{
-                                    padding: "9px 18px",
-                                    borderRadius: "8px",
-                                    border: "1px solid #e2e8f0",
-                                    backgroundColor: "#ffffff",
-                                    color: "#334155",
-                                    fontSize: "13px",
-                                    fontWeight: 500,
-                                    cursor: isSubmitting ? "not-allowed" : "pointer",
-                                }}
-                            >
-                                Back
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={handleConfirmAndSign}
-                                disabled={isSubmitting}
-                                style={{
-                                    padding: "9px 20px",
-                                    borderRadius: "8px",
-                                    border: "none",
-                                    backgroundColor: "#2563eb",
-                                    color: "#ffffff",
-                                    fontSize: "13px",
-                                    fontWeight: 600,
-                                    cursor: isSubmitting ? "not-allowed" : "pointer",
-                                    opacity: isSubmitting ? 0.75 : 1,
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: "8px",
-                                }}
-                            >
-                                {isSubmitting && <Loader2 className="animate-spin" size={15} />}
-                                <span>{isSubmitting ? "Signing..." : "Confirm & Sign"}</span>
-                            </button>
-                        </div>
                     </div>
                 )}
 
-                {/* MODAL 5: Document Signed — Success */}
-                {step === "success" && (
-                    <div style={{ textAlign: "center", padding: "16px 8px 8px 8px" }}>
-                        {/* Large Light-Green Circular Icon */}
-                        <div
-                            style={{
-                                width: "64px",
-                                height: "64px",
-                                borderRadius: "50%",
-                                backgroundColor: "#dcfce7",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                margin: "0 auto 16px auto",
-                            }}
+                {step === "confirm-signature" && (
+                    <div className="client-sign-actions-row" style={{ justifyContent: "space-between" }}>
+                        <button
+                            type="button"
+                            className="client-sign-btn-back"
+                            onClick={() => setStep("create-signature")}
+                            disabled={isSubmitting}
                         >
-                            <Check size={32} color="#16a34a" strokeWidth={2.6} />
+                            Back
+                        </button>
+
+                        <button
+                            type="button"
+                            className="client-sign-btn-confirm"
+                            onClick={handleConfirmAndSign}
+                            disabled={isSubmitDisabled}
+                        >
+                            {isSubmitting ? (
+                                <>
+                                    <Loader2 className="animate-spin" size={15} style={{ marginRight: "6px" }} />
+                                    <span>Signing...</span>
+                                </>
+                            ) : (
+                                "Confirm & Sign"
+                            )}
+                        </button>
+                    </div>
+                )}
+
+                {/* MODAL 5: Document Signed — Success (Figma Reference 2) */}
+                {step === "success" && (
+                    <>
+                        {/* Frame 2147225096: Inner White Success Panel (388x180px) */}
+                        <div className="client-sign-success-panel">
+                            {/* Frame 2147225105: 68x68 Circular Success Icon Box */}
+                            <div className="client-sign-success-icon-box" aria-hidden="true">
+                                <Check size={28} color="#16A34A" strokeWidth={2.8} />
+                            </div>
+
+                            {/* Frame 2147224969: Text Container (320x48px) */}
+                            <div className="client-sign-success-text-box">
+                                <h3 className="client-sign-success-title">
+                                    Document Signed
+                                </h3>
+                                <p className="client-sign-success-subtitle">
+                                    Your signature has been added successfully.
+                                </p>
+                            </div>
                         </div>
 
-                        {/* Heading */}
-                        <h2
-                            id="modal-header-title"
-                            style={{
-                                fontSize: "18px",
-                                fontWeight: 700,
-                                color: "#0f172a",
-                                margin: "0 0 6px 0",
-                            }}
-                        >
-                            Document Signed
-                        </h2>
-
-                        {/* Subtitle */}
-                        <p
-                            style={{
-                                fontSize: "13.5px",
-                                color: "#64748b",
-                                margin: "0 0 24px 0",
-                            }}
-                        >
-                            Your signature has been added successfully.
-                        </p>
-
-                        {/* Done Button */}
+                        {/* Buttons: 388x46px Full-Width Done Button */}
                         <button
                             type="button"
                             onClick={() => {
                                 onSigned(document.id);
                                 onClose();
                             }}
-                            style={{
-                                width: "100%",
-                                padding: "12px",
-                                borderRadius: "9px",
-                                border: "none",
-                                backgroundColor: "#2563eb",
-                                color: "#ffffff",
-                                fontSize: "14px",
-                                fontWeight: 600,
-                                cursor: "pointer",
-                                transition: "background-color 0.15s ease",
-                            }}
+                            className="client-sign-btn-done"
                         >
                             Done
                         </button>
-                    </div>
+                    </>
                 )}
             </div>
         </div>

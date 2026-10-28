@@ -1,18 +1,20 @@
 "use client";
 
-import { useState } from "react";
-import { X, Check, AlertCircle, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { X, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { submitClientBoqDecision } from "@/lib/api/client";
+import "@/app/client/client-redesign.css";
 
 export type BoqReviewAction = "APPROVE" | "REQUEST_MINOR_REVISION" | "REQUEST_MAJOR_REVISION" | "REJECT";
 
-interface ReviewBoqModalProps {
+export interface ReviewBoqModalProps {
     isOpen: boolean;
     onClose: () => void;
     boqId: string;
     boqNumber: string;
     version: string;
     totalAmount: number;
+    projectName?: string;
     onSuccess: (updatedStatus: string) => void;
 }
 
@@ -21,8 +23,35 @@ function formatCurrency(val: number) {
         style: "currency",
         currency: "INR",
         maximumFractionDigits: 0,
-    }).format(val);
+    }).format(val || 0);
 }
+
+const REVIEW_OPTIONS: {
+    action: BoqReviewAction;
+    title: string;
+    desc: string;
+}[] = [
+    {
+        action: "APPROVE",
+        title: "Approve",
+        desc: "I have reviewed the BOQ and approve it as submitted",
+    },
+    {
+        action: "REQUEST_MINOR_REVISION",
+        title: "Revise with Minor Revisions",
+        desc: "The BOQ is generally acceptable, but minor changes are required before approval.",
+    },
+    {
+        action: "REQUEST_MAJOR_REVISION",
+        title: "Revise with Major Revisions",
+        desc: "Significant changes are required before this BOQ can be approved.",
+    },
+    {
+        action: "REJECT",
+        title: "Reject",
+        desc: "I do not approve this BOQ in its current form.",
+    },
+];
 
 export default function ReviewBoqModal({
     isOpen,
@@ -31,6 +60,7 @@ export default function ReviewBoqModal({
     boqNumber,
     version,
     totalAmount,
+    projectName,
     onSuccess,
 }: ReviewBoqModalProps) {
     const [selectedAction, setSelectedAction] = useState<BoqReviewAction>("APPROVE");
@@ -39,6 +69,30 @@ export default function ReviewBoqModal({
     const [reason, setReason] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+    // Reset state when opening
+    useEffect(() => {
+        if (isOpen) {
+            setSelectedAction("APPROVE");
+            setConfirmed(false);
+            setComments("");
+            setReason("");
+            setErrorMessage(null);
+            setIsSubmitting(false);
+        }
+    }, [isOpen]);
+
+    // Handle Escape key
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape" && !isSubmitting) {
+                onClose();
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [isOpen, isSubmitting, onClose]);
 
     if (!isOpen) return null;
 
@@ -100,527 +154,205 @@ export default function ReviewBoqModal({
 
     return (
         <div
-            style={{
-                position: "fixed",
-                inset: 0,
-                zIndex: 9999,
-                backgroundColor: "rgba(15, 23, 42, 0.45)",
-                backdropFilter: "blur(4px)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "20px",
-            }}
-            onClick={(e) => {
-                if (e.target === e.currentTarget && !isSubmitting) onClose();
-            }}
+            className="client-review-modal-backdrop"
+            onClick={onClose}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="review-boq-modal-title"
         >
             <div
-                style={{
-                    backgroundColor: "#ffffff",
-                    borderRadius: "16px",
-                    width: "100%",
-                    maxWidth: "580px",
-                    boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
-                    overflow: "hidden",
-                    display: "flex",
-                    flexDirection: "column",
-                }}
+                className="client-review-modal-dialog"
+                onClick={(e) => e.stopPropagation()}
             >
-                {/* Header */}
-                <div
-                    style={{
-                        padding: "24px 28px 16px 28px",
-                        position: "relative",
-                    }}
-                >
+                {/* Header (Frame 2147225093) */}
+                <div className="client-review-modal-header">
+                    <div className="client-review-header-title-group">
+                        <h2 id="review-boq-modal-title" className="client-review-header-title">
+                            Review BOQ
+                        </h2>
+                        <p className="client-review-header-subtitle">
+                            Please review the BOQ and select an action below.
+                        </p>
+                    </div>
                     <button
                         type="button"
+                        className="client-review-close-btn"
                         onClick={onClose}
                         disabled={isSubmitting}
-                        style={{
-                            position: "absolute",
-                            right: "24px",
-                            top: "24px",
-                            background: "transparent",
-                            border: "none",
-                            color: "#64748b",
-                            cursor: "pointer",
-                            padding: "4px",
-                            borderRadius: "6px",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                        }}
+                        aria-label="Close review dialog"
                     >
                         <X size={20} />
                     </button>
-
-                    <h2
-                        style={{
-                            margin: 0,
-                            fontSize: "20px",
-                            fontWeight: 700,
-                            color: "#0f172a",
-                            lineHeight: "1.3",
-                        }}
-                    >
-                        Review BOQ
-                    </h2>
-                    <p
-                        style={{
-                            margin: "4px 0 0 0",
-                            fontSize: "14px",
-                            color: "#64748b",
-                        }}
-                    >
-                        Please review the BOQ and select an action below.
-                    </p>
                 </div>
 
-                {/* Body Content */}
-                <div
-                    style={{
-                        padding: "0 28px 24px 28px",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "16px",
-                        maxHeight: "calc(85vh - 150px)",
-                        overflowY: "auto",
-                    }}
-                >
-                    {/* Top Summary Box */}
-                    <div
-                        style={{
-                            backgroundColor: "#f8fafc",
-                            border: "1px solid #e2e8f0",
-                            borderRadius: "10px",
-                            padding: "14px 20px",
-                            display: "grid",
-                            gridTemplateColumns: "1.2fr 1fr 1.3fr",
-                            gap: "12px",
-                        }}
-                    >
-                        <div>
-                            <div style={{ fontSize: "11px", fontWeight: 600, color: "#64748b", letterSpacing: "0.04em" }}>
-                                BOQ
+                {/* Inner White Card (Frame 2147225027) */}
+                <div className="client-review-inner-card">
+                    {/* Metadata Context Bar (Frame 12) */}
+                    <div className="client-review-context-box">
+                        <div className="client-review-context-row">
+                            <div className="client-review-context-col">
+                                <span className="client-review-context-label">BOQ</span>
+                                <span className="client-review-context-val">{boqNumber}</span>
                             </div>
-                            <div style={{ fontSize: "15px", fontWeight: 700, color: "#0f172a", marginTop: "2px" }}>
-                                {boqNumber}
+
+                            <div className="client-review-context-divider" />
+
+                            <div className="client-review-context-col">
+                                <span className="client-review-context-label">VERSION</span>
+                                <span className="client-review-context-val">{version}</span>
                             </div>
-                        </div>
-                        <div>
-                            <div style={{ fontSize: "11px", fontWeight: 600, color: "#64748b", letterSpacing: "0.04em" }}>
-                                VERSION
-                            </div>
-                            <div style={{ fontSize: "15px", fontWeight: 700, color: "#0f172a", marginTop: "2px" }}>
-                                {version}
-                            </div>
-                        </div>
-                        <div>
-                            <div style={{ fontSize: "11px", fontWeight: 600, color: "#64748b", letterSpacing: "0.04em" }}>
-                                TOTAL AMOUNT
-                            </div>
-                            <div style={{ fontSize: "15px", fontWeight: 700, color: "#0f172a", marginTop: "2px" }}>
-                                {formatCurrency(totalAmount)}
+
+                            <div className="client-review-context-divider" />
+
+                            <div className="client-review-context-col">
+                                <span className="client-review-context-label">TOTAL AMOUNT</span>
+                                <span className="client-review-context-val">{formatCurrency(totalAmount)}</span>
                             </div>
                         </div>
                     </div>
 
-                    {/* Section Label */}
-                    <div>
-                        <div
-                            style={{
-                                fontSize: "11px",
-                                fontWeight: 700,
-                                color: "#64748b",
-                                letterSpacing: "0.06em",
-                                textTransform: "uppercase",
-                                marginBottom: "10px",
-                            }}
-                        >
-                            CHOOSE ONE ACTION
-                        </div>
-
-                        {/* 4 Action Cards */}
-                        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                            {/* Option 1: Approve */}
-                            <div
-                                onClick={() => setSelectedAction("APPROVE")}
-                                style={{
-                                    border: isApprove ? "1.5px solid #2563eb" : "1px solid #e2e8f0",
-                                    backgroundColor: isApprove ? "#f8faff" : "#ffffff",
-                                    borderRadius: "10px",
-                                    padding: "14px 18px",
-                                    cursor: "pointer",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    transition: "all 0.15s ease",
-                                }}
-                            >
-                                <div>
-                                    <div style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a" }}>
-                                        Approve
-                                    </div>
-                                    <div style={{ fontSize: "12px", color: "#64748b", marginTop: "2px" }}>
-                                        I have reviewed the BOQ and approve it as submitted
-                                    </div>
-                                </div>
-                                <div
-                                    style={{
-                                        width: "20px",
-                                        height: "20px",
-                                        borderRadius: "50%",
-                                        border: isApprove ? "none" : "1.5px solid #cbd5e1",
-                                        backgroundColor: isApprove ? "#2563eb" : "transparent",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        flexShrink: 0,
-                                        marginLeft: "12px",
-                                    }}
-                                >
-                                    {isApprove && <Check size={13} color="#ffffff" strokeWidth={3} />}
-                                </div>
+                    {/* Error Banner */}
+                    {errorMessage && (
+                        <div className="client-banner-error" role="alert" style={{ margin: 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                <AlertCircle size={16} />
+                                <span>{errorMessage}</span>
                             </div>
-
-                            {/* Option 2: Minor Revisions */}
-                            <div
-                                onClick={() => setSelectedAction("REQUEST_MINOR_REVISION")}
-                                style={{
-                                    border: isMinor ? "1.5px solid #2563eb" : "1px solid #e2e8f0",
-                                    backgroundColor: isMinor ? "#f8faff" : "#ffffff",
-                                    borderRadius: "10px",
-                                    padding: "14px 18px",
-                                    cursor: "pointer",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    transition: "all 0.15s ease",
-                                }}
-                            >
-                                <div>
-                                    <div style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a" }}>
-                                        Revise with Minor Revisions
-                                    </div>
-                                    <div style={{ fontSize: "12px", color: "#64748b", marginTop: "2px" }}>
-                                        The BOQ is generally acceptable, but minor changes are required before approval.
-                                    </div>
-                                </div>
-                                <div
-                                    style={{
-                                        width: "20px",
-                                        height: "20px",
-                                        borderRadius: "50%",
-                                        border: isMinor ? "none" : "1.5px solid #cbd5e1",
-                                        backgroundColor: isMinor ? "#2563eb" : "transparent",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        flexShrink: 0,
-                                        marginLeft: "12px",
-                                    }}
-                                >
-                                    {isMinor && <Check size={13} color="#ffffff" strokeWidth={3} />}
-                                </div>
-                            </div>
-
-                            {/* Option 3: Major Revisions */}
-                            <div
-                                onClick={() => setSelectedAction("REQUEST_MAJOR_REVISION")}
-                                style={{
-                                    border: isMajor ? "1.5px solid #2563eb" : "1px solid #e2e8f0",
-                                    backgroundColor: isMajor ? "#f8faff" : "#ffffff",
-                                    borderRadius: "10px",
-                                    padding: "14px 18px",
-                                    cursor: "pointer",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    transition: "all 0.15s ease",
-                                }}
-                            >
-                                <div>
-                                    <div style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a" }}>
-                                        Revise with Major Revisions
-                                    </div>
-                                    <div style={{ fontSize: "12px", color: "#64748b", marginTop: "2px" }}>
-                                        Significant changes are required before this BOQ can be approved.
-                                    </div>
-                                </div>
-                                <div
-                                    style={{
-                                        width: "20px",
-                                        height: "20px",
-                                        borderRadius: "50%",
-                                        border: isMajor ? "none" : "1.5px solid #cbd5e1",
-                                        backgroundColor: isMajor ? "#2563eb" : "transparent",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        flexShrink: 0,
-                                        marginLeft: "12px",
-                                    }}
-                                >
-                                    {isMajor && <Check size={13} color="#ffffff" strokeWidth={3} />}
-                                </div>
-                            </div>
-
-                            {/* Option 4: Reject */}
-                            <div
-                                onClick={() => setSelectedAction("REJECT")}
-                                style={{
-                                    border: isReject ? "1.5px solid #dc2626" : "1px solid #e2e8f0",
-                                    backgroundColor: isReject ? "#fef2f2" : "#ffffff",
-                                    borderRadius: "10px",
-                                    padding: "14px 18px",
-                                    cursor: "pointer",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    transition: "all 0.15s ease",
-                                }}
-                            >
-                                <div>
-                                    <div style={{ fontSize: "14px", fontWeight: 600, color: isReject ? "#b91c1c" : "#0f172a" }}>
-                                        Reject
-                                    </div>
-                                    <div style={{ fontSize: "12px", color: "#64748b", marginTop: "2px" }}>
-                                        I do not approve this BOQ in its current form.
-                                    </div>
-                                </div>
-                                <div
-                                    style={{
-                                        width: "20px",
-                                        height: "20px",
-                                        borderRadius: "50%",
-                                        border: isReject ? "none" : "1.5px solid #cbd5e1",
-                                        backgroundColor: isReject ? "#dc2626" : "transparent",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        flexShrink: 0,
-                                        marginLeft: "12px",
-                                    }}
-                                >
-                                    {isReject && <Check size={13} color="#ffffff" strokeWidth={3} />}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Contextual Forms */}
-                    {isApprove && (
-                        <div
-                            style={{
-                                border: "1px solid #e2e8f0",
-                                borderRadius: "10px",
-                                padding: "12px 16px",
-                                backgroundColor: "#ffffff",
-                            }}
-                        >
-                            <label
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "10px",
-                                    cursor: "pointer",
-                                    userSelect: "none",
-                                    fontSize: "13px",
-                                    color: "#1e293b",
-                                    fontWeight: 500,
-                                }}
-                            >
-                                <input
-                                    type="checkbox"
-                                    checked={confirmed}
-                                    onChange={(e) => setConfirmed(e.target.checked)}
-                                    style={{
-                                        width: "16px",
-                                        height: "16px",
-                                        accentColor: "#2563eb",
-                                        cursor: "pointer",
-                                    }}
-                                />
-                                <span>I confirm that I have reviewed this BOQ and approve it as submitted.</span>
-                            </label>
                         </div>
                     )}
 
+                    {/* Choose One Action Section (Frame 2147225386) */}
+                    <div className="client-review-actions-section">
+                        <h3 className="client-review-actions-heading">CHOOSE ONE ACTION</h3>
+
+                        <div
+                            className="client-review-options-list"
+                            role="radiogroup"
+                            aria-label="Choose one action"
+                        >
+                            {REVIEW_OPTIONS.map((opt) => {
+                                const isSelected = selectedAction === opt.action;
+                                return (
+                                    <div
+                                        key={opt.action}
+                                        role="radio"
+                                        aria-checked={isSelected}
+                                        tabIndex={0}
+                                        onClick={() => {
+                                            if (!isSubmitting) setSelectedAction(opt.action);
+                                        }}
+                                        onKeyDown={(e) => {
+                                            if (isSubmitting) return;
+                                            if (e.key === "Enter" || e.key === " ") {
+                                                e.preventDefault();
+                                                setSelectedAction(opt.action);
+                                            }
+                                        }}
+                                        className={`client-review-option-card ${isSelected ? "selected" : ""}`}
+                                    >
+                                        <div className="client-review-option-text-group">
+                                            <h4 className="client-review-option-title">{opt.title}</h4>
+                                            <p className="client-review-option-subtitle">{opt.desc}</p>
+                                        </div>
+                                        <div className="client-review-option-indicator">
+                                            {isSelected ? (
+                                                <CheckCircle2 size={22} color="#2563EB" />
+                                            ) : (
+                                                <div className="client-review-radio-circle" />
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Confirmation Checkbox Row (Frame 2147225087) */}
+                    {isApprove && (
+                        <label className="client-review-confirm-row">
+                            <input
+                                type="checkbox"
+                                checked={confirmed}
+                                onChange={(e) => setConfirmed(e.target.checked)}
+                                className="client-review-confirm-checkbox"
+                                disabled={isSubmitting}
+                            />
+                            <span className="client-review-confirm-text">
+                                I confirm that I have reviewed this BOQ and approve it as submitted.
+                            </span>
+                        </label>
+                    )}
+
+                    {/* Conditional feedback input for Revisions */}
                     {(isMinor || isMajor) && (
-                        <div>
-                            <label
-                                style={{
-                                    display: "block",
-                                    fontSize: "13px",
-                                    fontWeight: 600,
-                                    color: "#0f172a",
-                                    marginBottom: "6px",
-                                }}
-                            >
-                                Revision Comments
+                        <div className="client-review-feedback-group">
+                            <label className="client-review-feedback-label">
+                                Requested Changes <span style={{ color: "#DC2626" }}>*</span>
                             </label>
                             <textarea
+                                className="client-review-textarea"
+                                rows={3}
+                                placeholder="Detail the rooms, categories, or items you would like changed..."
                                 value={comments}
                                 onChange={(e) => setComments(e.target.value)}
-                                placeholder={
-                                    isMinor
-                                        ? "Please describe the minor revisions required..."
-                                        : "Please describe the major revisions required..."
-                                }
-                                rows={4}
-                                style={{
-                                    width: "100%",
-                                    padding: "10px 14px",
-                                    borderRadius: "8px",
-                                    border: "1px solid #cbd5e1",
-                                    fontSize: "13px",
-                                    color: "#0f172a",
-                                    outline: "none",
-                                    resize: "vertical",
-                                    boxSizing: "border-box",
-                                    fontFamily: "inherit",
-                                }}
+                                disabled={isSubmitting}
                             />
                         </div>
                     )}
 
+                    {/* Conditional feedback input for Rejection */}
                     {isReject && (
-                        <div>
-                            <label
-                                style={{
-                                    display: "block",
-                                    fontSize: "13px",
-                                    fontWeight: 600,
-                                    color: "#0f172a",
-                                    marginBottom: "6px",
-                                }}
-                            >
-                                Rejection Reason
+                        <div className="client-review-feedback-group">
+                            <label className="client-review-feedback-label">
+                                Rejection Reason <span style={{ color: "#DC2626" }}>*</span>
                             </label>
                             <textarea
+                                className="client-review-textarea"
+                                rows={3}
+                                placeholder="Please explain why this BOQ was declined..."
                                 value={reason}
                                 onChange={(e) => setReason(e.target.value)}
-                                placeholder="Please explain why this BOQ is being rejected..."
-                                rows={4}
-                                style={{
-                                    width: "100%",
-                                    padding: "10px 14px",
-                                    borderRadius: "8px",
-                                    border: "1px solid #cbd5e1",
-                                    fontSize: "13px",
-                                    color: "#0f172a",
-                                    outline: "none",
-                                    resize: "vertical",
-                                    boxSizing: "border-box",
-                                    fontFamily: "inherit",
-                                }}
+                                disabled={isSubmitting}
                             />
-                        </div>
-                    )}
-
-                    {/* Error Notice */}
-                    {errorMessage && (
-                        <div
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                                padding: "10px 14px",
-                                backgroundColor: "#fef2f2",
-                                border: "1px solid #fecaca",
-                                borderRadius: "8px",
-                                color: "#b91c1c",
-                                fontSize: "13px",
-                            }}
-                        >
-                            <AlertCircle size={16} />
-                            <span>{errorMessage}</span>
                         </div>
                     )}
                 </div>
 
-                {/* Footer Controls */}
-                <div
-                    style={{
-                        padding: "16px 28px 24px 28px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        borderTop: "1px solid #f1f5f9",
-                    }}
-                >
+                {/* Footer Actions (Frame 2147225095 bottom) */}
+                <div className="client-review-footer">
                     <button
                         type="button"
+                        className="client-review-btn-back"
                         onClick={onClose}
                         disabled={isSubmitting}
-                        style={{
-                            padding: "8px 18px",
-                            borderRadius: "8px",
-                            backgroundColor: "#f1f5f9",
-                            border: "1px solid #e2e8f0",
-                            color: "#334155",
-                            fontSize: "13px",
-                            fontWeight: 600,
-                            cursor: "pointer",
-                        }}
                     >
                         Back
                     </button>
 
-                    <div style={{ display: "flex", gap: "10px" }}>
+                    <div className="client-review-footer-right">
                         <button
                             type="button"
+                            className="client-review-btn-cancel"
                             onClick={onClose}
                             disabled={isSubmitting}
-                            style={{
-                                padding: "8px 18px",
-                                borderRadius: "8px",
-                                backgroundColor: "#ffffff",
-                                border: "1px solid #cbd5e1",
-                                color: "#475569",
-                                fontSize: "13px",
-                                fontWeight: 600,
-                                cursor: "pointer",
-                            }}
                         >
                             Cancel
                         </button>
-
                         <button
                             type="button"
+                            className={`client-review-btn-submit ${isReject ? "danger" : ""}`}
                             onClick={handleSubmit}
-                            disabled={!canSubmit}
-                            style={{
-                                padding: "8px 20px",
-                                borderRadius: "8px",
-                                backgroundColor: !canSubmit
-                                    ? "#94a3b8"
-                                    : isReject
-                                    ? "#dc2626"
-                                    : "#2563eb",
-                                border: "none",
-                                color: "#ffffff",
-                                fontSize: "13px",
-                                fontWeight: 600,
-                                cursor: canSubmit ? "pointer" : "not-allowed",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "6px",
-                                transition: "background-color 0.15s ease",
-                            }}
+                            disabled={!canSubmit || isSubmitting}
                         >
                             {isSubmitting ? (
                                 <>
-                                    <Loader2 size={15} className="animate-spin" /> Submitting...
+                                    <Loader2 size={16} className="animate-spin" />
+                                    <span>Submitting...</span>
                                 </>
-                            ) : isApprove ? (
-                                "Approve BOQ"
-                            ) : isReject ? (
-                                "Reject BOQ"
                             ) : (
-                                "Submit Revision Request"
+                                <span>
+                                    {isApprove ? "Approve BOQ" : isReject ? "Reject BOQ" : "Submit Revision Request"}
+                                </span>
                             )}
                         </button>
                     </div>

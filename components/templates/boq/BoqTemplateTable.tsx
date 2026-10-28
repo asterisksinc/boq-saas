@@ -94,9 +94,9 @@ export default function BoqTemplateTable({
   };
 
   const formatDateTime = (dateStr?: string | null) => {
-    if (!dateStr) return { date: "6 Aug 2026", time: "10:30 AM" };
+    if (!dateStr) return { date: "—", time: "" };
     const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return { date: "6 Aug 2026", time: "10:30 AM" };
+    if (isNaN(d.getTime())) return { date: "—", time: "" };
     const date = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(d);
     const time = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).format(d);
     return { date, time };
@@ -113,8 +113,7 @@ export default function BoqTemplateTable({
 
   const getTemplateCode = (item: BoqTemplateItem) => {
     if (item.templateCode) return item.templateCode;
-    const cat = (item.category || item.projectType || "BOQ").substring(0, 3).toUpperCase();
-    return `BOQ-${cat}-${item.id.replace(/-/g, "").slice(0, 4).toUpperCase()}`;
+    return "—";
   };
 
   const renderPaginationButtons = () => {
@@ -223,7 +222,7 @@ export default function BoqTemplateTable({
                 const { date, time } = formatDateTime(t.updatedAt || t.createdAt);
                 const displayTags = t.tags?.filter(
                   (tag) => !["active", "draft", "published", "v1.0", "v2.0", "v3.0"].includes(tag.toLowerCase())
-                ).slice(0, 2) || [t.projectType || "Residential", t.category || "Interior"];
+                ).slice(0, 2);
                 const used = getUsedIn(t);
                 const code = getTemplateCode(t);
                 const catClass = getCategoryClass(t.category);

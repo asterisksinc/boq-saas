@@ -12,6 +12,7 @@ import {
     Loader2,
     AlertCircle,
     ChevronLeft,
+    CheckCircle2,
 } from "lucide-react";
 import ClientDashboardRail from "@/components/client/ClientDashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
@@ -24,6 +25,7 @@ import {
     type ClientBoqRoom,
     type ClientBoqCategory,
 } from "@/lib/api/client";
+import "@/app/client/client-redesign.css";
 
 function formatMoney(value: number) {
     return new Intl.NumberFormat("en-IN", {
@@ -37,32 +39,39 @@ function formatNumber(value: number) {
     return new Intl.NumberFormat("en-IN").format(value);
 }
 
-function getStatusBadgeStyle(statusStr?: string) {
+function getStatusBadge(statusStr?: string) {
     const s = (statusStr || "").toLowerCase().replace(/[-_]/g, " ");
     if (s.includes("approved")) {
         return {
-            bg: "#dcfce7",
-            color: "#15803d",
+            className: "client-badge-success",
+            statusKey: "approved",
             label: "APPROVED",
         };
     }
     if (s.includes("revision") || s.includes("changes")) {
         return {
-            bg: "#fef3c7",
-            color: "#b45309",
+            className: "client-badge-warning",
+            statusKey: "revision-requested",
             label: "REVISION REQUESTED",
         };
     }
     if (s.includes("reject")) {
         return {
-            bg: "#fee2e2",
-            color: "#dc2626",
+            className: "client-badge-danger",
+            statusKey: "rejected",
             label: "REJECTED",
         };
     }
+    if (s.includes("draft")) {
+        return {
+            className: "client-badge-pending",
+            statusKey: "draft",
+            label: "DRAFT",
+        };
+    }
     return {
-        bg: "#cbd5e1",
-        color: "#334155",
+        className: "client-badge-pending",
+        statusKey: "yet-to-approve",
         label: "YET TO APPROVE",
     };
 }
@@ -86,23 +95,24 @@ export default function ClientBoqPage() {
     const [total, setTotal] = useState(0);
     const [pendingApprovals, setPendingApprovals] = useState(0);
 
-    // Room table search (Screenshot 2)
+    // Room table search (Screen 2)
     const [roomSearch, setRoomSearch] = useState("");
 
-    // Category items pagination (Screenshot 3)
+    // Category items pagination (Screen 3)
     const [itemsPerPage, setItemsPerPage] = useState(10);
     const [itemPageIndex, setItemPageIndex] = useState(1);
 
     // Dropdown menu state
     const [activeDropdownCardId, setActiveDropdownCardId] = useState<string | null>(null);
 
-    // Review Modal State (Screenshots 4-7)
+    // Review Modal State
     const [reviewModalOpen, setReviewModalOpen] = useState(false);
     const [reviewTargetBoq, setReviewTargetBoq] = useState<{
         id: string;
         boqNumber: string;
         version: string;
         totalAmount: number;
+        projectName?: string;
     } | null>(null);
 
     const loadBoqs = useCallback(async () => {
@@ -164,7 +174,7 @@ export default function ClientBoqPage() {
         setScreen("detail");
     };
 
-    const handleOpenReviewModal = (boqItem?: { id: string; boqNumber: string; version: string; totalAmount: number }) => {
+    const handleOpenReviewModal = (boqItem?: { id: string; boqNumber: string; version: string; totalAmount: number; projectName?: string }) => {
         if (boqItem) {
             setReviewTargetBoq(boqItem);
         } else if (selectedBoq) {
@@ -173,12 +183,14 @@ export default function ClientBoqPage() {
                 boqNumber: selectedBoq.boqNumber,
                 version: selectedBoq.version,
                 totalAmount: selectedBoq.grandTotal,
+                projectName: selectedBoq.projectName,
             });
         }
+        setActiveDropdownCardId(null);
         setReviewModalOpen(true);
     };
 
-    const handleDecisionSuccess = async (newStatus: string) => {
+    const handleDecisionSuccess = async (_newStatus: string) => {
         // Refresh list
         loadBoqs();
         // If viewing detail, reload selectedBoq
@@ -228,14 +240,14 @@ export default function ClientBoqPage() {
     }, [allCategoryItems]);
 
     return (
-        <main className="fig-dashboard boq-dashboard" style={{ backgroundColor: "#e9edf5", minHeight: "100vh" }}>
-            <div className="fig-dashboard-glow" />
+        <main className="client-redesign-shell">
+            <div className="client-bg-glow" />
 
             {/* Left Nav Rail */}
             <ClientDashboardRail current="/client/boq" />
 
-            <div className="fig-dashboard-main" style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-                {/* Header matching Screenshot 1-3 */}
+            <div className="client-main-area">
+                {/* Global Dashboard Header */}
                 <DashboardHeader
                     title="BOQ"
                     hideNew={true}
@@ -246,91 +258,47 @@ export default function ClientBoqPage() {
                 />
 
                 {detailLoading ? (
-                    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
-                        <Loader2 className="animate-spin" size={40} color="#2563EB" />
+                    <div className="client-loading-card">
+                        <Loader2 className="animate-spin" size={36} color="#2563EB" />
+                        <span>Loading BOQ details...</span>
                     </div>
                 ) : screen === "category_items" && selectedBoq && selectedRoom && selectedCategory ? (
                     /* ========================================================================= */
-                    /* SCREEN 3: Room / Category / Item Details (Screenshot 3)                    */
+                    /* SCREEN 3: Room / Category / Item Details                                  */
                     /* ========================================================================= */
-                    <section style={{ padding: "20px 32px 40px 32px", flex: 1 }}>
-                        {/* Breadcrumbs: Bill of Quantities > BOQ-0071 > Master Bedroom */}
-                        <div
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                                marginBottom: "20px",
-                                fontSize: "14px",
-                                color: "#64748b",
-                            }}
-                        >
+                    <section style={{ display: "flex", flexDirection: "column", gap: "16px", width: "100%" }}>
+                        {/* Breadcrumbs (Frame 240) */}
+                        <div className="client-boq-breadcrumbs">
                             <button
                                 type="button"
                                 onClick={handleBackToList}
-                                style={{
-                                    background: "none",
-                                    border: "none",
-                                    color: "#64748b",
-                                    cursor: "pointer",
-                                    padding: 0,
-                                    fontSize: "14px",
-                                }}
+                                className="client-boq-crumb-btn"
                             >
                                 Bill of Quantities
                             </button>
-                            <ChevronRight size={14} color="#94a3b8" />
+                            <ChevronRight size={18} color="#64748B" />
                             <button
                                 type="button"
                                 onClick={handleBackToDetail}
-                                style={{
-                                    background: "none",
-                                    border: "none",
-                                    color: "#64748b",
-                                    cursor: "pointer",
-                                    padding: 0,
-                                    fontSize: "14px",
-                                }}
+                                className="client-boq-crumb-btn"
                             >
                                 {selectedBoq.boqNumber}
                             </button>
-                            <ChevronRight size={14} color="#94a3b8" />
-                            <span style={{ color: "#0f172a", fontWeight: 700 }}>{selectedRoom.name}</span>
+                            <ChevronRight size={18} color="#64748B" />
+                            <span className="client-boq-crumb-current">{selectedRoom.name}</span>
                         </div>
 
-                        {/* 2-Column Layout */}
-                        <div
-                            style={{
-                                display: "grid",
-                                gridTemplateColumns: "240px 1fr",
-                                gap: "20px",
-                                alignItems: "start",
-                            }}
-                        >
-                            {/* Left Panel: Category Navigation */}
-                            <div
-                                style={{
-                                    backgroundColor: "#ffffff",
-                                    borderRadius: "14px",
-                                    border: "1px solid #e2e8f0",
-                                    padding: "20px 16px",
-                                    boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)",
-                                }}
-                            >
-                                <h3
-                                    style={{
-                                        margin: "0 0 16px 0",
-                                        fontSize: "15px",
-                                        fontWeight: 700,
-                                        color: "#0f172a",
-                                        paddingBottom: "12px",
-                                        borderBottom: "1px solid #f1f5f9",
-                                    }}
-                                >
+                        {/* Main 2-Column Room Detail Workspace (Frame 2147225085) */}
+                        <div className="client-room-detail-workspace">
+                            {/* Left Column: Room Category Sidebar (Frame 2147225071) */}
+                            <aside className="client-room-category-sidebar">
+                                <h2 className="client-room-sidebar-title">
                                     {selectedRoom.name}
-                                </h3>
+                                </h2>
 
-                                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                <hr className="client-room-sidebar-divider" />
+
+                                <div className="client-room-category-list">
                                     {selectedRoom.categories.map((cat, idx) => {
                                         const isActive = idx === selectedCategoryIndex;
                                         return (
@@ -341,88 +309,77 @@ export default function ClientBoqPage() {
                                                     setSelectedCategoryIndex(idx);
                                                     setItemPageIndex(1);
                                                 }}
-                                                style={{
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    justifyContent: "space-between",
-                                                    padding: "10px 12px",
-                                                    borderRadius: "8px",
-                                                    border: "none",
-                                                    backgroundColor: isActive ? "#eff6ff" : "transparent",
-                                                    color: isActive ? "#2563eb" : "#334155",
-                                                    cursor: "pointer",
-                                                    textAlign: "left",
-                                                    width: "100%",
-                                                    transition: "background 0.15s ease",
-                                                }}
+                                                className={`client-room-category-btn ${isActive ? "active" : ""}`}
                                             >
-                                                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                                    <Folder size={16} color={isActive ? "#2563eb" : "#94a3b8"} />
-                                                    <span style={{ fontSize: "13px", fontWeight: isActive ? 600 : 500 }}>
-                                                        {cat.name}
-                                                    </span>
+                                                <div className="client-room-category-left">
+                                                    <Folder size={18} color={isActive ? "#2563EB" : "#64748B"} />
+                                                    <span>{cat.name}</span>
                                                 </div>
-                                                <span
-                                                    style={{
-                                                        fontSize: "11px",
-                                                        padding: "2px 8px",
-                                                        borderRadius: "999px",
-                                                        backgroundColor: isActive ? "#dbeafe" : "#f1f5f9",
-                                                        color: isActive ? "#1e40af" : "#64748b",
-                                                        fontWeight: 600,
-                                                    }}
-                                                >
+                                                <span className="client-room-category-chip">
                                                     Item {cat.items.length}
                                                 </span>
                                             </button>
                                         );
                                     })}
                                 </div>
-                            </div>
+                            </aside>
 
-                            {/* Right Panel: Items Table */}
-                            <div
-                                style={{
-                                    backgroundColor: "#ffffff",
-                                    borderRadius: "14px",
-                                    border: "1px solid #e2e8f0",
-                                    boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)",
-                                    overflow: "hidden",
-                                    display: "flex",
-                                    flexDirection: "column",
-                                }}
-                            >
-                                {/* Header */}
-                                <div style={{ padding: "20px 24px 16px 24px" }}>
-                                    <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 700, color: "#0f172a" }}>
-                                        {selectedCategory.name}
-                                    </h2>
-                                    <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "#64748b" }}>
-                                        {selectedRoom.name} · BOQ Section
-                                    </p>
+                            {/* Right Column: Category Item Details (Frame 2147225072) */}
+                            <div className="client-room-items-panel">
+                                {/* Header Section (Frame 2147225198) */}
+                                <div className="client-room-panel-header">
+                                    <div className="client-room-title-group">
+                                        <h1 className="client-room-category-heading">
+                                            {selectedCategory.name}
+                                        </h1>
+                                        <p className="client-room-context-subtitle">
+                                            {selectedRoom.name} • BOQ Section
+                                        </p>
+                                    </div>
+
+                                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                        <button
+                                            type="button"
+                                            onClick={handleBackToDetail}
+                                            className="client-boq-btn-export"
+                                            style={{ height: "40px", padding: "0 14px", fontSize: "13px" }}
+                                        >
+                                            <ArrowLeft size={16} /> Back to Rooms
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => window.open(`/api/v1/client/boqs/${selectedBoq.id}/pdf`, "_blank")}
+                                            className="client-boq-btn-export"
+                                            style={{ height: "40px", padding: "0 14px", fontSize: "13px" }}
+                                        >
+                                            <FileDown size={16} /> Export PDF
+                                        </button>
+                                    </div>
                                 </div>
 
-                                {/* Table */}
-                                <div style={{ overflowX: "auto" }}>
-                                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                <hr className="client-room-panel-divider" />
+
+                                {/* Items Table Container */}
+                                <div className="client-room-table-container">
+                                    <table className="client-room-table">
                                         <thead>
-                                            <tr style={{ backgroundColor: "#eaf0f9", borderBottom: "1px solid #dbeafe" }}>
-                                                <th style={{ width: "32px", padding: "12px 8px", textAlign: "center" }}></th>
-                                                <th style={{ width: "40px", padding: "12px 10px", textAlign: "center", fontSize: "12px", color: "#475569", fontWeight: 600 }}>#</th>
-                                                <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", color: "#475569", fontWeight: 600 }}>ITEM</th>
-                                                <th style={{ width: "80px", padding: "12px 12px", textAlign: "left", fontSize: "12px", color: "#475569", fontWeight: 600 }}>UNIT</th>
-                                                <th style={{ width: "70px", padding: "12px 12px", textAlign: "right", fontSize: "12px", color: "#475569", fontWeight: 600 }}>QTY</th>
-                                                <th style={{ width: "110px", padding: "12px 12px", textAlign: "right", fontSize: "12px", color: "#475569", fontWeight: 600 }}>RATE (₹)</th>
-                                                <th style={{ width: "90px", padding: "12px 12px", textAlign: "right", fontSize: "12px", color: "#475569", fontWeight: 600 }}>WASTE (%)</th>
-                                                <th style={{ width: "80px", padding: "12px 12px", textAlign: "right", fontSize: "12px", color: "#475569", fontWeight: 600 }}>TAX (%)</th>
-                                                <th style={{ width: "120px", padding: "12px 16px", textAlign: "right", fontSize: "12px", color: "#475569", fontWeight: 600 }}>AMOUNT(₹)</th>
-                                                <th style={{ width: "40px", padding: "12px 8px", textAlign: "center" }}></th>
+                                            <tr>
+                                                <th style={{ width: "32px", textAlign: "center" }} />
+                                                <th style={{ width: "32px", textAlign: "center" }}>#</th>
+                                                <th>ITEM</th>
+                                                <th style={{ width: "80px" }}>UNIT</th>
+                                                <th style={{ width: "60px", textAlign: "right" }}>QTY</th>
+                                                <th style={{ width: "110px", textAlign: "right" }}>RATE (₹)</th>
+                                                <th style={{ width: "100px", textAlign: "right" }}>WASTE (%)</th>
+                                                <th style={{ width: "90px", textAlign: "right" }}>TAX (%)</th>
+                                                <th style={{ width: "110px", textAlign: "right" }}>AMOUNT(₹)</th>
+                                                <th style={{ width: "56px", textAlign: "center" }} />
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {paginatedItems.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan={10} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "14px" }}>
+                                                    <td colSpan={10} style={{ padding: "40px", textAlign: "center", color: "#94A3B8", fontSize: "14px" }}>
                                                         No items found in this category.
                                                     </td>
                                                 </tr>
@@ -430,53 +387,48 @@ export default function ClientBoqPage() {
                                                 paginatedItems.map((item, idx) => {
                                                     const rowNum = (itemPageIndex - 1) * itemsPerPage + idx + 1;
                                                     return (
-                                                        <tr
-                                                            key={item.id || idx}
-                                                            style={{
-                                                                borderBottom: "1px solid #f1f5f9",
-                                                                transition: "background 0.15s ease",
-                                                            }}
-                                                        >
-                                                            <td style={{ textAlign: "center", padding: "14px 4px", color: "#cbd5e1" }}>
-                                                                <GripVertical size={14} />
+                                                        <tr key={item.id || idx}>
+                                                            <td style={{ textAlign: "center", color: "#CBD5E1" }}>
+                                                                <GripVertical size={16} color="#B8B9B9" />
                                                             </td>
-                                                            <td style={{ textAlign: "center", padding: "14px 10px", fontSize: "13px", color: "#64748b" }}>
+                                                            <td style={{ textAlign: "center", color: "#64748B", fontSize: "14px" }}>
                                                                 {rowNum}
                                                             </td>
-                                                            <td style={{ padding: "14px 16px" }}>
-                                                                <div style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a" }}>
+                                                            <td>
+                                                                <div className="client-room-item-name">
                                                                     {item.name}
                                                                 </div>
                                                                 {item.description && (
-                                                                    <div style={{ fontSize: "12px", color: "#64748b", marginTop: "2px" }}>
+                                                                    <div className="client-room-item-desc">
                                                                         {item.description}
                                                                     </div>
                                                                 )}
                                                             </td>
-                                                            <td style={{ padding: "14px 12px", fontSize: "13px", color: "#64748b" }}>
+                                                            <td>
                                                                 {item.unit || "Nos"}
                                                             </td>
-                                                            <td style={{ padding: "14px 12px", textAlign: "right", fontSize: "13px", color: "#0f172a", fontWeight: 500 }}>
+                                                            <td style={{ textAlign: "right" }}>
                                                                 {item.quantity}
                                                             </td>
-                                                            <td style={{ padding: "14px 12px", textAlign: "right", fontSize: "13px", color: "#0f172a", fontWeight: 600 }}>
+                                                            <td style={{ textAlign: "right", fontWeight: 500, color: "#0F172A" }}>
                                                                 {Number(item.rate).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                             </td>
-                                                            <td style={{ padding: "14px 12px", textAlign: "right", fontSize: "13px", color: "#64748b" }}>
+                                                            <td style={{ textAlign: "right" }}>
                                                                 {item.wastePercent != null ? `${item.wastePercent}%` : "0%"}
                                                             </td>
-                                                            <td style={{ padding: "14px 12px", textAlign: "right", fontSize: "13px", color: "#64748b" }}>
+                                                            <td style={{ textAlign: "right" }}>
                                                                 {item.taxPercent != null ? `${item.taxPercent}%` : "18%"}
                                                             </td>
-                                                            <td style={{ padding: "14px 16px", textAlign: "right", fontSize: "13px", color: "#16a34a", fontWeight: 600 }}>
+                                                            <td className="client-room-table-amount">
                                                                 {Number(item.amount).toLocaleString("en-IN")}
                                                             </td>
-                                                            <td style={{ textAlign: "center", padding: "14px 8px", color: "#94a3b8" }}>
+                                                            <td style={{ textAlign: "center" }}>
                                                                 <button
                                                                     type="button"
-                                                                    style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", padding: "4px" }}
+                                                                    className="client-btn-icon"
+                                                                    aria-label="Item actions"
                                                                 >
-                                                                    <MoreHorizontal size={16} />
+                                                                    <MoreHorizontal size={16} color="#64748B" />
                                                                 </button>
                                                             </td>
                                                         </tr>
@@ -487,76 +439,40 @@ export default function ClientBoqPage() {
                                     </table>
                                 </div>
 
-                                {/* Table Footer Summary Row */}
-                                <div
-                                    style={{
-                                        backgroundColor: "#eff6ff",
-                                        padding: "14px 24px",
-                                        display: "grid",
-                                        gridTemplateColumns: "1fr 140px 180px",
-                                        alignItems: "center",
-                                        borderTop: "1px solid #dbeafe",
-                                    }}
-                                >
-                                    <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e3a8a", textTransform: "uppercase" }}>
+                                {/* Table Total Summary Bar (Frame 63) */}
+                                <div className="client-room-table-total-bar">
+                                    <div className="client-room-total-label">
                                         TOTAL ({totalCategoryItemsCount} ITEMS)
                                     </div>
-                                    <div style={{ textAlign: "right", fontSize: "13px", fontWeight: 700, color: "#1e3a8a" }}>
-                                        {formatNumber(categoryTotalQty)}
-                                    </div>
-                                    <div style={{ textAlign: "right", fontSize: "14px", fontWeight: 700, color: "#1e3a8a" }}>
-                                        ₹{formatNumber(categoryTotalAmount)}
+                                    <div className="client-room-total-values">
+                                        <span>Qty: {formatNumber(categoryTotalQty)}</span>
+                                        <span>₹{formatNumber(categoryTotalAmount)}</span>
                                     </div>
                                 </div>
 
-                                {/* Pagination and Page size */}
-                                <div
-                                    style={{
-                                        padding: "16px 24px",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "space-between",
-                                        borderTop: "1px solid #f1f5f9",
-                                        fontSize: "13px",
-                                        color: "#64748b",
-                                    }}
-                                >
-                                    <div>Total Items: {totalCategoryItemsCount}</div>
+                                {/* Pagination Bar (Frame 2147225166) */}
+                                <div className="client-room-pagination-bar">
+                                    <div className="client-room-pagination-count">
+                                        Total Items: {totalCategoryItemsCount}
+                                    </div>
 
-                                    {/* Pagination Controls */}
-                                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                    <div className="client-room-pagination-pages">
                                         <button
                                             type="button"
+                                            className="client-room-page-btn"
                                             disabled={itemPageIndex <= 1}
                                             onClick={() => setItemPageIndex((p) => Math.max(1, p - 1))}
-                                            style={{
-                                                padding: "4px 8px",
-                                                borderRadius: "6px",
-                                                border: "1px solid #e2e8f0",
-                                                background: "#ffffff",
-                                                cursor: itemPageIndex <= 1 ? "not-allowed" : "pointer",
-                                                opacity: itemPageIndex <= 1 ? 0.5 : 1,
-                                            }}
+                                            aria-label="Previous Page"
                                         >
-                                            <ChevronLeft size={14} />
+                                            <ChevronLeft size={16} />
                                         </button>
 
                                         {Array.from({ length: totalCategoryPages }, (_, i) => i + 1).map((pNum) => (
                                             <button
                                                 key={pNum}
                                                 type="button"
+                                                className={`client-room-page-btn ${pNum === itemPageIndex ? "active" : ""}`}
                                                 onClick={() => setItemPageIndex(pNum)}
-                                                style={{
-                                                    width: "28px",
-                                                    height: "28px",
-                                                    borderRadius: "6px",
-                                                    border: pNum === itemPageIndex ? "1px solid #2563eb" : "1px solid #e2e8f0",
-                                                    backgroundColor: pNum === itemPageIndex ? "#eff6ff" : "#ffffff",
-                                                    color: pNum === itemPageIndex ? "#2563eb" : "#334155",
-                                                    fontWeight: pNum === itemPageIndex ? 700 : 500,
-                                                    fontSize: "12px",
-                                                    cursor: "pointer",
-                                                }}
                                             >
                                                 {pNum}
                                             </button>
@@ -564,38 +480,23 @@ export default function ClientBoqPage() {
 
                                         <button
                                             type="button"
+                                            className="client-room-page-btn"
                                             disabled={itemPageIndex >= totalCategoryPages}
                                             onClick={() => setItemPageIndex((p) => Math.min(totalCategoryPages, p + 1))}
-                                            style={{
-                                                padding: "4px 8px",
-                                                borderRadius: "6px",
-                                                border: "1px solid #e2e8f0",
-                                                background: "#ffffff",
-                                                cursor: itemPageIndex >= totalCategoryPages ? "not-allowed" : "pointer",
-                                                opacity: itemPageIndex >= totalCategoryPages ? 0.5 : 1,
-                                            }}
+                                            aria-label="Next Page"
                                         >
-                                            <ChevronRight size={14} />
+                                            <ChevronRight size={16} />
                                         </button>
                                     </div>
 
-                                    {/* Show per page */}
-                                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                    <div className="client-room-per-page">
                                         <span>Show per Page:</span>
                                         <select
+                                            className="client-room-per-page-select"
                                             value={itemsPerPage}
                                             onChange={(e) => {
                                                 setItemsPerPage(Number(e.target.value));
                                                 setItemPageIndex(1);
-                                            }}
-                                            style={{
-                                                padding: "4px 8px",
-                                                borderRadius: "6px",
-                                                border: "1px solid #cbd5e1",
-                                                fontSize: "12px",
-                                                color: "#334155",
-                                                outline: "none",
-                                                background: "#ffffff",
                                             }}
                                         >
                                             <option value={10}>10</option>
@@ -609,372 +510,244 @@ export default function ClientBoqPage() {
                     </section>
                 ) : screen === "detail" && selectedBoq ? (
                     /* ========================================================================= */
-                    /* SCREEN 2: Individual BOQ Overview (Screenshot 2)                          */
+                    /* SCREEN 2: Individual BOQ Overview (Figma CSS Quick Mock Reference)         */
                     /* ========================================================================= */
-                    <section style={{ padding: "20px 32px 40px 32px", flex: 1 }}>
-                        {/* Breadcrumbs */}
-                        <div
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                                marginBottom: "16px",
-                                fontSize: "14px",
-                                color: "#64748b",
-                            }}
-                        >
+                    <section style={{ display: "flex", flexDirection: "column", gap: "16px", width: "100%" }}>
+                        {/* Breadcrumbs (Frame 240) */}
+                        <div className="client-boq-breadcrumbs">
                             <button
                                 type="button"
                                 onClick={handleBackToList}
-                                style={{
-                                    background: "none",
-                                    border: "none",
-                                    color: "#64748b",
-                                    cursor: "pointer",
-                                    padding: 0,
-                                    fontSize: "14px",
-                                }}
+                                className="client-boq-crumb-btn"
                             >
                                 Bill of Quantities
                             </button>
-                            <ChevronRight size={14} color="#94a3b8" />
-                            <span style={{ color: "#0f172a", fontWeight: 700 }}>{selectedBoq.boqNumber}</span>
+                            <ChevronRight size={18} color="#64748B" />
+                            <span className="client-boq-crumb-current">{selectedBoq.boqNumber}</span>
                         </div>
 
-                        {/* Top BOQ Header Card */}
-                        <div
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                marginBottom: "24px",
-                                flexWrap: "wrap",
-                                gap: "16px",
-                            }}
-                        >
-                            <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
+                        {/* Top BOQ Identity & Action Row (Frame 2147225066) */}
+                        <div className="client-boq-detail-header-row">
+                            <div className="client-boq-detail-identity">
                                 <button
                                     type="button"
                                     onClick={handleBackToList}
-                                    style={{
-                                        background: "none",
-                                        border: "none",
-                                        cursor: "pointer",
-                                        padding: "4px",
-                                        color: "#0f172a",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        marginTop: "4px",
-                                    }}
+                                    className="client-boq-back-circle-btn"
+                                    aria-label="Back to BOQ list"
                                 >
-                                    <ArrowLeft size={22} />
+                                    <ArrowLeft size={18} />
                                 </button>
-                                <div>
-                                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                        <h1 style={{ margin: 0, fontSize: "22px", fontWeight: 700, color: "#0f172a" }}>
+                                <div className="client-boq-detail-title-group">
+                                    <div className="client-boq-detail-num-row">
+                                        <h1 className="client-boq-detail-title">
                                             {selectedBoq.boqNumber}
                                         </h1>
                                         {(() => {
-                                            const badge = getStatusBadgeStyle(selectedBoq.decisionStatus || selectedBoq.status);
+                                            const badge = getStatusBadge(selectedBoq.decisionStatus || selectedBoq.status);
                                             return (
-                                                <span
-                                                    style={{
-                                                        padding: "4px 10px",
-                                                        borderRadius: "999px",
-                                                        backgroundColor: badge.bg,
-                                                        color: badge.color,
-                                                        fontSize: "11px",
-                                                        fontWeight: 700,
-                                                        letterSpacing: "0.04em",
-                                                    }}
-                                                >
+                                                <span className={`client-boq-detail-status-pill ${badge.statusKey}`}>
                                                     {badge.label}
                                                 </span>
                                             );
                                         })()}
                                     </div>
-                                    <div style={{ fontSize: "13px", color: "#64748b", marginTop: "4px" }}>
-                                        {selectedBoq.projectName} - {selectedBoq.version}
-                                    </div>
+                                    <p className="client-boq-detail-subtitle">
+                                        {selectedBoq.projectName || "Project"} · {selectedBoq.version}
+                                    </p>
                                 </div>
                             </div>
 
-                            {/* Top Right Actions */}
-                            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                            {/* Top Right Actions (Frame 2147225069) */}
+                            <div className="client-boq-detail-actions">
                                 <button
                                     type="button"
                                     onClick={() => window.open(`/api/v1/client/boqs/${selectedBoq.id}/pdf`, "_blank")}
-                                    style={{
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        gap: "6px",
-                                        backgroundColor: "#ffffff",
-                                        border: "1px solid #cbd5e1",
-                                        borderRadius: "8px",
-                                        padding: "8px 16px",
-                                        fontSize: "13px",
-                                        fontWeight: 600,
-                                        color: "#334155",
-                                        cursor: "pointer",
-                                    }}
+                                    className="client-boq-btn-export"
                                 >
-                                    <FileDown size={15} /> Export PDF
+                                    <FileDown size={16} /> Export PDF
                                 </button>
 
-                                <button
-                                    type="button"
-                                    onClick={() => handleOpenReviewModal()}
-                                    style={{
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        gap: "6px",
-                                        backgroundColor: "#2563eb",
-                                        border: "none",
-                                        borderRadius: "8px",
-                                        padding: "8px 18px",
-                                        fontSize: "13px",
-                                        fontWeight: 600,
-                                        color: "#ffffff",
-                                        cursor: "pointer",
-                                    }}
-                                >
-                                    Approve BOQ
-                                </button>
+                                {(() => {
+                                    const isApproved = (selectedBoq.decisionStatus || selectedBoq.status || "").toLowerCase().includes("approved");
+                                    if (isApproved) {
+                                        return (
+                                            <button
+                                                type="button"
+                                                disabled
+                                                className="client-boq-btn-approve approved"
+                                                style={{ opacity: 0.7, cursor: "not-allowed" }}
+                                                title="This BOQ has already been approved"
+                                            >
+                                                <CheckCircle2 size={16} /> Approved
+                                            </button>
+                                        );
+                                    }
+                                    return (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleOpenReviewModal()}
+                                            className="client-boq-btn-approve"
+                                        >
+                                            Approve BOQ
+                                        </button>
+                                    );
+                                })()}
                             </div>
                         </div>
 
-                        {/* Main Grid: Left Rooms Table & Right Summary Panel */}
-                        <div
-                            style={{
-                                display: "grid",
-                                gridTemplateColumns: "1fr 340px",
-                                gap: "24px",
-                                alignItems: "start",
-                            }}
-                        >
-                            {/* Left Rooms Table Container */}
-                            <div
-                                style={{
-                                    backgroundColor: "#ffffff",
-                                    borderRadius: "14px",
-                                    border: "1px solid #e2e8f0",
-                                    boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)",
-                                    overflow: "hidden",
-                                }}
-                            >
-                                {/* Header with Room count and Search */}
-                                <div
-                                    style={{
-                                        padding: "16px 20px",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "space-between",
-                                        borderBottom: "1px solid #f1f5f9",
-                                    }}
-                                >
-                                    <div style={{ fontSize: "15px", fontWeight: 700, color: "#0f172a" }}>
-                                        {selectedBoq.rooms.length} Rooms
+                        {/* Main 2-Column Workspace (Frame 2147225084) */}
+                        <div className="client-boq-detail-workspace">
+                            {/* Left Column: Rooms Table (Frame 2147225085) */}
+                            <div className="client-boq-detail-main-col">
+                                {/* Subhead: Room Count & Glassmorphic Search (Frame 2147225066) */}
+                                <div className="client-boq-detail-subhead">
+                                    <div className="client-boq-room-count">
+                                        {filteredRooms.length} Rooms
                                     </div>
-                                    <div
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            backgroundColor: "#f8fafc",
-                                            border: "1px solid #e2e8f0",
-                                            borderRadius: "8px",
-                                            padding: "6px 12px",
-                                            width: "220px",
-                                        }}
-                                    >
-                                        <Search size={15} color="#94a3b8" style={{ marginRight: "8px" }} />
+                                    <div className="client-boq-detail-search-wrap">
+                                        <div className="client-boq-detail-search-icon-box">
+                                            <Search size={16} color="#475569" />
+                                        </div>
                                         <input
                                             type="text"
                                             placeholder="Search..."
                                             value={roomSearch}
                                             onChange={(e) => setRoomSearch(e.target.value)}
-                                            style={{
-                                                border: "none",
-                                                outline: "none",
-                                                backgroundColor: "transparent",
-                                                width: "100%",
-                                                fontSize: "13px",
-                                                color: "#0f172a",
-                                            }}
+                                            className="client-boq-detail-search-input"
                                         />
                                     </div>
                                 </div>
 
-                                {/* Rooms Table */}
-                                <div style={{ overflowX: "auto" }}>
-                                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                                        <thead>
-                                            <tr style={{ backgroundColor: "#eaf0f9", borderBottom: "1px solid #dbeafe" }}>
-                                                <th style={{ width: "40px", padding: "12px 10px", textAlign: "center", fontSize: "12px", color: "#475569", fontWeight: 600 }}>#</th>
-                                                <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", color: "#475569", fontWeight: 600 }}>ROOM</th>
-                                                <th style={{ width: "80px", padding: "12px 12px", textAlign: "center", fontSize: "12px", color: "#475569", fontWeight: 600 }}>CATEGORY</th>
-                                                <th style={{ width: "130px", padding: "12px 12px", textAlign: "left", fontSize: "12px", color: "#475569", fontWeight: 600 }}>SPEC</th>
-                                                <th style={{ width: "70px", padding: "12px 12px", textAlign: "left", fontSize: "12px", color: "#475569", fontWeight: 600 }}>UNIT</th>
-                                                <th style={{ width: "70px", padding: "12px 12px", textAlign: "center", fontSize: "12px", color: "#475569", fontWeight: 600 }}>ITEMS</th>
-                                                <th style={{ width: "120px", padding: "12px 12px", textAlign: "right", fontSize: "12px", color: "#475569", fontWeight: 600 }}>AMOUNT (₹)</th>
-                                                <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", color: "#475569", fontWeight: 600 }}>DESCRIPTION</th>
-                                                <th style={{ width: "40px", padding: "12px 8px", textAlign: "center" }}></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {filteredRooms.length === 0 ? (
+                                {/* Table Card Container (Frame 2147225072) */}
+                                <div className="client-boq-detail-table-card">
+                                    <div style={{ width: "100%", overflowX: "auto" }}>
+                                        <table className="client-boq-room-table">
+                                            <thead>
                                                 <tr>
-                                                    <td colSpan={9} style={{ padding: "40px", textAlign: "center", color: "#94a3b8", fontSize: "14px" }}>
-                                                        No rooms match your search.
-                                                    </td>
+                                                    <th style={{ width: "44px", textAlign: "center" }}>#</th>
+                                                    <th style={{ width: "160px" }}>ROOM</th>
+                                                    <th style={{ width: "110px" }}>CATEGORY</th>
+                                                    <th style={{ width: "140px" }}>SPEC</th>
+                                                    <th style={{ width: "64px" }}>UNIT</th>
+                                                    <th style={{ width: "70px" }}>ITEMS</th>
+                                                    <th style={{ width: "112px", textAlign: "right" }}>AMOUNT (₹)</th>
+                                                    <th style={{ minWidth: "180px" }}>DESCRIPTION</th>
+                                                    <th style={{ width: "64px", textAlign: "center" }} />
                                                 </tr>
-                                            ) : (
-                                                filteredRooms.map((room, idx) => {
-                                                    const roomItemsCount = room.categories.reduce((acc, c) => acc + c.items.length, 0);
-                                                    const roomAmount = room.categories.reduce(
-                                                        (acc, c) => acc + c.items.reduce((iAcc, it) => iAcc + (Number(it.amount) || 0), 0),
-                                                        0
-                                                    );
-                                                    const firstItem = room.categories[0]?.items[0];
-                                                    const specLabel = firstItem?.description || room.description || "Custom specifications";
-                                                    const unitLabel = firstItem?.unit || "No";
+                                            </thead>
+                                            <tbody>
+                                                {filteredRooms.length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan={9} style={{ padding: "40px", textAlign: "center", color: "#94A3B8", fontSize: "14px" }}>
+                                                            No rooms match your search.
+                                                        </td>
+                                                    </tr>
+                                                ) : (
+                                                    filteredRooms.map((room, idx) => {
+                                                        const roomItemsCount = room.categories.reduce((acc, c) => acc + c.items.length, 0);
+                                                        const roomAmount = room.categories.reduce(
+                                                            (acc, c) => acc + c.items.reduce((iAcc, it) => iAcc + (Number(it.amount) || 0), 0),
+                                                            0
+                                                        );
+                                                        const firstItem = room.categories[0]?.items[0];
+                                                        const specLabel = firstItem?.description || room.description || "Custom specifications";
+                                                        const unitLabel = firstItem?.unit || "No";
+                                                        const roomDesc = room.description || (firstItem ? `${firstItem.name} with specifications` : "Standard room finish");
 
-                                                    return (
-                                                        <tr
-                                                            key={room.id || idx}
-                                                            onClick={() => {
-                                                                const actualIndex = selectedBoq.rooms.findIndex((r) => r.id === room.id);
-                                                                setSelectedRoomIndex(actualIndex >= 0 ? actualIndex : idx);
-                                                                setSelectedCategoryIndex(0);
-                                                                setItemPageIndex(1);
-                                                                setScreen("category_items");
-                                                            }}
-                                                            style={{
-                                                                borderBottom: "1px solid #f1f5f9",
-                                                                cursor: "pointer",
-                                                                transition: "background 0.15s ease",
-                                                            }}
-                                                            onMouseEnter={(e) => {
-                                                                e.currentTarget.style.backgroundColor = "#f8faff";
-                                                            }}
-                                                            onMouseLeave={(e) => {
-                                                                e.currentTarget.style.backgroundColor = "transparent";
-                                                            }}
-                                                        >
-                                                            <td style={{ textAlign: "center", padding: "16px 10px", fontSize: "13px", color: "#64748b" }}>
-                                                                {idx + 1}
-                                                            </td>
-                                                            <td style={{ padding: "16px", fontSize: "14px", fontWeight: 600, color: "#0f172a" }}>
-                                                                {room.name}
-                                                            </td>
-                                                            <td style={{ textAlign: "center", padding: "16px 12px", fontSize: "13px", color: "#334155" }}>
-                                                                {room.categories.length}
-                                                            </td>
-                                                            <td style={{ padding: "16px 12px", fontSize: "13px", color: "#64748b" }}>
-                                                                {specLabel.length > 20 ? `${specLabel.slice(0, 20)}...` : specLabel}
-                                                            </td>
-                                                            <td style={{ padding: "16px 12px", fontSize: "13px", color: "#64748b" }}>
-                                                                {unitLabel}
-                                                            </td>
-                                                            <td style={{ textAlign: "center", padding: "16px 12px", fontSize: "13px", color: "#334155" }}>
-                                                                {roomItemsCount}
-                                                            </td>
-                                                            <td style={{ textAlign: "right", padding: "16px 12px", fontSize: "13px", fontWeight: 600, color: "#0f172a" }}>
-                                                                ₹{formatNumber(roomAmount)}
-                                                            </td>
-                                                            <td style={{ padding: "16px", fontSize: "13px", color: "#64748b" }}>
-                                                                {room.description || (firstItem ? `${firstItem.name} with specifications` : "Standard room finish")}
-                                                            </td>
-                                                            <td style={{ textAlign: "center", padding: "16px 8px", color: "#94a3b8" }}>
-                                                                <MoreHorizontal size={16} />
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })
-                                            )}
-                                        </tbody>
-                                    </table>
+                                                        return (
+                                                            <tr
+                                                                key={room.id || idx}
+                                                                onClick={() => {
+                                                                    const actualIndex = selectedBoq.rooms.findIndex((r) => r.id === room.id);
+                                                                    setSelectedRoomIndex(actualIndex >= 0 ? actualIndex : idx);
+                                                                    setSelectedCategoryIndex(0);
+                                                                    setItemPageIndex(1);
+                                                                    setScreen("category_items");
+                                                                }}
+                                                            >
+                                                                <td style={{ textAlign: "center", width: "44px" }}>
+                                                                    {idx + 1}
+                                                                </td>
+                                                                <td className="primary-text" style={{ width: "160px" }}>
+                                                                    {room.name}
+                                                                </td>
+                                                                <td className="primary-text" style={{ width: "110px" }}>
+                                                                    {room.categories.length}
+                                                                </td>
+                                                                <td style={{ width: "140px" }} title={specLabel}>
+                                                                    {specLabel.length > 20 ? `${specLabel.slice(0, 20)}...` : specLabel}
+                                                                </td>
+                                                                <td style={{ width: "64px" }}>
+                                                                    {unitLabel}
+                                                                </td>
+                                                                <td className="primary-text" style={{ width: "70px" }}>
+                                                                    {roomItemsCount}
+                                                                </td>
+                                                                <td className="primary-text" style={{ textAlign: "right", width: "112px" }}>
+                                                                    ₹{formatNumber(roomAmount)}
+                                                                </td>
+                                                                <td style={{ minWidth: "180px" }} title={roomDesc}>
+                                                                    {roomDesc.length > 40 ? `${roomDesc.slice(0, 40)}...` : roomDesc}
+                                                                </td>
+                                                                <td style={{ textAlign: "center", width: "64px" }}>
+                                                                    <MoreHorizontal size={18} color="#64748B" />
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Right Summary Panel (Screenshot 2) */}
-                            <div
-                                style={{
-                                    backgroundColor: "#ffffff",
-                                    borderRadius: "14px",
-                                    border: "1px solid #e2e8f0",
-                                    padding: "24px",
-                                    boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)",
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    gap: "16px",
-                                }}
-                            >
-                                <div
-                                    style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#64748b",
-                                        letterSpacing: "0.06em",
-                                        textTransform: "uppercase",
-                                    }}
-                                >
-                                    SUMMARY
-                                </div>
+                            {/* Right Column: Financial Summary Panel (Frame 2147225071) */}
+                            <div className="client-boq-summary-panel">
+                                <h3 className="client-boq-summary-title">SUMMARY</h3>
 
-                                <div style={{ display: "flex", flexDirection: "column", gap: "10px", fontSize: "14px" }}>
-                                    <div style={{ display: "flex", justifyContent: "space-between", color: "#64748b" }}>
-                                        <span>Subtotal</span>
-                                        <span style={{ color: "#0f172a", fontWeight: 600 }}>{formatMoney(selectedBoq.subtotal)}</span>
-                                    </div>
-                                    <div style={{ display: "flex", justifyContent: "space-between", color: "#64748b" }}>
-                                        <span>Markup ({selectedBoq.markupPercent}%)</span>
-                                        <span style={{ color: "#0f172a", fontWeight: 600 }}>{formatMoney(selectedBoq.markupAmount)}</span>
-                                    </div>
-                                    <div style={{ display: "flex", justifyContent: "space-between", color: "#64748b" }}>
-                                        <span>GST ({selectedBoq.taxPercent}%)</span>
-                                        <span style={{ color: "#0f172a", fontWeight: 600 }}>{formatMoney(selectedBoq.taxAmount)}</span>
-                                    </div>
+                                <div className="client-boq-summary-divider" />
 
-                                    <div style={{ borderTop: "1px solid #f1f5f9", margin: "6px 0" }} />
-
-                                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "16px", fontWeight: 700 }}>
-                                        <span style={{ color: "#0f172a" }}>Grand Total</span>
-                                        <span style={{ color: "#0f172a" }}>{formatMoney(selectedBoq.grandTotal)}</span>
+                                <div className="client-boq-summary-breakdown">
+                                    <div className="client-boq-summary-row">
+                                        <span className="label">Subtotal</span>
+                                        <span className="val">{formatMoney(selectedBoq.subtotal)}</span>
+                                    </div>
+                                    <div className="client-boq-summary-row">
+                                        <span className="label">Markup ({selectedBoq.markupPercent}%)</span>
+                                        <span className="val">{formatMoney(selectedBoq.markupAmount)}</span>
+                                    </div>
+                                    <div className="client-boq-summary-row">
+                                        <span className="label">GST ({selectedBoq.taxPercent}%)</span>
+                                        <span className="val">{formatMoney(selectedBoq.taxAmount)}</span>
                                     </div>
                                 </div>
 
-                                {/* Metric Box 1: Rooms Covered */}
-                                <div
-                                    style={{
-                                        backgroundColor: "#f8fafc",
-                                        borderRadius: "10px",
-                                        padding: "16px 20px",
-                                        border: "1px solid #f1f5f9",
-                                        marginTop: "8px",
-                                    }}
-                                >
-                                    <div style={{ fontSize: "12px", color: "#64748b", fontWeight: 500 }}>Rooms Covered</div>
-                                    <div style={{ fontSize: "22px", fontWeight: 700, color: "#0f172a", marginTop: "4px" }}>
-                                        {selectedBoq.roomsCovered ?? selectedBoq.rooms.length}
-                                    </div>
+                                <div className="client-boq-summary-divider" />
+
+                                <div className="client-boq-summary-row grand-total">
+                                    <span className="label">Grand Total</span>
+                                    <span className="val">{formatMoney(selectedBoq.grandTotal)}</span>
                                 </div>
 
-                                {/* Metric Box 2: Total Items */}
-                                <div
-                                    style={{
-                                        backgroundColor: "#f8fafc",
-                                        borderRadius: "10px",
-                                        padding: "16px 20px",
-                                        border: "1px solid #f1f5f9",
-                                    }}
-                                >
-                                    <div style={{ fontSize: "12px", color: "#64748b", fontWeight: 500 }}>Items</div>
-                                    <div style={{ fontSize: "22px", fontWeight: 700, color: "#0f172a", marginTop: "4px" }}>
-                                        {selectedBoq.totalItems ??
-                                            selectedBoq.rooms.reduce(
-                                                (acc, r) => acc + r.categories.reduce((cAcc, c) => cAcc + c.items.length, 0),
-                                                0
-                                            )}
+                                {/* Metric Cards (Frame 2147225090) */}
+                                <div className="client-boq-summary-metrics">
+                                    <div className="client-boq-summary-metric-card">
+                                        <div className="client-boq-summary-metric-label">Rooms Covered</div>
+                                        <div className="client-boq-summary-metric-val">
+                                            {selectedBoq.roomsCovered ?? selectedBoq.rooms.length}
+                                        </div>
+                                    </div>
+
+                                    <div className="client-boq-summary-metric-card">
+                                        <div className="client-boq-summary-metric-label">Items</div>
+                                        <div className="client-boq-summary-metric-val">
+                                            {selectedBoq.totalItems ??
+                                                selectedBoq.rooms.reduce(
+                                                    (acc, r) => acc + r.categories.reduce((cAcc, c) => cAcc + c.items.length, 0),
+                                                    0
+                                                )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -982,122 +755,142 @@ export default function ClientBoqPage() {
                     </section>
                 ) : (
                     /* ========================================================================= */
-                    /* SCREEN 1: Client BOQ Listing Overview (Screenshot 1)                      */
+                    /* SCREEN 1: Client BOQ Listing Overview (Figma CSS Quick Mock Reference)   */
                     /* ========================================================================= */
-                    <section style={{ padding: "24px 32px 48px 32px", flex: 1 }}>
-                        {/* Title and summary header matching Screenshot 1 */}
-                        <div style={{ marginBottom: "24px" }}>
-                            <h1 style={{ margin: 0, fontSize: "22px", fontWeight: 700, color: "#0f172a" }}>
-                                Bill of Quantities
-                            </h1>
-                            <p style={{ margin: "4px 0 0 0", fontSize: "14px", color: "#64748b" }}>
-                                {total} BOQs | {pendingApprovals} pending approval
-                            </p>
+                    <section className="client-boq-section">
+                        {/* Heading & Summary (Frame 2147225066 / Frame 2147224969) */}
+                        <div className="client-boq-heading-row">
+                            <div className="client-boq-heading-wrap">
+                                <h1 className="client-boq-title">Bill of Quantities</h1>
+                                <p className="client-boq-subtitle">
+                                    {loading
+                                        ? "Loading BOQs..."
+                                        : `${total} ${total === 1 ? "BOQ" : "BOQs"} | ${pendingApprovals} pending approval`}
+                                </p>
+                            </div>
                         </div>
 
                         {/* Error state */}
                         {error && (
-                            <div
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "10px",
-                                    padding: "14px 18px",
-                                    backgroundColor: "#fef2f2",
-                                    border: "1px solid #fecaca",
-                                    borderRadius: "10px",
-                                    color: "#b91c1c",
-                                    fontSize: "14px",
-                                    marginBottom: "20px",
-                                }}
-                            >
-                                <AlertCircle size={18} />
-                                <span>{error}</span>
+                            <div className="client-banner-error">
+                                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                    <AlertCircle size={16} />
+                                    <span>{error}</span>
+                                </div>
+                                <button type="button" onClick={loadBoqs}>
+                                    Retry
+                                </button>
                             </div>
                         )}
 
                         {loading ? (
-                            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "40vh" }}>
-                                <Loader2 className="animate-spin" size={36} color="#2563EB" />
+                            <div className="client-boq-grid" aria-label="Loading BOQs">
+                                {[1, 2, 3].map((n) => (
+                                    <div key={n} className="client-boq-card" style={{ opacity: 0.7 }}>
+                                        <div className="client-boq-card-header">
+                                            <div style={{ width: "90px", height: "18px", background: "#E2E8F0", borderRadius: "4px" }} />
+                                            <div style={{ width: "80px", height: "18px", background: "#E2E8F0", borderRadius: "9999px" }} />
+                                        </div>
+                                        <div className="client-boq-details-panel">
+                                            <div className="client-boq-meta-container">
+                                                <div className="client-boq-meta-row">
+                                                    <div className="client-boq-meta-cell">
+                                                        <div style={{ width: "60px", height: "12px", background: "#F1F5F9", borderRadius: "3px" }} />
+                                                        <div style={{ width: "80px", height: "14px", background: "#E2E8F0", borderRadius: "3px" }} />
+                                                    </div>
+                                                    <div className="client-boq-meta-cell">
+                                                        <div style={{ width: "80px", height: "12px", background: "#F1F5F9", borderRadius: "3px" }} />
+                                                        <div style={{ width: "70px", height: "14px", background: "#E2E8F0", borderRadius: "3px" }} />
+                                                    </div>
+                                                    <div className="client-boq-meta-cell">
+                                                        <div style={{ width: "65px", height: "12px", background: "#F1F5F9", borderRadius: "3px" }} />
+                                                        <div style={{ width: "75px", height: "14px", background: "#E2E8F0", borderRadius: "3px" }} />
+                                                    </div>
+                                                </div>
+                                                <div className="client-boq-meta-row">
+                                                    <div className="client-boq-meta-cell">
+                                                        <div style={{ width: "50px", height: "12px", background: "#F1F5F9", borderRadius: "3px" }} />
+                                                        <div style={{ width: "30px", height: "14px", background: "#E2E8F0", borderRadius: "3px" }} />
+                                                    </div>
+                                                    <div className="client-boq-meta-cell">
+                                                        <div style={{ width: "45px", height: "12px", background: "#F1F5F9", borderRadius: "3px" }} />
+                                                        <div style={{ width: "25px", height: "14px", background: "#E2E8F0", borderRadius: "3px" }} />
+                                                    </div>
+                                                    <div className="client-boq-meta-cell">
+                                                        <div style={{ width: "40px", height: "12px", background: "#F1F5F9", borderRadius: "3px" }} />
+                                                        <div style={{ width: "35px", height: "14px", background: "#E2E8F0", borderRadius: "3px" }} />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="client-boq-divider" />
+                                            <div className="client-boq-progress-section">
+                                                <div style={{ width: "50px", height: "12px", background: "#F1F5F9", borderRadius: "3px" }} />
+                                                <div className="client-boq-progress-row">
+                                                    <div className="client-boq-progress-track" style={{ background: "#E2E8F0" }} />
+                                                    <div style={{ width: "30px", height: "14px", background: "#F1F5F9", borderRadius: "3px" }} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         ) : boqs.length === 0 ? (
-                            <div
-                                style={{
-                                    backgroundColor: "#ffffff",
-                                    borderRadius: "14px",
-                                    border: "1px solid #e2e8f0",
-                                    padding: "60px 24px",
-                                    textAlign: "center",
-                                }}
-                            >
-                                <p style={{ fontSize: "16px", fontWeight: 600, color: "#0f172a", margin: 0 }}>
-                                    No BOQs available
-                                </p>
-                                <p style={{ fontSize: "14px", color: "#64748b", margin: "6px 0 0 0" }}>
-                                    You do not currently have any BOQs assigned or shared for review.
-                                </p>
-                            </div>
+                            searchQuery ? (
+                                <div className="client-empty-card">
+                                    <AlertCircle size={40} color="#94A3B8" style={{ margin: "0 auto 8px auto" }} />
+                                    <div className="client-empty-title">No matching BOQs</div>
+                                    <p className="client-empty-desc">
+                                        No Bill of Quantities matched &ldquo;{searchQuery}&rdquo;. Try another search term or clear the filter.
+                                    </p>
+                                    <button
+                                        type="button"
+                                        className="client-btn-secondary client-btn-compact"
+                                        onClick={() => setSearchQuery("")}
+                                        style={{ marginTop: "12px" }}
+                                    >
+                                        Clear Search
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="client-empty-card">
+                                    <CheckCircle2 size={40} color="#94A3B8" style={{ margin: "0 auto 8px auto" }} />
+                                    <div className="client-empty-title">No BOQs available</div>
+                                    <p className="client-empty-desc">
+                                        You do not currently have any BOQs assigned or shared for review.
+                                    </p>
+                                </div>
+                            )
                         ) : (
-                            /* Responsive 3-Column Grid of BOQ Cards */
-                            <div
-                                style={{
-                                    display: "grid",
-                                    gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))",
-                                    gap: "20px",
-                                }}
-                            >
+                            /* Responsive 3-Column Grid of BOQ Cards (Frame 2147225083) */
+                            <div className="client-boq-grid">
                                 {boqs.map((item) => {
-                                    const badge = getStatusBadgeStyle(item.decisionStatus || item.status);
-                                    const progressVal = item.progress ?? 68;
+                                    const badge = getStatusBadge(item.decisionStatus || item.status);
+                                    const progressVal = Math.min(
+                                        100,
+                                        Math.max(0, item.progress ?? (badge.label === "APPROVED" ? 100 : 68))
+                                    );
 
                                     return (
                                         <div
                                             key={item.id}
-                                            style={{
-                                                backgroundColor: "#ffffff",
-                                                borderRadius: "14px",
-                                                border: "1px solid #e2e8f0",
-                                                padding: "20px 22px",
-                                                boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)",
-                                                display: "flex",
-                                                flexDirection: "column",
-                                                gap: "18px",
-                                                position: "relative",
-                                                cursor: "pointer",
-                                                transition: "transform 0.15s ease, box-shadow 0.15s ease",
-                                            }}
+                                            className="client-boq-card"
+                                            role="button"
+                                            tabIndex={0}
                                             onClick={() => openBoqDetail(item.id)}
-                                            onMouseEnter={(e) => {
-                                                e.currentTarget.style.boxShadow = "0 6px 16px -2px rgba(0, 0, 0, 0.08)";
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter" || e.key === " ") {
+                                                    e.preventDefault();
+                                                    openBoqDetail(item.id);
+                                                }
                                             }}
-                                            onMouseLeave={(e) => {
-                                                e.currentTarget.style.boxShadow = "0 1px 3px 0 rgba(0, 0, 0, 0.05)";
-                                            }}
+                                            aria-label={`BOQ ${item.boqNumber}, status ${badge.label}`}
                                         >
-                                            {/* Card Top Row: BOQ Number, Status Pill, Three-dot Menu */}
-                                            <div
-                                                style={{
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    justifyContent: "space-between",
-                                                }}
-                                            >
-                                                <div style={{ fontSize: "15px", fontWeight: 700, color: "#0f172a" }}>
-                                                    {item.boqNumber}
-                                                </div>
+                                            {/* Card Top Row: BOQ Identifier, Status Pill, Three-dot Menu (Frame 2147225073) */}
+                                            <div className="client-boq-card-header">
+                                                <h2 className="client-boq-card-id">{item.boqNumber}</h2>
 
-                                                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                                    <span
-                                                        style={{
-                                                            padding: "3px 9px",
-                                                            borderRadius: "999px",
-                                                            backgroundColor: badge.bg,
-                                                            color: badge.color,
-                                                            fontSize: "11px",
-                                                            fontWeight: 700,
-                                                            letterSpacing: "0.04em",
-                                                        }}
-                                                    >
+                                                <div className="client-boq-card-actions">
+                                                    <span className={`client-boq-status-pill ${badge.statusKey}`}>
                                                         {badge.label}
                                                     </span>
 
@@ -1105,77 +898,41 @@ export default function ClientBoqPage() {
                                                     <div
                                                         style={{ position: "relative" }}
                                                         onClick={(e) => e.stopPropagation()}
+                                                        onKeyDown={(e) => e.stopPropagation()}
                                                     >
                                                         <button
                                                             type="button"
+                                                            className="client-boq-dot-btn"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 setActiveDropdownCardId(
                                                                     activeDropdownCardId === item.id ? null : item.id
                                                                 );
                                                             }}
-                                                            style={{
-                                                                background: "none",
-                                                                border: "none",
-                                                                color: "#94a3b8",
-                                                                cursor: "pointer",
-                                                                padding: "4px",
-                                                                display: "flex",
-                                                                alignItems: "center",
-                                                            }}
+                                                            aria-label="BOQ options"
+                                                            title="Options"
                                                         >
                                                             <MoreHorizontal size={18} />
                                                         </button>
 
                                                         {activeDropdownCardId === item.id && (
-                                                            <div
-                                                                style={{
-                                                                    position: "absolute",
-                                                                    right: 0,
-                                                                    top: "26px",
-                                                                    backgroundColor: "#ffffff",
-                                                                    border: "1px solid #e2e8f0",
-                                                                    borderRadius: "10px",
-                                                                    boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
-                                                                    zIndex: 50,
-                                                                    minWidth: "150px",
-                                                                    padding: "6px 0",
-                                                                }}
-                                                            >
+                                                            <div className="client-menu-popover">
                                                                 <button
                                                                     type="button"
+                                                                    className="client-menu-item"
                                                                     onClick={() => {
                                                                         setActiveDropdownCardId(null);
                                                                         openBoqDetail(item.id);
-                                                                    }}
-                                                                    style={{
-                                                                        width: "100%",
-                                                                        textAlign: "left",
-                                                                        padding: "8px 14px",
-                                                                        background: "none",
-                                                                        border: "none",
-                                                                        fontSize: "13px",
-                                                                        color: "#334155",
-                                                                        cursor: "pointer",
                                                                     }}
                                                                 >
                                                                     View BOQ
                                                                 </button>
                                                                 <button
                                                                     type="button"
+                                                                    className="client-menu-item"
                                                                     onClick={() => {
                                                                         setActiveDropdownCardId(null);
                                                                         window.open(`/api/v1/client/boqs/${item.id}/pdf`, "_blank");
-                                                                    }}
-                                                                    style={{
-                                                                        width: "100%",
-                                                                        textAlign: "left",
-                                                                        padding: "8px 14px",
-                                                                        background: "none",
-                                                                        border: "none",
-                                                                        fontSize: "13px",
-                                                                        color: "#334155",
-                                                                        cursor: "pointer",
                                                                     }}
                                                                 >
                                                                     Export PDF
@@ -1183,6 +940,8 @@ export default function ClientBoqPage() {
                                                                 {badge.label !== "APPROVED" && (
                                                                     <button
                                                                         type="button"
+                                                                        className="client-menu-item"
+                                                                        style={{ color: "#2563EB", fontWeight: 600 }}
                                                                         onClick={() => {
                                                                             setActiveDropdownCardId(null);
                                                                             handleOpenReviewModal({
@@ -1191,17 +950,6 @@ export default function ClientBoqPage() {
                                                                                 version: item.version,
                                                                                 totalAmount: item.grandTotal,
                                                                             });
-                                                                        }}
-                                                                        style={{
-                                                                            width: "100%",
-                                                                            textAlign: "left",
-                                                                            padding: "8px 14px",
-                                                                            background: "none",
-                                                                            border: "none",
-                                                                            fontSize: "13px",
-                                                                            color: "#2563eb",
-                                                                            fontWeight: 600,
-                                                                            cursor: "pointer",
                                                                         }}
                                                                     >
                                                                         Review BOQ
@@ -1213,95 +961,77 @@ export default function ClientBoqPage() {
                                                 </div>
                                             </div>
 
-                                            {/* Metadata 2x3 Grid (Screenshot 1) */}
-                                            <div
-                                                style={{
-                                                    display: "grid",
-                                                    gridTemplateColumns: "1.2fr 1fr 1fr",
-                                                    rowGap: "14px",
-                                                    columnGap: "12px",
-                                                }}
-                                            >
-                                                {/* Row 1 */}
-                                                <div>
-                                                    <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 500 }}>
-                                                        Issued by
+                                            {/* Inner Details White Panel (Frame 2147225077) */}
+                                            <div className="client-boq-details-panel">
+                                                <div className="client-boq-meta-container">
+                                                    {/* Row 1: Issued by, Estimated Value, Issued Date (Frame 2147225075) */}
+                                                    <div className="client-boq-meta-row">
+                                                        <div className="client-boq-meta-cell">
+                                                            <span className="client-boq-meta-label">Issued by</span>
+                                                            <span className="client-boq-meta-val" title={item.issuedBy || "Nikhil Oberoi"}>
+                                                                {item.issuedBy || "Nikhil Oberoi"}
+                                                            </span>
+                                                        </div>
+                                                        <div className="client-boq-meta-cell">
+                                                            <span className="client-boq-meta-label">Estimated Value</span>
+                                                            <span
+                                                                className="client-boq-meta-val"
+                                                                title={
+                                                                    item.estimatedAreaValue ||
+                                                                    (item.grandTotal ? formatMoney(item.grandTotal) : "3,200 sqft")
+                                                                }
+                                                            >
+                                                                {item.estimatedAreaValue ||
+                                                                    (item.grandTotal ? formatMoney(item.grandTotal) : "3,200 sqft")}
+                                                            </span>
+                                                        </div>
+                                                        <div className="client-boq-meta-cell">
+                                                            <span className="client-boq-meta-label">Issued Date</span>
+                                                            <span className="client-boq-meta-val" title={item.date || "04 Sep 2026"}>
+                                                                {item.date || "04 Sep 2026"}
+                                                            </span>
+                                                        </div>
                                                     </div>
-                                                    <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a", marginTop: "2px" }}>
-                                                        {item.issuedBy || "Nikhil Oberoi"}
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 500 }}>
-                                                        Estimated Value
-                                                    </div>
-                                                    <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a", marginTop: "2px" }}>
-                                                        {item.estimatedAreaValue || "3.200 sqft"}
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 500 }}>
-                                                        Issued Date
-                                                    </div>
-                                                    <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a", marginTop: "2px" }}>
-                                                        {item.date || "04 Sep 2026"}
+
+                                                    {/* Row 2: Version, Rooms, Items (Frame 2147225076) */}
+                                                    <div className="client-boq-meta-row">
+                                                        <div className="client-boq-meta-cell">
+                                                            <span className="client-boq-meta-label">Version</span>
+                                                            <span className="client-boq-meta-val">{item.version || "v7"}</span>
+                                                        </div>
+                                                        <div className="client-boq-meta-cell">
+                                                            <span className="client-boq-meta-label">Rooms</span>
+                                                            <span className="client-boq-meta-val">{item.roomsCount ?? "8"}</span>
+                                                        </div>
+                                                        <div className="client-boq-meta-cell">
+                                                            <span className="client-boq-meta-label">Items</span>
+                                                            <span className="client-boq-meta-val">{item.itemsCount ?? "142"}</span>
+                                                        </div>
                                                     </div>
                                                 </div>
 
-                                                {/* Row 2 */}
-                                                <div>
-                                                    <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 500 }}>
-                                                        Version
-                                                    </div>
-                                                    <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a", marginTop: "2px" }}>
-                                                        {item.version}
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 500 }}>
-                                                        Rooms
-                                                    </div>
-                                                    <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a", marginTop: "2px" }}>
-                                                        {item.roomsCount}
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 500 }}>
-                                                        Items
-                                                    </div>
-                                                    <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a", marginTop: "2px" }}>
-                                                        {item.itemsCount}
-                                                    </div>
-                                                </div>
-                                            </div>
+                                                {/* Divider Line (Rectangle 40) */}
+                                                <hr className="client-boq-divider" />
 
-                                            {/* Progress Row */}
-                                            <div>
-                                                <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 500, marginBottom: "6px" }}>
-                                                    Progress
-                                                </div>
-                                                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                                    <div
-                                                        style={{
-                                                            flex: 1,
-                                                            height: "6px",
-                                                            borderRadius: "999px",
-                                                            backgroundColor: "#f1f5f9",
-                                                            overflow: "hidden",
-                                                        }}
-                                                    >
+                                                {/* Progress Section (Frame 2147225075) */}
+                                                <div className="client-boq-progress-section">
+                                                    <span className="client-boq-progress-label">Progress</span>
+                                                    <div className="client-boq-progress-row">
                                                         <div
-                                                            style={{
-                                                                width: `${progressVal}%`,
-                                                                height: "100%",
-                                                                backgroundColor: "#f97316",
-                                                                borderRadius: "999px",
-                                                            }}
-                                                        />
+                                                            className="client-boq-progress-track"
+                                                            role="progressbar"
+                                                            aria-valuenow={progressVal}
+                                                            aria-valuemin={0}
+                                                            aria-valuemax={100}
+                                                            aria-label={`Progress: ${progressVal}%`}
+                                                        >
+                                                            <div
+                                                                className="client-boq-progress-fill"
+                                                                style={{ width: `${progressVal}%` }}
+                                                            />
+                                                        </div>
+                                                        <span className="client-boq-progress-text">{progressVal}%</span>
                                                     </div>
-                                                    <span style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 500, minWidth: "28px" }}>
-                                                        {progressVal}%
-                                                    </span>
                                                 </div>
                                             </div>
                                         </div>
@@ -1313,7 +1043,7 @@ export default function ClientBoqPage() {
                 )}
             </div>
 
-            {/* Review BOQ Modal (Screenshots 4-7) */}
+            {/* Review BOQ Modal */}
             {reviewTargetBoq && (
                 <ReviewBoqModal
                     isOpen={reviewModalOpen}
@@ -1322,6 +1052,7 @@ export default function ClientBoqPage() {
                     boqNumber={reviewTargetBoq.boqNumber}
                     version={reviewTargetBoq.version}
                     totalAmount={reviewTargetBoq.totalAmount}
+                    projectName={reviewTargetBoq.projectName}
                     onSuccess={handleDecisionSuccess}
                 />
             )}

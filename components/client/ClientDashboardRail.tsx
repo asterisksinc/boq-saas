@@ -13,6 +13,7 @@ interface ClientNavItem {
 }
 
 const clientNavItems: ClientNavItem[] = [
+    { route: "/client/dashboard", icon: "dashboard-overview-active", label: "Dashboard" },
     { route: "/client/boq", icon: "dashboard-boqs", label: "BOQ" },
     { route: "/client/documents", icon: "dashboard-reports", label: "Documents" },
     { route: "/client/invoices", icon: "dashboard-purchase-orders", label: "Invoices" },
@@ -26,6 +27,9 @@ export default function ClientDashboardRail({ current }: ClientDashboardRailProp
     const isCurrent = (itemRoute: string) => {
         if (current) return current === itemRoute;
         if (!pathname) return false;
+        if (itemRoute === "/client/dashboard") {
+            return pathname === "/client/dashboard" || pathname.startsWith("/client/dashboard/");
+        }
         if (itemRoute === "/client/boq") {
             return pathname === "/client/boq" || pathname.startsWith("/client/boq/") || pathname === "/client/boqs" || pathname.startsWith("/client/boqs/");
         }
@@ -46,15 +50,15 @@ export default function ClientDashboardRail({ current }: ClientDashboardRailProp
     return (
         <aside className="fig-dashboard-rail" aria-label="Client navigation">
             <div
-                className="fig-dashboard-logo"
+                className={`fig-dashboard-logo ${isCurrent("/client/dashboard") ? "is-current" : ""}`}
                 role="button"
                 tabIndex={0}
                 style={{ cursor: "pointer" }}
-                onClick={() => navigate("/client/boq")}
+                onClick={() => navigate("/client/dashboard")}
                 onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") navigate("/client/boq");
+                    if (e.key === "Enter" || e.key === " ") navigate("/client/dashboard");
                 }}
-                aria-label="Go to BOQ"
+                aria-label="Go to Overview"
             >
                 <span>
                     <img src="/assets/boq-logo-small.svg" alt="BOQ" />
