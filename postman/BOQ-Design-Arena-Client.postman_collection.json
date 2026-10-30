@@ -1,0 +1,31 @@
+{
+  "info": {
+    "name": "BOQ Design Arena - Client Portal",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Client-only API requests. Run the client seed first and set access_token from Supabase Auth or the application's login flow."
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "access_token", "value": "" },
+    { "key": "project_id", "value": "70000000-0000-4000-8000-000000000001" },
+    { "key": "boq_id", "value": "" },
+    { "key": "proposal_id", "value": "" },
+    { "key": "invoice_id", "value": "" }
+  ],
+  "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+  "item": [
+    { "name": "Dashboard", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/client/dashboard?projectId={{project_id}}" } },
+    { "name": "Projects", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/client/projects" } },
+    { "name": "BOQ list", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/client/boqs?projectId={{project_id}}" } },
+    { "name": "BOQ detail", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/client/boqs/{{boq_id}}" } },
+    { "name": "Approve BOQ", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"action\": \"APPROVE\",\n  \"version\": \"v1.0\",\n  \"confirmation\": true\n}" }, "url": "{{baseUrl}}/api/v1/client/boqs/{{boq_id}}/decision" } },
+    { "name": "Proposals", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/client/proposals?projectId={{project_id}}" } },
+    { "name": "Proposal detail", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/client/proposals/{{proposal_id}}" } },
+    { "name": "Decide proposal", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"decision\": \"approved\",\n  \"comment\": \"Approved by client\"\n}" }, "url": "{{baseUrl}}/api/v1/client/proposals/{{proposal_id}}/decision" } },
+    { "name": "Documents", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/client/documents?projectId={{project_id}}" } },
+    { "name": "Invoices", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/client/invoices?projectId={{project_id}}" } },
+    { "name": "Invoice detail", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/client/invoices/{{invoice_id}}" } },
+    { "name": "Submit payment / transaction", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"amount\": 1000,\n  \"method\": \"bank_transfer\",\n  \"reference\": \"UTR-CLIENT-001\",\n  \"idempotencyKey\": \"client-demo-001\",\n  \"notes\": \"Payment proof submitted from client portal\"\n}" }, "url": "{{baseUrl}}/api/v1/client/invoices/{{invoice_id}}/pay" } },
+    { "name": "Approvals", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/client/approvals?projectId={{project_id}}" } }
+  ]
+}

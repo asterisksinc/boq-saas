@@ -125,6 +125,21 @@ async function requireUser(supabase: SupabaseClient, id: string) {
   return { user: data.user };
 }
 
+/**
+ * Client portal guard. The client namespace is deliberately isolated from the
+ * workspace/member APIs so a normal workspace user cannot call client routes.
+ */
+async function requireClientUser(supabase: SupabaseClient, id: string) {
+  const auth = await requireUser(supabase, id);
+  if (auth.response) return auth;
+  const appRole = auth.user.app_metadata?.role;
+  const userRole = auth.user.user_metadata?.role;
+  if (appRole !== "client" && userRole !== "client") {
+    return { response: fail("FORBIDDEN", "Client role required.", 403, id) };
+  }
+  return auth;
+}
+
 async function context(supabase: SupabaseClient, id: string) {
   const auth = await requireUser(supabase, id);
   if (auth.response) return auth;
@@ -1233,22 +1248,8 @@ async function getClientProjectDetails(request: NextRequest, supabase: SupabaseC
 
   if (projErr || !project) return fail("NOT_FOUND", "Project was not found.", 404, id);
 
-  const userEmail = (auth.user.email ?? "").toLowerCase();
-  const { data: invite } = await admin
-    .from("project_client_invitations")
-    .select("id, status")
-    .eq("project_id", projectId)
-    .ilike("email", userEmail)
-    .maybeSingle();
-
-  const { data: member } = await admin
-    .from("workspace_memberships")
-    .select("role")
-    .eq("workspace_id", project.workspace_id)
-    .eq("user_id", auth.user.id)
-    .maybeSingle();
-
-  if (!invite && !member) {
+  const accessibleProjectIds = await getClientAccessibleProjectIds(admin, (auth.user.email ?? "").toLowerCase(), auth.user.id);
+  if (!accessibleProjectIds.includes(projectId)) {
     return fail("FORBIDDEN", "You do not have access to this project.", 403, id);
   }
 
@@ -1285,6 +1286,8 @@ async function getClientProjectDocuments(request: NextRequest, supabase: Supabas
 
   const { data: project } = await admin.from("projects").select("id, name, workspace_id").eq("id", projectId).maybeSingle();
   if (!project) return fail("NOT_FOUND", "Project was not found.", 404, id);
+  const accessibleProjectIds = await getClientAccessibleProjectIds(admin, (auth.user.email ?? "").toLowerCase(), auth.user.id);
+  if (!accessibleProjectIds.includes(projectId)) return fail("FORBIDDEN", "You do not have access to this project.", 403, id);
 
   const { data: proposals } = await admin
     .from("proposals")
@@ -1398,22 +1401,8 @@ async function signClientProjectDocument(request: NextRequest, supabase: Supabas
   const { data: project } = await admin.from("projects").select("id, name, workspace_id").eq("id", projectId).maybeSingle();
   if (!project) return fail("NOT_FOUND", "Project was not found.", 404, id);
 
-  const userEmail = (auth.user.email ?? "").toLowerCase();
-  const { data: invite } = await admin
-    .from("project_client_invitations")
-    .select("id, status")
-    .eq("project_id", projectId)
-    .ilike("email", userEmail)
-    .maybeSingle();
-
-  const { data: member } = await admin
-    .from("workspace_memberships")
-    .select("role")
-    .eq("workspace_id", project.workspace_id)
-    .eq("user_id", auth.user.id)
-    .maybeSingle();
-
-  if (!invite && !member) {
+  const accessibleProjectIds = await getClientAccessibleProjectIds(admin, (auth.user.email ?? "").toLowerCase(), auth.user.id);
+  if (!accessibleProjectIds.includes(projectId)) {
     return fail("FORBIDDEN", "You do not have access to sign documents for this project.", 403, id);
   }
 
@@ -1661,26 +1650,6 @@ async function getClientDashboardData(request: NextRequest, supabase: SupabaseCl
   }
 
   if (!projectId) {
-    const { data: wsMem } = await admin
-      .from("workspace_memberships")
-      .select("workspace_id")
-      .eq("user_id", auth.user.id)
-      .limit(1)
-      .maybeSingle();
-
-    if (wsMem?.workspace_id) {
-      const { data: anyProj } = await admin
-        .from("projects")
-        .select("id")
-        .eq("workspace_id", wsMem.workspace_id)
-        .is("archived_at", null)
-        .limit(1)
-        .maybeSingle();
-      if (anyProj?.id) projectId = anyProj.id;
-    }
-  }
-
-  if (!projectId) {
     return fail("NOT_FOUND", "No active project found for this client account.", 404, id);
   }
 
@@ -1780,25 +1749,86 @@ async function getClientDashboardData(request: NextRequest, supabase: SupabaseCl
 
 async function getClientAccessibleProjectIds(admin: SupabaseClient, userEmail: string, userId: string): Promise<string[]> {
   const normalizedEmail = (userEmail || "").toLowerCase();
-  const [invitesRes, projectsRes, onboardRes, memberRes] = await Promise.all([
-    admin.from("project_client_invitations").select("project_id").ilike("email", normalizedEmail),
+  const [invitesRes, projectsRes, onboardRes, explicitAccessRes] = await Promise.all([
+    admin.from("project_client_invitations").select("project_id").ilike("email", normalizedEmail).eq("status", "accepted"),
     admin.from("projects").select("id").ilike("client_email", normalizedEmail).is("archived_at", null),
     admin.from("client_onboarding").select("project_id").eq("user_id", userId),
-    admin.from("workspace_memberships").select("workspace_id").eq("user_id", userId).limit(10),
+    admin.from("client_project_access").select("project_id").eq("user_id", userId).eq("access_status", "active"),
   ]);
 
   const ids = new Set<string>();
   (invitesRes.data || []).forEach((r) => { if (r.project_id) ids.add(r.project_id); });
   (projectsRes.data || []).forEach((r) => { if (r.id) ids.add(r.id); });
   (onboardRes.data || []).forEach((r) => { if (r.project_id) ids.add(r.project_id); });
-
-  if (memberRes.data && memberRes.data.length > 0) {
-    const wsIds = memberRes.data.map((m) => m.workspace_id).filter(Boolean);
-    const { data: wsProjects } = await admin.from("projects").select("id").in("workspace_id", wsIds).is("archived_at", null);
-    (wsProjects || []).forEach((p) => ids.add(p.id));
-  }
+  (explicitAccessRes.data || []).forEach((r) => { if (r.project_id) ids.add(r.project_id); });
 
   return Array.from(ids);
+}
+
+async function getClientProposalsList(request: NextRequest, supabase: SupabaseClient, id: string) {
+  const auth = await requireClientUser(supabase, id);
+  if (auth.response) return auth.response;
+  const admin = createSupabaseAdminClient();
+  const ids = await getClientAccessibleProjectIds(admin, (auth.user.email ?? "").toLowerCase(), auth.user.id);
+  if (ids.length === 0) return ok({ items: [], total: 0 }, 200, id);
+
+  const projectId = request.nextUrl.searchParams.get("projectId");
+  if (projectId && !ids.includes(projectId)) return fail("FORBIDDEN", "You do not have access to this project.", 403, id);
+  const query = admin.from("proposals")
+    .select("id, project_id, proposal_code, project_name, client_name, proposed_value, currency, expiry_date, scope_items, status, sent_at, updated_at")
+    .in("project_id", projectId ? [projectId] : ids)
+    .in("status", ["sent", "approved", "revisions", "won"])
+    .is("archived_at", null)
+    .order("updated_at", { ascending: false });
+  const { data, error } = await query;
+  if (error) return fail("INTERNAL_ERROR", "Proposals could not be loaded.", 500, id);
+  return ok({ items: (data ?? []).map((p) => ({
+    id: p.id, projectId: p.project_id, proposalNumber: p.proposal_code,
+    projectName: p.project_name, clientName: p.client_name, amount: Number(p.proposed_value || 0),
+    currency: p.currency, expiryDate: p.expiry_date, scopeItems: p.scope_items ?? [],
+    status: p.status, sentAt: p.sent_at, updatedAt: p.updated_at,
+  })), total: data?.length ?? 0 }, 200, id);
+}
+
+async function getClientProposalDetail(supabase: SupabaseClient, id: string, proposalId: string) {
+  const auth = await requireClientUser(supabase, id);
+  if (auth.response) return auth.response;
+  const admin = createSupabaseAdminClient();
+  const ids = await getClientAccessibleProjectIds(admin, (auth.user.email ?? "").toLowerCase(), auth.user.id);
+  const { data: proposal, error } = await admin.from("proposals")
+    .select("id, project_id, proposal_code, project_name, client_name, proposed_value, currency, expiry_date, scope_items, status, sent_at, created_at, updated_at")
+    .eq("id", proposalId).is("archived_at", null).maybeSingle();
+  if (error || !proposal) return fail("NOT_FOUND", "Proposal was not found.", 404, id);
+  if (!proposal.project_id || !ids.includes(proposal.project_id)) return fail("FORBIDDEN", "You do not have access to this proposal.", 403, id);
+  return ok({
+    id: proposal.id, projectId: proposal.project_id, proposalNumber: proposal.proposal_code,
+    projectName: proposal.project_name, clientName: proposal.client_name,
+    amount: Number(proposal.proposed_value || 0), currency: proposal.currency,
+    expiryDate: proposal.expiry_date, scopeItems: proposal.scope_items ?? [],
+    status: proposal.status, sentAt: proposal.sent_at, createdAt: proposal.created_at, updatedAt: proposal.updated_at,
+    pdfUrl: `/api/v1/proposals/${proposal.id}/pdf`,
+  }, 200, id);
+}
+
+async function decideClientProposal(request: Request, supabase: SupabaseClient, id: string, proposalId: string) {
+  const auth = await requireClientUser(supabase, id);
+  if (auth.response) return auth.response;
+  const admin = createSupabaseAdminClient();
+  const ids = await getClientAccessibleProjectIds(admin, (auth.user.email ?? "").toLowerCase(), auth.user.id);
+  let input: any;
+  try { input = await request.json(); } catch { return fail("VALIDATION_ERROR", "Invalid JSON payload.", 400, id); }
+  const decision = String(input?.decision || "").toLowerCase();
+  const nextStatus = decision === "approved" ? "approved" : decision === "revisions" ? "revisions" : decision === "rejected" ? "lost" : null;
+  if (!nextStatus) return fail("VALIDATION_ERROR", "decision must be approved, revisions, or rejected.", 400, id);
+  const { data: proposal } = await admin.from("proposals").select("id, project_id, workspace_id, status, proposal_code").eq("id", proposalId).is("archived_at", null).maybeSingle();
+  if (!proposal) return fail("NOT_FOUND", "Proposal was not found.", 404, id);
+  if (!proposal.project_id || !ids.includes(proposal.project_id)) return fail("FORBIDDEN", "You do not have access to this proposal.", 403, id);
+  if (!["sent", "revisions"].includes(proposal.status)) return fail("CONFLICT", "This proposal is no longer awaiting client decision.", 409, id);
+  const now = new Date().toISOString();
+  const { error } = await admin.from("proposals").update({ status: nextStatus, updated_by: auth.user.id, updated_at: now }).eq("id", proposalId);
+  if (error) return fail("INTERNAL_ERROR", "Proposal decision could not be saved.", 500, id);
+  await admin.from("audit_logs").insert({ workspace_id: proposal.workspace_id, actor_user_id: auth.user.id, action: `client.proposal.${decision}`, entity_type: "proposal", entity_id: proposalId, metadata: { proposalCode: proposal.proposal_code, comment: input?.comment || null }, request_id: id });
+  return ok({ success: true, proposalId, status: nextStatus, decidedAt: now }, 200, id);
 }
 
 async function getClientProjectsList(request: NextRequest, supabase: SupabaseClient, id: string) {
@@ -2746,6 +2776,16 @@ async function clientInvoicePayment(request: Request, supabase: SupabaseClient, 
   const method = body.method || "bank_transfer";
   const reference = body.reference || `PAY-${Date.now().toString(36).toUpperCase()}`;
   const notes = body.notes || "Payment submitted via Client Dashboard";
+  const idempotencyKey = typeof body.idempotencyKey === "string" ? body.idempotencyKey.trim().slice(0, 120) : null;
+
+  if (idempotencyKey) {
+    const { data: existing } = await admin.from("invoice_payments")
+      .select("id, amount, invoice_id")
+      .eq("invoice_id", invoiceId).eq("idempotency_key", idempotencyKey).maybeSingle();
+    if (existing) {
+      return ok({ success: true, duplicate: true, invoiceId, amount: Number(existing.amount), paymentId: existing.id }, 200, id);
+    }
+  }
 
   // Insert verified payment record
   const { data: payment, error: payErr } = await admin
@@ -2758,6 +2798,7 @@ async function clientInvoicePayment(request: Request, supabase: SupabaseClient, 
       method,
       reference,
       notes,
+      idempotency_key: idempotencyKey,
       recorded_by: auth.user.id,
     })
     .select()
@@ -15794,6 +15835,12 @@ async function dispatch(request: NextRequest, path: string[]) {
   try { supabase = await createSupabaseServerClient(); }
   catch { return fail("INTERNAL_ERROR", "Backend is not configured.", 500, id); }
 
+  // Keep client APIs role-scoped without changing any existing non-client route.
+  if (route.startsWith("client/")) {
+    const clientAuth = await requireClientUser(supabase, id);
+    if (clientAuth.response) return clientAuth.response;
+  }
+
   if (request.method === "POST" && route === "auth/register") return register(request, supabase, id);
   if (request.method === "POST" && route === "auth/login") return login(request, supabase, id);
   if (request.method === "POST" && route === "auth/refresh") return refresh(supabase, id);
@@ -15847,6 +15894,11 @@ async function dispatch(request: NextRequest, path: string[]) {
 
   if (route === "client/dashboard" && request.method === "GET") return getClientDashboardData(request, supabase, id);
   if (route === "client/projects" && request.method === "GET") return getClientProjectsList(request, supabase, id);
+  if (route === "client/proposals" && request.method === "GET") return getClientProposalsList(request, supabase, id);
+  const clientProposalDecisionMatch = route.match(/^client\/proposals\/([0-9a-f-]{36})\/decision$/i);
+  if (clientProposalDecisionMatch && request.method === "POST") return decideClientProposal(request, supabase, id, clientProposalDecisionMatch[1]);
+  const clientProposalMatch = route.match(/^client\/proposals\/([0-9a-f-]{36})$/i);
+  if (clientProposalMatch && request.method === "GET") return getClientProposalDetail(supabase, id, clientProposalMatch[1]);
   if (route === "client/boqs" && request.method === "GET") return getClientBoqsList(request, supabase, id);
   const clientBoqMatch = route.match(/^client\/boqs\/([0-9a-f-]{36})$/i);
   if (clientBoqMatch && request.method === "GET") return getClientBoqDetail(request, supabase, id, clientBoqMatch[1]);
