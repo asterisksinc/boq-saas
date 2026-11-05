@@ -59872,3 +59872,27 @@ textarea {
 .client-sign-btn-done:hover {
     background: #1D4ED8;
 }
+/* Contextual actions used at the end of entity selectors. */
+.contextual-add-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    min-height: 36px;
+    padding: 8px 12px;
+    border: 0;
+    border-top: 1px solid #e2e8f0;
+    background: transparent;
+    color: #2563eb;
+    font: inherit;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+}
+
+.contextual-add-action:hover,
+.contextual-add-action:focus-visible {
+    background: #eff6ff;
+    outline: none;
+}

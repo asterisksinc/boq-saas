@@ -114,9 +114,10 @@ async function body(request: Request) {
 }
 
 async function parsed<T extends z.ZodType>(request: Request, schema: T, id: string) {
-  const result = schema.safeParse(await body(request));
+  const raw = await body(request);
+  const result = schema.safeParse(raw);
   if (!result.success) return { response: fail("VALIDATION_ERROR", "Request validation failed.", 400, id, fieldErrors(result.error)) };
-  return { data: result.data as z.infer<T> };
+  return { data: result.data as z.infer<T>, raw };
 }
 
 async function requireUser(supabase: SupabaseClient, id: string) {
@@ -973,19 +974,252 @@ async function mfaUnenroll(request: Request, supabase: SupabaseClient, id: strin
   return ok({ unenrolled: true }, 200, id);
 }
 
+async function completeOnboarding(request: Request, supabase: SupabaseClient, id: string) {
+  const ctx = await context(supabase, id); if ("response" in ctx) return ctx.response;
+  const ctxData = (ctx.data ?? {}) as Record<string, any>;
+  if (ctxData.user?.role === "client") return fail("FORBIDDEN", "Client accounts cannot complete workspace onboarding.", 403, id);
+  const wid = ctxData.workspace?.id;
+  const uid = ctxData.user?.id;
+  if (!wid || !uid) return fail("UNAUTHENTICATED", "Active workspace session required.", 401, id);
+
+  await supabase.from("onboarding_progress").update({ status: "completed", current_step: "complete" }).eq("workspace_id", wid).eq("user_id", uid);
+  
+  const existing = await supabase.from("workspace_settings").select("advanced").eq("workspace_id", wid).maybeSingle();
+  const adv = (existing.data?.advanced ?? {}) as Record<string, any>;
+  const ob = (adv.onboarding ?? {}) as Record<string, any>;
+  await supabase.from("workspace_settings").upsert({
+    workspace_id: wid,
+    advanced: { ...adv, onboarding: { ...ob, isCompleted: true, status: "completed", currentStep: "complete" } },
+    updated_by: uid,
+  });
+
+  await audit(supabase, "onboarding.completed", id);
+  return ok({ completed: true, status: "completed" }, 200, id);
+}
+
 async function onboarding(request: Request, supabase: SupabaseClient, id: string) {
   const ctx = await context(supabase, id); if ("response" in ctx) return ctx.response;
-  if (request.method === "GET") return ok((ctx.data as { onboarding?: unknown })?.onboarding ?? null, 200, id);
-  const input = await parsed(request, onboardingPatchSchema, id); if (input.response) return input.response;
-  const { data, error } = await supabase.rpc("update_onboarding", { p_patch: input.data });
-  if (error) {
-    if (error.message?.includes("forbidden")) {
-      return fail("FORBIDDEN", "Your workspace role cannot update organization settings.", 403, id);
-    }
-    return fail("VALIDATION_ERROR", error.message || "Onboarding state could not be updated.", 400, id);
+  const ctxData = (ctx.data ?? {}) as Record<string, any>;
+  const user = ctxData.user;
+  if (user?.role === "client") {
+    return fail("FORBIDDEN", "Client accounts cannot access workspace onboarding.", 403, id);
   }
+  const workspaceId = ctxData.workspace?.id;
+  const userId = user?.id;
+
+  if (!workspaceId || !userId) {
+    return fail("UNAUTHENTICATED", "Active workspace session required.", 401, id);
+  }
+
+  if (request.method === "GET") {
+    const [progressRes, wsRes, settingsRes] = await Promise.all([
+      supabase.from("onboarding_progress").select("*").eq("workspace_id", workspaceId).eq("user_id", userId).maybeSingle(),
+      supabase.from("workspaces").select("id, name, currency, timezone, country, status").eq("id", workspaceId).maybeSingle(),
+      supabase.from("workspace_settings").select("branding, boq_costing, advanced").eq("workspace_id", workspaceId).maybeSingle(),
+    ]);
+
+    const progress = (progressRes.data || ctxData.onboarding || {}) as Record<string, any>;
+    const ws = (wsRes.data || ctxData.workspace || {}) as Record<string, any>;
+    const settings = (settingsRes.data || {}) as Record<string, any>;
+    const boqCosting = (settings.boq_costing ?? {}) as Record<string, any>;
+    const advanced = (settings.advanced ?? {}) as Record<string, any>;
+    const savedOnboarding = (advanced.onboarding ?? {}) as Record<string, any>;
+    const savedWorkspace = (savedOnboarding.workspace ?? {}) as Record<string, any>;
+    const savedWorkflow = (savedOnboarding.workflow ?? {}) as Record<string, any>;
+    const savedProject = (savedOnboarding.project ?? {}) as Record<string, any>;
+    const businessInfo = ((boqCosting.businessInfo || boqCosting.business_info || {}) as Record<string, any>);
+
+    const isDone = progress.status === "completed" || progress.current_step === "complete" || progress.current_step === "dashboard" || Boolean(savedOnboarding.isCompleted);
+
+    const currencyCode = ws.currency || (boqCosting.currency as string) || "INR";
+    const currencyDisplay = savedWorkflow.currency || (currencyCode === "USD" ? "US Dollar ($)" : currencyCode === "EUR" ? "Euro (€)" : currencyCode === "GBP" ? "British Pound (£)" : currencyCode === "AED" ? "UAE Dirham (AED)" : currencyCode === "SAR" ? "Saudi Riyal (SAR)" : "Indian Rupee (₹)");
+
+    const defaultTax = typeof boqCosting.defaultTaxPercent === "number" ? boqCosting.defaultTaxPercent : 18;
+    const taxTypeDisplay = savedWorkflow.taxType || (boqCosting.taxType as string) || (defaultTax === 0 ? "No Tax / Exempt" : defaultTax === 5 ? "VAT (Standard 5%)" : defaultTax === 15 ? "VAT (Standard 15%)" : defaultTax === 8 ? "Sales Tax (US)" : "GST (India)");
+
+    const responsePayload = {
+      currentStep: progress.current_step || savedOnboarding.currentStep || "workspace",
+      completedSteps: Array.isArray(progress.completed_steps) && progress.completed_steps.length > 0 ? progress.completed_steps : (savedOnboarding.completedSteps || []),
+      skippedSteps: progress.skipped_steps || savedOnboarding.skippedSteps || [],
+      status: isDone ? "completed" : (progress.status || "in_progress"),
+      isCompleted: isDone,
+      workspace: {
+        name: ws.name || savedWorkspace.name || "",
+        businessType: savedWorkspace.businessType || businessInfo.businessType || "Interior Design Studio",
+        customBusinessType: savedWorkspace.customBusinessType || null,
+        teamSize: savedWorkspace.teamSize || businessInfo.teamSize || "2-5",
+      },
+      workflow: {
+        currency: currencyDisplay,
+        measurementSystem: savedWorkflow.measurementSystem || (boqCosting.measurementSystem as string) || "Metric (m, sq.m, cu.m)",
+        taxType: taxTypeDisplay,
+        defaultMarkup: savedWorkflow.defaultMarkup !== undefined ? String(savedWorkflow.defaultMarkup) : String(boqCosting.defaultMarkupPercent ?? "0"),
+        configuration: savedWorkflow.configuration || {},
+      },
+      project: {
+        startingOption: savedProject.startingOption || "scratch",
+        details: savedProject.details || {},
+      },
+      company: {
+        name: ws.name || "",
+        currency: currencyCode,
+        timezone: ws.timezone || "Asia/Kolkata",
+      },
+      onboarding: {
+        currentStep: progress.current_step || savedOnboarding.currentStep || "workspace",
+        completedSteps: Array.isArray(progress.completed_steps) && progress.completed_steps.length > 0 ? progress.completed_steps : (savedOnboarding.completedSteps || []),
+        skippedSteps: progress.skipped_steps || savedOnboarding.skippedSteps || [],
+        status: isDone ? "completed" : (progress.status || "in_progress"),
+        isCompleted: isDone,
+      },
+    };
+
+    return ok(responsePayload, 200, id);
+  }
+
+  // PATCH
+  const input = await parsed(request, onboardingPatchSchema, id); if (input.response) return input.response;
+  const patch = input.data as Record<string, any>;
+
+  const companyPatch: Record<string, any> = { ...(patch.company || {}) };
+  if (patch.workspace?.name) {
+    companyPatch.name = patch.workspace.name;
+  }
+  if (patch.workflow?.currency) {
+    const currStr = String(patch.workflow.currency);
+    if (currStr.includes("USD") || currStr.includes("$")) companyPatch.currency = "USD";
+    else if (currStr.includes("EUR") || currStr.includes("€")) companyPatch.currency = "EUR";
+    else if (currStr.includes("GBP") || currStr.includes("£")) companyPatch.currency = "GBP";
+    else if (currStr.includes("AED")) companyPatch.currency = "AED";
+    else if (currStr.includes("SAR")) companyPatch.currency = "SAR";
+    else companyPatch.currency = "INR";
+  }
+
+  // Call update_onboarding RPC for base compatibility
+  const rpcPatch: Record<string, any> = {};
+  if (patch.currentStep) rpcPatch.currentStep = patch.currentStep;
+  if (patch.completedSteps) rpcPatch.completedSteps = patch.completedSteps;
+  if (patch.skippedSteps) rpcPatch.skippedSteps = patch.skippedSteps;
+  if (Object.keys(companyPatch).length > 0) rpcPatch.company = companyPatch;
+
+  if (Object.keys(rpcPatch).length > 0) {
+    try {
+      await supabase.rpc("update_onboarding", { p_patch: rpcPatch });
+    } catch {
+      // fallback
+    }
+  }
+
+  // Direct updates on workspaces
+  if (companyPatch.name || companyPatch.currency) {
+    const wsUpdate: Record<string, any> = {};
+    if (companyPatch.name) wsUpdate.name = companyPatch.name;
+    if (companyPatch.currency) wsUpdate.currency = companyPatch.currency;
+    await supabase.from("workspaces").update(wsUpdate).eq("id", workspaceId);
+  }
+
+  // Direct update on onboarding_progress
+  const isComplete = patch.status === "completed" || patch.currentStep === "complete" || patch.currentStep === "dashboard";
+  const progressUpdate: Record<string, any> = {};
+  if (patch.currentStep) progressUpdate.current_step = patch.currentStep;
+  if (patch.completedSteps) progressUpdate.completed_steps = patch.completedSteps;
+  if (patch.skippedSteps) progressUpdate.skipped_steps = patch.skippedSteps;
+  if (patch.status) progressUpdate.status = patch.status;
+  if (isComplete) progressUpdate.status = "completed";
+
+  if (Object.keys(progressUpdate).length > 0) {
+    await supabase.from("onboarding_progress").update(progressUpdate).eq("workspace_id", workspaceId).eq("user_id", userId);
+  }
+
+  // Update workspace_settings: advanced.onboarding and boq_costing
+  const existingSettingsRes = await supabase.from("workspace_settings").select("*").eq("workspace_id", workspaceId).maybeSingle();
+  const existingSettings = (existingSettingsRes.data || {}) as Record<string, any>;
+  const adv = (existingSettings.advanced ?? {}) as Record<string, any>;
+  const prevOnboarding = (adv.onboarding ?? {}) as Record<string, any>;
+
+  const mergedWorkspace = { ...(prevOnboarding.workspace || {}), ...(patch.workspace || {}) };
+  if (companyPatch.name) mergedWorkspace.name = companyPatch.name;
+
+  const mergedWorkflow = { ...(prevOnboarding.workflow || {}), ...(patch.workflow || {}) };
+  const mergedProject = { ...(prevOnboarding.project || {}), ...(patch.project || {}) };
+
+  const updatedOnboardingData = {
+    workspace: mergedWorkspace,
+    workflow: mergedWorkflow,
+    project: mergedProject,
+    currentStep: patch.currentStep || prevOnboarding.currentStep || "workspace",
+    completedSteps: patch.completedSteps || prevOnboarding.completedSteps || [],
+    isCompleted: isComplete || prevOnboarding.isCompleted || false,
+    updatedAt: new Date().toISOString(),
+  };
+
+  const boqCosting = { ...(existingSettings.boq_costing ?? {}) };
+  if (companyPatch.currency) {
+    boqCosting.currency = companyPatch.currency;
+  }
+  if (patch.workspace?.businessType) {
+    boqCosting.businessInfo = {
+      ...(boqCosting.businessInfo || {}),
+      businessType: patch.workspace.businessType,
+      customBusinessType: patch.workspace.customBusinessType || null,
+      teamSize: patch.workspace.teamSize,
+    };
+  }
+  if (patch.workflow?.defaultMarkup !== undefined) {
+    const markupVal = Number(patch.workflow.defaultMarkup) || 0;
+    boqCosting.defaultMarkupPercent = markupVal;
+    boqCosting.pricing = {
+      ...((boqCosting.pricing as Record<string, unknown>) || {}),
+      defaultMarkupPercent: markupVal,
+    };
+  }
+  if (patch.workflow?.taxType) {
+    const taxType = patch.workflow.taxType;
+    boqCosting.taxType = taxType;
+    if (taxType.includes("No Tax") || taxType.includes("Exempt")) {
+      boqCosting.defaultTaxPercent = 0;
+    } else if (taxType.includes("5%")) {
+      boqCosting.defaultTaxPercent = 5;
+    } else if (taxType.includes("15%")) {
+      boqCosting.defaultTaxPercent = 15;
+    } else if (taxType.includes("US") || taxType.includes("8")) {
+      boqCosting.defaultTaxPercent = 8;
+    } else {
+      boqCosting.defaultTaxPercent = 18;
+    }
+  }
+  if (patch.workflow?.measurementSystem) {
+    boqCosting.measurementSystem = patch.workflow.measurementSystem;
+  }
+
+  await supabase.from("workspace_settings").upsert({
+    workspace_id: workspaceId,
+    advanced: { ...adv, onboarding: updatedOnboardingData },
+    boq_costing: boqCosting,
+    updated_by: userId,
+  });
+
   await audit(supabase, "onboarding.updated", id);
-  return ok(data, 200, id);
+
+  return ok({
+    currentStep: patch.currentStep || "workspace",
+    completedSteps: patch.completedSteps || [],
+    status: isComplete ? "completed" : "in_progress",
+    isCompleted: isComplete,
+    workspace: mergedWorkspace,
+    workflow: mergedWorkflow,
+    project: mergedProject,
+    company: {
+      name: companyPatch.name || ctxData.workspace?.name,
+      currency: companyPatch.currency || ctxData.workspace?.currency,
+    },
+    onboarding: {
+      currentStep: patch.currentStep || "workspace",
+      completedSteps: patch.completedSteps || [],
+      status: isComplete ? "completed" : "in_progress",
+      isCompleted: isComplete,
+    },
+  }, 200, id);
 }
 
 async function inspectProjectClientInvite(request: NextRequest, id: string, token: string) {
@@ -4927,7 +5161,7 @@ async function parseProjectWorkbook(request: Request, id: string) {
   if (!(upload instanceof File)) return { response: fail("VALIDATION_ERROR", "The file field is required.", 400, id, { file: ["Choose a CSV, XLS, or XLSX file."] }) };
   const extension = upload.name.split(".").pop()?.toLowerCase();
   if (!extension || !["csv", "xls", "xlsx"].includes(extension)) return { response: fail("VALIDATION_ERROR", "Unsupported spreadsheet type.", 400, id, { file: ["Only .csv, .xls, and .xlsx files are accepted."] }) };
-  if (upload.size > 10 * 1024 * 1024) return { response: fail("PAYLOAD_TOO_LARGE", "Spreadsheet files are limited to 10 MB.", 413, id) };
+  if (upload.size > 25 * 1024 * 1024) return { response: fail("PAYLOAD_TOO_LARGE", "Spreadsheet files are limited to 25 MB.", 413, id) };
   let workbook: XLSX.WorkBook;
   try { workbook = XLSX.read(Buffer.from(await upload.arrayBuffer()), { type: "buffer", cellDates: true }); }
   catch { return { response: fail("VALIDATION_ERROR", "The spreadsheet could not be read.", 400, id, { file: ["The file may be corrupted or password protected."] }) }; }
@@ -5061,7 +5295,7 @@ async function parseBoqWorkbook(request: Request, id: string) {
   if (!(upload instanceof File)) return { response: fail("VALIDATION_ERROR", "The file field is required.", 400, id, { file: ["Choose a CSV, XLS, or XLSX file."] }) };
   const extension = upload.name.split(".").pop()?.toLowerCase();
   if (!extension || !["csv", "xls", "xlsx"].includes(extension)) return { response: fail("VALIDATION_ERROR", "Unsupported spreadsheet type.", 400, id) };
-  if (upload.size > 10 * 1024 * 1024) return { response: fail("PAYLOAD_TOO_LARGE", "Spreadsheet files are limited to 10 MB.", 413, id) };
+  if (upload.size > 25 * 1024 * 1024) return { response: fail("PAYLOAD_TOO_LARGE", "Spreadsheet files are limited to 25 MB.", 413, id) };
   let workbook: XLSX.WorkBook;
   try { workbook = XLSX.read(Buffer.from(await upload.arrayBuffer()), { type: "buffer", cellDates: true }); }
   catch { return { response: fail("VALIDATION_ERROR", "The spreadsheet could not be read.", 400, id) }; }
@@ -6453,13 +6687,29 @@ async function createBoq(request: Request, supabase: SupabaseClient, id: string)
 
   const assignedTo = input.data.assignedTo || project.data.assigned_designer_id || scoped.access.userId;
 
+  let markupPercent = input.data.markupPercent;
+  let taxPercent = input.data.taxPercent;
+  const rawInput = (input as any).raw && typeof (input as any).raw === "object" ? ((input as any).raw as Record<string, unknown>) : {};
+  if (rawInput.markupPercent === undefined || rawInput.taxPercent === undefined) {
+    try {
+      const wsSettings = await supabase.from("workspace_settings").select("boq_costing").eq("workspace_id", scoped.access.workspaceId).maybeSingle();
+      const boqCosting = (wsSettings.data?.boq_costing ?? {}) as Record<string, any>;
+      if (rawInput.markupPercent === undefined && boqCosting.defaultMarkupPercent !== undefined) {
+        markupPercent = Number(boqCosting.defaultMarkupPercent) || 0;
+      }
+      if (rawInput.taxPercent === undefined && boqCosting.defaultTaxPercent !== undefined) {
+        taxPercent = Number(boqCosting.defaultTaxPercent) || 0;
+      }
+    } catch {}
+  }
+
   let inserted;
   for (let attempt = 1; attempt <= 5; attempt++) {
     const identity = await nextBoqIdentity(supabase, scoped.access.workspaceId, attempt, input.data.projectId);
     inserted = await supabase.from("boqs").insert({ workspace_id: scoped.access.workspaceId, project_id: input.data.projectId,
       boq_number: identity.boqNumber, version: identity.version, assigned_to: assignedTo,
-      source_method: input.data.method, source_template_id: input.data.templateId, markup_percent: input.data.markupPercent,
-      tax_percent: input.data.taxPercent, created_by: scoped.access.userId, updated_by: scoped.access.userId }).select(boqSelect).single();
+      source_method: input.data.method, source_template_id: input.data.templateId, markup_percent: markupPercent,
+      tax_percent: taxPercent, created_by: scoped.access.userId, updated_by: scoped.access.userId }).select(boqSelect).single();
     if (!inserted.error || inserted.error.code !== "23505") break;
   }
   if (!inserted || inserted.error) return fail(inserted?.error?.code === "23505" ? "CONFLICT" : "VALIDATION_ERROR", inserted?.error?.code === "23505" ? "A BOQ number could not be generated. Please retry." : "BOQ could not be created.", inserted?.error?.code === "23505" ? 409 : 400, id);
@@ -15868,6 +16118,7 @@ async function dispatch(request: NextRequest, path: string[]) {
     if (sessionId) return revokeSpecificSession(request, supabase, id, sessionId);
   }
   if ((request.method === "GET" || request.method === "PATCH") && route === "onboarding/me") return onboarding(request, supabase, id);
+  if (request.method === "POST" && (route === "onboarding/complete" || route === "auth/onboarding/complete")) return completeOnboarding(request, supabase, id);
   if (request.method === "GET" && route === "dashboard/overview") return dashboardOverview(request, supabase, id);
   const invitationTokenMatch = route.match(/^invitations\/([^/]+)$/);
   if (invitationTokenMatch && request.method === "GET") return inspectProjectClientInvite(request, id, invitationTokenMatch[1]);

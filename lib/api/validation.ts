@@ -125,6 +125,34 @@ export const onboardingPatchSchema = z
       .max(50)
       .optional(),
 
+    status: z.enum(["not_started", "in_progress", "completed"]).optional(),
+
+    workspace: z
+      .object({
+        name: z.string().trim().min(1).max(160).optional(),
+        businessType: z.string().trim().max(100).optional(),
+        customBusinessType: z.string().trim().max(100).nullable().optional(),
+        teamSize: z.string().trim().max(50).optional(),
+      })
+      .optional(),
+
+    workflow: z
+      .object({
+        currency: z.string().trim().max(80).optional(),
+        measurementSystem: z.string().trim().max(80).optional(),
+        taxType: z.string().trim().max(80).optional(),
+        defaultMarkup: z.union([z.string().trim().max(20), z.number()]).optional(),
+        configuration: z.record(z.string(), z.unknown()).optional(),
+      })
+      .optional(),
+
+    project: z
+      .object({
+        startingOption: z.string().trim().max(50).optional(),
+        details: z.record(z.string(), z.unknown()).optional(),
+      })
+      .optional(),
+
     company: z
       .object({
         name: z.string().trim().min(1).max(160).optional(),

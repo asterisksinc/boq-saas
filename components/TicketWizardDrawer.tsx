@@ -18,6 +18,7 @@ import {
     ExternalLink,
     HelpCircle,
 } from "lucide-react";
+import ContextualAddAction from "@/components/shared/ContextualAddAction";
 import { ChangeEvent, DragEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
     createSupportTicket,
@@ -651,6 +652,12 @@ export default function TicketWizardDrawer({
                                         </option>
                                     ))}
                                 </select>
+                                <ContextualAddAction
+                                    entity="Project"
+                                    onClick={() => {
+                                        window.location.href = "/projects?create=true&returnTo=%2Fhelp";
+                                    }}
+                                />
                             </div>
 
                             <div className="ticket-form-group">

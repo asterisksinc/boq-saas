@@ -21,9 +21,11 @@ import {
     X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
 import InvoiceExcelImportModal from "@/components/invoices/InvoiceExcelImportModal";
+import ContextualAddAction from "@/components/shared/ContextualAddAction";
 import { getApiErrorMessage, getDashboardOverview, parseApiResponse } from "@/lib/api/auth";
 import { archiveInvoice, changeInvoiceStatus, getInvoicePdf } from "@/lib/api/invoices";
 import "./invoices-redesign.css";
@@ -1565,6 +1567,7 @@ function CreateInvoiceView({
     onClose: () => void;
     onCreated: () => void;
 }) {
+    const router = useRouter();
     const [boqs, setBoqs] = useState<BoqOption[]>([]);
     const [projectsMap, setProjectsMap] = useState<Map<string, string>>(new Map());
     const [selectedBoq, setSelectedBoq] = useState<BoqOption | null>(null);
@@ -1952,6 +1955,10 @@ function CreateInvoiceView({
                                                     </span>
                                                 </div>
                                             ))}
+                                            <ContextualAddAction
+                                                entity="BOQ"
+                                                onClick={() => router.push("/boqs?create=true&returnTo=%2Finvoices")}
+                                            />
                                         </div>
                                     )}
                                 </div>

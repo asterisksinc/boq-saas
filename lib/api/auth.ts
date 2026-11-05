@@ -187,7 +187,11 @@ export async function createProject(input: { name: string; clientName: string; p
     return request<{ id: string }>("/api/v1/projects", { method: "POST", body: JSON.stringify(input) });
 }
 
-export async function createBoqImport(input: { fileName: string; fileType: "csv" | "xlsx" | "xls"; rowCount: number; columns: string[]; rows: Array<Array<string | number | boolean | null>> }) {
+export async function createBoq(input: { projectId: string; version?: string; method?: "scratch" | "template" | "blank"; templateId?: string; markupPercent?: number; taxPercent?: number }) {
+    return request<{ id: string; boqNumber?: string }>("/api/v1/boqs", { method: "POST", body: JSON.stringify(input) });
+}
+
+export async function createBoqImport(input: { fileName: string; fileType: "csv" | "xlsx" | "xls"; rowCount: number; columns: string[]; rows: Array<Array<string | number | boolean | null>>; projectId?: string | null }) {
     return request<{ id: string }>("/api/v1/boq-imports", { method: "POST", body: JSON.stringify(input) });
 }
 
@@ -248,12 +252,43 @@ export type OnboardingState = {
     currentStep?: string;
     completedSteps?: string[];
     skippedSteps?: string[];
+    status?: "not_started" | "in_progress" | "completed";
+    isCompleted?: boolean;
+    workspace?: {
+        name?: string;
+        businessType?: string;
+        customBusinessType?: string | null;
+        teamSize?: string;
+    };
+    workflow?: {
+        currency?: string;
+        measurementSystem?: string;
+        taxType?: string;
+        defaultMarkup?: string;
+        configuration?: Record<string, unknown>;
+    };
+    project?: {
+        startingOption?: "scratch" | "import" | string;
+        details?: Record<string, unknown>;
+    };
     company?: {
         name?: string | null;
         currency?: string | null;
         timezone?: string | null;
     };
+    onboarding?: {
+        currentStep?: string;
+        completedSteps?: string[];
+        status?: "not_started" | "in_progress" | "completed";
+        isCompleted?: boolean;
+    };
 };
+
+export async function completeOnboarding() {
+    return request<{ completed: boolean; status: string }>("/api/v1/onboarding/complete", {
+        method: "POST",
+    });
+}
 
 export async function getOnboardingState() {
     return request<OnboardingState>("/api/v1/onboarding/me");

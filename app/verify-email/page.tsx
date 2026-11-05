@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { AuthLayout } from "@/components/auth/AuthLayout";
-import { getApiErrorMessage, getCurrentUser, resendVerification, verifyEmail, verifyEmailCode } from "@/lib/api/auth";
+import { getApiErrorMessage, getCurrentUser, getOnboardingState, resendVerification, verifyEmail, verifyEmailCode } from "@/lib/api/auth";
 
 export default function VerifyEmailPage() {
     return (
@@ -100,7 +100,19 @@ function VerifyEmailContent() {
                     const currentUser = await getCurrentUser().catch(() => null);
                     const requestedNext = next && next.startsWith("/") ? next : null;
                     const isClient = currentUser?.user?.role === "client";
-                    router.push(isClient ? (requestedNext?.startsWith("/client/") ? requestedNext : "/client/dashboard") : (requestedNext || "/dashboard"));
+                    if (isClient) {
+                        router.push(requestedNext?.startsWith("/client/") ? requestedNext : "/client/dashboard");
+                        return;
+                    }
+
+                    // Check onboarding status for regular user
+                    const onboarding = await getOnboardingState().catch(() => null);
+                    const isComplete = onboarding?.isCompleted || onboarding?.status === "completed";
+                    if (!isComplete) {
+                        router.push("/onboarding");
+                        return;
+                    }
+                    router.push(requestedNext || "/dashboard");
                 } else {
                     router.push("/login");
                 }

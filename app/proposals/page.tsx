@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Plus, ChevronDown, ChevronLeft, ChevronRight, ArrowRight, X, Calendar } from "lucide-react";
 import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
+import ContextualAddAction from "@/components/shared/ContextualAddAction";
 import { getApiErrorMessage, parseApiResponse } from "@/lib/api/auth";
 import "./proposals-redesign.css";
 
@@ -774,6 +775,7 @@ function NewProposalModal({
     onClose: () => void;
     onRefresh: () => void;
 }) {
+    const router = useRouter();
     const [step, setStep] = useState<"select" | "details" | "success">(
         initialTemplate ? "details" : "select"
     );
@@ -1250,23 +1252,29 @@ function NewProposalModal({
                                     <span className="proposal-form-required">*</span>
                                 </div>
                                 {!isCustomProject ? (
-                                    <div className="proposal-form-control-box">
-                                        <select
-                                            className="proposal-form-select"
-                                            value={formData.projectId}
-                                            onChange={(e) => handleProjectChange(e.target.value)}
-                                            required={!formData.projectName}
-                                        >
-                                            <option value="">Select project</option>
-                                            {projects.map((p) => (
-                                                <option key={p.id} value={p.id}>
-                                                    {p.name} {p.clientName ? `— ${p.clientName}` : ""}
-                                                </option>
-                                            ))}
-                                            <option value="__custom__">+ Enter Custom Project Name...</option>
-                                        </select>
-                                        <ChevronDown size={18} className="proposal-form-icon-right" />
-                                    </div>
+                                    <>
+                                        <div className="proposal-form-control-box">
+                                            <select
+                                                className="proposal-form-select"
+                                                value={formData.projectId}
+                                                onChange={(e) => handleProjectChange(e.target.value)}
+                                                required={!formData.projectName}
+                                            >
+                                                <option value="">Select project</option>
+                                                {projects.map((p) => (
+                                                    <option key={p.id} value={p.id}>
+                                                        {p.name} {p.clientName ? `— ${p.clientName}` : ""}
+                                                    </option>
+                                                ))}
+                                                <option value="__custom__">+ Enter Custom Project Name...</option>
+                                            </select>
+                                            <ChevronDown size={18} className="proposal-form-icon-right" />
+                                        </div>
+                                        <ContextualAddAction
+                                            entity="Project"
+                                            onClick={() => router.push("/projects?create=true&returnTo=%2Fproposals")}
+                                        />
+                                    </>
                                 ) : (
                                     <div style={{ display: "flex", gap: "8px", width: "100%" }}>
                                         <div className="proposal-form-control-box" style={{ flex: 1 }}>
@@ -1360,6 +1368,10 @@ function NewProposalModal({
                                         </select>
                                         <ChevronDown size={18} className="proposal-form-icon-right" />
                                     </div>
+                                    <ContextualAddAction
+                                        entity="BOQ"
+                                        onClick={() => router.push("/boqs?create=true&returnTo=%2Fproposals")}
+                                    />
                                 </div>
                             )}
 

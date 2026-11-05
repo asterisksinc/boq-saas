@@ -4,6 +4,7 @@ import React, { useState, useRef, ChangeEvent } from "react";
 import { X, FileSpreadsheet, Loader2, CheckCircle2, AlertCircle, UploadCloud } from "lucide-react";
 import * as XLSX from "xlsx";
 import { getApiErrorMessage } from "@/lib/api/auth";
+import ContextualAddAction from "@/components/shared/ContextualAddAction";
 
 interface ProjectOption {
     id: string;
@@ -544,6 +545,12 @@ export default function BoqExcelImportModal({
                                     </option>
                                 ))}
                             </select>
+                            <ContextualAddAction
+                                entity="Project"
+                                onClick={() => {
+                                    window.location.href = "/projects?create=true&returnTo=%2Fboqs";
+                                }}
+                            />
                         </div>
                         <div>
                             <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#0F172A", marginBottom: "6px" }}>

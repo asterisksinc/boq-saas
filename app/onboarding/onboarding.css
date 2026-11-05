@@ -1,0 +1,1780 @@
+/* ==========================================================================
+   USER ONBOARDING STYLES (FIGMA REDESIGN - 1440x900 REFERENCE)
+   ========================================================================== */
+
+.onb-root {
+    position: relative;
+    width: 100%;
+    min-height: 100vh;
+    background: #ffffff;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #0f172a;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+}
+
+/* --------------------------------------------------------------------------
+   Header (Figma Frame 45: 88px height, 1px dashed #E2E8F0, padding 24px 44px)
+   -------------------------------------------------------------------------- */
+.onb-header {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24px 44px;
+    height: 88px;
+    width: 100%;
+    border-bottom: 1px dashed #e2e8f0;
+    background: #ffffff;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+}
+
+.onb-logo-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.onb-logo-mark {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.onb-logo-mark img {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+}
+
+/* Language Selector (Figma Frame 12: 102px x 36px, 1px solid #E2E8F0, radius 4px) */
+.onb-lang-wrapper {
+    position: relative;
+}
+
+.onb-lang-pill {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    gap: 8px;
+    width: 102px;
+    height: 36px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.onb-lang-pill:hover,
+.onb-lang-pill:focus-visible {
+    border-color: #cbd5e1;
+    outline: none;
+}
+
+.onb-lang-globe {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+.onb-lang-text {
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 20px;
+    color: #0f172a;
+    flex-grow: 1;
+    text-align: left;
+}
+
+.onb-lang-chevron {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+}
+
+.onb-lang-chevron.open {
+    transform: rotate(180deg);
+}
+
+.onb-lang-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    width: 140px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    z-index: 60;
+}
+
+.onb-lang-item {
+    background: transparent;
+    border: none;
+    padding: 8px 10px;
+    font-size: 13px;
+    text-align: left;
+    color: #0f172a;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+
+.onb-lang-item:hover {
+    background: #f1f5f9;
+}
+
+.onb-lang-item.selected {
+    font-weight: 600;
+    color: #2563eb;
+    background: #eff6ff;
+}
+
+/* --------------------------------------------------------------------------
+   Body Layout (Figma Frame 2147225025: Sidebar + Main Area)
+   -------------------------------------------------------------------------- */
+.onb-body {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    flex: 1;
+    width: 100%;
+    min-height: calc(100vh - 88px);
+    box-sizing: border-box;
+}
+
+/* --------------------------------------------------------------------------
+   Sidebar (Figma Frame 2147225024: 300px width, 1px dashed #E2E8F0, padding 64px 30px)
+   -------------------------------------------------------------------------- */
+.onb-sidebar {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 64px 30px;
+    gap: 24px;
+    width: 300px;
+    min-width: 300px;
+    min-height: calc(100vh - 88px);
+    border-right: 1px dashed #e2e8f0;
+    background: #ffffff;
+    flex-shrink: 0;
+}
+
+.onb-sidebar-title {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    width: 238px;
+    height: 20px;
+}
+
+.onb-sidebar-title-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.onb-sidebar-title-text {
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0f172a;
+}
+
+/* Steps list (Figma Frame 2147225022) */
+.onb-steps-list {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    gap: 24px;
+    isolation: isolate;
+    width: 238px;
+    position: relative;
+}
+
+.onb-step-item {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 8px;
+    width: 238px;
+    min-height: 37px;
+    position: relative;
+    background: transparent;
+    border: none;
+    padding: 0;
+    text-align: left;
+    cursor: default;
+}
+
+.onb-step-item.clickable {
+    cursor: pointer;
+}
+
+.onb-step-item.clickable:hover .onb-step-title {
+    color: #2563eb;
+}
+
+/* Step Circle (20x20) */
+.onb-step-circle {
+    box-sizing: border-box;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+    z-index: 2;
+    transition: all 0.2s ease;
+}
+
+/* Completed Step: Green (#22C55E) with white checkmark */
+.onb-step-circle.completed {
+    background: #22c55e;
+    color: #ffffff;
+}
+
+.onb-step-check {
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+/* Active Step: Green (#22C55E) with inner white dot, matching Figma reference */
+.onb-step-circle.active {
+    background: #22c55e;
+    color: #ffffff;
+}
+
+.onb-step-active-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ffffff;
+}
+
+/* Upcoming Step: Muted Gray (#94A3B8) */
+.onb-step-circle.upcoming {
+    background: #94a3b8;
+    color: #ffffff;
+}
+
+.onb-step-upcoming-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #ffffff;
+}
+
+/* Connector Line (Figma Rectangles 60, 61, 62: width 2px, height 36px, left 9px, background #94A3B8) */
+.onb-step-line {
+    position: absolute;
+    width: 2px;
+    height: 32px;
+    left: 9px;
+    top: 22px;
+    background: #94a3b8;
+    border-radius: 51px;
+    z-index: 1;
+    transition: background 0.2s ease;
+}
+
+.onb-step-line.completed {
+    background: #22c55e;
+}
+
+/* Step Copy (Figma Frame 2147225019) */
+.onb-step-copy {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    gap: 4px;
+    flex-grow: 1;
+}
+
+.onb-step-title {
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #94a3b8;
+    transition: color 0.15s ease;
+}
+
+.onb-step-title.active {
+    color: #0f172a;
+}
+
+.onb-step-desc {
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #94a3b8;
+}
+
+.onb-step-desc.active {
+    color: #64748b;
+}
+
+/* --------------------------------------------------------------------------
+   Main Content Area (Figma Frame 27: padding 64px 334px 64px 160px, gap 40px)
+   -------------------------------------------------------------------------- */
+.onb-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 64px 160px;
+    box-sizing: border-box;
+    background: #ffffff;
+    min-height: calc(100vh - 88px);
+}
+
+@media (min-width: 1440px) {
+    .onb-main {
+        padding: 64px 334px 64px 160px;
+    }
+}
+
+@media (max-width: 1280px) {
+    .onb-main {
+        padding: 48px 60px;
+    }
+}
+
+/* Header block (Figma Frame 2147225026: 596px width, gap 8px) */
+.onb-content-header {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    gap: 8px;
+    width: 100%;
+    max-width: 596px;
+    margin-bottom: 24px;
+}
+
+.onb-content-title {
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 28px;
+    line-height: 36px;
+    letter-spacing: -0.005em;
+    color: #0f172a;
+    margin: 0;
+}
+
+.onb-content-subtitle {
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 140%;
+    color: #475569;
+    margin: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Form Card (Figma Frame 2147225027: width 596px, #F2F3F2, 20px radius, 24px padding)
+   -------------------------------------------------------------------------- */
+.onb-form-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 24px;
+    gap: 24px;
+    width: 100%;
+    max-width: 596px;
+    background: #f2f3f2;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+}
+
+/* Field Containers */
+.onb-field {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    gap: 8px;
+    width: 100%;
+}
+
+.onb-field-label-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+}
+
+.onb-field-label {
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    color: #0f172a;
+}
+
+.onb-field-required {
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 16px;
+    color: #dc2626;
+}
+
+/* Text Inputs (Figma Frame 12: height 48px, background #FFFFFF, radius 8px, padding 14px 16px) */
+.onb-text-input {
+    box-sizing: border-box;
+    width: 100%;
+    height: 48px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 20px;
+    color: #0f172a;
+    transition: all 0.15s ease;
+}
+
+.onb-text-input::placeholder {
+    color: #64748b;
+}
+
+.onb-text-input:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+    outline: none;
+}
+
+.onb-text-input.error {
+    border-color: #dc2626;
+    background: #fef2f2;
+}
+
+.onb-field-error {
+    font-size: 12px;
+    color: #dc2626;
+    font-weight: 500;
+    margin-top: 4px;
+}
+
+/* --------------------------------------------------------------------------
+   Business Type Cards (Figma: 2-column grid, 16px gap, 48px height each)
+   -------------------------------------------------------------------------- */
+.onb-business-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    width: 100%;
+}
+
+.onb-business-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 14px 16px;
+    gap: 12px;
+    height: 48px;
+    width: 100%;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: left;
+}
+
+.onb-business-card:hover {
+    border-color: #cbd5e1;
+}
+
+.onb-business-card.selected {
+    border: 1.5px solid #2563eb;
+    box-shadow: 0 0 0 1px #2563eb;
+    background: #ffffff;
+}
+
+.onb-business-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.onb-business-icon img {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+}
+
+.onb-business-name {
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    color: #0f172a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* --------------------------------------------------------------------------
+   Team Size Cards (Figma: row of 6 chips, 48px height, 16px gap)
+   -------------------------------------------------------------------------- */
+.onb-team-row {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+}
+
+.onb-team-chip {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px 8px;
+    height: 48px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    color: #0f172a;
+    transition: all 0.15s ease;
+    text-align: center;
+}
+
+.onb-team-chip:hover {
+    border-color: #cbd5e1;
+}
+
+.onb-team-chip.selected {
+    border: 1.5px solid #2563eb;
+    color: #2563eb;
+    box-shadow: 0 0 0 1px #2563eb;
+    background: #ffffff;
+}
+
+/* --------------------------------------------------------------------------
+   Step 2: Workflow Styles
+   -------------------------------------------------------------------------- */
+/* Information Notice (Figma Frame 22: 596px x 64px, #F2F3F2, 1px solid #E2E8F0, radius 6px, padding 12px, gap 10px) */
+.onb-info-callout {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+    background: #f2f3f2;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    width: 100%;
+    max-width: 596px;
+    min-height: 64px;
+    margin-bottom: 24px;
+}
+
+.onb-info-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #64748b;
+    margin-top: 1px;
+}
+
+.onb-info-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+.onb-info-text {
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    color: #64748b;
+    flex: 1;
+}
+
+/* Select Inputs (Figma Frame 12: height 48px, background #FFFFFF, border 1px solid #E2E8F0, radius 8px, padding 14px 16px) */
+.onb-select-input {
+    box-sizing: border-box;
+    width: 100%;
+    height: 48px;
+    background-color: #ffffff;
+    background-image: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5' stroke='%230F172A' stroke-width='1.67' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 16px center;
+    background-size: 20px 20px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0 44px 0 16px;
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 20px;
+    color: #0f172a;
+    cursor: pointer;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    transition: all 0.15s ease;
+}
+
+.onb-select-input:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.onb-select-input:hover {
+    border-color: #cbd5e1;
+}
+
+/* Hide spin buttons for numeric markup input */
+.onb-text-input[type="number"]::-webkit-outer-spin-button,
+.onb-text-input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.onb-text-input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+.onb-input-suffix-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.onb-input-suffix-wrapper .onb-text-input {
+    padding-right: 36px;
+}
+
+.onb-input-suffix {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    color: #0f172a;
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* Helper text below inputs (Figma Frame 14: 12px, line-height 16px, #475569) */
+.onb-helper-text {
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 400;
+    font-size: 12px;
+    line-height: 16px;
+    color: #475569;
+    margin-top: 4px;
+}
+
+/* Split Row for Tax & Default Markup (Figma Frame 2147225035: gap 24px, 546px width) */
+.onb-split-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+    width: 100%;
+}
+
+/* --------------------------------------------------------------------------
+   Step 3: Project Choice Cards (Figma Frame 2147225036 / Frame 2147225032)
+   -------------------------------------------------------------------------- */
+.onb-project-cards-row {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    padding: 0;
+    gap: 24px;
+    width: 100%;
+    max-width: 596px;
+    min-height: 284px;
+}
+
+.onb-project-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 24px;
+    gap: 18px;
+    width: 286px;
+    flex: 1;
+    min-height: 284px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    transition: all 0.2s ease;
+}
+
+.onb-project-card:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+/* Frame 26: Icon container 56x56, background #F1F5F9, radius 8px, padding 12px */
+.onb-project-card-icon {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+    gap: 10px;
+    width: 56px;
+    height: 56px;
+    background: #f1f5f9;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+.onb-project-card-icon svg {
+    width: 32px;
+    height: 32px;
+    color: #2563eb;
+}
+
+/* Frame 2: Title and Description container (236px x 94px, gap 6px) */
+.onb-project-card-body {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    gap: 6px;
+    width: 100%;
+    flex: 1;
+}
+
+.onb-project-card-title {
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 120%;
+    letter-spacing: -0.005em;
+    color: #0f172a;
+    margin: 0;
+}
+
+.onb-project-card-desc {
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 140%;
+    color: #475569;
+    margin: 0;
+}
+
+/* Card Button: width 100%, height 48px, background #2563EB, radius 6px, padding 14px 20px */
+.onb-project-card-btn {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px 20px;
+    gap: 8px;
+    width: 100%;
+    height: 48px;
+    background: #2563eb;
+    border-radius: 6px;
+    border: none;
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    color: #ffffff;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.onb-project-card-btn:hover:not(:disabled) {
+    background: #1d4ed8;
+}
+
+.onb-project-card-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Step 3 Footer Navigation Row (Frame 2147225031 & Frame 12: "Not ready yet? Go to Dashboard") */
+.onb-footer-dashboard-link-wrap {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    height: 20px;
+}
+
+.onb-footer-not-ready {
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    color: #0f172a;
+}
+
+.onb-footer-dashboard-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 14px;
+    color: #2563eb;
+    cursor: pointer;
+    text-decoration: underline;
+    transition: color 0.15s ease;
+}
+
+.onb-footer-dashboard-btn:hover {
+    color: #1d4ed8;
+}
+
+/* --------------------------------------------------------------------------
+   Step 4: Project Form Layout (Figma Frame 2147225027) & Status Chips
+   -------------------------------------------------------------------------- */
+/* Two-column layout for Project Name & Client Name (Figma Frame 2147225037) */
+.onb-project-two-col {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    padding: 0;
+    gap: 24px;
+    width: 100%;
+}
+
+.onb-project-col {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Status row: 3 equal width chips with 16px gap (Figma Frame 2147225028) */
+.onb-status-row {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    padding: 0;
+    gap: 16px;
+    width: 100%;
+}
+
+.onb-status-chip {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px 16px;
+    gap: 6px;
+    flex: 1;
+    height: 48px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    color: #0f172a;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.onb-status-chip:hover:not(.selected) {
+    border-color: #cbd5e1;
+}
+
+/* Active / Selected status chip: Green border (#22C55E) & green text (#22C55E) per Figma */
+.onb-status-chip.selected {
+    border: 1px solid #22c55e;
+    color: #22c55e;
+    background: #ffffff;
+}
+
+/* Ellipse 20: 8x8px green circle indicator */
+.onb-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #22c55e;
+    flex-shrink: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Step 4: Import Existing BOQ (Figma Frame 27 / Frame 2147225050 / Frame 2147225027)
+   -------------------------------------------------------------------------- */
+.onb-import-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    gap: 24px;
+    width: 100%;
+    max-width: 596px;
+    box-sizing: border-box;
+}
+
+/* Upload Card (Figma Frame 2147225027: 596x251px, #F2F3F2, 20px radius, 1px solid #E2E8F0) */
+.onb-upload-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 32px 24px;
+    gap: 24px;
+    width: 100%;
+    max-width: 596px;
+    min-height: 251px;
+    background: #f2f3f2;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+}
+
+.onb-upload-card:hover {
+    border-color: #cbd5e1;
+    background: #eef0ee;
+}
+
+.onb-upload-card.dragging {
+    border-color: #2563eb;
+    background: rgba(37, 99, 235, 0.05);
+}
+
+/* Upload Icon Badge (Figma Frame 2147225048: 62x62px, 8px radius, border #2563EB, bg rgba(37, 99, 235, 0.1)) */
+.onb-upload-icon-box {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    width: 62px;
+    height: 62px;
+    background: rgba(37, 99, 235, 0.1);
+    border: 1px solid #2563eb;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+.onb-upload-icon-box svg {
+    width: 24px;
+    height: 24px;
+    color: #2563eb;
+}
+
+/* Text Content Group (Figma Frame 2147225019: 546px width, 8px gap) */
+.onb-upload-text-group {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 0;
+    gap: 8px;
+    width: 100%;
+    max-width: 546px;
+}
+
+.onb-upload-heading {
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0f172a;
+    margin: 0;
+}
+
+.onb-upload-or {
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748b;
+    margin: 0;
+}
+
+/* Action Sub-wrap (Figma Frame 2147225049: 311px width, 6px gap) */
+.onb-upload-sub-action {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0;
+    gap: 6px;
+    width: 100%;
+    max-width: 311px;
+}
+
+/* Browse Button (Figma Frame: 130x32px, #FFFFFF, border 1px solid #E2E8F0, radius 6px) */
+.onb-upload-browse-btn {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 12px;
+    gap: 6px;
+    width: 130px;
+    height: 32px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 16px;
+    color: #0f172a;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.onb-upload-browse-btn:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+.onb-upload-specs {
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748b;
+    margin: 0;
+    text-align: center;
+}
+
+/* File Selected Card & Details */
+.onb-import-file-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 24px;
+    gap: 20px;
+    width: 100%;
+    max-width: 596px;
+    background: #f2f3f2;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+}
+
+.onb-import-file-header {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.onb-import-file-left {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+}
+
+.onb-import-file-icon-box {
+    width: 44px;
+    height: 44px;
+    background: rgba(37, 99, 235, 0.1);
+    border: 1px solid #2563eb;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #2563eb;
+    flex-shrink: 0;
+}
+
+.onb-import-file-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.onb-import-file-title {
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 18px;
+    color: #0f172a;
+    word-break: break-all;
+}
+
+.onb-import-file-meta {
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 16px;
+    color: #64748b;
+}
+
+.onb-import-change-btn {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 12px;
+    color: #0f172a;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.onb-import-change-btn:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+.onb-import-project-section {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.onb-import-preview-box {
+    box-sizing: border-box;
+    width: 100%;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.onb-import-preview-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    color: #0f172a;
+}
+
+.onb-import-columns-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.onb-import-col-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    color: #0f172a;
+}
+
+.onb-import-col-badge {
+    color: #2563eb;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.onb-import-status-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 6px;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    color: #16a34a;
+    font-weight: 500;
+}
+
+/* Fallback compatibility classes */
+.onb-upload-dropzone {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 20px;
+    background: #ffffff;
+    border: 2px dashed #cbd5e1;
+    border-radius: 12px;
+    width: 100%;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.onb-upload-icon {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 12px;
+}
+
+.onb-upload-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 4px;
+}
+
+.onb-upload-meta {
+    font-size: 12px;
+    color: #64748b;
+}
+
+.onb-import-preview {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 16px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.onb-import-file-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f1f5f9;
+    margin-bottom: 12px;
+    font-size: 14px;
+    color: #0f172a;
+}
+
+.onb-import-table-preview {
+    font-size: 13px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.onb-import-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid #f8fafc;
+}
+
+/* --------------------------------------------------------------------------
+   Step 5: Project Creation Confirmation Screen (Figma Frame 27 / Frame 2147225039)
+   -------------------------------------------------------------------------- */
+.onb-completion-view {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 596px;
+    gap: 40px;
+    box-sizing: border-box;
+}
+
+/* Success Badge (Outer: 82x82px, Frame 2147225039) */
+.onb-success-badge-outer {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    padding: 5px;
+    width: 82px;
+    height: 82px;
+    border: 2px solid rgba(34, 197, 94, 0.3);
+    border-radius: 71px;
+    flex-shrink: 0;
+}
+
+/* Success Badge (Inner: 68x68px, Frame 2147225038) */
+.onb-success-badge-inner {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    width: 68px;
+    height: 68px;
+    background: rgba(34, 197, 94, 0.2);
+    border: 2px solid #22c55e;
+    border-radius: 100px;
+    flex-shrink: 0;
+}
+
+.onb-success-badge-inner svg {
+    width: 28px;
+    height: 28px;
+    color: #22c55e;
+}
+
+/* Success Title & Description (Frame 2147225034) */
+.onb-success-header {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 0;
+    gap: 8px;
+    width: 100%;
+    max-width: 596px;
+    text-align: center;
+}
+
+.onb-success-title {
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 28px;
+    line-height: 36px;
+    letter-spacing: -0.005em;
+    color: #0f172a;
+    margin: 0;
+}
+
+.onb-success-subtitle {
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 140%;
+    color: #475569;
+    margin: 0;
+}
+
+/* Summary Card (Frame 2147225027: 596x286px, #F2F3F2, border-radius 20px) */
+.onb-success-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 16px 24px;
+    gap: 16px;
+    width: 100%;
+    max-width: 596px;
+    min-height: 286px;
+    background: #f2f3f2;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+}
+
+/* Summary Row (Frame 2147225042 - 2147225046) */
+.onb-success-row {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0;
+    gap: 24px;
+    width: 100%;
+    height: 24px;
+    box-sizing: border-box;
+}
+
+.onb-success-row-left {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0;
+    gap: 6px;
+}
+
+.onb-success-check-icon {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.onb-success-check-icon svg {
+    width: 18px;
+    height: 18px;
+    color: #22c55e;
+}
+
+.onb-success-label {
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    color: #475569;
+}
+
+.onb-success-value {
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    color: #0f172a;
+    text-align: right;
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.onb-success-divider {
+    width: 100%;
+    height: 1px;
+    background: #e2e8f0;
+    border: none;
+    margin: 0;
+}
+
+/* Success Footer Actions (Frame 2147225031) */
+.onb-success-actions-row {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0;
+    gap: 68px;
+    width: 100%;
+    max-width: 596px;
+    height: 48px;
+}
+
+.onb-btn-explore-templates {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px 20px;
+    gap: 8px;
+    min-width: 164px;
+    height: 48px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    color: #0f172a;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.onb-btn-explore-templates:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+.onb-btn-dashboard {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px 20px;
+    gap: 8px;
+    min-width: 153px;
+    height: 48px;
+    background: #2563eb;
+    border-radius: 6px;
+    border: none;
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    color: #ffffff;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.onb-btn-dashboard:hover {
+    background: #1d4ed8;
+}
+
+/* --------------------------------------------------------------------------
+   Footer Actions (Figma Frame 2147225031: Back & Continue buttons)
+   -------------------------------------------------------------------------- */
+.onb-actions-row {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0;
+    gap: 16px;
+    width: 100%;
+    max-width: 596px;
+    margin-top: 24px;
+}
+
+.onb-btn-back {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px 20px;
+    min-width: 73px;
+    height: 48px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    background: #ffffff;
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    color: #0f172a;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.onb-btn-back:hover:not(:disabled) {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+.onb-btn-back:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.onb-btn-continue {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 14px 24px;
+    min-width: 101px;
+    height: 48px;
+    background: #2563eb;
+    border-radius: 6px;
+    border: none;
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+    color: #ffffff;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.onb-btn-continue:hover:not(:disabled) {
+    background: #1d4ed8;
+}
+
+.onb-btn-continue:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Error banner */
+.onb-error-banner {
+    width: 100%;
+    max-width: 596px;
+    box-sizing: border-box;
+    padding: 12px 16px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    color: #b91c1c;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+/* --------------------------------------------------------------------------
+   Responsive Breakpoints
+   -------------------------------------------------------------------------- */
+@media (max-width: 900px) {
+    .onb-header {
+        padding: 16px 20px;
+        height: 72px;
+    }
+
+    .onb-body {
+        flex-direction: column;
+    }
+
+    .onb-sidebar {
+        width: 100%;
+        min-width: 100%;
+        min-height: auto;
+        padding: 20px 20px 16px;
+        border-right: none;
+        border-bottom: 1px dashed #e2e8f0;
+        gap: 16px;
+    }
+
+    .onb-steps-list {
+        flex-direction: row;
+        justify-content: space-between;
+        width: 100%;
+        gap: 8px;
+    }
+
+    .onb-step-item {
+        width: auto;
+        flex: 1;
+        gap: 6px;
+    }
+
+    .onb-step-desc {
+        display: none;
+    }
+
+    .onb-step-line {
+        display: none;
+    }
+
+    .onb-main {
+        padding: 32px 20px;
+        width: 100%;
+    }
+
+    .onb-form-card,
+    .onb-info-callout,
+    .onb-actions-row,
+    .onb-content-header {
+        max-width: 100%;
+    }
+
+    .onb-team-row {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 600px) {
+    .onb-business-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .onb-team-row {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .onb-split-row {
+        grid-template-columns: 1fr;
+    }
+
+    .onb-project-two-col {
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .onb-status-row {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .onb-success-actions-row {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .onb-btn-explore-templates,
+    .onb-btn-dashboard {
+        width: 100%;
+        min-width: 100%;
+    }
+
+    .onb-step-title {
+        font-size: 12px;
+    }
+}

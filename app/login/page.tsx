@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { AuthLayout } from "@/components/auth/AuthLayout";
-import { getApiErrorMessage, getUserPreferences, login } from "@/lib/api/auth";
+import { getApiErrorMessage, getOnboardingState, getUserPreferences, login } from "@/lib/api/auth";
 
 export default function LoginPage() {
     const router = useRouter();
@@ -23,13 +23,24 @@ export default function LoginPage() {
         try {
             const response = await login({ email: email.trim(), password });
             if (!response.otpRequired) {
-                const userPref = await getUserPreferences().catch(() => null);
-                const landing = userPref?.landingPage || userPref?.landing_page || "dashboard";
                 const requestedNext = new URLSearchParams(window.location.search).get("next");
                 const nextPath = requestedNext && requestedNext.startsWith("/") ? requestedNext : null;
-                const target = response.user?.role === "client"
-                    ? (nextPath?.startsWith("/client/") ? nextPath : "/client/dashboard")
-                    : (nextPath || (landing.startsWith("/") ? landing : `/${landing.toLowerCase()}`));
+                if (response.user?.role === "client") {
+                    router.push(nextPath?.startsWith("/client/") ? nextPath : "/client/dashboard");
+                    return;
+                }
+
+                // Check onboarding status for regular user
+                const onboarding = await getOnboardingState().catch(() => null);
+                const isComplete = onboarding?.isCompleted || onboarding?.status === "completed";
+                if (!isComplete) {
+                    router.push("/onboarding");
+                    return;
+                }
+
+                const userPref = await getUserPreferences().catch(() => null);
+                const landing = userPref?.landingPage || userPref?.landing_page || "dashboard";
+                const target = nextPath || (landing.startsWith("/") ? landing : `/${landing.toLowerCase()}`);
                 router.push(target);
                 return;
             }

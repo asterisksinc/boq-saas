@@ -13,6 +13,8 @@ import type { CostingScenario, Boq } from "@/lib/types";
 import { formatFullCurrency, formatScenarioDate, formatScenarioVariance } from "@/lib/costing-format";
 import CostingMoreMenu from "@/components/costing/CostingMoreMenu";
 import CostingPagination from "@/components/costing/CostingPagination";
+import ContextualAddAction from "@/components/shared/ContextualAddAction";
+import { useRouter } from "next/navigation";
 
 interface ScenariosTabProps {
     statusFilter?: string;
@@ -31,6 +33,7 @@ export default function ScenariosTab({
     isNewScenarioOpen: propIsNewScenarioOpen,
     setIsNewScenarioOpen: propSetIsNewScenarioOpen,
 }: ScenariosTabProps = {}) {
+    const router = useRouter();
     const [scenarios, setScenarios] = useState<CostingScenario[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -674,6 +677,10 @@ export default function ScenariosTab({
                                         ))
                                     )}
                                 </select>
+                                <ContextualAddAction
+                                    entity="BOQ"
+                                    onClick={() => router.push("/boqs?create=true&returnTo=%2Fcosts%3Ftab%3DScenarios")}
+                                />
                             </div>
 
                             <div>

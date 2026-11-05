@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
-import { DashboardOverview, getApiErrorMessage, getDashboardOverview } from "@/lib/api/auth";
+import { DashboardOverview, getApiErrorMessage, getDashboardOverview, getOnboardingState } from "@/lib/api/auth";
 
 type DashboardPeriod = "week" | "month" | "quarter";
 type DashboardItem = { name: string; subtitle?: string; value?: number; status?: string };
@@ -59,11 +59,19 @@ export default function DashboardPage() {
     const load = useCallback(async () => {
         setLoading(true); setError("");
         try {
-            const [overviewData, projRes, boqRes] = await Promise.all([
+            const [overviewData, projRes, boqRes, onboardingState] = await Promise.all([
                 getDashboardOverview(),
                 fetch("/api/v1/dashboard/recent-projects?pageSize=5", { credentials: "include" }).then(r => r.ok ? r.json() : null).catch(() => null),
                 fetch("/api/v1/dashboard/recent-boqs?pageSize=5", { credentials: "include" }).then(r => r.ok ? r.json() : null).catch(() => null),
+                getOnboardingState().catch(() => null),
             ]);
+            if (onboardingState && !onboardingState.isCompleted && onboardingState.status !== "completed") {
+                const isDeferred = typeof window !== "undefined" && window.sessionStorage.getItem("onboarding_deferred") === "true";
+                if (!isDeferred) {
+                    router.replace("/onboarding");
+                    return;
+                }
+            }
             setOverview(overviewData);
             setRecentProjects(toDashboardItems(projRes?.data?.items ?? overviewData.recentProjects, "project"));
             setRecentBoqs(toDashboardItems(boqRes?.data?.items ?? overviewData.recentBoqs, "boq"));
