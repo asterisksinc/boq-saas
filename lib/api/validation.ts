@@ -101,12 +101,12 @@ export const preferencesPatchSchema = z
     theme: z.enum(["light", "dark", "system"]).optional(),
     density: z.enum(["comfortable", "compact"]).optional(),
     landingPage: z.string().trim().min(1).max(80).optional(),
-    projectView: z.enum(["table", "card"]).optional(),
+    projectView: z.enum(["table", "card", "board"]).optional(),
     emailDigest: z.string().trim().min(1).max(40).optional(),
     date_format: z.string().trim().min(1).max(40).optional(),
     currency_display: z.string().trim().min(1).max(40).optional(),
     landing_page: z.string().trim().min(1).max(80).optional(),
-    project_view: z.enum(["table", "card"]).optional(),
+    project_view: z.enum(["table", "card", "board"]).optional(),
     email_digest: z.string().trim().min(1).max(40).optional(),
   })
   .strict();
@@ -218,6 +218,9 @@ const projectBaseSchema = z
     estimator: z.string().trim().max(120).nullable().optional(),
     procurementOwner: z.string().trim().max(120).nullable().optional(),
     financeOwner: z.string().trim().max(120).nullable().optional(),
+    stage: z.string().trim().max(80).nullable().optional(),
+    workflowStage: z.string().trim().max(80).nullable().optional(),
+    stageId: z.string().trim().max(80).nullable().optional(),
   })
   .strict();
 
@@ -234,6 +237,14 @@ export const projectPatchSchema = projectBaseSchema.partial().strict().superRefi
   if (value.startDate && value.targetCompletionDate && value.targetCompletionDate < value.startDate) {
     ctx.addIssue({ code: "custom", path: ["targetCompletionDate"], message: "Target completion cannot be before the start date." });
   }
+});
+
+export const projectWorkflowSchema = z.object({
+  stageId: z.string().trim().max(80).optional(),
+  workflowStage: z.string().trim().max(80).optional(),
+  stage: z.string().trim().max(80).optional(),
+}).refine((value) => Boolean(value.stageId || value.workflowStage || value.stage), {
+  message: "Either stageId, workflowStage, or stage is required.",
 });
 
 export const projectStatusSchema = z.object({

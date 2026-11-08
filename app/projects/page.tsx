@@ -29,8 +29,11 @@ export type Project = {
   totalCost?: number | null;
   stage?: string | null;
   currentPhase?: string | null;
+  workflowStage?: string | null;
   leadDesigner?: string | null;
   designer?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
   rooms?: ProjectRoom[];
 };
 
@@ -156,11 +159,26 @@ const formatTimeline = (start?: string | null, end?: string | null) => {
   return `Due ${fmt(end!)}`;
 };
 
+const WORKFLOW_STAGES = [
+  { id: "design_concept", key: "design_concept", title: "Design Concept", label: "DESIGN CONCEPT" },
+  { id: "boq_approval", key: "boq_approval", title: "BOQ Approval", label: "BOQ APPROVAL" },
+  { id: "procurement", key: "procurement", title: "Procurement", label: "PROCUREMENT" },
+  { id: "site_execution", key: "site_execution", title: "Site Execution", label: "SITE EXECUTION" },
+] as const;
+
+function getProjectStageKey(p: Project): "design_concept" | "boq_approval" | "procurement" | "site_execution" {
+  const raw = (p.stage || p.workflowStage || p.currentPhase || "").toLowerCase();
+  if (raw.includes("boq") || raw.includes("approval") || raw.includes("review")) return "boq_approval";
+  if (raw.includes("procure") || raw.includes("order") || raw.includes("purchase")) return "procurement";
+  if (raw.includes("site") || raw.includes("execut") || raw.includes("construct")) return "site_execution";
+  return "design_concept";
+}
+
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
-  const [view, setView] = useState<"list" | "grid">("list");
+  const [view, setView] = useState<"list" | "grid" | "board">("grid");
   const [filter, setFilter] = useState("all");
   const [filterOpen, setFilterOpen] = useState(false);
   const [menuState, setMenuState] = useState<{
@@ -280,11 +298,12 @@ export default function ProjectsPage() {
         const pv = b?.data?.projectView || b?.data?.project_view;
         if (pv === "card") setView("grid");
         else if (pv === "table") setView("list");
+        else if (pv === "board" || pv === "kanban") setView("board");
       })
       .catch(() => {});
   }, []);
 
-  const changeView = (nextView: "list" | "grid") => {
+  const changeView = (nextView: "list" | "grid" | "board") => {
     setView(nextView);
     fetch("/api/v1/users/me/preferences", {
       method: "PATCH",
@@ -444,6 +463,57 @@ export default function ProjectsPage() {
   const openEditDetails = (p: Project) => {
     setMenuState(null);
     setEditingProject(p);
+  };
+
+  const moveProjectWorkflow = async (projectId: string, targetStageKey: string) => {
+    const targetStage = WORKFLOW_STAGES.find((s) => s.id === targetStageKey) || WORKFLOW_STAGES[0];
+    const project = projects.find((p) => p.id === projectId);
+    if (!project) return;
+    const currentKey = getProjectStageKey(project);
+    if (currentKey === targetStageKey) return;
+
+    // Snapshot for rollback on network or server error
+    const rollbackSnapshot = [...projects];
+
+    // Optimistic UI update across all views (Board, Grid, List)
+    setProjects((prev) =>
+      prev.map((p) =>
+        p.id === projectId
+          ? {
+              ...p,
+              stage: targetStage.title,
+              workflowStage: targetStage.id,
+              currentPhase: targetStage.title,
+            }
+          : p
+      )
+    );
+
+    try {
+      const res = await fetch(`/api/v1/projects/${projectId}/workflow`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workflowStage: targetStage.id,
+        }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error?.message || "Failed to persist workflow update");
+      } else {
+        const body = await res.json();
+        if (body.data) {
+          setProjects((prev) => prev.map((p) => (p.id === projectId ? { ...p, ...body.data } : p)));
+        }
+        setNotice(`Project moved to ${targetStage.title}.`);
+      }
+    } catch {
+      // Revert optimistic update
+      setProjects(rollbackSnapshot);
+      setNotice("Failed to update project stage. Changes reverted.");
+    }
   };
 
   const resumeWizard = (p: Project, step = "rooms") => {
@@ -611,6 +681,15 @@ export default function ProjectsPage() {
               <div className="view-switch">
                 <button
                   type="button"
+                  title="Grid view"
+                  aria-label="Grid view"
+                  className={view === "grid" ? "active" : ""}
+                  onClick={() => changeView("grid")}
+                >
+                  <img src="/assets/projects/view-grid.svg" alt="Grid view" width={18} height={18} />
+                </button>
+                <button
+                  type="button"
                   title="List view"
                   aria-label="List view"
                   className={view === "list" ? "active" : ""}
@@ -620,12 +699,12 @@ export default function ProjectsPage() {
                 </button>
                 <button
                   type="button"
-                  title="Grid view"
-                  aria-label="Grid view"
-                  className={view === "grid" ? "active" : ""}
-                  onClick={() => changeView("grid")}
+                  title="Board view"
+                  aria-label="Board view"
+                  className={view === "board" ? "active" : ""}
+                  onClick={() => changeView("board")}
                 >
-                  <img src="/assets/projects/view-grid.svg" alt="Grid view" width={18} height={18} />
+                  <img src="/assets/projects/view-board.svg" alt="Board view" width={18} height={18} />
                 </button>
               </div>
             </div>
@@ -679,6 +758,18 @@ export default function ProjectsPage() {
                 activeMenuId={menuState?.project.id ?? null}
                 toggleMenu={toggleMenu}
               />
+            ) : view === "board" ? (
+              <Board
+                projects={projects}
+                activeMenuId={menuState?.project.id ?? null}
+                toggleMenu={toggleMenu}
+                onMoveProject={moveProjectWorkflow}
+                onQuickAdd={() => {
+                  setWizardProject(null);
+                  setCreateScreen("choice");
+                  setCreate(true);
+                }}
+              />
             ) : (
               <Table
                 projects={projects}
@@ -730,6 +821,10 @@ export default function ProjectsPage() {
                 exportProject={exportSingleProject}
                 openEdit={openEditDetails}
                 closeMenu={() => setMenuState(null)}
+                onMoveWorkflow={(id, stg) => {
+                  setMenuState(null);
+                  moveProjectWorkflow(id, stg);
+                }}
               />
             </div>
           </>
@@ -818,6 +913,59 @@ function Table({
   activeMenuId: string | null;
   toggleMenu: (p: Project, btn: HTMLElement) => void;
 }) {
+  const [sortField, setSortField] = useState<string>("date");
+  const [sortAsc, setSortAsc] = useState<boolean>(false);
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortAsc(!sortAsc);
+    } else {
+      setSortField(field);
+      setSortAsc(true);
+    }
+  };
+
+  const sortedProjects = useMemo(() => {
+    return [...projects].sort((a, b) => {
+      let va: any = "";
+      let vb: any = "";
+      if (sortField === "id") {
+        va = a.projectCode || "";
+        vb = b.projectCode || "";
+      } else if (sortField === "project") {
+        va = a.name || "";
+        vb = b.name || "";
+      } else if (sortField === "type") {
+        va = a.projectType || "";
+        vb = b.projectType || "";
+      } else if (sortField === "stage") {
+        va = a.stage || a.currentPhase || "";
+        vb = b.stage || b.currentPhase || "";
+      } else if (sortField === "status") {
+        va = a.status || "";
+        vb = b.status || "";
+      } else if (sortField === "designer") {
+        va = a.leadDesigner || a.designer || a.clientName || "";
+        vb = b.leadDesigner || b.designer || b.clientName || "";
+      } else if (sortField === "boqs") {
+        va = a.boqsCount ?? 0;
+        vb = b.boqsCount ?? 0;
+      } else if (sortField === "margin") {
+        va = a.margin ?? 0;
+        vb = b.margin ?? 0;
+      } else if (sortField === "progress") {
+        va = a.progress ?? 0;
+        vb = b.progress ?? 0;
+      } else {
+        va = a.targetCompletionDate || a.createdAt || "";
+        vb = b.targetCompletionDate || b.createdAt || "";
+      }
+      if (va < vb) return sortAsc ? -1 : 1;
+      if (va > vb) return sortAsc ? 1 : -1;
+      return 0;
+    });
+  }, [projects, sortField, sortAsc]);
+
   return (
     <div className="projects-table-card">
       <div className="projects-table-wrap">
@@ -838,7 +986,7 @@ function Table({
             </tr>
           </thead>
           <tbody>
-            {projects.map((p, i) => {
+            {sortedProjects.map((p, i) => {
               return (
                 <tr key={p.id} onClick={() => location.assign(`/projects/${p.id}`)}>
                   <td className="cell-id">{p.projectCode || `PRJ-${String(i + 1).padStart(4, "0")}`}</td>
@@ -925,7 +1073,7 @@ function Grid({
 }) {
   return (
     <div className="project-grid">
-      {projects.map((p) => {
+      {projects.map((p, idx) => {
         return (
           <div key={p.id} className="project-card" onClick={() => location.assign(`/projects/${p.id}`)}>
             <div className="project-card-header">
@@ -934,7 +1082,7 @@ function Grid({
                   {p.name}
                   {p.location ? ` — ${p.location}` : ""}
                 </h3>
-                <p className="project-card-code">{p.projectCode || "PRJ-0001"}</p>
+                <p className="project-card-code">{p.projectCode || `PRJ-${String(idx + 1).padStart(4, "0")}`}</p>
               </div>
               <div className="project-card-header-right" onClick={(e) => e.stopPropagation()}>
                 <span className={`project-status-badge status-${(p.status || "").toLowerCase().replace(/\s+/g, "_")}`}>
@@ -1030,6 +1178,221 @@ function Grid({
   );
 }
 
+function Board({
+  projects,
+  activeMenuId,
+  toggleMenu,
+  onMoveProject,
+  onQuickAdd,
+}: {
+  projects: Project[];
+  activeMenuId: string | null;
+  toggleMenu: (p: Project, btn: HTMLElement) => void;
+  onMoveProject: (projectId: string, targetStageKey: string) => Promise<void>;
+  onQuickAdd?: (stageKey: string) => void;
+}) {
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dragOverCol, setDragOverCol] = useState<string | null>(null);
+
+  const columns = useMemo(() => {
+    const map: Record<string, Project[]> = {
+      design_concept: [],
+      boq_approval: [],
+      procurement: [],
+      site_execution: [],
+    };
+    projects.forEach((p) => {
+      const key = getProjectStageKey(p);
+      if (map[key]) {
+        map[key].push(p);
+      } else {
+        map.design_concept.push(p);
+      }
+    });
+    return map;
+  }, [projects]);
+
+  const handleDragStart = (e: React.DragEvent, project: Project) => {
+    setDraggedId(project.id);
+    e.dataTransfer.setData("text/plain", project.id);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragEnd = () => {
+    setDraggedId(null);
+    setDragOverCol(null);
+  };
+
+  const handleDragOverCol = (e: React.DragEvent, colKey: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverCol !== colKey) {
+      setDragOverCol(colKey);
+    }
+  };
+
+  const handleDragLeaveCol = (e: React.DragEvent, colKey: string) => {
+    if (e.currentTarget === e.target) {
+      setDragOverCol(null);
+    }
+  };
+
+  const handleDropOnCol = (e: React.DragEvent, colKey: string) => {
+    e.preventDefault();
+    setDragOverCol(null);
+    const id = draggedId || e.dataTransfer.getData("text/plain");
+    setDraggedId(null);
+    if (!id) return;
+    onMoveProject(id, colKey);
+  };
+
+  return (
+    <div className="projects-kanban-board" role="region" aria-label="Projects workflow board">
+      {WORKFLOW_STAGES.map((col) => {
+        const colProjects = columns[col.id] || [];
+        const isOver = dragOverCol === col.id;
+
+        return (
+          <div
+            key={col.id}
+            className={`kanban-column ${isOver ? "drag-over" : ""}`}
+            onDragOver={(e) => handleDragOverCol(e, col.id)}
+            onDragLeave={(e) => handleDragLeaveCol(e, col.id)}
+            onDrop={(e) => handleDropOnCol(e, col.id)}
+            data-stage={col.id}
+          >
+            <div className="kanban-column-header">
+              <div className="kanban-column-title-wrap">
+                <h3 className="kanban-column-title">{col.label}</h3>
+                <span className="kanban-column-badge">{colProjects.length}</span>
+              </div>
+              {onQuickAdd && (
+                <button
+                  type="button"
+                  className="kanban-column-add-btn"
+                  title={`Add project to ${col.title}`}
+                  aria-label={`Add project to ${col.title}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onQuickAdd(col.id);
+                  }}
+                >
+                  <Plus size={16} />
+                </button>
+              )}
+            </div>
+
+            <div className="kanban-column-divider" />
+
+            <div className="kanban-cards-list">
+              {colProjects.length === 0 ? (
+                <div className="kanban-column-empty">
+                  <span>No projects in this stage</span>
+                  <small style={{ color: "#94A3B8", fontSize: "11px" }}>Drag cards here to move</small>
+                </div>
+              ) : (
+                colProjects.map((p, idx) => {
+                  const isBeingDragged = draggedId === p.id;
+                  const pct = Math.min(100, Math.max(0, p.progress || 0));
+                  const progressColor = pct >= 100 ? "#16A34A" : pct >= 50 ? "#2563EB" : "#F59E0B";
+                  const designerName = p.leadDesigner || p.designer || p.clientName?.split(" ")[0] || "Unassigned";
+                  const st = (p.status || "planning").toLowerCase().replace(/\s+/g, "_");
+
+                  return (
+                    <div
+                      key={p.id}
+                      className={`kanban-card ${isBeingDragged ? "is-dragging" : ""}`}
+                      draggable={true}
+                      onDragStart={(e) => handleDragStart(e, p)}
+                      onDragEnd={handleDragEnd}
+                      onClick={() => location.assign(`/projects/${p.id}`)}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Project ${p.name}, stage ${col.title}`}
+                    >
+                      <div className="kanban-card-top">
+                        <span className="kanban-card-id">
+                          {p.projectCode || `PRJ-${String(idx + 1).padStart(4, "0")}`}
+                        </span>
+                        <div className="kanban-card-top-right" onClick={(e) => e.stopPropagation()}>
+                          <span className={`kanban-card-status status-${st}`}>
+                            {label(p.status || "planning")}
+                          </span>
+                          <button
+                            type="button"
+                            className={`more-button ${activeMenuId === p.id ? "active" : ""}`}
+                            title="More actions"
+                            aria-label="More actions"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              toggleMenu(p, e.currentTarget);
+                            }}
+                          >
+                            <MoreHorizontal size={18} color="#64748B" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="kanban-card-main">
+                        <h4 className="kanban-card-name" title={p.name}>
+                          {p.name}
+                        </h4>
+                        <div className="kanban-card-client-location">
+                          <span>{p.clientName || "—"}</span>
+                          {p.location && (
+                            <>
+                              <span className="kanban-card-dot">·</span>
+                              <span>{p.location}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="kanban-card-meta-row">
+                        <span className="kanban-card-pill">
+                          {p.projectType || "Residential"}
+                        </span>
+                        <span className="kanban-card-dot">·</span>
+                        <span className="kanban-card-boqs">
+                          {p.boqsCount ?? 0} BOQs
+                        </span>
+                      </div>
+
+                      <div className="kanban-card-progress-section">
+                        <span className="kanban-card-progress-label">Progress</span>
+                        <div className="kanban-card-progress-bar-wrap">
+                          <div className="kanban-card-progress-track">
+                            <div
+                              className="kanban-card-progress-fill"
+                              style={{ width: `${pct}%`, background: progressColor }}
+                            />
+                          </div>
+                          <span className="kanban-card-progress-pct">{pct}%</span>
+                        </div>
+                      </div>
+
+                      <div className="kanban-column-divider" />
+
+                      <div className="kanban-card-bottom">
+                        <span className="kanban-card-designer-label">Designer</span>
+                        <span className="kanban-card-designer-val" title={designerName}>
+                          {designerName}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function Menu({
   project,
   status,
@@ -1039,6 +1402,7 @@ function Menu({
   exportProject,
   openEdit,
   closeMenu,
+  onMoveWorkflow,
 }: {
   project: Project;
   status: (p: Project, x: string) => void;
@@ -1048,6 +1412,7 @@ function Menu({
   exportProject: (p: Project) => void;
   openEdit: (p: Project) => void;
   closeMenu: () => void;
+  onMoveWorkflow?: (projectId: string, stageKey: string) => void;
 }) {
   const go = (path: string) => (e: React.MouseEvent) => {
     e.preventDefault();
@@ -1062,6 +1427,8 @@ function Menu({
     closeMenu();
     fn();
   };
+
+  const currentStageKey = getProjectStageKey(project);
 
   return (
     <>
@@ -1085,6 +1452,26 @@ function Menu({
         <img src="/assets/projects/menu-export.svg" alt="" width={18} height={18} />
         Export
       </button>
+
+      {onMoveWorkflow && (
+        <div className="menu-section-divider">
+          <span className="menu-section-title">MOVE TO STAGE</span>
+          {WORKFLOW_STAGES.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              className={currentStageKey === s.id ? "selected-option" : ""}
+              onClick={act(() => onMoveWorkflow(project.id, s.id))}
+            >
+              <span style={{ width: 14, display: "inline-flex" }}>
+                {currentStageKey === s.id ? "✓" : "•"}
+              </span>
+              {s.title}
+            </button>
+          ))}
+        </div>
+      )}
+
       <button
         type="button"
         onClick={act(() => status(project, project.status === "on_hold" ? "active" : "on_hold"))}

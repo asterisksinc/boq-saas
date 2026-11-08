@@ -36,6 +36,7 @@ import {
   projectRoomRequirementPatchSchema,
   projectRoomRequirementMaterialSchema,
   projectStatusSchema,
+  projectWorkflowSchema,
   projectClientInviteSchema,
   clientRegisterSchema,
   clientDocumentSignSchema,
@@ -111,6 +112,16 @@ type Params = { params: Promise<{ path: string[] }> };
 
 async function body(request: Request) {
   try { return await request.json(); } catch { return null; }
+}
+
+function isMissingProjectColumnError(error: { code?: string; message?: string } | null | undefined) {
+  return Boolean(
+    error && (
+      error.code === "42703" ||
+      error.code === "PGRST204" ||
+      error.message?.toLowerCase().includes("column")
+    )
+  );
 }
 
 async function parsed<T extends z.ZodType>(request: Request, schema: T, id: string) {
@@ -3898,6 +3909,10 @@ function projectDto(row: Record<string, unknown>, metrics?: ProjectMetrics) {
   const fallbackEstimated = approvedBudget ?? projectValue ?? 0;
   const metadata = (row.metadata && typeof row.metadata === "object" ? row.metadata : {}) as Record<string, unknown>;
 
+  const tagsList = Array.isArray(row.tags) ? (row.tags as string[]) : [];
+  const stageTag = tagsList.find((t) => typeof t === "string" && t.startsWith("stage:"));
+  const tagStageValue = stageTag ? stageTag.slice(6).trim() : null;
+
   return {
     id: row.id,
     projectCode: row.project_code,
@@ -3915,7 +3930,7 @@ function projectDto(row: Record<string, unknown>, metrics?: ProjectMetrics) {
     startDate: row.start_date,
     targetCompletionDate: row.target_completion_date,
     assignedDesignerId: row.assigned_designer_id,
-    tags: row.tags ?? [],
+    tags: tagsList,
     progress: metrics ? metrics.progress : Math.min(100, Math.max(0, Number(row.progress ?? 0))),
     imageUrl: row.cover_image ?? (typeof metadata.coverImage === "string" ? metadata.coverImage : null),
     coverImage: row.cover_image ?? (typeof metadata.coverImage === "string" ? metadata.coverImage : null),
@@ -3944,6 +3959,9 @@ function projectDto(row: Record<string, unknown>, metrics?: ProjectMetrics) {
     contractReference: (metadata.contractReference as string) || null,
     projectManager: (metadata.projectManager as string) || null,
     leadDesigner: (metadata.leadDesigner as string) || (row.assigned_designer_id as string) || null,
+    stage: (metadata.stage as string) || tagStageValue || (metadata.workflowStage as string) || (metadata.currentPhase as string) || (row.stage as string) || "Design Concept",
+    workflowStage: (metadata.workflowStage as string) || tagStageValue || (metadata.stage as string) || (metadata.currentPhase as string) || (row.workflow_stage as string) || "design_concept",
+    stageId: tagStageValue || (metadata.stageId as string) || (metadata.workflowStage as string) || null,
     estimator: (metadata.estimator as string) || null,
     procurementOwner: (metadata.procurementOwner as string) || null,
     financeOwner: (metadata.financeOwner as string) || null,
@@ -3969,7 +3987,7 @@ function projectValues(input: Record<string, unknown>, existingMetadata: Record<
     "organization", "billingContact", "communicationPreference",
     "actualStartDate", "currentPhase", "priority",
     "currency", "taxConfiguration", "targetMargin", "paymentTerms", "contractReference",
-    "projectManager", "leadDesigner", "estimator", "procurementOwner", "financeOwner",
+    "projectManager", "leadDesigner", "estimator", "procurementOwner", "financeOwner", "stage", "workflowStage",
   ];
 
   const result: Record<string, unknown> = {};
@@ -3985,6 +4003,20 @@ function projectValues(input: Record<string, unknown>, existingMetadata: Record<
     if (mKey in input) {
       newMeta[mKey] = input[mKey];
       metaChanged = true;
+    }
+  }
+  if (input.stage || input.workflowStage || input.stageId) {
+    const stg = String(input.stageId || input.workflowStage || input.stage || "").trim();
+    if (stg) {
+      newMeta.stage = stg;
+      newMeta.workflowStage = stg;
+      newMeta.stageId = stg;
+      metaChanged = true;
+      const currentTags = Array.isArray(result.tags)
+        ? (result.tags as string[])
+        : (Array.isArray(input.tags) ? (input.tags as string[]) : []);
+      const cleanTags = currentTags.filter((t) => typeof t === "string" && !t.startsWith("stage:"));
+      result.tags = [...cleanTags, `stage:${stg}`];
     }
   }
   if (input.coverImage) {
@@ -4015,7 +4047,7 @@ async function listProjects(request: NextRequest, supabase: SupabaseClient, id: 
     query = query.or(`project_code.ilike.%${safe}%,name.ilike.%${safe}%,client_name.ilike.%${safe}%,location.ilike.%${safe}%`);
   }
   let result: any = await query;
-  if (result.error && (result.error.message?.includes("column") || result.error.code === "42703")) {
+  if (isMissingProjectColumnError(result.error)) {
     let fallbackQuery = supabase.from("projects").select(projectBaseSelect, { count: "exact" })
       .eq("workspace_id", scoped.access.workspaceId).is("archived_at", null)
       .order("updated_at", { ascending: false }).range(from, to);
@@ -4076,10 +4108,12 @@ async function createProject(request: Request, supabase: SupabaseClient, id: str
   let insertRes = await supabase.from("projects").insert({
     workspace_id: scoped.access.workspaceId, created_by: scoped.access.userId, ...projectValues(input.data),
   }).select(projectSelect).single();
-  if (insertRes.error && (insertRes.error.message?.includes("column") || insertRes.error.code === "42703")) {
+  if (isMissingProjectColumnError(insertRes.error)) {
     const safeVals = { ...projectValues(input.data) };
     delete safeVals.metadata;
     delete safeVals.cover_image;
+    delete safeVals.stage;
+    delete safeVals.workflow_stage;
     insertRes = await supabase.from("projects").insert({
       workspace_id: scoped.access.workspaceId, created_by: scoped.access.userId, ...safeVals,
     }).select(projectBaseSelect).single();
@@ -4203,7 +4237,7 @@ function formatRoom(row: Record<string, unknown>) {
 async function getProject(supabase: SupabaseClient, id: string, projectId: string) {
   const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
   let project: any = await supabase.from("projects").select(projectSelect).eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).is("archived_at", null).maybeSingle();
-  if (project.error && (project.error.message?.includes("column") || project.error.code === "42703")) {
+  if (isMissingProjectColumnError(project.error)) {
     project = await supabase.from("projects").select(projectBaseSelect).eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).is("archived_at", null).maybeSingle();
   }
   const rooms = await supabase.from("project_rooms").select("id,project_id,name,room_type,length,width,height,unit,notes,sort_order,created_at,updated_at").eq("workspace_id", scoped.access.workspaceId).eq("project_id", projectId).order("sort_order");
@@ -4228,10 +4262,12 @@ async function updateProject(request: Request, supabase: SupabaseClient, id: str
   if (Object.keys(values).length === 0) return fail("VALIDATION_ERROR", "At least one valid field must be provided.", 400, id);
   let updateRes = await supabase.from("projects").update(values)
     .eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).is("archived_at", null).select(projectSelect).maybeSingle();
-  if (updateRes.error && (updateRes.error.message?.includes("column") || updateRes.error.code === "42703")) {
+  if (isMissingProjectColumnError(updateRes.error)) {
     const safeVals = { ...values };
     delete safeVals.metadata;
     delete safeVals.cover_image;
+    delete safeVals.stage;
+    delete safeVals.workflow_stage;
     updateRes = await supabase.from("projects").update(safeVals)
       .eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).is("archived_at", null).select(projectBaseSelect).maybeSingle();
   }
@@ -4245,12 +4281,115 @@ async function updateProject(request: Request, supabase: SupabaseClient, id: str
   return ok(projectDto(data as Record<string, unknown>), 200, id);
 }
 
+function normalizeWorkflowStage(input: string): { id: string; title: string } {
+  const clean = input.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (clean.includes("boq") || clean.includes("approval") || clean.includes("review")) {
+    return { id: "boq_approval", title: "BOQ Approval" };
+  }
+  if (clean.includes("procure") || clean.includes("order") || clean.includes("purchase")) {
+    return { id: "procurement", title: "Procurement" };
+  }
+  if (clean.includes("site") || clean.includes("execut") || clean.includes("construct")) {
+    return { id: "site_execution", title: "Site Execution" };
+  }
+  return { id: "design_concept", title: "Design Concept" };
+}
+
+async function changeProjectWorkflow(request: Request, supabase: SupabaseClient, id: string, projectId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
+  const input = await parsed(request, projectWorkflowSchema, id); if (input.response) return input.response;
+  const targetStageInput = (input.data.stageId || input.data.workflowStage || input.data.stage || "").trim();
+
+  // 1. Fetch existing project using projectBaseSelect (avoiding non-existent columns)
+  const existing = await supabase.from("projects")
+    .select(projectBaseSelect)
+    .eq("workspace_id", scoped.access.workspaceId)
+    .eq("id", projectId)
+    .is("archived_at", null)
+    .maybeSingle();
+
+  if (existing.error) {
+    console.error(JSON.stringify({
+      requestId: id,
+      event: "project_workflow_load_failed",
+      code: existing.error.code,
+      message: existing.error.message,
+    }));
+    return fail("INTERNAL_ERROR", "Project could not be loaded.", 500, id);
+  }
+  if (!existing.data) return fail("NOT_FOUND", "Project was not found.", 404, id);
+
+  // 2. Resolve destination stage against workspace activity_stages if available
+  let resolvedStageId = targetStageInput;
+  let resolvedStageTitle = targetStageInput;
+
+  const { data: stagesList } = await supabase
+    .from("activity_stages")
+    .select("id, name")
+    .eq("workspace_id", scoped.access.workspaceId);
+
+  if (Array.isArray(stagesList) && stagesList.length > 0) {
+    const matched = stagesList.find((s) => s.id === targetStageInput)
+      || stagesList.find((s) => s.name.toLowerCase() === targetStageInput.toLowerCase());
+    if (matched) {
+      resolvedStageId = matched.id;
+      resolvedStageTitle = matched.name;
+    } else {
+      const normalized = normalizeWorkflowStage(targetStageInput);
+      resolvedStageId = normalized.id;
+      resolvedStageTitle = normalized.title;
+    }
+  } else {
+    const normalized = normalizeWorkflowStage(targetStageInput);
+    resolvedStageId = normalized.id;
+    resolvedStageTitle = normalized.title;
+  }
+
+  // 3. Compute updated tags: preserve non-stage tags and append destination stage tag
+  const currentTags = Array.isArray(existing.data.tags) ? (existing.data.tags as string[]) : [];
+  const cleanTags = currentTags.filter((t) => typeof t === "string" && !t.startsWith("stage:"));
+  const updatedTags = [...cleanTags, `stage:${resolvedStageId}`];
+
+  // 4. Update ONLY valid columns on public.projects
+  const updateRes = await supabase.from("projects")
+    .update({ tags: updatedTags })
+    .eq("workspace_id", scoped.access.workspaceId)
+    .eq("id", projectId)
+    .is("archived_at", null)
+    .select(projectBaseSelect)
+    .maybeSingle();
+
+  if (updateRes.error) {
+    console.error(JSON.stringify({
+      requestId: id,
+      event: "project_workflow_update_failed",
+      code: updateRes.error.code,
+      message: updateRes.error.message,
+    }));
+    return fail("VALIDATION_ERROR", "Project workflow could not be updated.", 400, id);
+  }
+  if (!updateRes.data) return fail("NOT_FOUND", "Project was not found.", 404, id);
+
+  await audit(supabase, `project.workflow.${resolvedStageId}`, id);
+  const metrics = await computeProjectsMetrics(supabase, scoped.access.workspaceId, [updateRes.data as Record<string, unknown>]);
+  const dto = projectDto(updateRes.data as Record<string, unknown>, metrics.get(projectId));
+  dto.stage = resolvedStageTitle;
+  dto.workflowStage = resolvedStageId;
+  (dto as any).stageId = resolvedStageId;
+  return ok(dto, 200, id);
+}
+
 async function changeProjectStatus(request: Request, supabase: SupabaseClient, id: string, projectId: string) {
   const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
   const input = await parsed(request, projectStatusSchema, id); if (input.response) return input.response;
   const progress = input.data.status === "completed" ? 100 : undefined;
-  const { data, error } = await supabase.from("projects").update({ status: input.data.status, ...(progress == null ? {} : { progress }) })
+  let updateRes = await supabase.from("projects").update({ status: input.data.status, ...(progress == null ? {} : { progress }) })
     .eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).is("archived_at", null).select(projectSelect).maybeSingle();
+  if (isMissingProjectColumnError(updateRes.error)) {
+    updateRes = await supabase.from("projects").update({ status: input.data.status, ...(progress == null ? {} : { progress }) })
+      .eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).is("archived_at", null).select(projectBaseSelect).maybeSingle();
+  }
+  const { data, error } = updateRes;
   if (error) return fail("VALIDATION_ERROR", "Project status could not be changed.", 400, id);
   if (!data) return fail("NOT_FOUND", "Project was not found.", 404, id);
   await audit(supabase, `project.status.${input.data.status}`, id);
@@ -4259,11 +4398,14 @@ async function changeProjectStatus(request: Request, supabase: SupabaseClient, i
 
 async function duplicateProject(supabase: SupabaseClient, id: string, projectId: string) {
   const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
-  const source = await supabase.from("projects").select(projectSelect).eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).is("archived_at", null).maybeSingle();
+  let source = await supabase.from("projects").select(projectSelect).eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).is("archived_at", null).maybeSingle();
+  if (isMissingProjectColumnError(source.error)) {
+    source = await supabase.from("projects").select(projectBaseSelect).eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).is("archived_at", null).maybeSingle();
+  }
   if (source.error) return fail("INTERNAL_ERROR", "Project could not be duplicated.", 500, id);
   if (!source.data) return fail("NOT_FOUND", "Project was not found.", 404, id);
   const row = source.data as Record<string, unknown>;
-  const created = await supabase.from("projects").insert({
+  let created = await supabase.from("projects").insert({
     workspace_id: scoped.access.workspaceId, created_by: scoped.access.userId, name: `${row.name} (Copy)`,
     client_name: row.client_name, client_contact: row.client_contact, client_email: row.client_email,
     project_type: row.project_type, status: "planning", location: row.location, description: row.description,
@@ -4271,6 +4413,16 @@ async function duplicateProject(supabase: SupabaseClient, id: string, projectId:
     start_date: row.start_date, target_completion_date: row.target_completion_date,
     assigned_designer_id: row.assigned_designer_id, tags: row.tags,
   }).select(projectSelect).single();
+  if (isMissingProjectColumnError(created.error)) {
+    created = await supabase.from("projects").insert({
+      workspace_id: scoped.access.workspaceId, created_by: scoped.access.userId, name: `${row.name} (Copy)`,
+      client_name: row.client_name, client_contact: row.client_contact, client_email: row.client_email,
+      project_type: row.project_type, status: "planning", location: row.location, description: row.description,
+      area_sqft: row.area_sqft, project_value: row.project_value, approved_budget: row.approved_budget,
+      start_date: row.start_date, target_completion_date: row.target_completion_date,
+      assigned_designer_id: row.assigned_designer_id, tags: row.tags,
+    }).select(projectBaseSelect).single();
+  }
   if (created.error) return fail("VALIDATION_ERROR", "Project could not be duplicated.", 400, id);
   const sourceRooms = await supabase.from("project_rooms").select("name,room_type,length,width,height,unit,notes,sort_order").eq("project_id", projectId).eq("workspace_id", scoped.access.workspaceId);
   if (!sourceRooms.error && sourceRooms.data?.length) await supabase.from("project_rooms").insert(sourceRooms.data.map((room) => ({ ...room, workspace_id: scoped.access.workspaceId, project_id: created.data.id, created_by: scoped.access.userId })));
@@ -4289,8 +4441,13 @@ async function deleteProject(supabase: SupabaseClient, id: string, projectId: st
 
 async function archiveProject(supabase: SupabaseClient, id: string, projectId: string) {
   const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
-  const { data, error } = await supabase.from("projects").update({ archived_at: new Date().toISOString() })
+  let res = await supabase.from("projects").update({ archived_at: new Date().toISOString() })
     .eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).is("archived_at", null).select(projectSelect).maybeSingle();
+  if (isMissingProjectColumnError(res.error)) {
+    res = await supabase.from("projects").update({ archived_at: new Date().toISOString() })
+      .eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).is("archived_at", null).select(projectBaseSelect).maybeSingle();
+  }
+  const { data, error } = res;
   if (error) return fail("VALIDATION_ERROR", "Project could not be archived.", 400, id);
   if (!data) return fail("NOT_FOUND", "Project was not found.", 404, id);
   await audit(supabase, "project.archived", id);
@@ -16291,6 +16448,8 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (projectClientInviteMatch && request.method === "DELETE") return revokeProjectClientInvite(request, supabase, id, projectClientInviteMatch[1]);
   const projectClientInviteResendMatch = route.match(/^projects\/([0-9a-f-]{36})\/client-invite\/resend$/i);
   if (projectClientInviteResendMatch && request.method === "POST") return resendProjectClientInvite(request, supabase, id, projectClientInviteResendMatch[1]);
+  const projectWorkflowMatch = route.match(/^projects\/([0-9a-f-]{36})\/workflow$/i);
+  if (projectWorkflowMatch && (request.method === "PATCH" || request.method === "POST")) return changeProjectWorkflow(request, supabase, id, projectWorkflowMatch[1]);
   const projectStatusMatch = route.match(/^projects\/([0-9a-f-]{36})\/status$/i);
   if (projectStatusMatch && request.method === "POST") return changeProjectStatus(request, supabase, id, projectStatusMatch[1]);
   const projectArchiveMatch = route.match(/^projects\/([0-9a-f-]{36})\/archive$/i);

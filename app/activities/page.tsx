@@ -183,6 +183,10 @@ type ProjectItem = {
     assignedDesignerId?: string | null;
     tags?: string[];
     designerName?: string;
+    workflowStage?: string;
+    stage?: string;
+    stageId?: string;
+    metadata?: Record<string, unknown>;
 };
 
 const blankStage: StageForm = { name: "", color: "#2563eb", terminalType: "" };
@@ -222,6 +226,9 @@ export default function ActivitiesPage() {
 
     const [projects, setProjects] = useState<ProjectItem[]>([]);
     const [loadingProjects, setLoadingProjects] = useState(true);
+    const [draggedProjectId, setDraggedProjectId] = useState<string | null>(null);
+    const [dragOverStageId, setDragOverStageId] = useState<string | null>(null);
+    const movingProjectIds = useRef(new Set<string>());
 
     const [tasks, setTasks] = useState<ActivityTask[]>([]);
     const [loadingTasks, setLoadingTasks] = useState(true);
@@ -442,6 +449,9 @@ export default function ActivitiesPage() {
                     assignedDesignerId: p.assignedDesignerId,
                     tags: p.tags || [],
                     designerName: undefined,
+                    workflowStage: p.workflowStage || p.metadata?.workflowStage || p.metadata?.stage,
+                    stage: p.stage || p.metadata?.stage,
+                    metadata: p.metadata,
                 }));
                 setProjects(mapped);
                 setTaskProjects(mapped.map(p => ({ id: p.id, name: p.name, projectCode: p.projectCode })));
@@ -1042,26 +1052,55 @@ export default function ActivitiesPage() {
         return sortedApprovals.slice(start, start + approvalPageSize);
     }, [sortedApprovals, approvalPage, approvalPageSize]);
 
+    const getProjectStageId = useCallback((p: ProjectItem, allStages: ActivityStage[]): string => {
+        if (!allStages || allStages.length === 0) return "";
+
+        // 1. Explicit stage tag (e.g. stage:<uuid> or stage:<name>)
+        const stageTag = p.tags?.find(t => t.startsWith("stage:"));
+        if (stageTag) {
+            const val = stageTag.slice(6).trim();
+            const matchById = allStages.find(s => s.id === val);
+            if (matchById) return matchById.id;
+            const matchByName = allStages.find(s => s.name.toLowerCase() === val.toLowerCase());
+            if (matchByName) return matchByName.id;
+        }
+
+        // 2. Explicit stageId, workflowStage, or metadata
+        const wf = p.stageId || p.workflowStage || (p.metadata?.stageId as string) || (p.metadata?.workflowStage as string) || (p.metadata?.stage as string) || (p as any).stage;
+        if (wf) {
+            const matchById = allStages.find(s => s.id === wf);
+            if (matchById) return matchById.id;
+            const matchByName = allStages.find(s => s.name.toLowerCase() === wf.toLowerCase());
+            if (matchByName) return matchByName.id;
+        }
+
+        // 3. Fallback: check tasks in stage
+        const tMatch = tasks.find(t => t.projectId === p.id && allStages.some(s => s.id === t.stageId));
+        if (tMatch) return tMatch.stageId;
+
+        // 4. Fallback: check approvals in stage
+        const aMatch = approvals.find(a => a.projectId === p.id && allStages.some(s => s.id === a.stageId));
+        if (aMatch) return aMatch.stageId;
+
+        // 5. Fallback based on project status
+        const status = (p.status || "").toLowerCase();
+        if (status === "planning" || status === "draft") {
+            const initStage = allStages.find(s => s.name.toLowerCase().includes("initiat"));
+            if (initStage) return initStage.id;
+        } else if (status === "in_progress" || status === "active") {
+            const designStage = allStages.find(s => s.name.toLowerCase().includes("design"));
+            if (designStage) return designStage.id;
+        } else if (status === "review" || status === "on_hold") {
+            const reviewStage = allStages.find(s => s.name.toLowerCase().includes("approv") || s.name.toLowerCase().includes("estimat"));
+            if (reviewStage) return reviewStage.id;
+        }
+
+        return allStages[0]?.id || "";
+    }, [tasks, approvals]);
+
     const getProjectsForStage = useCallback((stage: ActivityStage): ProjectItem[] => {
         return projects.filter(p => {
-            const hasTaskInStage = tasks.some(t => t.projectId === p.id && t.stageId === stage.id);
-            const hasApprovalInStage = approvals.some(a => a.projectId === p.id && a.stageId === stage.id);
-            const hasStageTag = p.tags?.some(tag =>
-                tag === `stage:${stage.id}` ||
-                tag.toLowerCase() === `stage:${stage.name.toLowerCase()}`
-            );
-
-            let belongs = hasTaskInStage || hasApprovalInStage || hasStageTag;
-
-            if (!belongs && (!p.tags || !p.tags.some(t => t.startsWith("stage:")))) {
-                const stageName = stage.name.toLowerCase();
-                if (stageName.includes("initiat") && (p.status === "planning" || p.status === "active")) belongs = true;
-                else if (stageName.includes("design") && p.status === "in_progress") belongs = true;
-                else if (stageName.includes("estimat") && p.status === "active") belongs = true;
-                else if (stageName.includes("approv") && p.status === "on_hold") belongs = true;
-                else if (stages.indexOf(stage) === 0) belongs = true;
-            }
-
+            const belongs = getProjectStageId(p, stages) === stage.id;
             if (!belongs) return false;
 
             if (filterOnlyOverdue) {
@@ -1076,25 +1115,58 @@ export default function ActivitiesPage() {
 
             return true;
         });
-    }, [projects, tasks, approvals, stages, filterOnlyOverdue, filterOnlyPendingApproval]);
+    }, [projects, stages, getProjectStageId, tasks, approvals, filterOnlyOverdue, filterOnlyPendingApproval]);
 
     const moveProjectToStage = async (project: ProjectItem, targetStage: ActivityStage) => {
+        const currentStageId = getProjectStageId(project, stages);
+        if (currentStageId === targetStage.id) return; // Dropped on same stage, no-op
+        if (movingProjectIds.current.has(project.id)) return;
+        movingProjectIds.current.add(project.id);
+
+        const previousProjects = [...projects];
+        const cleanTags = (project.tags || []).filter(t => !t.startsWith("stage:"));
+        const newTags = [...cleanTags, `stage:${targetStage.id}`];
+
+        // Optimistic UI update
+        setProjects(prev => prev.map(p => {
+            if (p.id === project.id) {
+                return {
+                    ...p,
+                    tags: newTags,
+                    stageId: targetStage.id,
+                    workflowStage: targetStage.id,
+                    stage: targetStage.name,
+                };
+            }
+            return p;
+        }));
+
         try {
-            const cleanTags = (project.tags || []).filter(t => !t.startsWith("stage:"));
-            const newTags = [...cleanTags, `stage:${targetStage.id}`];
-
-            setProjects(prev => prev.map(p => p.id === project.id ? { ...p, tags: newTags } : p));
-
-            const response = await fetch(`/api/v1/projects/${project.id}`, {
+            const wfRes = await fetch(`/api/v1/projects/${project.id}/workflow`, {
                 method: "PATCH",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ tags: newTags }),
+                body: JSON.stringify({
+                    stageId: targetStage.id,
+                }),
             });
-            if (!response.ok) throw new Error("Project stage update failed");
+
+            if (!wfRes.ok) {
+                throw new Error("Failed to persist stage change.");
+            }
+
+            const wfData = await wfRes.json();
+            if (wfData?.data) {
+                setProjects(prev => prev.map(p => (p.id === project.id ? { ...p, ...wfData.data } : p)));
+            }
+
             setNotice(`Moved "${project.name}" to ${targetStage.name}`);
         } catch {
-            setNotice("Could not update project stage");
+            // Rollback on failure
+            setProjects(previousProjects);
+            setNotice("Failed to move project. Reverting changes.");
+        } finally {
+            movingProjectIds.current.delete(project.id);
         }
     };
 
@@ -2109,7 +2181,7 @@ export default function ActivitiesPage() {
                         </div>
 
                         {/* Frame 2147225067: Attachments Card */}
-                        <div className="view-task-attachments-card view-task-attachments-section">
+                        <div className="view-task-attachments-section">
                             <div className="view-task-card-header">
                                 <span className="view-task-card-title">Attachments</span>
                                 <span className="view-task-count-pill">
@@ -3860,7 +3932,45 @@ export default function ActivitiesPage() {
                                                     </div>
 
                                                     {/* Stage Column Body (Figma Frame 93 / Frame 2147225083) */}
-                                                    <div className="activities-stage-column-body">
+                                                    <div
+                                                        className="activities-stage-column-body"
+                                                        data-drag-over={dragOverStageId === stage.id ? "true" : "false"}
+                                                        onDragOver={(e) => {
+                                                            e.preventDefault();
+                                                            e.dataTransfer.dropEffect = "move";
+                                                            if (dragOverStageId !== stage.id) {
+                                                                setDragOverStageId(stage.id);
+                                                            }
+                                                        }}
+                                                        onDragLeave={(e) => {
+                                                            if (e.currentTarget === e.target) {
+                                                                setDragOverStageId(null);
+                                                            }
+                                                        }}
+                                                        onDrop={(e) => {
+                                                            e.preventDefault();
+                                                            setDragOverStageId(null);
+                                                            setDraggedProjectId(null);
+                                                            try {
+                                                                const rawData = e.dataTransfer.getData("text/plain");
+                                                                let pId = "";
+                                                                if (rawData) {
+                                                                    try {
+                                                                        const parsed = JSON.parse(rawData);
+                                                                        pId = parsed.projectId || "";
+                                                                    } catch {
+                                                                        pId = rawData;
+                                                                    }
+                                                                }
+                                                                if (!pId && draggedProjectId) pId = draggedProjectId;
+                                                                if (!pId) return;
+
+                                                                const proj = projects.find(p => p.id === pId);
+                                                                if (!proj) return;
+                                                                void moveProjectToStage(proj, stage);
+                                                            } catch {}
+                                                        }}
+                                                    >
                                                         {stageProjects.length === 0 ? (
                                                             <div className="activities-stage-column-empty">
                                                                 No projects in this stage
@@ -3884,6 +3994,18 @@ export default function ActivitiesPage() {
                                                                     <div
                                                                         key={proj.id}
                                                                         className="activities-project-card"
+                                                                        data-dragging={draggedProjectId === proj.id ? "true" : "false"}
+                                                                        draggable={true}
+                                                                        onDragStart={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setDraggedProjectId(proj.id);
+                                                                            e.dataTransfer.effectAllowed = "move";
+                                                                            e.dataTransfer.setData("text/plain", JSON.stringify({ projectId: proj.id, sourceStageId: stage.id }));
+                                                                        }}
+                                                                        onDragEnd={() => {
+                                                                            setDraggedProjectId(null);
+                                                                            setDragOverStageId(null);
+                                                                        }}
                                                                         onClick={() => router.push(`/projects`)}
                                                                     >
                                                                         {/* Top Row: Code + Due Date (Figma Frame 2147225457) */}
@@ -4166,135 +4288,15 @@ export default function ActivitiesPage() {
                                                                 aria-label="Select all tasks"
                                                             />
                                                         </th>
-                                                        <th className="col-task">
-                                                            <button
-                                                                type="button"
-                                                                className="activities-tasks-th-sortable"
-                                                                onClick={() => handleSort("name")}
-                                                            >
-                                                                <span className="activities-tasks-th-content">
-                                                                    TASK
-                                                                    {taskSortField === "name" ? (
-                                                                        taskSortDirection === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                                                                    ) : (
-                                                                        <ChevronsUpDown size={14} />
-                                                                    )}
-                                                                </span>
-                                                            </button>
-                                                        </th>
-                                                        <th className="col-project">
-                                                            <button
-                                                                type="button"
-                                                                className="activities-tasks-th-sortable"
-                                                                onClick={() => handleSort("project")}
-                                                            >
-                                                                <span className="activities-tasks-th-content">
-                                                                    PROJECT
-                                                                    {taskSortField === "project" ? (
-                                                                        taskSortDirection === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                                                                    ) : (
-                                                                        <ChevronsUpDown size={14} />
-                                                                    )}
-                                                                </span>
-                                                            </button>
-                                                        </th>
-                                                        <th className="col-stage">
-                                                            <button
-                                                                type="button"
-                                                                className="activities-tasks-th-sortable"
-                                                                onClick={() => handleSort("stage")}
-                                                            >
-                                                                <span className="activities-tasks-th-content">
-                                                                    STAGE
-                                                                    {taskSortField === "stage" ? (
-                                                                        taskSortDirection === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                                                                    ) : (
-                                                                        <ChevronsUpDown size={14} />
-                                                                    )}
-                                                                </span>
-                                                            </button>
-                                                        </th>
-                                                        <th className="col-assignee">
-                                                            <button
-                                                                type="button"
-                                                                className="activities-tasks-th-sortable"
-                                                                onClick={() => handleSort("assignee")}
-                                                            >
-                                                                <span className="activities-tasks-th-content">
-                                                                    ASSIGNED TO
-                                                                    {taskSortField === "assignee" ? (
-                                                                        taskSortDirection === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                                                                    ) : (
-                                                                        <ChevronsUpDown size={14} />
-                                                                    )}
-                                                                </span>
-                                                            </button>
-                                                        </th>
-                                                        <th className="col-duedate">
-                                                            <button
-                                                                type="button"
-                                                                className="activities-tasks-th-sortable"
-                                                                onClick={() => handleSort("dueDate")}
-                                                            >
-                                                                <span className="activities-tasks-th-content">
-                                                                    DUE DATE
-                                                                    {taskSortField === "dueDate" ? (
-                                                                        taskSortDirection === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                                                                    ) : (
-                                                                        <ChevronsUpDown size={14} />
-                                                                    )}
-                                                                </span>
-                                                            </button>
-                                                        </th>
-                                                        <th className="col-priority">
-                                                            <button
-                                                                type="button"
-                                                                className="activities-tasks-th-sortable"
-                                                                onClick={() => handleSort("priority")}
-                                                            >
-                                                                <span className="activities-tasks-th-content">
-                                                                    PRIORITY
-                                                                    {taskSortField === "priority" ? (
-                                                                        taskSortDirection === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                                                                    ) : (
-                                                                        <ChevronsUpDown size={14} />
-                                                                    )}
-                                                                </span>
-                                                            </button>
-                                                        </th>
-                                                        <th className="col-status">
-                                                            <button
-                                                                type="button"
-                                                                className="activities-tasks-th-sortable"
-                                                                onClick={() => handleSort("status")}
-                                                            >
-                                                                <span className="activities-tasks-th-content">
-                                                                    STATUS
-                                                                    {taskSortField === "status" ? (
-                                                                        taskSortDirection === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                                                                    ) : (
-                                                                        <ChevronsUpDown size={14} />
-                                                                    )}
-                                                                </span>
-                                                            </button>
-                                                        </th>
-                                                        <th className="col-updated">
-                                                            <button
-                                                                type="button"
-                                                                className="activities-tasks-th-sortable"
-                                                                onClick={() => handleSort("updatedAt")}
-                                                            >
-                                                                <span className="activities-tasks-th-content">
-                                                                    UPDATED
-                                                                    {taskSortField === "updatedAt" ? (
-                                                                        taskSortDirection === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                                                                    ) : (
-                                                                        <ChevronsUpDown size={14} />
-                                                                    )}
-                                                                </span>
-                                                            </button>
-                                                        </th>
-                                                        <th className="col-actions" style={{ textAlign: "center" }} />
+                                                        <th style={{ width: "234px" }}>TASK</th>
+                                                        <th style={{ width: "175px" }}>PROJECT</th>
+                                                        <th style={{ width: "115px" }}>STAGE</th>
+                                                        <th style={{ width: "175px" }}>ASSIGNED TO</th>
+                                                        <th style={{ width: "148px" }}>DUE DATE</th>
+                                                        <th style={{ width: "84px" }}>PRIORITY</th>
+                                                        <th style={{ width: "122px" }}>STATUS</th>
+                                                        <th style={{ width: "130px" }}>UPDATED</th>
+                                                        <th className="col-actions" style={{ width: "50px" }} />
                                                     </tr>
                                                 </thead>
                                                 <tbody>

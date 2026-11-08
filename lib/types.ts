@@ -28,6 +28,9 @@ export interface Project {
   margin?: number | null;
   estimatedValue?: number | null;
   totalCost?: number | null;
+  stage?: string | null;
+  workflowStage?: string | null;
+  stageId?: string | null;
   createdBy: string;
   createdAt: string;
   updatedAt: string;

@@ -573,6 +573,14 @@
     min-height: 562px;
     background: #EEF2F6;
     border-radius: 6px;
+    transition: background-color 0.15s ease, outline 0.15s ease;
+}
+
+.activities-stage-column-body.drag-over,
+.activities-stage-column-body[data-drag-over="true"] {
+    background: #E4ECFB;
+    outline: 2px dashed #2563EB;
+    outline-offset: -2px;
 }
 
 .activities-stage-column-empty {
@@ -603,8 +611,9 @@
     background: rgba(255, 255, 255, 0.8);
     border: 1px solid rgba(255, 255, 255, 0.6);
     border-radius: 6px;
-    cursor: pointer;
+    cursor: grab;
     transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s;
+    user-select: none;
     position: relative;
 }
 
@@ -612,6 +621,19 @@
     transform: translateY(-2px);
     box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
     background: #FFFFFF;
+}
+
+.activities-project-card:active {
+    cursor: grabbing;
+}
+
+.activities-project-card.dragging,
+.activities-project-card[data-dragging="true"] {
+    opacity: 0.45;
+    border: 2px dashed #2563EB;
+    box-shadow: 0 8px 24px rgba(37, 99, 235, 0.18);
+    cursor: grabbing;
+    transform: scale(0.98);
 }
 
 /* Project Card Top Row (Figma Frame 2147225457) */

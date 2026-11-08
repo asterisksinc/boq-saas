@@ -4976,6 +4976,478 @@ textarea {
     flex-shrink: 0;
 }
 
+/* ==========================================================================
+   Kanban / Board View — Figma Frame 2147225556
+   ========================================================================== */
+.projects-kanban-board {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    padding: 0px;
+    gap: 16px;
+    width: 100%;
+    min-height: 651px;
+    overflow-x: auto;
+    overflow-y: visible;
+    padding-bottom: 24px;
+    box-sizing: border-box;
+}
+
+.projects-kanban-board::-webkit-scrollbar {
+    height: 8px;
+}
+
+.projects-kanban-board::-webkit-scrollbar-track {
+    background: rgba(226, 232, 240, 0.5);
+    border-radius: 100px;
+}
+
+.projects-kanban-board::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+    border-radius: 100px;
+}
+
+/* Kanban Column (Frame 2147225078 / 2147225083 / 2147225082 / 2147225084) */
+.kanban-column {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 12px;
+    gap: 16px;
+    width: 340px;
+    min-width: 300px;
+    max-width: 340px;
+    flex: 1 0 320px;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(226, 232, 240, 0.6);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 6px;
+    min-height: 651px;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.kanban-column.drag-over {
+    background: rgba(239, 246, 255, 0.85);
+    border: 1.5px dashed #2563EB;
+}
+
+/* Column Header (Frame 2147225557) */
+.kanban-column-header {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    height: 24px;
+    box-sizing: border-box;
+}
+
+.kanban-column-title-wrap {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+}
+
+.kanban-column-title {
+    margin: 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 16px;
+    line-height: 120%;
+    color: #0F172A;
+    letter-spacing: 0.02em;
+}
+
+.kanban-column-badge {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 2px 8px;
+    min-width: 18px;
+    height: 18px;
+    background: rgba(100, 116, 139, 0.12);
+    border-radius: 9999px;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.kanban-column-add-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    border: 0;
+    background: transparent;
+    color: #64748B;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    padding: 0;
+}
+
+.kanban-column-add-btn:hover {
+    background: #EFF6FF;
+    color: #2563EB;
+}
+
+/* Divider (Rectangle 40) */
+.kanban-column-divider {
+    width: 100%;
+    height: 1px;
+    background: #EBEBEB;
+    border: 0;
+    margin: 0;
+    box-sizing: border-box;
+}
+
+/* Dropzone container inside column */
+.kanban-cards-list {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    width: 100%;
+    flex: 1;
+    min-height: 200px;
+    box-sizing: border-box;
+}
+
+/* Kanban Card (Frame 2147225077) */
+.kanban-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 12px;
+    gap: 12px;
+    width: 100%;
+    background: #FFFFFF;
+    box-shadow: 0px 0px 6px rgba(0, 0, 0, 0.06);
+    border-radius: 8px;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+    position: relative;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+    text-align: left;
+}
+
+.kanban-card:hover {
+    box-shadow: 0px 4px 12px rgba(15, 23, 42, 0.08);
+    border-color: #CBD5E1;
+}
+
+.kanban-card.is-dragging {
+    opacity: 0.45;
+    transform: scale(0.97);
+    border: 1.5px dashed #2563EB;
+    box-shadow: 0px 8px 24px rgba(37, 99, 235, 0.15);
+}
+
+.kanban-column-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 120px;
+    border: 1.5px dashed #CBD5E1;
+    border-radius: 6px;
+    padding: 20px 12px;
+    box-sizing: border-box;
+    gap: 8px;
+    color: #94A3B8;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-size: 13px;
+    text-align: center;
+}
+
+/* Frame 2147225558: Top Row of Card */
+.kanban-card-top {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    min-height: 18px;
+    box-sizing: border-box;
+    gap: 8px;
+}
+
+.kanban-card-id {
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 120%;
+    color: #2563EB;
+}
+
+.kanban-card-top-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Frame 2147225014: Status Pill */
+.kanban-card-status {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 2px 8px;
+    min-height: 18px;
+    border-radius: 9999px;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 11px;
+    line-height: 120%;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.kanban-card-status.status-active {
+    background: rgba(22, 163, 74, 0.12);
+    color: #16A34A;
+}
+
+.kanban-card-status.status-planning {
+    background: rgba(37, 99, 235, 0.12);
+    color: #2563EB;
+}
+
+.kanban-card-status.status-in_progress {
+    background: rgba(245, 158, 11, 0.12);
+    color: #D97706;
+}
+
+.kanban-card-status.status-on_hold {
+    background: rgba(100, 116, 139, 0.12);
+    color: #64748B;
+}
+
+.kanban-card-status.status-completed {
+    background: rgba(16, 185, 129, 0.12);
+    color: #059669;
+}
+
+.kanban-card .more-button {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    color: #64748B;
+    padding: 0;
+    border-radius: 4px;
+    transition: color 0.15s, background 0.15s;
+}
+
+.kanban-card .more-button:hover,
+.kanban-card .more-button.active {
+    color: #0F172A;
+    background: rgba(100, 116, 139, 0.12);
+}
+
+/* Frame 2147225072: Middle Details */
+.kanban-card-main {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0px;
+    gap: 4px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.kanban-card-name {
+    margin: 0;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 16px;
+    line-height: 120%;
+    color: #0F172A;
+    word-break: break-word;
+}
+
+/* Frame 2147225559: Client & Location */
+.kanban-card-client-location {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+}
+
+/* Frame 2147225560: Tags & BOQs */
+.kanban-card-meta-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+.kanban-card-pill {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 8px;
+    height: 18px;
+    background: rgba(100, 116, 139, 0.12);
+    border-radius: 9999px;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.kanban-card-boqs {
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 12px;
+    line-height: 120%;
+    color: #2563EB;
+}
+
+.kanban-card-dot {
+    color: #94A3B8;
+    font-size: 12px;
+}
+
+/* Frame 2147225075: Progress Section */
+.kanban-card-progress-section {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0px;
+    gap: 4px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.kanban-card-progress-label {
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+/* Frame 2147225082: Progress Bar & % */
+.kanban-card-progress-bar-wrap {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.kanban-card-progress-track {
+    flex: 1;
+    height: 8px;
+    background: #E2E8F0;
+    border-radius: 100px;
+    overflow: hidden;
+}
+
+.kanban-card-progress-fill {
+    height: 8px;
+    background: #F59E0B;
+    border-radius: 100px;
+    transition: width 0.3s ease;
+}
+
+.kanban-card-progress-pct {
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 120%;
+    color: #64748B;
+    min-width: 30px;
+    text-align: right;
+}
+
+/* Frame 2147225000: Bottom Designer Row */
+.kanban-card-bottom {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.kanban-card-designer-label {
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 120%;
+    color: #64748B;
+}
+
+.kanban-card-designer-val {
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 120%;
+    color: #0F172A;
+}
+
+.menu-section-divider {
+    border-top: 1px solid #E2E8F0;
+    margin: 6px 0;
+    padding-top: 6px;
+}
+
+.menu-section-title {
+    display: block;
+    padding: 4px 8px;
+    font-family: 'Urbanist', Inter, sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748B;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+
 .onboarding-step.active .step-dot,
 .onboarding-step.done .step-dot {
     background: #22c55e;

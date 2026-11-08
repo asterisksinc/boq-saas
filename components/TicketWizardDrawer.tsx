@@ -440,7 +440,7 @@ export default function TicketWizardDrawer({
                 {/* Header (Frame 2147225093 header) */}
                 <div className="ticket-drawer-header">
                     <div className="ticket-drawer-header-content">
-                        <h2>Let&apos;s Get This Sorted.</h2>
+                        <h2>Let&apos;s Get This Sorted.{/* Let's Get This Sorted. */}</h2>
                         {draftTicketId && (
                             <span
                                 className="ticket-draft-badge"
@@ -527,6 +527,7 @@ export default function TicketWizardDrawer({
                     {currentStep === 1 && (
                         <div>
                             <div className="ticket-step-header">
+                                <span className="ticket-step-tag">Step 01 of 07</span>
                                 <h3 className="ticket-step-title">What Can We Help You With?</h3>
                                 <p className="ticket-step-desc">
                                     Choose the area closest to your issue.
