@@ -6162,7 +6162,7 @@ textarea {
 
 .fig-dashboard-menu {
     width: 66px;
-    flex: 1 1 auto;
+    /* flex: 1 1 auto; */
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
@@ -59091,6 +59091,182 @@ textarea {
 .workspace-record-btn-submit:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* Scoped workspace action forms. */
+.workspace-form-modal {
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(720px, calc(100vh - 32px));
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.15);
+  overflow-y: auto;
+}
+
+.workspace-form-modal header {
+  min-height: 36px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.workspace-form-modal header h3 {
+  font-family: 'Urbanist', Inter, sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.workspace-form-modal form,
+.workspace-review-modal {
+  font-family: 'Urbanist', Inter, sans-serif;
+}
+
+.workspace-form-modal-content {
+  margin-top: 16px;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 14px;
+  box-shadow: 0 0 6px rgba(15, 23, 42, 0.06);
+}
+
+.workspace-form-modal-content form {
+  margin: 0;
+}
+
+.workspace-form-modal .modal-label {
+  margin-top: 16px;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.workspace-form-modal .modal-label input,
+.workspace-form-modal .modal-label select,
+.workspace-form-modal .modal-label textarea {
+  margin-top: 7px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.workspace-form-modal .modal-label input:focus,
+.workspace-form-modal .modal-label select:focus,
+.workspace-form-modal .modal-label textarea:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.workspace-form-modal form footer,
+.workspace-review-modal .workspace-form-modal-content > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.workspace-form-modal form footer button,
+.workspace-review-modal .workspace-form-modal-content > footer button {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #0f172a;
+  font: 600 13px 'Urbanist', Inter, sans-serif;
+  cursor: pointer;
+}
+
+.workspace-form-modal form footer button.primary,
+.workspace-review-modal .workspace-form-modal-content > footer button.primary {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #fff;
+}
+
+.workspace-review-modal .workspace-form-modal-content > p {
+  margin: 14px 0 16px !important;
+  color: #64748b !important;
+  font-size: 13px !important;
+}
+
+.workspace-review-modal .workspace-form-modal-content > div {
+  scrollbar-width: thin;
+}
+
+.workspace-simulate-modal {
+  width: min(520px, 100%);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.15);
+}
+
+.workspace-simulate-content {
+  margin-top: 16px;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 14px;
+  box-shadow: 0 0 6px rgba(15, 23, 42, 0.06);
+}
+
+.workspace-simulate-content > div[style*="flex-direction"] {
+  margin: 0 !important;
+}
+
+.workspace-simulate-modal label {
+  font-family: 'Urbanist', Inter, sans-serif !important;
+  color: #0f172a !important;
+}
+
+.workspace-simulate-modal input,
+.workspace-simulate-modal select {
+  min-height: 44px;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 8px !important;
+  background: #fff !important;
+  color: #0f172a !important;
+  font: 14px 'Urbanist', Inter, sans-serif !important;
+  box-sizing: border-box;
+}
+
+.workspace-simulate-modal input:focus,
+.workspace-simulate-modal select:focus {
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  outline: none;
+}
+
+.workspace-simulate-content .workspace-doc-modal-actions {
+  padding-top: 16px;
+  border-top: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+@media (max-width: 560px) {
+  .workspace-form-modal {
+    width: calc(100vw - 24px);
+    padding: 16px;
+  }
+
+  .workspace-form-modal form > div[style*="grid-template-columns"],
+  .workspace-simulate-content div[style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 /* =========================================================================

@@ -554,42 +554,50 @@ export default function BoqsPage() {
             </div>
 
             {showCreateModal ? (
-                <div className="boq-modal-backdrop" onClick={() => setShowCreateModal(false)}>
-                    <div className="boq-create-modal" onClick={(event) => event.stopPropagation()}>
-                        <div className="boq-create-header">
-                            <h3>New Bill of Quantities</h3>
-                            <button type="button" className="boq-close-button" onClick={() => setShowCreateModal(false)}>
+                <div className="boq-modal-backdrop boq-selection-backdrop" onClick={() => setShowCreateModal(false)}>
+                    <div className="boq-create-modal-redesign" onClick={(event) => event.stopPropagation()}>
+                        <div className="boq-create-header-redesign">
+                            <div>
+                                <h3 className="boq-create-header-title">New Bill of Quantities</h3>
+                                <p className="boq-create-header-sub">Choose how you want to create this BOQ</p>
+                            </div>
+                            <button type="button" className="boq-close-btn-redesign" onClick={() => setShowCreateModal(false)} aria-label="Close modal">
                                 <X size={18} />
                             </button>
                         </div>
-                        <p>Choose how you want to create this BOQ</p>
 
-                        <div className="boq-option-grid">
+                        <div className="boq-create-options-panel-redesign">
                             <button
                                 type="button"
-                                className={`boq-option-card ${createMode === "blank" ? "selected" : ""}`}
+                                className={`boq-create-card-redesign ${createMode === "blank" ? "selected" : ""}`}
                                 onClick={() => setCreateMode("blank")}
                             >
-                                <div className="boq-option-icon"><FileText size={20} /></div>
-                                <strong>Blank BOQ</strong>
-                                <small>Start with an empty bill of quantities</small>
+                                <div className="boq-card-icon-wrap"><FileText size={20} color={createMode === "blank" ? "#2563EB" : "#64748B"} /></div>
+                                <div className="boq-card-text-group">
+                                    <strong className="boq-card-title-text" style={{ color: createMode === "blank" ? "#2563EB" : "#0F172A" }}>Blank BOQ</strong>
+                                    <small className="boq-card-subtitle-text">Start with an empty bill of quantities</small>
+                                </div>
+                                {createMode === "blank" && <span className="boq-card-selected-indicator"><Check size={12} color="#FFFFFF" /></span>}
                             </button>
                             <button
                                 type="button"
-                                className={`boq-option-card ${createMode === "template" ? "selected" : ""}`}
+                                className={`boq-create-card-redesign ${createMode === "template" ? "selected" : ""}`}
                                 onClick={() => setCreateMode("template")}
                             >
-                                <div className="boq-option-icon"><FileText size={20} /></div>
-                                <strong>From Template</strong>
-                                <small>Use a saved BOQ or room template</small>
+                                <div className="boq-card-icon-wrap"><FileText size={20} color={createMode === "template" ? "#2563EB" : "#64748B"} /></div>
+                                <div className="boq-card-text-group">
+                                    <strong className="boq-card-title-text" style={{ color: createMode === "template" ? "#2563EB" : "#0F172A" }}>From Template</strong>
+                                    <small className="boq-card-subtitle-text">Use a saved BOQ or room template</small>
+                                </div>
+                                {createMode === "template" && <span className="boq-card-selected-indicator"><Check size={12} color="#FFFFFF" /></span>}
                             </button>
                         </div>
 
-                        <div className="boq-create-footer">
-                            <button type="button" className="boq-cancel-button" onClick={() => setShowCreateModal(false)}>
+                        <div className="boq-create-footer-redesign">
+                            <button type="button" className="boq-btn-create-cancel-redesign" onClick={() => setShowCreateModal(false)}>
                                 Cancel
                             </button>
-                            <button type="button" className="fig-dashboard-new" onClick={continueCreate}>
+                            <button type="button" className="boq-btn-create-continue-redesign" onClick={continueCreate}>
                                 Continue
                             </button>
                         </div>

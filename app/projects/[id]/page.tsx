@@ -1452,9 +1452,9 @@ function Details({ p, onEdit }: { p: Project; onEdit: () => void }) {
   );
 }
 
-function Table({ heads, children }: { heads: string[]; children: React.ReactNode }) {
+function Table({ heads, children, className = "" }: { heads: string[]; children: React.ReactNode; className?: string }) {
   return (
-    <table>
+    <table className={className}>
       <thead>
         <tr>
           {heads.map((x, i) => (
@@ -2090,8 +2090,8 @@ function ProjectBoqExcelImportModal({
   if (!isOpen) return null;
 
   return (
-    <div className="po-modal-overlay" onClick={onClose}>
-      <div className="po-modal-box" onClick={(e) => e.stopPropagation()}>
+    <div className="po-modal-overlay po-new-boq-overlay" onClick={onClose}>
+      <div className="po-modal-box po-form-modal po-new-boq-form-modal" onClick={(e) => e.stopPropagation()}>
         <div className="po-modal-header">
           <div>
             <h3 className="po-modal-title">Import Excel Spreadsheet</h3>
@@ -2104,7 +2104,7 @@ function ProjectBoqExcelImportModal({
 
         <div className="po-modal-body">
           {error && (
-            <div style={{ padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: "6px", color: "#B91C1C", fontSize: "13px" }}>
+            <div className="po-new-boq-error">
               {error}
             </div>
           )}
@@ -2260,11 +2260,11 @@ function ProjectNewBoqModal({
 
   return (
     <div className="po-modal-overlay" onClick={onClose}>
-      <div className="po-modal-box" onClick={(e) => e.stopPropagation()}>
+      <div className="po-modal-box po-form-modal" onClick={(e) => e.stopPropagation()}>
         <div className="po-modal-header">
           <div>
-            <h3 className="po-modal-title">Create New BOQ</h3>
-            <p className="po-modal-subtitle">Project: {p.name}</p>
+            <h3 className="po-modal-title">New Bill of Quantities</h3>
+            <p className="po-modal-subtitle">Choose how you want to create this BOQ</p>
           </div>
           <button type="button" className="po-modal-close" onClick={onClose} aria-label="Close modal">
             <X size={20} />
@@ -2278,53 +2278,33 @@ function ProjectNewBoqModal({
             </div>
           )}
 
-          <div style={{ padding: "12px 16px", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: "8px", fontSize: "13px", color: "#1E40AF" }}>
+          <div className="po-boq-info">
             <strong>Auto-assigned identity:</strong> The server will automatically generate a unique immutable BOQ ID and assign the next major version for this project.
           </div>
 
-          <div>
-            <label style={{ display: "block", fontSize: "14px", fontWeight: 600, color: "#0F172A", marginBottom: "8px" }}>
+          <div className="po-new-boq-method-section">
+            <label className="po-new-boq-field-label">
               Creation Method
             </label>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <div className="po-new-boq-method-grid">
               <button
                 type="button"
-                className={`po-boq-btn-import ${method === "blank" ? "active" : ""}`}
-                style={{
-                  borderColor: method === "blank" ? "#2563EB" : "#E2E8F0",
-                  background: method === "blank" ? "rgba(37, 99, 235, 0.05)" : "#FFFFFF",
-                  color: method === "blank" ? "#2563EB" : "#0F172A",
-                  height: "auto",
-                  padding: "12px",
-                  justifyContent: "flex-start",
-                  flexDirection: "column",
-                  alignItems: "flex-start",
-                }}
+                className={`po-new-boq-method-card ${method === "blank" ? "selected" : ""}`}
                 onClick={() => setMethod("blank")}
               >
-                <span style={{ fontWeight: 600, fontSize: "14px" }}>Blank BOQ</span>
-                <span style={{ fontSize: "12px", color: "#64748B", marginTop: "2px" }}>
+                <span className="po-new-boq-method-title">Blank BOQ</span>
+                <span className="po-new-boq-method-description">
                   Imports project rooms and requirements
                 </span>
               </button>
 
               <button
                 type="button"
-                className={`po-boq-btn-import ${method === "template" ? "active" : ""}`}
-                style={{
-                  borderColor: method === "template" ? "#2563EB" : "#E2E8F0",
-                  background: method === "template" ? "rgba(37, 99, 235, 0.05)" : "#FFFFFF",
-                  color: method === "template" ? "#2563EB" : "#0F172A",
-                  height: "auto",
-                  padding: "12px",
-                  justifyContent: "flex-start",
-                  flexDirection: "column",
-                  alignItems: "flex-start",
-                }}
+                className={`po-new-boq-method-card ${method === "template" ? "selected" : ""}`}
                 onClick={() => setMethod("template")}
               >
-                <span style={{ fontWeight: 600, fontSize: "14px" }}>From Template</span>
-                <span style={{ fontSize: "12px", color: "#64748B", marginTop: "2px" }}>
+                <span className="po-new-boq-method-title">From Template</span>
+                <span className="po-new-boq-method-description">
                   Use pre-configured interior package
                 </span>
               </button>
@@ -2332,21 +2312,12 @@ function ProjectNewBoqModal({
           </div>
 
           {method === "template" && (
-            <div>
-              <label style={{ display: "block", fontSize: "14px", fontWeight: 600, color: "#0F172A", marginBottom: "6px" }}>
+            <div className="po-new-boq-field">
+              <label className="po-new-boq-field-label">
                 Select BOQ Template *
               </label>
               <select
-                style={{
-                  width: "100%",
-                  height: "42px",
-                  padding: "0 12px",
-                  border: "1px solid #CBD5E1",
-                  borderRadius: "6px",
-                  fontSize: "14px",
-                  color: "#0F172A",
-                  background: "#FFFFFF",
-                }}
+                className="po-new-boq-input"
                 value={templateId}
                 onChange={(e) => setTemplateId(e.target.value)}
               >
@@ -2359,9 +2330,9 @@ function ProjectNewBoqModal({
             </div>
           )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-            <div>
-              <label style={{ display: "block", fontSize: "14px", fontWeight: 600, color: "#0F172A", marginBottom: "6px" }}>
+          <div className="po-new-boq-numeric-grid">
+            <div className="po-new-boq-field">
+              <label className="po-new-boq-field-label">
                 Markup (%)
               </label>
               <input
@@ -2371,18 +2342,11 @@ function ProjectNewBoqModal({
                 step="0.5"
                 value={markupPercent}
                 onChange={(e) => setMarkupPercent(Number(e.target.value))}
-                style={{
-                  width: "100%",
-                  height: "42px",
-                  padding: "0 12px",
-                  border: "1px solid #CBD5E1",
-                  borderRadius: "6px",
-                  fontSize: "14px",
-                }}
+                className="po-new-boq-input"
               />
             </div>
-            <div>
-              <label style={{ display: "block", fontSize: "14px", fontWeight: 600, color: "#0F172A", marginBottom: "6px" }}>
+            <div className="po-new-boq-field">
+              <label className="po-new-boq-field-label">
                 GST / Tax (%)
               </label>
               <input
@@ -2392,14 +2356,7 @@ function ProjectNewBoqModal({
                 step="0.5"
                 value={taxPercent}
                 onChange={(e) => setTaxPercent(Number(e.target.value))}
-                style={{
-                  width: "100%",
-                  height: "42px",
-                  padding: "0 12px",
-                  border: "1px solid #CBD5E1",
-                  borderRadius: "6px",
-                  fontSize: "14px",
-                }}
+                className="po-new-boq-input"
               />
             </div>
           </div>
@@ -2799,7 +2756,7 @@ interface CategoryCostGroup {
 
         <div className="po-costing-table-card">
           {filteredItems.length > 0 ? (
-            <Table heads={["ITEM NAME", "CATEGORY", "UNIT", "BASE COST", "SELLING RATE", "VENDOR", "STATUS"]}>
+            <Table className="po-costing-items-table" heads={["ITEM NAME", "CATEGORY", "UNIT", "BASE COST", "SELLING RATE", "VENDOR", "STATUS"]}>
               {filteredItems.map((item) => (
                 <tr key={item.id}>
                   <td><b>{item.name}</b></td>
@@ -3376,7 +3333,7 @@ function Work({ p, b, showToast }: { p: Project; b: Boq[]; showToast?: (msg: str
 
       {/* Task Creation Modal */}
       {newTaskOpen && (
-        <Modal title="Add Workspace Task" close={() => setNewTaskOpen(false)}>
+        <Modal title="Add Workspace Task" close={() => setNewTaskOpen(false)} className="workspace-form-modal">
           <form onSubmit={handleCreateTask}>
             <label className="modal-label" style={{ marginTop: 0 }}>
               Task Title *
@@ -3394,7 +3351,6 @@ function Work({ p, b, showToast }: { p: Project; b: Boq[]; showToast?: (msg: str
               <select
                 value={newTaskStage}
                 onChange={(e) => setNewTaskStage(e.target.value)}
-                style={{ width: "100%", marginTop: "6px", padding: "10px", border: "1px solid #dce4ef", borderRadius: "6px", background: "#fff" }}
               >
                 {activeStagesList.map((s) => (
                   <option key={s.id || s.name} value={s.name}>
@@ -3409,7 +3365,6 @@ function Work({ p, b, showToast }: { p: Project; b: Boq[]; showToast?: (msg: str
                 <select
                   value={newTaskPriority}
                   onChange={(e) => setNewTaskPriority(e.target.value)}
-                  style={{ width: "100%", marginTop: "6px", padding: "10px", border: "1px solid #dce4ef", borderRadius: "6px", background: "#fff" }}
                 >
                   <option value="High">High</option>
                   <option value="Medium">Medium (Normal)</option>
@@ -3423,7 +3378,6 @@ function Work({ p, b, showToast }: { p: Project; b: Boq[]; showToast?: (msg: str
                   type="date"
                   value={newTaskDueDate}
                   onChange={(e) => setNewTaskDueDate(e.target.value)}
-                  style={{ width: "100%", marginTop: "6px", padding: "10px", border: "1px solid #dce4ef", borderRadius: "6px", background: "#fff" }}
                 />
               </label>
             </div>
@@ -3442,8 +3396,7 @@ function Work({ p, b, showToast }: { p: Project; b: Boq[]; showToast?: (msg: str
                 value={newTaskDesc}
                 onChange={(e) => setNewTaskDesc(e.target.value)}
                 placeholder="Add specifications, vendor notes, or deliverables..."
-                rows={3}
-                style={{ width: "100%", marginTop: "6px", padding: "10px", border: "1px solid #dce4ef", borderRadius: "6px", background: "#fff", resize: "vertical" }}
+                rows={3} cols={55}
               />
             </label>
             <footer>
@@ -5193,7 +5146,7 @@ function SimulatePaymentModal({
 
   return (
     <div className="workspace-doc-modal-backdrop" onClick={close}>
-      <div className="workspace-doc-modal-card" style={{ maxWidth: "520px" }} onClick={(e) => e.stopPropagation()}>
+      <div className="workspace-doc-modal-card workspace-simulate-modal" style={{ maxWidth: "520px" }} onClick={(e) => e.stopPropagation()}>
         <div className="workspace-doc-modal-header">
           <div>
             <h3 className="workspace-doc-modal-title">Simulate Client Payment</h3>
@@ -5206,13 +5159,14 @@ function SimulatePaymentModal({
           </button>
         </div>
 
-        {error && (
-          <div style={{ color: "#DC2626", background: "#FEF2F2", padding: "8px 12px", borderRadius: "6px", fontSize: "13px", marginBottom: "14px" }}>
-            {error}
-          </div>
-        )}
+        <div className="workspace-simulate-content">
+          {error && (
+            <div style={{ color: "#DC2626", background: "#FEF2F2", padding: "8px 12px", borderRadius: "6px", fontSize: "13px", marginBottom: "14px" }}>
+              {error}
+            </div>
+          )}
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "14px", margin: "16px 0" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "14px", margin: "16px 0" }}>
           <div>
             <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#0F172A", marginBottom: "6px", fontFamily: "'Urbanist', sans-serif" }}>
               Select Invoice / Milestone *
@@ -5282,25 +5236,26 @@ function SimulatePaymentModal({
           <div style={{ background: "#F1F5F9", borderRadius: "6px", padding: "10px 14px", fontSize: "12px", color: "#64748B", lineHeight: 1.4 }}>
             💡 <strong>Notice:</strong> This simulates an instantaneous customer payment event, updates the invoice status, ledger, and payment schedule in real time.
           </div>
-        </div>
+          </div>
 
-        <div className="workspace-doc-modal-actions" style={{ justifyContent: "flex-end" }}>
-          <button
-            type="button"
-            className="workspace-doc-btn-cancel"
-            onClick={close}
-            disabled={isSubmitting}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="workspace-doc-btn-primary"
-            onClick={handleSimulate}
-            disabled={isSubmitting || !invoices.length}
-          >
-            {isSubmitting ? "Processing..." : "Simulate Payment"}
-          </button>
+          <div className="workspace-doc-modal-actions" style={{ justifyContent: "flex-end" }}>
+            <button
+              type="button"
+              className="workspace-doc-btn-cancel"
+              onClick={close}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="workspace-doc-btn-primary"
+              onClick={handleSimulate}
+              disabled={isSubmitting || !invoices.length}
+            >
+              {isSubmitting ? "Processing..." : "Simulate Payment"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -5444,17 +5399,17 @@ function Activity({ pId }: { pId: string }) {
   );
 }
 
-function Modal({ title, close, children }: { title: string; close: () => void; children: React.ReactNode }) {
+function Modal({ title, close, children, className = "" }: { title: string; close: () => void; children: React.ReactNode; className?: string }) {
   return (
     <div className="workspace-modal-bg" onMouseDown={close}>
-      <section className="workspace-modal" onMouseDown={(e) => e.stopPropagation()}>
+      <section className={`workspace-modal ${className}`} onMouseDown={(e) => e.stopPropagation()}>
         <header>
           <h3>{title}</h3>
           <button onClick={close} aria-label="Close modal">
             <X />
           </button>
         </header>
-        {children}
+        <div className="workspace-form-modal-content">{children}</div>
       </section>
     </div>
   );
@@ -5824,7 +5779,7 @@ function ReviewPendingModal({
   const totalCount = approvals.length + tasks.length;
 
   return (
-    <Modal title="Review Pending Actions" close={onClose}>
+    <Modal title="Review Pending Actions" close={onClose} className="workspace-form-modal workspace-review-modal">
       <p style={{ margin: "4px 0 12px", fontSize: "12px", color: "#64748b" }}>
         Pending actions and deliverables for <strong>{projectName}</strong>
       </p>

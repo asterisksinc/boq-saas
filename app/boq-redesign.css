@@ -2226,6 +2226,12 @@
    Screen 1: New BOQ Selection Modal (Figma Frame 2147225092)
    ========================================================================== */
 
+.boq-selection-backdrop {
+    background: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+}
+
 .boq-create-modal-redesign {
     box-sizing: border-box;
     display: flex;
@@ -2243,6 +2249,28 @@
     -webkit-backdrop-filter: blur(20.4px);
     border-radius: 8px;
     animation: boqModalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.boq-selection-backdrop .boq-create-modal-redesign {
+    border-radius: 16px;
+}
+
+.boq-selection-backdrop .boq-create-options-panel-redesign {
+    border-radius: 14px;
+}
+
+/* Keep the costing item form above the room toolbar/search surface. */
+.boq-costing-form-backdrop {
+    z-index: 1200;
+    isolation: isolate;
+}
+
+.boq-costing-form-modal {
+    position: relative;
+    z-index: 1201;
+    background: #FFFFFF;
+    overflow-y: auto;
+    max-height: calc(100vh - 32px);
 }
 
 .boq-create-header-redesign {

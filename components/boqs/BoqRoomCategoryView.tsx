@@ -1634,8 +1634,8 @@ export default function BoqRoomCategoryView({
 
             {/* 5. Add Item Modal (Contextual to Selected Subcategory) */}
             {showAddItemModal && activeCategory && (
-                <div className="boq-modal-backdrop" onClick={() => setShowAddItemModal(false)}>
-                    <div className="boq-create-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "540px" }}>
+                <div className="boq-modal-backdrop boq-costing-form-backdrop" onClick={() => setShowAddItemModal(false)}>
+                    <div className="boq-create-modal boq-costing-form-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "540px" }}>
                         <div className="boq-create-header">
                             <div>
                                 <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 700, color: "#0F172A" }}>
