@@ -191,6 +191,9 @@ const projectBaseSchema = z
     startDate: z.string().date().nullable().optional(),
     targetCompletionDate: z.string().date().nullable().optional(),
     assignedDesignerId: z.string().uuid().nullable().optional(),
+    currentStageId: z.string().uuid().nullable().optional(),
+    projectCode: z.string().trim().max(80).nullable().optional(),
+    progress: z.coerce.number().finite().min(0).max(100).nullable().optional(),
     tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
     imageUrl: z.string().trim().max(2048).nullable().optional(),
     coverImage: z.string().trim().max(2048).nullable().optional(),
@@ -535,7 +538,13 @@ export const paymentMethodSchema = z.object({
 }).strict();
 export const subscriptionChangeSchema = z.object({ planCode: z.enum(["starter", "professional", "business", "enterprise"]), billingFrequency: z.enum(["monthly", "annual"]).default("monthly") }).strict();
 
-export const activityStageSchema = z.object({ name: z.string().trim().min(1).max(120), color: z.string().trim().max(40).nullable().optional(), terminalType: z.enum(["completed", "lost"]).nullable().optional() }).strict();
+export const activityStageSchema = z.object({
+  name: z.string().trim().min(1).max(120).optional(),
+  color: z.string().trim().max(40).nullable().optional(),
+  terminalType: z.enum(["completed", "lost"]).nullable().optional(),
+  sortOrder: z.coerce.number().int().min(0).max(1000).nullable().optional(),
+  position: z.coerce.number().int().min(0).max(1000).nullable().optional(),
+});
 export const activityTaskSchema = z.object({
   name: z.string().trim().min(1).max(200), projectId: z.string().uuid(), stageId: z.string().uuid(),
   description: z.string().trim().max(5000).nullable().optional(), assignedTo: z.string().uuid().nullable().optional(), ownerId: z.string().uuid().nullable().optional(),

@@ -1,0 +1,4 @@
+ProjectName,ClientName,ProjectType,Status,Location,ClientContact,ClientEmail,AreaSqft,ProjectValue,ApprovedBudget,StartDate,TargetCompletionDate,Tags,Description
+Green Valley Villa,Ramesh Sharma,Residential,planning,"Whitefield, Bengaluru","+91 98765 43210",ramesh@example.com,4200,6500000,5800000,2026-12-01,2027-04-30,"Villa,Turnkey","Luxury villa interior and turnkey execution"
+Nexus Retail Flagship,Priya Mehta,Commercial,in_progress,"Andheri West, Mumbai","+91 98921 45678",priya@nexusretail.com,6800,12500000,11800000,2026-11-15,2027-03-31,"Retail,Fast Track","Retail flagship store fit-out"
+Lakeview Office Renovation,Kiran Rao,Commercial,active,"Hitech City, Hyderabad","+91 98480 12345",kiran@lakeview.com,3200,4800000,4500000,2026-10-20,2027-02-28,"Office,Renovation","Corporate office renovation and furniture"

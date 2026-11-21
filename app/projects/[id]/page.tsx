@@ -45,6 +45,7 @@ import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
 import { recordPayment } from "@/lib/api/invoices";
 import { getCostingAnalysis } from "@/lib/api/costing";
+import { resolveDesignerDisplay, formatIndianCurrency, calculateStageProgress } from "@/lib/domain/project-stages";
 
 export type Project = {
   id: string;
@@ -65,6 +66,10 @@ export type Project = {
   progress?: number;
   imageUrl?: string | null;
   rooms?: { id: string; name: string }[];
+  companyName?: string;
+  boqValue?: number;
+  currentStageId?: string;
+  stageId?: string;
   propertyName?: string;
   address?: string;
   city?: string;
@@ -374,8 +379,17 @@ export default function ProjectPage() {
               <button className="po-btn-primary primary" onClick={() => setReviewPendingOpen(true)}>
                 Review Pending Actions
               </button>
-              <button className="po-btn-secondary" onClick={() => setInviteOpen(true)}>
-                Send Invite to Client
+              <button
+                className="po-btn-secondary"
+                onClick={() => setInviteOpen(true)}
+              >
+                {!invitation
+                  ? "Send Invite to Client"
+                  : invitation.status === "accepted"
+                    ? "Invitation Sent - Client Accepted"
+                    : invitation.status === "pending"
+                      ? "Invitation Sent - Client Yet to Accept"
+                      : "Send Invite to Client"}
               </button>
               <button className="po-btn-secondary" onClick={() => setEditOpen(true)}>
                 Edit Project
@@ -1032,7 +1046,7 @@ function Overview({
               </div>
               <div className="po-detail-item">
                 <span className="po-detail-label">Lead Designer</span>
-                <span className="po-detail-value">{p.leadDesigner || "Riya Sharma"}</span>
+                <span className="po-detail-value">{resolveDesignerDisplay(p.leadDesigner, p.companyName)}</span>
               </div>
               <div className="po-detail-item">
                 <span className="po-detail-label">Client Contact</span>
@@ -1283,7 +1297,7 @@ function Overview({
             <div className="po-list-stack">
               {[
                 { role: "Project Manager", name: p.projectManager || "Riya Sharma" },
-                { role: "Lead Designer", name: p.leadDesigner || "Riya Sharma" },
+                { role: "Lead Designer", name: resolveDesignerDisplay(p.leadDesigner, p.companyName) },
                 { role: "Estimator", name: p.estimator || "Karan Patel" },
                 { role: "Procurement Owner", name: p.procurementOwner || "Anika Rao" },
                 { role: "Finance Owner", name: p.financeOwner || "Priya Nair" },
@@ -1441,7 +1455,7 @@ function Details({ p, onEdit }: { p: Project; onEdit: () => void }) {
           title="Ownership & Team"
           rows={[
             ["Project Manager", p.projectManager || "Unassigned"],
-            ["Lead Designer", p.leadDesigner || "Unassigned"],
+            ["Lead Designer", resolveDesignerDisplay(p.leadDesigner, p.companyName)],
             ["Estimator", p.estimator || "Unassigned"],
             ["Procurement Owner", p.procurementOwner || "Unassigned"],
             ["Finance Owner", p.financeOwner || "Unassigned"],
@@ -5443,7 +5457,7 @@ function ClientInviteModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const projectCodeDisplay = project.projectCode || (project.id ? "PRJ-" + project.id.slice(0, 4).toUpperCase() : "PRJ-0048");
+  const projectCodeDisplay = project.projectCode || (project.id ? "PRJ-" + project.id.slice(0, 4).toUpperCase() : "AST-0000001");
 
   const handleSend = async (e: FormEvent) => {
     e.preventDefault();

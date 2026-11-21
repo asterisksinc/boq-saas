@@ -1,9 +1,20 @@
 "use client";
 
 import { Check, ChevronDown, MoreHorizontal, Plus, X, ArrowLeft, Home, User, MapPin, Calendar, Briefcase, Search, Minus, Info, RefreshCcw, Edit2, Trash2, Copy, UploadCloud, Layers } from "lucide-react";
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { ChangeEvent, CSSProperties, FormEvent, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
+import {
+  DEFAULT_PROJECT_STAGES,
+  STAGE_COLOR_MAP,
+  resolveDesignerDisplay,
+  formatIndianCurrency,
+  calculateStageProgress,
+  toDbProgress,
+  resolveProjectCanonicalStage,
+  extractCompanyPrefix,
+  formatProjectCode,
+} from "@/lib/domain/project-stages";
 
 export type Project = {
   id: string;
@@ -24,14 +35,19 @@ export type Project = {
   imageUrl?: string | null;
   coverImage?: string | null;
   boqsCount?: number;
+  boqValue?: number;
   margin?: number | null;
   estimatedValue?: number | null;
   totalCost?: number | null;
   stage?: string | null;
   currentPhase?: string | null;
   workflowStage?: string | null;
+  currentStageId?: string | null;
+  stageId?: string | null;
+  assignedDesignerId?: string | null;
   leadDesigner?: string | null;
   designer?: string | null;
+  companyName?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
   rooms?: ProjectRoom[];
@@ -89,6 +105,7 @@ type Form = {
   startDate: string;
   targetCompletionDate: string;
   leadDesigner?: string;
+  assignedDesignerId?: string;
 };
 
 const blankForm: Form = {
@@ -104,7 +121,126 @@ const blankForm: Form = {
   startDate: "",
   targetCompletionDate: "",
   leadDesigner: "",
+  assignedDesignerId: "",
 };
+
+let projectsPageCache: {
+  projects: Project[];
+  stages: any[];
+  summary: { totalProjects: number; totalEstimatedValue: number; companyName?: string | null } | null;
+} | null = null;
+
+function getStageColor(stageName?: string | null): string {
+  if (!stageName) return "#2563EB";
+  const upper = stageName.trim().toUpperCase();
+  if (STAGE_COLOR_MAP[upper]) return STAGE_COLOR_MAP[upper].hex;
+  for (const [key, color] of Object.entries(STAGE_COLOR_MAP)) {
+    if (upper.includes(key) || key.includes(upper)) return color.hex;
+  }
+  return "#2563EB";
+}
+
+function getProjectDisplayCode(project: Project, index: number): string {
+  if (project.projectCode) return project.projectCode;
+  const prefix = extractCompanyPrefix(project.companyName);
+  return formatProjectCode(prefix, index + 1);
+}
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function getProjectDisplayStage(project: Project, stagesList?: any[]): string {
+  if (stagesList && stagesList.length > 0) {
+    const canonical = resolveProjectCanonicalStage(project, stagesList);
+    if (canonical?.name) return canonical.name;
+  }
+  const raw = project.stage || project.currentPhase || "";
+  if (!raw || UUID_REGEX.test(raw.trim())) {
+    return "Design Concepts";
+  }
+  return raw;
+}
+
+function ConfettiCanvas({ active }: { active: boolean }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    if (!active) return;
+    if (typeof window === "undefined") return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const colors = ["#2563EB", "#7C3AED", "#EA580C", "#4F46E5", "#0891B2", "#0D9488", "#16A34A", "#F59E0B", "#EC4899"];
+    const count = 75;
+    const particles = Array.from({ length: count }, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * -canvas.height * 0.5,
+      size: Math.random() * 8 + 4,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      speedY: Math.random() * 3 + 2.5,
+      speedX: (Math.random() - 0.5) * 3,
+      rotation: Math.random() * 360,
+      rotSpeed: (Math.random() - 0.5) * 8,
+      opacity: 1,
+    }));
+
+    let animId: number;
+    const startTime = Date.now();
+    const duration = 2500;
+
+    const render = () => {
+      const elapsed = Date.now() - startTime;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      particles.forEach((p) => {
+        p.y += p.speedY;
+        p.x += p.speedX;
+        p.rotation += p.rotSpeed;
+        if (elapsed > 1800) {
+          p.opacity = Math.max(0, 1 - (elapsed - 1800) / 700);
+        }
+
+        ctx.save();
+        ctx.globalAlpha = p.opacity;
+        ctx.translate(p.x, p.y);
+        ctx.rotate((p.rotation * Math.PI) / 180);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+        ctx.restore();
+      });
+
+      if (elapsed < duration) {
+        animId = requestAnimationFrame(render);
+      } else {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    };
+
+    animId = requestAnimationFrame(render);
+    return () => cancelAnimationFrame(animId);
+  }, [active]);
+
+  if (!active) return null;
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{
+        position: "fixed",
+        inset: 0,
+        pointerEvents: "none",
+        zIndex: 99999,
+        width: "100vw",
+        height: "100vh",
+      }}
+    />
+  );
+}
 
 const message = (x: unknown, fallback: string) =>
   (x as { error?: { message?: string }; message?: string })?.error?.message ||
@@ -175,8 +311,11 @@ function getProjectStageKey(p: Project): "design_concept" | "boq_approval" | "pr
 }
 
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [projects, setProjects] = useState<Project[]>(() => projectsPageCache?.projects ?? []);
+  const [stages, setStages] = useState<any[]>(() => projectsPageCache?.stages ?? []);
+  const [stageToast, setStageToast] = useState<{ id: string; type: "success" | "celebration" | "error"; title: string; subtitle: string; color?: string } | null>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [loading, setLoading] = useState(() => projectsPageCache === null);
   const [query, setQuery] = useState("");
   const [view, setView] = useState<"list" | "grid" | "board">("grid");
   const [filter, setFilter] = useState("all");
@@ -193,16 +332,24 @@ export default function ProjectsPage() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
-  const [summary, setSummary] = useState<{ totalProjects: number; totalEstimatedValue: number } | null>(null);
+  const [summary, setSummary] = useState<{ totalProjects: number; totalEstimatedValue: number; companyName?: string | null } | null>(() => projectsPageCache?.summary ?? null);
 
   const filterWrapRef = useRef<HTMLDivElement>(null);
   const file = useRef<HTMLInputElement>(null);
   const loadInFlight = useRef(false);
 
-  const load = useCallback(async () => {
+  useEffect(() => {
+    if (!stageToast) return;
+    const t = setTimeout(() => {
+      setStageToast(null);
+    }, stageToast.type === "celebration" ? 4500 : 3500);
+    return () => clearTimeout(t);
+  }, [stageToast]);
+
+  const load = useCallback(async (options?: { silent?: boolean }) => {
     if (loadInFlight.current) return;
     loadInFlight.current = true;
-    setLoading(true);
+    if (!options?.silent) setLoading(true);
     try {
       const p = new URLSearchParams({ pageSize: "100" });
       if (query.trim()) p.set("search", query.trim());
@@ -210,9 +357,31 @@ export default function ProjectsPage() {
       const r = await fetch(`/api/v1/projects?${p}`, { credentials: "include" });
       const b = await r.json();
       if (!r.ok) throw new Error(message(b, "Projects could not be loaded."));
-      setProjects(b.data?.items || []);
+      const nextProjects = b.data?.items || [];
+      setProjects(nextProjects);
       if (b.data?.summary) {
         setSummary(b.data.summary);
+      }
+      let nextStages = stages;
+      try {
+        let stgRes = await fetch("/api/v1/activities/stages", { credentials: "include" });
+        if (!stgRes.ok) {
+          stgRes = await fetch("/api/v1/stages", { credentials: "include" });
+        }
+        if (stgRes.ok) {
+          const stgJson = await stgRes.json();
+          if (stgJson.data?.items && Array.isArray(stgJson.data.items) && stgJson.data.items.length > 0) {
+            nextStages = stgJson.data.items;
+            setStages(nextStages);
+          }
+        }
+      } catch {}
+      if (!query.trim() && filter === "all") {
+        projectsPageCache = {
+          projects: nextProjects,
+          stages: nextStages,
+          summary: b.data?.summary ?? summary,
+        };
       }
     } catch (e) {
       setNotice(e instanceof Error ? e.message : "Projects could not be loaded.");
@@ -223,8 +392,40 @@ export default function ProjectsPage() {
   }, [query, filter]);
 
   useEffect(() => {
+    const handleStagesUpdated = () => {
+      fetch("/api/v1/activities/stages", { credentials: "include" })
+        .then((r) => r.json())
+        .then((b) => {
+          if (b.data?.items && Array.isArray(b.data.items) && b.data.items.length > 0) {
+            setStages(b.data.items);
+            if (projectsPageCache) {
+              projectsPageCache.stages = b.data.items;
+            }
+          }
+        })
+        .catch(() => {});
+    };
+    const handleProjectsUpdated = () => {
+      load({ silent: true });
+    };
+
+    window.addEventListener("boq:stages-updated", handleStagesUpdated);
+    window.addEventListener("boq:projects-updated", handleProjectsUpdated);
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "boq:stages-updated") handleStagesUpdated();
+      if (e.key === "boq:projects-updated") handleProjectsUpdated();
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("boq:stages-updated", handleStagesUpdated);
+      window.removeEventListener("boq:projects-updated", handleProjectsUpdated);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, [load]);
+
+  useEffect(() => {
     const handleFocus = () => {
-      load();
+      load({ silent: true });
     };
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
@@ -466,11 +667,31 @@ export default function ProjectsPage() {
   };
 
   const moveProjectWorkflow = async (projectId: string, targetStageKey: string) => {
-    const targetStage = WORKFLOW_STAGES.find((s) => s.id === targetStageKey) || WORKFLOW_STAGES[0];
+    const activeList = stages.length > 0 ? stages : DEFAULT_PROJECT_STAGES;
+    const targetStage =
+      activeList.find((s) => s.id === targetStageKey || s.name.toUpperCase() === targetStageKey.toUpperCase()) ||
+      activeList[0];
     const project = projects.find((p) => p.id === projectId);
-    if (!project) return;
-    const currentKey = getProjectStageKey(project);
-    if (currentKey === targetStageKey) return;
+    if (!project || !targetStage) return;
+
+    // Resolve current stage
+    const currentCanonical = resolveProjectCanonicalStage(project, activeList);
+    const currentKey = currentCanonical?.id || project.currentStageId || project.stageId;
+
+    // No-op condition: dropping into existing stage
+    if (
+      currentKey === targetStage.id ||
+      (currentCanonical && currentCanonical.name.toUpperCase() === targetStage.name.toUpperCase())
+    ) {
+      return;
+    }
+
+    const oldStage = currentCanonical?.name || project.stage || "Previous Stage";
+    const newStageName = targetStage.name || (targetStage as any).title;
+    const targetStageId = targetStage.id;
+    const newProgress = calculateStageProgress(targetStageId, activeList);
+    const isWon = newStageName.toUpperCase() === "WON" || targetStage.terminal_type === "completed" || targetStage.terminalType === "completed";
+    const isLost = newStageName.toUpperCase() === "LOST" || targetStage.terminal_type === "lost" || targetStage.terminalType === "lost";
 
     // Snapshot for rollback on network or server error
     const rollbackSnapshot = [...projects];
@@ -481,9 +702,13 @@ export default function ProjectsPage() {
         p.id === projectId
           ? {
               ...p,
-              stage: targetStage.title,
-              workflowStage: targetStage.id,
-              currentPhase: targetStage.title,
+              currentStageId: targetStageId,
+              stageId: targetStageId,
+              stage: newStageName,
+              workflowStage: targetStageId,
+              currentPhase: newStageName,
+              progress: isWon ? 100 : isLost ? 0 : newProgress,
+              status: isWon ? "active" : isLost ? "on_hold" : p.status,
             }
           : p
       )
@@ -495,24 +720,117 @@ export default function ProjectsPage() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          workflowStage: targetStage.id,
+          stageId: targetStageId,
+          stage: newStageName,
+          workflowStage: targetStageId,
         }),
       });
 
       if (!res.ok) {
         const body = await res.json().catch(() => null);
         throw new Error(body?.error?.message || "Failed to persist workflow update");
-      } else {
-        const body = await res.json();
-        if (body.data) {
-          setProjects((prev) => prev.map((p) => (p.id === projectId ? { ...p, ...body.data } : p)));
-        }
-        setNotice(`Project moved to ${targetStage.title}.`);
       }
+
+      const body = await res.json();
+      const updatedProject = body.data;
+
+      // Validate that the backend accepted and persisted the stage
+      if (!updatedProject || !updatedProject.id) {
+        throw new Error("Invalid response received from server.");
+      }
+
+      const returnedStageId = updatedProject.currentStageId || updatedProject.stageId || updatedProject.current_stage_id;
+      const returnedStageName = updatedProject.stage || updatedProject.stageObj?.name;
+
+      if (
+        returnedStageId &&
+        targetStageId &&
+        returnedStageId !== targetStageId &&
+        returnedStageName?.toUpperCase() !== newStageName.toUpperCase()
+      ) {
+        throw new Error("Returned stage does not match requested target stage.");
+      }
+
+      // Synchronize confirmed state
+      setProjects((prev) =>
+        prev.map((p) =>
+          p.id === projectId
+            ? {
+                ...p,
+                ...updatedProject,
+                currentStageId: targetStageId,
+                stageId: targetStageId,
+                stage: newStageName,
+                progress: isWon ? 100 : isLost ? 0 : (updatedProject.progress ?? newProgress),
+              }
+            : p
+        )
+      );
+
+      // Invalidate / update cache
+      if (projectsPageCache) {
+        projectsPageCache.projects = projectsPageCache.projects.map((p) =>
+          p.id === projectId
+            ? {
+                ...p,
+                ...updatedProject,
+                currentStageId: targetStageId,
+                stageId: targetStageId,
+                stage: newStageName,
+              }
+            : p
+        );
+      }
+
+      // Broadcast project update so Activities tab synchronizes
+      try {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("boq:projects-updated", {
+              detail: { projectId, stageId: targetStageId, stageName: newStageName },
+            })
+          );
+          localStorage.setItem(
+            "boq:projects-updated",
+            JSON.stringify({ projectId, stageId: targetStageId, time: Date.now() })
+          );
+        }
+      } catch {}
+
+      // Show success toast only after confirmed persistence
+      if (isWon) {
+        setShowConfetti(true);
+        setTimeout(() => setShowConfetti(false), 3000);
+        setStageToast({
+          id: String(Date.now()),
+          type: "celebration",
+          title: "🎉 Congratulations! Project Won!",
+          subtitle: `${project.name} has successfully reached the WON stage.`,
+          color: "#16A34A",
+        });
+      } else {
+        setStageToast({
+          id: String(Date.now()),
+          type: "success",
+          title: "Project moved successfully",
+          subtitle: `${project.name} moved from ${oldStage} to ${newStageName}.`,
+          color: targetStage.color || STAGE_COLOR_MAP[newStageName.toUpperCase()]?.hex || "#2563EB",
+        });
+      }
+      setNotice(`Project moved to ${newStageName}.`);
     } catch {
       // Revert optimistic update
       setProjects(rollbackSnapshot);
-      setNotice("Failed to update project stage. Changes reverted.");
+      if (projectsPageCache) {
+        projectsPageCache.projects = rollbackSnapshot;
+      }
+      setNotice("Unable to update project stage. Changes reverted.");
+      setStageToast({
+        id: String(Date.now()),
+        type: "error",
+        title: "Update Failed",
+        subtitle: "Unable to update project stage. Changes reverted.",
+      });
     }
   };
 
@@ -590,7 +908,7 @@ export default function ProjectsPage() {
                   <span>New Project</span>
                 </button>
               </div>
-            </div>
+              </div>
 
             <div className="projects-toolbar">
               <div className="projects-toolbar-left">
@@ -755,12 +1073,16 @@ export default function ProjectsPage() {
             ) : view === "grid" ? (
               <Grid
                 projects={projects}
+                stages={stages}
+                summary={summary}
                 activeMenuId={menuState?.project.id ?? null}
                 toggleMenu={toggleMenu}
               />
             ) : view === "board" ? (
               <Board
                 projects={projects}
+                stages={stages}
+                summary={summary}
                 activeMenuId={menuState?.project.id ?? null}
                 toggleMenu={toggleMenu}
                 onMoveProject={moveProjectWorkflow}
@@ -773,6 +1095,8 @@ export default function ProjectsPage() {
             ) : (
               <Table
                 projects={projects}
+                stages={stages}
+                summary={summary}
                 activeMenuId={menuState?.project.id ?? null}
                 toggleMenu={toggleMenu}
               />
@@ -814,6 +1138,7 @@ export default function ProjectsPage() {
             >
               <Menu
                 project={menuState.project}
+                stages={stages}
                 status={status}
                 archive={archive}
                 duplicate={duplicate}
@@ -835,6 +1160,7 @@ export default function ProjectsPage() {
             initialProject={wizardProject}
             screen={createScreen}
             setScreen={setCreateScreen}
+            companyName={summary?.companyName}
             onClose={() => {
               setCreate(false);
               setWizardProject(null);
@@ -878,6 +1204,51 @@ export default function ProjectsPage() {
         />
       )}
 
+      <ConfettiCanvas active={showConfetti} />
+
+      {stageToast && (
+        <div
+          className={`project-stage-toast ${stageToast.type}`}
+          style={{
+            position: "fixed",
+            bottom: "24px",
+            right: "24px",
+            zIndex: 99999,
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "12px",
+            padding: "14px 18px",
+            background: stageToast.type === "celebration" ? "linear-gradient(135deg, #0F172A 0%, #1E293B 100%)" : "#0F172A",
+            color: "#FFFFFF",
+            borderRadius: "10px",
+            boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2)",
+            minWidth: "320px",
+            maxWidth: "420px",
+            borderLeft: `4px solid ${stageToast.color || "#2563EB"}`,
+            border: stageToast.type === "celebration" ? "1px solid rgba(34, 197, 94, 0.4)" : undefined,
+          }}
+          role="status"
+          aria-live="polite"
+        >
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600, fontSize: "14px", color: stageToast.type === "celebration" ? "#22C55E" : "#F8FAFC" }}>
+              {stageToast.title}
+            </div>
+            <div style={{ fontSize: "12px", color: "#94A3B8", marginTop: "3px" }}>
+              {stageToast.subtitle}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setStageToast(null)}
+            style={{ background: "transparent", border: 0, color: "#94A3B8", cursor: "pointer", padding: "2px" }}
+            aria-label="Dismiss toast"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       {notice && (
         <div className="projects-toast">
           {notice}
@@ -906,10 +1277,14 @@ function Empty({ onCreate }: { onCreate: () => void }) {
 
 function Table({
   projects,
+  stages,
+  summary,
   activeMenuId,
   toggleMenu,
 }: {
   projects: Project[];
+  stages?: any[];
+  summary?: any;
   activeMenuId: string | null;
   toggleMenu: (p: Project, btn: HTMLElement) => void;
 }) {
@@ -939,17 +1314,17 @@ function Table({
         va = a.projectType || "";
         vb = b.projectType || "";
       } else if (sortField === "stage") {
-        va = a.stage || a.currentPhase || "";
-        vb = b.stage || b.currentPhase || "";
+        va = getProjectDisplayStage(a, stages);
+        vb = getProjectDisplayStage(b, stages);
       } else if (sortField === "status") {
         va = a.status || "";
         vb = b.status || "";
       } else if (sortField === "designer") {
-        va = a.leadDesigner || a.designer || a.clientName || "";
-        vb = b.leadDesigner || b.designer || b.clientName || "";
+        va = resolveDesignerDisplay(a.leadDesigner || a.designer, a.companyName || summary?.companyName);
+        vb = resolveDesignerDisplay(b.leadDesigner || b.designer, b.companyName || summary?.companyName);
       } else if (sortField === "boqs") {
-        va = a.boqsCount ?? 0;
-        vb = b.boqsCount ?? 0;
+        va = a.boqValue ?? a.boqsCount ?? 0;
+        vb = b.boqValue ?? b.boqsCount ?? 0;
       } else if (sortField === "margin") {
         va = a.margin ?? 0;
         vb = b.margin ?? 0;
@@ -964,7 +1339,7 @@ function Table({
       if (va > vb) return sortAsc ? 1 : -1;
       return 0;
     });
-  }, [projects, sortField, sortAsc]);
+  }, [projects, sortField, sortAsc, summary, stages]);
 
   return (
     <div className="projects-table-card">
@@ -972,13 +1347,13 @@ function Table({
         <table className="projects-table">
           <thead>
             <tr>
-              <th>ID</th>
+              <th>PROJECT ID{/* <th>ID</th> */}</th>
               <th>PROJECT</th>
               <th>TYPE</th>
               <th>STAGE</th>
               <th>STATUS</th>
               <th>DESIGNER</th>
-              <th>BOQS</th>
+              <th>BOQ VALUE{/* <th>BOQS</th> */}</th>
               <th>MARGIN</th>
               <th>PROGRESS</th>
               <th>DUE DATE</th>
@@ -987,9 +1362,11 @@ function Table({
           </thead>
           <tbody>
             {sortedProjects.map((p, i) => {
+              const displayStage = getProjectDisplayStage(p, stages);
+              const stageColor = getStageColor(displayStage);
               return (
                 <tr key={p.id} onClick={() => location.assign(`/projects/${p.id}`)}>
-                  <td className="cell-id">{p.projectCode || `PRJ-${String(i + 1).padStart(4, "0")}`}</td>
+                  <td className="cell-id">{getProjectDisplayCode(p, i)}</td>
                   <td className="cell-project">
                     <div className="project-cell-content">
                       <span className="project-cell-name">
@@ -1002,8 +1379,15 @@ function Table({
                   </td>
                   <td className="cell-type">{p.projectType || "—"}</td>
                   <td className="cell-stage">
-                    <span className="project-stage-badge">
-                      {p.stage || p.currentPhase || "Planning"}
+                    <span
+                      className="project-stage-badge"
+                      style={{
+                        backgroundColor: `${stageColor}18`,
+                        color: stageColor,
+                        borderColor: `${stageColor}30`,
+                      }}
+                    >
+                      {displayStage}
                     </span>
                   </td>
                   <td className="cell-status">
@@ -1012,9 +1396,11 @@ function Table({
                     </span>
                   </td>
                   <td className="cell-designer">
-                    {p.leadDesigner || p.designer || p.clientName?.split(" ")[0] || "Unassigned"}
+                    {resolveDesignerDisplay(p.leadDesigner || p.designer, p.companyName || summary?.companyName)}
                   </td>
-                  <td className="cell-boqs">{p.boqsCount ?? 0}</td>
+                  <td className="cell-boqs cell-boq-value">
+                    {formatIndianCurrency(p.boqValue)}
+                  </td>
                   <td className="cell-margin">{p.margin != null ? `${p.margin}%` : "—"}</td>
                   <td className="cell-progress">
                     <div
@@ -1028,7 +1414,11 @@ function Table({
                       <div className="project-progress-track">
                         <div
                           className="project-progress-fill"
-                          style={{ width: `${Math.min(100, Math.max(0, p.progress || 0))}%` }}
+                          style={{
+                            width: `${Math.min(100, Math.max(0, p.progress || 0))}%`,
+                            backgroundColor: stageColor,
+                            transition: "width 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+                          }}
                         />
                       </div>
                       <span className="project-progress-pct">{p.progress || 0}%</span>
@@ -1064,16 +1454,22 @@ function Table({
 
 function Grid({
   projects,
+  stages,
+  summary,
   activeMenuId,
   toggleMenu,
 }: {
   projects: Project[];
+  stages?: any[];
+  summary?: any;
   activeMenuId: string | null;
   toggleMenu: (p: Project, btn: HTMLElement) => void;
 }) {
   return (
     <div className="project-grid">
       {projects.map((p, idx) => {
+        const displayStage = getProjectDisplayStage(p, stages);
+        const stageColor = getStageColor(displayStage);
         return (
           <div key={p.id} className="project-card" onClick={() => location.assign(`/projects/${p.id}`)}>
             <div className="project-card-header">
@@ -1082,7 +1478,7 @@ function Grid({
                   {p.name}
                   {p.location ? ` — ${p.location}` : ""}
                 </h3>
-                <p className="project-card-code">{p.projectCode || `PRJ-${String(idx + 1).padStart(4, "0")}`}</p>
+                <p className="project-card-code">{getProjectDisplayCode(p, idx)}</p>
               </div>
               <div className="project-card-header-right" onClick={(e) => e.stopPropagation()}>
                 <span className={`project-status-badge status-${(p.status || "").toLowerCase().replace(/\s+/g, "_")}`}>
@@ -1124,13 +1520,13 @@ function Grid({
                 <div className="project-card-row">
                   <div className="project-card-col">
                     <span className="project-card-label">Designer</span>
-                    <span className="project-card-value" title={p.leadDesigner || p.designer || p.clientName?.split(" ")[0] || "Unassigned"}>
-                      {p.leadDesigner || p.designer || p.clientName?.split(" ")[0] || "Unassigned"}
+                    <span className="project-card-value" title={resolveDesignerDisplay(p.leadDesigner || p.designer, p.companyName || summary?.companyName)}>
+                      {resolveDesignerDisplay(p.leadDesigner || p.designer, p.companyName || summary?.companyName)}
                     </span>
                   </div>
                   <div className="project-card-col">
-                    <span className="project-card-label">BOQs</span>
-                    <span className="project-card-value">{boqDisplayValue(p)}</span>
+                    <span className="project-card-label">BOQ Value</span>
+                    <span className="project-card-value">{formatIndianCurrency(p.boqValue)}</span>
                   </div>
                   <div className="project-card-col">
                     <span className="project-card-label">Margin</span>
@@ -1144,7 +1540,16 @@ function Grid({
               <div className="project-card-row project-card-row-footer">
                 <div className="project-card-col">
                   <span className="project-card-label">Stage</span>
-                  <span className="project-stage-badge">{p.stage || p.currentPhase || "Planning"}</span>
+                  <span
+                    className="project-stage-badge"
+                    style={{
+                      backgroundColor: `${stageColor}18`,
+                      color: stageColor,
+                      borderColor: `${stageColor}30`,
+                    }}
+                  >
+                    {displayStage}
+                  </span>
                 </div>
                 <div className="project-card-col">
                   <span className="project-card-label">Due Date</span>
@@ -1163,7 +1568,11 @@ function Grid({
                     <div className="project-progress-track">
                       <div
                         className="project-progress-fill"
-                        style={{ width: `${Math.min(100, Math.max(0, p.progress || 0))}%` }}
+                        style={{
+                          width: `${Math.min(100, Math.max(0, p.progress || 0))}%`,
+                          backgroundColor: stageColor,
+                          transition: "width 0.4s ease",
+                        }}
                       />
                     </div>
                     <span className="project-progress-pct">{p.progress || 0}%</span>
@@ -1180,12 +1589,16 @@ function Grid({
 
 function Board({
   projects,
+  stages = [],
+  summary,
   activeMenuId,
   toggleMenu,
   onMoveProject,
   onQuickAdd,
 }: {
   projects: Project[];
+  stages?: any[];
+  summary?: any;
   activeMenuId: string | null;
   toggleMenu: (p: Project, btn: HTMLElement) => void;
   onMoveProject: (projectId: string, targetStageKey: string) => Promise<void>;
@@ -1194,23 +1607,44 @@ function Board({
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
 
+  const boardStages = useMemo(() => {
+    if (stages && stages.length > 0) {
+      return stages.map((s) => ({
+        id: s.id,
+        key: s.id,
+        name: s.name,
+        title: s.name,
+        label: s.name.toUpperCase(),
+        color: s.color || STAGE_COLOR_MAP[s.name.toUpperCase()]?.hex || "#2563EB",
+      }));
+    }
+    return DEFAULT_PROJECT_STAGES.map((s) => ({
+      id: s.name,
+      key: s.name,
+      name: s.name,
+      title: s.name,
+      label: s.name.toUpperCase(),
+      color: s.color,
+    }));
+  }, [stages]);
+
   const columns = useMemo(() => {
-    const map: Record<string, Project[]> = {
-      design_concept: [],
-      boq_approval: [],
-      procurement: [],
-      site_execution: [],
-    };
+    const map: Record<string, Project[]> = {};
+    boardStages.forEach((s) => {
+      map[s.id] = [];
+    });
+
     projects.forEach((p) => {
-      const key = getProjectStageKey(p);
-      if (map[key]) {
-        map[key].push(p);
-      } else {
-        map.design_concept.push(p);
+      const canonical = resolveProjectCanonicalStage(p, boardStages);
+      if (canonical && map[canonical.id]) {
+        map[canonical.id].push(p);
+      } else if (boardStages[0]) {
+        map[boardStages[0].id].push(p);
       }
     });
+
     return map;
-  }, [projects]);
+  }, [projects, boardStages]);
 
   const handleDragStart = (e: React.DragEvent, project: Project) => {
     setDraggedId(project.id);
@@ -1247,8 +1681,16 @@ function Board({
   };
 
   return (
-    <div className="projects-kanban-board" role="region" aria-label="Projects workflow board">
-      {WORKFLOW_STAGES.map((col) => {
+    <div
+      className="projects-kanban-board"
+      role="region"
+      aria-label="Projects workflow board"
+      style={{
+        "--kanban-stage-count": boardStages.length,
+        "--kanban-board-width": `${Math.max(1, boardStages.length) * 296}px`,
+      } as CSSProperties}
+    >
+      {boardStages.map((col) => {
         const colProjects = columns[col.id] || [];
         const isOver = dragOverCol === col.id;
 
@@ -1263,6 +1705,15 @@ function Board({
           >
             <div className="kanban-column-header">
               <div className="kanban-column-title-wrap">
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: "8px",
+                    height: "8px",
+                    borderRadius: "50%",
+                    backgroundColor: col.color,
+                  }}
+                />
                 <h3 className="kanban-column-title">{col.label}</h3>
                 <span className="kanban-column-badge">{colProjects.length}</span>
               </div>
@@ -1295,8 +1746,8 @@ function Board({
                 colProjects.map((p, idx) => {
                   const isBeingDragged = draggedId === p.id;
                   const pct = Math.min(100, Math.max(0, p.progress || 0));
-                  const progressColor = pct >= 100 ? "#16A34A" : pct >= 50 ? "#2563EB" : "#F59E0B";
-                  const designerName = p.leadDesigner || p.designer || p.clientName?.split(" ")[0] || "Unassigned";
+                  const progressColor = col.color || (pct >= 100 ? "#16A34A" : pct >= 50 ? "#2563EB" : "#F59E0B");
+                  const designerName = resolveDesignerDisplay(p.leadDesigner || p.designer, p.companyName || summary?.companyName);
                   const st = (p.status || "planning").toLowerCase().replace(/\s+/g, "_");
 
                   return (
@@ -1313,7 +1764,7 @@ function Board({
                     >
                       <div className="kanban-card-top">
                         <span className="kanban-card-id">
-                          {p.projectCode || `PRJ-${String(idx + 1).padStart(4, "0")}`}
+                          {getProjectDisplayCode(p, idx)}
                         </span>
                         <div className="kanban-card-top-right" onClick={(e) => e.stopPropagation()}>
                           <span className={`kanban-card-status status-${st}`}>
@@ -1336,6 +1787,20 @@ function Board({
                       </div>
 
                       <div className="kanban-card-main">
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+                          <span
+                            className="project-stage-badge"
+                            style={{
+                              backgroundColor: `${col.color}15`,
+                              color: col.color,
+                              borderColor: `${col.color}35`,
+                              fontSize: "10px",
+                              padding: "1px 6px",
+                            }}
+                          >
+                            {col.title}
+                          </span>
+                        </div>
                         <h4 className="kanban-card-name" title={p.name}>
                           {p.name}
                         </h4>
@@ -1356,17 +1821,30 @@ function Board({
                         </span>
                         <span className="kanban-card-dot">·</span>
                         <span className="kanban-card-boqs">
-                          {p.boqsCount ?? 0} BOQs
+                          {formatIndianCurrency(p.boqValue)}
                         </span>
+                        {p.margin != null && (
+                          <>
+                            <span className="kanban-card-dot">·</span>
+                            <span className="kanban-card-pill" style={{ color: "#0F172A", fontWeight: 600 }}>
+                              Margin: {p.margin}%
+                            </span>
+                          </>
+                        )}
                       </div>
 
                       <div className="kanban-card-progress-section">
-                        <span className="kanban-card-progress-label">Progress</span>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: "4px" }}>
+                          <span className="kanban-card-progress-label">Progress</span>
+                          <span style={{ fontSize: "11px", color: "#64748B" }}>
+                            {p.targetCompletionDate ? `Due ${date(p.targetCompletionDate)}` : ""}
+                          </span>
+                        </div>
                         <div className="kanban-card-progress-bar-wrap">
                           <div className="kanban-card-progress-track">
                             <div
                               className="kanban-card-progress-fill"
-                              style={{ width: `${pct}%`, background: progressColor }}
+                              style={{ width: `${pct}%`, background: progressColor, transition: "width 0.4s ease" }}
                             />
                           </div>
                           <span className="kanban-card-progress-pct">{pct}%</span>
@@ -1395,6 +1873,7 @@ function Board({
 
 function Menu({
   project,
+  stages,
   status,
   archive,
   duplicate,
@@ -1405,6 +1884,7 @@ function Menu({
   onMoveWorkflow,
 }: {
   project: Project;
+  stages?: any[];
   status: (p: Project, x: string) => void;
   archive: (p: Project) => void;
   duplicate: (p: Project) => void;
@@ -1428,7 +1908,25 @@ function Menu({
     fn();
   };
 
-  const currentStageKey = getProjectStageKey(project);
+  const menuStages = useMemo(() => {
+    if (stages && stages.length > 0) {
+      return stages.map((s) => ({
+        id: s.id as string,
+        title: s.name as string,
+        name: s.name as string,
+        color: (s.color || "#2563EB") as string,
+      }));
+    }
+    return WORKFLOW_STAGES.map((s) => ({
+      id: s.id,
+      title: s.title,
+      name: s.title,
+      color: "#2563EB",
+    }));
+  }, [stages]);
+
+  const canonicalStage = resolveProjectCanonicalStage(project, menuStages);
+  const currentStageKey = canonicalStage?.id || getProjectStageKey(project);
 
   return (
     <>
@@ -1456,19 +1954,22 @@ function Menu({
       {onMoveWorkflow && (
         <div className="menu-section-divider">
           <span className="menu-section-title">MOVE TO STAGE</span>
-          {WORKFLOW_STAGES.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              className={currentStageKey === s.id ? "selected-option" : ""}
-              onClick={act(() => onMoveWorkflow(project.id, s.id))}
-            >
-              <span style={{ width: 14, display: "inline-flex" }}>
-                {currentStageKey === s.id ? "✓" : "•"}
-              </span>
-              {s.title}
-            </button>
-          ))}
+          {menuStages.map((s) => {
+            const isCurrent = currentStageKey === s.id;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                className={isCurrent ? "selected-option" : ""}
+                onClick={act(() => onMoveWorkflow(project.id, s.id))}
+              >
+                <span style={{ width: 14, display: "inline-flex" }}>
+                  {isCurrent ? "✓" : "•"}
+                </span>
+                {s.title}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -1506,6 +2007,7 @@ function EditProjectModal({
   onSaved: (msg: string) => void;
   onConfigureRooms: (p: Project) => void;
 }) {
+  const [designers, setDesigners] = useState<any[]>([]);
   const [form, setForm] = useState<Form>({
     name: project.name || "",
     clientName: project.clientName || "",
@@ -1519,9 +2021,19 @@ function EditProjectModal({
     startDate: project.startDate ? project.startDate.split("T")[0] : "",
     targetCompletionDate: project.targetCompletionDate ? project.targetCompletionDate.split("T")[0] : "",
     leadDesigner: project.leadDesigner || project.designer || "",
+    assignedDesignerId: project.assignedDesignerId || "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetch("/api/v1/projects/designers", { credentials: "include" })
+      .then((r) => r.json())
+      .then((b) => {
+        if (b.data?.items) setDesigners(b.data.items);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const origOverflow = document.body.style.overflow;
@@ -1578,6 +2090,7 @@ function EditProjectModal({
       projectValue: parseBudget(form.projectValue),
       startDate: form.startDate || null,
       targetCompletionDate: form.targetCompletionDate || null,
+      assignedDesignerId: form.assignedDesignerId || null,
       leadDesigner: form.leadDesigner?.trim() || null,
       metadata: {
         leadDesigner: form.leadDesigner?.trim() || null,
@@ -1985,15 +2498,18 @@ function Create({
   setScreen,
   onClose,
   onCreated,
+  companyName,
 }: {
   initialProject?: Project | null;
   screen: string;
   setScreen: (s: string) => void;
   onClose: () => void;
   onCreated: (x: string) => void;
+  companyName?: string | null;
 }) {
   const [method, setMethod] = useState("scratch");
   const [form, setForm] = useState<Form>(blankForm);
+  const [designers, setDesigners] = useState<any[]>([]);
   const [project, setProject] = useState<Project | null>(initialProject || null);
   const [rooms, setRooms] = useState<ProjectRoom[]>([
     { name: "Master Bedroom", roomType: "Master Bedroom", unit: "ft" },
@@ -2001,6 +2517,26 @@ function Create({
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [coverFile, setCoverFile] = useState<File | null>(null);
+
+  useEffect(() => {
+    fetch("/api/v1/projects/designers", { credentials: "include" })
+      .then((r) => r.json())
+      .then((b) => {
+        if (b.data?.items) setDesigners(b.data.items);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (screen !== "success") return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onCreated("Project created successfully.");
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [screen, onCreated]);
 
   const [activeRoomIndex, setActiveRoomIndex] = useState(0);
   const [roomSearch, setRoomSearch] = useState("");
@@ -2016,6 +2552,28 @@ function Create({
   const [editingReqId, setEditingReqId] = useState<string | null>(null);
   const [itemSearchQuery, setItemSearchQuery] = useState("");
   const [activeReqMenu, setActiveReqMenu] = useState<string | null>(null);
+  const [showEditRoomNameModal, setShowEditRoomNameModal] = useState(false);
+  const [editRoomNameInput, setEditRoomNameInput] = useState("");
+
+  const getCommonRoomSuggestions = useCallback((roomName?: string, roomType?: string) => {
+    const target = `${roomName || ""} ${roomType || ""}`.toLowerCase();
+    if (target.includes("kitchen")) {
+      return ["Base Cabinet", "Wall Cabinet", "Tall Unit", "Pantry", "Overhead Cabinet", "Countertop Unit"];
+    }
+    if (target.includes("living") || target.includes("hall") || target.includes("drawing")) {
+      return ["TV Unit", "Shoe Cabinet", "Wall Panel", "False Ceiling", "Decorative Panel", "Console Table"];
+    }
+    if (target.includes("dining")) {
+      return ["Crockery Unit", "Dining Storage", "False Ceiling", "Wall Panel", "Bar Unit"];
+    }
+    if (target.includes("bath") || target.includes("toilet") || target.includes("powder")) {
+      return ["Vanity", "Mirror Cabinet", "Under Basin Storage", "Wall Shelves"];
+    }
+    if (target.includes("study") || target.includes("office")) {
+      return ["Study Table", "Book Shelf", "Wall Shelves", "Storage Unit", "TV Unit"];
+    }
+    return ["Wardrobe", "Bed Back Panel", "Side Table", "TV Unit", "Study Table", "Storage Unit"];
+  }, []);
 
   const [reqForm, setReqForm] = useState<{
     name: string;
@@ -2600,6 +3158,8 @@ function Create({
       projectValue: form.projectValue ? Number(form.projectValue) : null,
       startDate: form.startDate || null,
       targetCompletionDate: form.targetCompletionDate || null,
+      assignedDesignerId: form.assignedDesignerId || null,
+      leadDesigner: form.leadDesigner?.trim() || null,
     };
 
     try {
@@ -2612,9 +3172,23 @@ function Create({
           body: JSON.stringify(body),
         });
         const b = await r.json();
-        if (!r.ok) throw new Error(message(b, "Project could not be updated."));
-        currentProj = b.data;
-        setProject(currentProj);
+        if (r.ok) {
+          currentProj = b.data;
+          setProject(currentProj);
+        } else if (r.status === 404) {
+          const createRes = await fetch("/api/v1/projects", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const createData = await createRes.json();
+          if (!createRes.ok) throw new Error(message(createData, "Project could not be created."));
+          currentProj = createData.data;
+          setProject(currentProj);
+        } else {
+          throw new Error(message(b, "Project could not be updated."));
+        }
       } else {
         const r = await fetch("/api/v1/projects", {
           method: "POST",
@@ -3267,6 +3841,8 @@ function Create({
       projectValue: form.projectValue ? Number(form.projectValue) : null,
       startDate: form.startDate || null,
       targetCompletionDate: form.targetCompletionDate || null,
+      assignedDesignerId: form.assignedDesignerId || null,
+      leadDesigner: form.leadDesigner?.trim() || null,
     };
 
     try {
@@ -3831,6 +4407,7 @@ function Create({
           <div className="project-details-card">
             <div className="project-details-heading">PROJECT DETAILS</div>
 
+            <div className="project-details-scroll">
             {/* Inner White Form Panel Frame 93 */}
             <div className="project-details-panel">
               <form id="create-details-form" className="project-scratch-form" onSubmit={submitProjectDetails}>
@@ -4006,6 +4583,39 @@ function Create({
                   </div>
                 </div>
 
+                <div className="project-details-divider alt" />
+
+                <div className="project-section-subtitle">TEAM & DESIGNER</div>
+
+                <div className="project-fields-row">
+                  <div className="project-field-group">
+                    <label className="project-field-label" htmlFor="assigned-designer-select">
+                      Assigned Designer (Optional)
+                    </label>
+                    <select
+                      id="assigned-designer-select"
+                      className="project-field-select"
+                      value={form.assignedDesignerId || ""}
+                      onChange={(e) => {
+                        const selId = e.target.value;
+                        const sel = designers.find((d: any) => d.id === selId);
+                        change("assignedDesignerId", selId);
+                        change("leadDesigner", sel ? sel.name : "");
+                      }}
+                    >
+                      <option value="">No designer assigned (defaults to company name)</option>
+                      {designers.map((d: any) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name} {d.role ? `(${d.role})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="project-field-helper">
+                      If unassigned, the company name will be displayed as the default designer.
+                    </span>
+                  </div>
+                </div>
+
                 {error && <p className="form-error">{error}</p>}
               </form>
             </div>
@@ -4068,6 +4678,7 @@ function Create({
                   </span>
                 )}
               </div>
+            </div>
             </div>
           </div>
         </div>
@@ -4241,7 +4852,9 @@ function Create({
                       <Minus size={18} />
                     </button>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       min={1}
                       max={50}
                       className="room-count-display"
@@ -4668,22 +5281,6 @@ function Create({
             >
               Edit Project
             </button>
-          </div>
-        </div>
-
-        {/* Dynamic Room Summary Metrics Bar (Frame 2147225071) */}
-        <div className="room-metrics-bar">
-          <div className="room-metric-card">
-            <span className="room-metric-label">Total Rooms</span>
-            <span className="room-metric-value">{rooms.length}</span>
-          </div>
-          <div className="room-metric-card">
-            <span className="room-metric-label">Configured</span>
-            <span className="room-metric-value configured">{configuredCount}</span>
-          </div>
-          <div className="room-metric-card">
-            <span className="room-metric-label">Pending</span>
-            <span className="room-metric-value pending">{Math.max(0, rooms.length - configuredCount)}</span>
           </div>
         </div>
 
@@ -5205,7 +5802,7 @@ function Create({
     const currentRoomReqs = activeRoom.requirements || [];
 
     return (
-      <div className="create-page-wrapper project-scratch-wrapper">
+      <div className="create-page-wrapper project-scratch-wrapper wizard-screen-requirements">
         <div className="project-scratch-container">
           <div className="project-scratch-gradient" />
 
@@ -5441,8 +6038,8 @@ function Create({
                   type="button"
                   className="room-action-btn"
                   onClick={() => {
-                    const nextName = prompt("Enter new room name:", activeRoom.name);
-                    if (nextName?.trim()) updateActiveRoomField("name", nextName.trim());
+                    setEditRoomNameInput(activeRoom.name || "");
+                    setShowEditRoomNameModal(true);
                   }}
                 >
                   <Edit2 size={14} /> Edit Name
@@ -5482,72 +6079,37 @@ function Create({
                   </div>
 
                   {!currentRoomReqs.length ? (
-                    <>
-                      <div className="empty-requirements-state">
-                        <div className="empty-requirements-icon">
-                          <Plus size={24} />
-                        </div>
-                        <h4 className="empty-requirements-title">No Requirements Added</h4>
-                        <p className="empty-requirements-desc">
-                          Add the furniture, storage, panels, cabinets, or other items required for this room.
-                        </p>
-                        <button
-                          type="button"
-                          className="add-requirement-primary-btn"
-                          onClick={() => {
-                            setReqForm({
-                              name: "Wardrobe",
-                              category: "Storage",
-                              length: "8",
-                              depth: "2",
-                              height: "8",
-                              unit: "Unit",
-                              quantity: 1,
-                              partitions: 4,
-                              notes: "",
-                              referenceImageUrl: null,
-                            });
-                            setEditingReqId(null);
-                            setAddingRequirement(true);
-                          }}
-                        >
-                          <Plus size={16} /> Add Requirement
-                        </button>
+                    <div className="empty-requirements-state">
+                      <div className="empty-requirements-icon">
+                        <Plus size={24} />
                       </div>
-
-                      <div className="common-requirements-section">
-                        <h5 className="common-requirements-title">
-                          COMMON FOR {activeRoom.name?.toUpperCase() || "ROOM"}
-                        </h5>
-                        <div className="common-chips-list">
-                          {["Wardrobe", "Bed Back Panel", "Side Table", "TV Unit", "Study Table", "Storage Unit"].map((c) => (
-                            <button
-                              key={c}
-                              type="button"
-                              className="common-chip-btn"
-                              onClick={() => {
-                                setReqForm({
-                                  name: c,
-                                  category: c === "Wardrobe" || c === "Storage Unit" ? "Storage" : "Furniture",
-                                  length: "6",
-                                  depth: "2",
-                                  height: "7",
-                                  unit: "Unit",
-                                  quantity: 1,
-                                  partitions: 2,
-                                  notes: "",
-                                  referenceImageUrl: null,
-                                });
-                                setEditingReqId(null);
-                                setAddingRequirement(true);
-                              }}
-                            >
-                              <Plus size={12} /> {c}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </>
+                      <h4 className="empty-requirements-title">No Requirements Added</h4>
+                      <p className="empty-requirements-desc">
+                        Add the furniture, storage, panels, cabinets, or other items required for this room.
+                      </p>
+                      <button
+                        type="button"
+                        className="add-requirement-primary-btn"
+                        onClick={() => {
+                          setReqForm({
+                            name: "Wardrobe",
+                            category: "Storage",
+                            length: "8",
+                            depth: "2",
+                            height: "8",
+                            unit: "Unit",
+                            quantity: 1,
+                            partitions: 4,
+                            notes: "",
+                            referenceImageUrl: null,
+                          });
+                          setEditingReqId(null);
+                          setAddingRequirement(true);
+                        }}
+                      >
+                        <Plus size={16} /> Add Requirement
+                      </button>
+                    </div>
                   ) : (
                     <div className="requirements-cards-grid">
                       {currentRoomReqs.map((rq) => {
@@ -5630,6 +6192,49 @@ function Create({
                       })}
                     </div>
                   )}
+
+                  <div className="common-requirements-divider" />
+
+                  <div className="common-requirements-section">
+                    <h5 className="common-requirements-title">
+                      COMMON FOR {activeRoom.name?.toUpperCase() || "ROOM"}
+                    </h5>
+                    <div className="common-chips-list">
+                      {getCommonRoomSuggestions(activeRoom.name, activeRoom.roomType).map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          className="common-chip-btn"
+                          onClick={() => {
+                            let cat = "Furniture";
+                            if (["Wardrobe", "Storage Unit", "Shoe Cabinet", "Book Shelf", "Crockery Unit", "Dining Storage", "Under Basin Storage"].includes(c)) {
+                              cat = "Storage";
+                            } else if (["Base Cabinet", "Wall Cabinet", "Tall Unit", "Pantry", "Overhead Cabinet", "Countertop Unit"].includes(c)) {
+                              cat = "Kitchen";
+                            } else if (["Wall Panel", "False Ceiling", "Decorative Panel"].includes(c)) {
+                              cat = "Wall & Ceiling";
+                            }
+                            setReqForm({
+                              name: c,
+                              category: cat,
+                              length: "6",
+                              depth: "2",
+                              height: "7",
+                              unit: "Unit",
+                              quantity: 1,
+                              partitions: 2,
+                              notes: "",
+                              referenceImageUrl: null,
+                            });
+                            setEditingReqId(null);
+                            setAddingRequirement(true);
+                          }}
+                        >
+                          <Plus size={12} /> {c}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </>
               ) : (
                 /* VIEW 2: Add / Edit Requirement Form */
@@ -6171,6 +6776,80 @@ function Create({
             </div>
           </Modal>
         )}
+
+        {/* Modal for editing room name */}
+        {showEditRoomNameModal && (
+          <Modal
+            title="Edit Room Name"
+            subtitle={`Update the display name for this room in ${project?.name || form.name || "the project"}.`}
+            onClose={() => setShowEditRoomNameModal(false)}
+          >
+            <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div className="dimension-input-group">
+                <label className="dimension-label">
+                  Room Name <span className="req-star">*</span>
+                </label>
+                <input
+                  type="text"
+                  className="dimension-text-input"
+                  value={editRoomNameInput}
+                  onChange={(e) => setEditRoomNameInput(e.target.value)}
+                  placeholder="ex. Master Bedroom"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && editRoomNameInput.trim()) {
+                      e.preventDefault();
+                      const nextName = editRoomNameInput.trim();
+                      if (nextName) {
+                        updateActiveRoomField("name", nextName.trim());
+                        if (project?.id && activeRoom?.id) {
+                          fetch(`/api/v1/projects/${project.id}/rooms/${activeRoom.id}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            credentials: "include",
+                            body: JSON.stringify({ name: nextName.trim() }),
+                          }).catch(() => {});
+                        }
+                      }
+                      setShowEditRoomNameModal(false);
+                    }
+                  }}
+                />
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "8px" }}>
+                <button
+                  type="button"
+                  className="room-form-cancel-btn"
+                  onClick={() => setShowEditRoomNameModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="room-form-save-btn"
+                  disabled={!editRoomNameInput.trim()}
+                  onClick={() => {
+                    const nextName = editRoomNameInput.trim();
+                    if (nextName) {
+                      updateActiveRoomField("name", nextName.trim());
+                      if (project?.id && activeRoom?.id) {
+                        fetch(`/api/v1/projects/${project.id}/rooms/${activeRoom.id}`, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          credentials: "include",
+                          body: JSON.stringify({ name: nextName.trim() }),
+                        }).catch(() => {});
+                      }
+                    }
+                    setShowEditRoomNameModal(false);
+                  }}
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
       </div>
     );
   }
@@ -6698,75 +7377,199 @@ function Create({
     );
   }
 
+  const clientNameDisplay = project?.clientName?.trim() || form.clientName?.trim() || "N/A";
+  const projectTypeDisplay = project?.projectType?.trim() || form.projectType?.trim() || "Residential";
+  const designerDisplay = resolveDesignerDisplay(
+    project?.leadDesigner || project?.designer || form.leadDesigner,
+    project?.companyName || companyName
+  );
+  const rawBudget = project?.projectValue ?? form.projectValue;
+  const budgetNum = rawBudget != null && rawBudget !== "" ? Number(rawBudget) : NaN;
+  const budgetDisplay = !isNaN(budgetNum) && budgetNum > 0 ? formatIndianCurrency(budgetNum) : "N/A";
+
+  const rawArea = project?.areaSqft ?? form.areaSqft;
+  const areaNum = rawArea != null && rawArea !== "" ? Number(rawArea) : NaN;
+  const areaDisplay = !isNaN(areaNum) && areaNum > 0 ? `${areaNum.toLocaleString("en-IN")} sqft` : "N/A";
+
   return (
     <div className="create-page-wrapper">
-      <div className="create-page-header">
-        <div className="create-page-header-left">
-          <button className="back-btn" onClick={() => onCreated("Project setup completed.")}>
-            <ArrowLeft size={18} />
-          </button>
-          <div>
-            <h2>Project Workspace Ready</h2>
-            <p>Your project and rooms have been successfully initialized.</p>
+      <div
+        className="success-modal-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="project-success-modal-title"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            onCreated("Project created successfully.");
+          }
+        }}
+      >
+        <div className="success-modal" onClick={(e) => e.stopPropagation()}>
+          {/* Frame 2147225093 - Header */}
+          <header className="success-modal-header">
+            {/* Frame 2147224969 */}
+            <div className="success-modal-header-titles">
+              <h2 id="project-success-modal-title" className="success-modal-title">
+                Create New Project
+              </h2>
+              <p className="success-modal-subtitle">
+                Choose how you want to start this project.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="success-modal-close-btn"
+              onClick={() => onCreated("Project created successfully.")}
+              aria-label="Close modal"
+            >
+              <X size={20} />
+            </button>
+          </header>
+
+          {/* Frame 2147225027 - Inner White Success Card */}
+          <div className="success-content">
+            {/* Frame 2147225039 & Frame 2147225038 - Green Animated Success Indicator */}
+            <div className="success-indicator-outer">
+              <div className="success-indicator-inner">
+                <Check size={24} className="success-indicator-check" strokeWidth={2.5} />
+              </div>
+            </div>
+
+            {/* Frame 2147225034 - Success Titles */}
+            <div className="success-titles-wrap">
+              <h3 className="success-main-heading">Project Created Successfully!</h3>
+              <p className="success-sub-heading">Your project workspace is ready</p>
+            </div>
+
+            {/* Frame 2147225027 inner - Project Summary Card */}
+            <div className="project-summary-info-card">
+              {/* Frame 2147225098 - Row 1 */}
+              <div className="psi-row">
+                {/* Frame 2147225042 - Client Name */}
+                <div className="psi-item">
+                  <div className="psi-label-group">
+                    <span className="psi-icon-wrap" aria-hidden="true">
+                      <Check size={16} strokeWidth={2.5} />
+                    </span>
+                    <span className="psi-label">Client Name</span>
+                  </div>
+                  <span className="psi-value" title={clientNameDisplay}>
+                    {clientNameDisplay}
+                  </span>
+                </div>
+
+                {/* Rectangle 63 - Vertical Divider */}
+                <div className="psi-divider-v" aria-hidden="true" />
+
+                {/* Frame 2147225043 - Type */}
+                <div className="psi-item">
+                  <div className="psi-label-group">
+                    <span className="psi-icon-wrap" aria-hidden="true">
+                      <Check size={16} strokeWidth={2.5} />
+                    </span>
+                    <span className="psi-label">Type</span>
+                  </div>
+                  <span className="psi-value" title={projectTypeDisplay}>
+                    {projectTypeDisplay}
+                  </span>
+                </div>
+              </div>
+
+              {/* Rectangle 64 - Horizontal Divider */}
+              <div className="psi-divider-h" aria-hidden="true" />
+
+              {/* Frame 2147225099 - Row 2 */}
+              <div className="psi-row">
+                {/* Frame 2147225044 - Designer */}
+                <div className="psi-item">
+                  <div className="psi-label-group">
+                    <span className="psi-icon-wrap" aria-hidden="true">
+                      <Check size={16} strokeWidth={2.5} />
+                    </span>
+                    <span className="psi-label">Designer</span>
+                  </div>
+                  <span className="psi-value" title={designerDisplay}>
+                    {designerDisplay}
+                  </span>
+                </div>
+
+                {/* Rectangle 63 - Vertical Divider */}
+                <div className="psi-divider-v" aria-hidden="true" />
+
+                {/* Frame 2147225045 - Budget */}
+                <div className="psi-item">
+                  <div className="psi-label-group">
+                    <span className="psi-icon-wrap" aria-hidden="true">
+                      <Check size={16} strokeWidth={2.5} />
+                    </span>
+                    <span className="psi-label">Budget</span>
+                  </div>
+                  <span className="psi-value" title={budgetDisplay}>
+                    {budgetDisplay}
+                  </span>
+                </div>
+              </div>
+
+              {/* Rectangle 66 - Horizontal Divider */}
+              <div className="psi-divider-h" aria-hidden="true" />
+
+              {/* Frame 2147225046 - Row 3 */}
+              <div className="psi-row psi-row-full">
+                {/* Area */}
+                <div className="psi-item psi-item-full">
+                  <div className="psi-label-group">
+                    <span className="psi-icon-wrap" aria-hidden="true">
+                      <Check size={16} strokeWidth={2.5} />
+                    </span>
+                    <span className="psi-label">Area</span>
+                  </div>
+                  <span className="psi-value" title={areaDisplay}>
+                    {areaDisplay}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
+
+          {/* Frame 2147225069 - Buttons Footer */}
+          <footer className="success-modal-footer">
+            {/* Button 1: Back to Projects */}
+            <button
+              type="button"
+              className="success-btn-back"
+              onClick={() => onCreated("Project created successfully.")}
+            >
+              Back to Projects
+            </button>
+
+            {/* Frame 2147225097 - Right Actions */}
+            <div className="success-footer-actions-right">
+              {/* Button 2: Create BOQ Now */}
+              <button
+                type="button"
+                className="success-btn-boq"
+                onClick={() => {
+                  const pId = project?.id || "";
+                  location.assign(pId ? `/boqs?new=true&projectId=${pId}` : "/boqs?new=true");
+                }}
+              >
+                Create BOQ Now
+              </button>
+
+              {/* Button 3: Open Project Workspace */}
+              <button
+                type="button"
+                className="success-btn-workspace"
+                onClick={() => {
+                  const pId = project?.id || "";
+                  location.assign(pId ? `/projects/${pId}` : "/projects");
+                }}
+              >
+                Open Project Workspace
+              </button>
+            </div>
+          </footer>
         </div>
-      </div>
-      <div className="success-panel">
-        <div className="success-check">
-          <Check />
-        </div>
-        <h2>Project Configured Successfully!</h2>
-        <p>{project?.name} is ready for BOQ creation and review.</p>
-        <dl>
-          <div>
-            <dt>Client</dt>
-            <dd>{project?.clientName}</dd>
-          </div>
-          <div>
-            <dt>Type</dt>
-            <dd>{project?.projectType}</dd>
-          </div>
-          <div>
-            <dt>Configured Rooms</dt>
-            <dd>{rooms.filter((r) => r.name.trim()).length}</dd>
-          </div>
-          <div>
-            <dt>Total Requirements</dt>
-            <dd>{allRequirementsAcrossRooms.length}</dd>
-          </div>
-        </dl>
-        <footer style={{ display: "flex", justifyContent: "center", gap: "10px", marginTop: "20px" }}>
-          <button
-            type="button"
-            onClick={() => onCreated("Project created.")}
-            style={{
-              padding: "10px 20px",
-              borderRadius: "8px",
-              border: "1px solid #e2e8f0",
-              background: "white",
-              cursor: "pointer",
-              fontWeight: 600,
-            }}
-          >
-            Back to Projects
-          </button>
-          <button
-            type="button"
-            className="primary"
-            onClick={() => location.assign(`/projects/${project?.id}`)}
-            style={{
-              padding: "10px 20px",
-              borderRadius: "8px",
-              border: "1px solid #2865e8",
-              background: "#2865e8",
-              color: "white",
-              cursor: "pointer",
-              fontWeight: 600,
-            }}
-          >
-            Open Project Workspace
-          </button>
-        </footer>
       </div>
     </div>
   );

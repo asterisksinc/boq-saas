@@ -59,6 +59,7 @@ import {
     listActivityApprovalComments,
     createActivityApprovalComment,
 } from "@/lib/api/auth";
+import { resolveProjectCanonicalStage } from "@/lib/domain/project-stages";
 import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
 import "./activities-redesign.css";
@@ -183,6 +184,7 @@ type ProjectItem = {
     assignedDesignerId?: string | null;
     tags?: string[];
     designerName?: string;
+    currentStageId?: string | null;
     workflowStage?: string;
     stage?: string;
     stageId?: string;
@@ -449,6 +451,8 @@ export default function ActivitiesPage() {
                     assignedDesignerId: p.assignedDesignerId,
                     tags: p.tags || [],
                     designerName: undefined,
+                    currentStageId: p.currentStageId || p.current_stage_id || p.stageId || null,
+                    stageId: p.currentStageId || p.stageId || p.current_stage_id || null,
                     workflowStage: p.workflowStage || p.metadata?.workflowStage || p.metadata?.stage,
                     stage: p.stage || p.metadata?.stage,
                     metadata: p.metadata,
@@ -580,6 +584,31 @@ export default function ActivitiesPage() {
         loadStagesForForms();
         loadUserProfile();
     }, [loadStages, loadProjects, loadTasks, loadApprovals, loadStagesForForms, loadUserProfile]);
+
+    useEffect(() => {
+        const handleProjectsUpdated = () => {
+            loadProjects();
+        };
+        const handleStagesUpdated = () => {
+            loadStages();
+            loadStagesForForms();
+        };
+        window.addEventListener("boq:projects-updated", handleProjectsUpdated);
+        window.addEventListener("boq:stages-updated", handleStagesUpdated);
+        const handleStorage = (e: StorageEvent) => {
+            if (e.key === "boq:projects-updated") loadProjects();
+            if (e.key === "boq:stages-updated") {
+                loadStages();
+                loadStagesForForms();
+            }
+        };
+        window.addEventListener("storage", handleStorage);
+        return () => {
+            window.removeEventListener("boq:projects-updated", handleProjectsUpdated);
+            window.removeEventListener("boq:stages-updated", handleStagesUpdated);
+            window.removeEventListener("storage", handleStorage);
+        };
+    }, [loadProjects, loadStages, loadStagesForForms]);
 
     useEffect(() => {
         const close = () => {
@@ -1054,6 +1083,8 @@ export default function ActivitiesPage() {
 
     const getProjectStageId = useCallback((p: ProjectItem, allStages: ActivityStage[]): string => {
         if (!allStages || allStages.length === 0) return "";
+        const canonical = resolveProjectCanonicalStage(p as any, allStages);
+        if (canonical) return canonical.id;
 
         // 1. Explicit stage tag (e.g. stage:<uuid> or stage:<name>)
         const stageTag = p.tags?.find(t => t.startsWith("stage:"));
@@ -1066,7 +1097,7 @@ export default function ActivitiesPage() {
         }
 
         // 2. Explicit stageId, workflowStage, or metadata
-        const wf = p.stageId || p.workflowStage || (p.metadata?.stageId as string) || (p.metadata?.workflowStage as string) || (p.metadata?.stage as string) || (p as any).stage;
+        const wf = p.currentStageId || p.stageId || p.workflowStage || (p.metadata?.stageId as string) || (p.metadata?.workflowStage as string) || (p.metadata?.stage as string) || (p as any).stage;
         if (wf) {
             const matchById = allStages.find(s => s.id === wf);
             if (matchById) return matchById.id;
@@ -1085,13 +1116,13 @@ export default function ActivitiesPage() {
         // 5. Fallback based on project status
         const status = (p.status || "").toLowerCase();
         if (status === "planning" || status === "draft") {
-            const initStage = allStages.find(s => s.name.toLowerCase().includes("initiat"));
+            const initStage = allStages.find(s => s.name.toLowerCase().includes("initiat") || s.name.toLowerCase().includes("requirement"));
             if (initStage) return initStage.id;
         } else if (status === "in_progress" || status === "active") {
             const designStage = allStages.find(s => s.name.toLowerCase().includes("design"));
             if (designStage) return designStage.id;
         } else if (status === "review" || status === "on_hold") {
-            const reviewStage = allStages.find(s => s.name.toLowerCase().includes("approv") || s.name.toLowerCase().includes("estimat"));
+            const reviewStage = allStages.find(s => s.name.toLowerCase().includes("approv") || s.name.toLowerCase().includes("estimat") || s.name.toLowerCase().includes("negotiat"));
             if (reviewStage) return reviewStage.id;
         }
 
@@ -1160,6 +1191,13 @@ export default function ActivitiesPage() {
                 setProjects(prev => prev.map(p => (p.id === project.id ? { ...p, ...wfData.data } : p)));
             }
 
+            try {
+                if (typeof window !== "undefined") {
+                    window.dispatchEvent(new CustomEvent("boq:projects-updated", { detail: { projectId: project.id, stageId: targetStage.id, stageName: targetStage.name } }));
+                    localStorage.setItem("boq:projects-updated", JSON.stringify({ projectId: project.id, stageId: targetStage.id, time: Date.now() }));
+                }
+            } catch {}
+
             setNotice(`Moved "${project.name}" to ${targetStage.name}`);
         } catch {
             // Rollback on failure
@@ -1209,6 +1247,12 @@ export default function ActivitiesPage() {
             setStageError("");
             await loadStages();
             await loadStagesForForms();
+            try {
+                if (typeof window !== "undefined") {
+                    window.dispatchEvent(new CustomEvent("boq:stages-updated"));
+                    localStorage.setItem("boq:stages-updated", Date.now().toString());
+                }
+            } catch {}
             setNotice(editStage ? "Stage updated successfully." : "Stage created successfully.");
         } catch (e: any) {
             setStageError(e?.message || "Could not save stage. Please try again.");
@@ -1401,6 +1445,12 @@ export default function ActivitiesPage() {
             loadStages();
             loadTasks();
             loadApprovals();
+            try {
+                if (typeof window !== "undefined") {
+                    window.dispatchEvent(new CustomEvent("boq:stages-updated"));
+                    localStorage.setItem("boq:stages-updated", Date.now().toString());
+                }
+            } catch {}
         } catch { setNotice("Could not delete stage"); }
     };
 
