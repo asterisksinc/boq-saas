@@ -59,6 +59,7 @@ export default function OrganizationBusinessInfo({
     const initialBank = (businessInfo.bankName as string) || "";
     const initialAccount = (businessInfo.accountNumber as string) || "";
     const initialIfsc = (businessInfo.ifscCode as string) || "";
+    const initialBranch = (businessInfo.branch as string) || "";
     const initialTerms = (businessInfo.paymentTerms as string) || (boqCosting.paymentTerms as string) || "Net 30";
 
     const [legalName, setLegalName] = useState(initialLegal);
@@ -70,6 +71,7 @@ export default function OrganizationBusinessInfo({
     const [bankName, setBankName] = useState(initialBank);
     const [accountNumber, setAccountNumber] = useState(initialAccount);
     const [ifscCode, setIfscCode] = useState(initialIfsc);
+    const [branch, setBranch] = useState(initialBranch);
     const [paymentTerms, setPaymentTerms] = useState(initialTerms);
 
     const [panManuallyEdited, setPanManuallyEdited] = useState(false);
@@ -98,6 +100,7 @@ export default function OrganizationBusinessInfo({
         setBankName((currentBiz.bankName as string) || "");
         setAccountNumber((currentBiz.accountNumber as string) || "");
         setIfscCode((currentBiz.ifscCode as string) || "");
+        setBranch((currentBiz.branch as string) || "");
         setPaymentTerms((currentBiz.paymentTerms as string) || (currentBoq.paymentTerms as string) || "Net 30");
     }, [overview, panManuallyEdited]);
 
@@ -187,6 +190,7 @@ export default function OrganizationBusinessInfo({
                 bankName: bankName.trim(),
                 accountNumber: accountNumber.trim(),
                 ifscCode: ifscCode.trim().toUpperCase(),
+                branch: branch.trim(),
                 paymentTerms: paymentTerms.trim(),
             });
 
@@ -394,7 +398,7 @@ export default function OrganizationBusinessInfo({
                         )}
                     </div>
 
-                    {/* ROW 5: IFSC Code * | Payment Terms * */}
+                    {/* ROW 5: IFSC Code * | Bank Branch */}
                     <div className="org-field">
                         <label htmlFor="ifscCode">
                             IFSC Code <span className="required">*</span>
@@ -418,6 +422,21 @@ export default function OrganizationBusinessInfo({
                         )}
                     </div>
 
+                    <div className="org-field">
+                        <label htmlFor="branch">Bank Branch</label>
+                        <input
+                            id="branch"
+                            type="text"
+                            className="org-input"
+                            value={branch}
+                            onChange={(e) => setBranch(e.target.value)}
+                            placeholder="e.g. Indiranagar Branch"
+                            maxLength={160}
+                            disabled={!canEdit}
+                        />
+                    </div>
+
+                    {/* ROW 6: Payment Terms * */}
                     <div className="org-field">
                         <label htmlFor="paymentTerms">
                             Payment Terms <span className="required">*</span>

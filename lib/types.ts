@@ -543,6 +543,11 @@ export interface InvoiceLineItem {
   quantity: number;
   rate: number;
   amount: number;
+  hsnSacCode?: string | null;
+  unit?: string;
+  taxRate?: number;
+  taxAmount?: number;
+  taxableAmount?: number;
 }
 
 export interface InvoicePayment {
@@ -553,6 +558,31 @@ export interface InvoicePayment {
   reference: string | null;
   notes: string | null;
   createdAt: string;
+}
+
+export interface InvoiceOrganizationSnapshot {
+  name?: string;
+  legalName?: string;
+  tradeName?: string;
+  gstin?: string;
+  pan?: string;
+  address?: {
+    line1?: string;
+    line2?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+    country?: string;
+  };
+  bankDetails?: {
+    bankName?: string;
+    accountHolder?: string;
+    accountNumber?: string;
+    ifscCode?: string;
+    branch?: string;
+  };
+  logoUrl?: string | null;
+  signatureUrl?: string | null;
 }
 
 export interface Invoice {
@@ -569,6 +599,7 @@ export interface Invoice {
     city?: string;
     state?: string;
     pincode?: string;
+    country?: string;
   } | null;
   projectId: string | null;
   projectName: string;
@@ -582,7 +613,25 @@ export interface Invoice {
     accountHolder?: string;
     accountNumber?: string;
     ifscCode?: string;
+    branch?: string;
+    branchAddress?: string;
   } | null;
+  ewayBillNumber?: string | null;
+  placeOfSupply?: string | null;
+  placeOfSupplyCode?: string | null;
+  shipToName?: string | null;
+  shipToAddress?: {
+    line1?: string;
+    line2?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+    country?: string;
+    gstin?: string;
+  } | null;
+  buyerGstin?: string | null;
+  termsAndConditions?: string | null;
+  organizationSnapshot?: InvoiceOrganizationSnapshot | null;
   taxRate: number;
   subtotal: number;
   taxAmount: number;

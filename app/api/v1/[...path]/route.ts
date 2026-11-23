@@ -4,6 +4,7 @@ import { createHash, randomUUID, randomBytes } from "node:crypto";
 import * as XLSX from "xlsx";
 import JSZip from "jszip";
 import nodemailer from "nodemailer";
+import { generateInvoicePdf, type InvoicePdfData } from "@/lib/invoices/invoice-pdf-generator";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { EmailOtpError, issueEmailOtp, verifyEmailOtp } from "@/lib/auth/email-otp";
@@ -3239,7 +3240,8 @@ async function getClientInvoicePdf(request: NextRequest, supabase: SupabaseClien
   const invoice = await loadInvoice(admin, inv.workspace_id, invoiceId);
   if (!invoice) return fail("NOT_FOUND", "Invoice could not be loaded.", 404, id);
 
-  return new Response(basicInvoicePdf(invoice as typeof invoice & Record<string, unknown>), {
+  const pdfBytes = await generateInvoicePdf(invoice as unknown as InvoicePdfData);
+  return new Response(Buffer.from(pdfBytes), {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",
@@ -11562,7 +11564,8 @@ async function reportsPdf(request: NextRequest, supabase: SupabaseClient, id: st
   });
 }
 
-const invoiceSelect = "id,invoice_code,manual_number,document_type,client_id,client_name,billing_address,project_id,project_name,issue_date,due_date,milestone,reference,additional_notes,bank_details,tax_rate,subtotal,tax_amount,total_amount,total_paid,currency,status,sent_at,created_at,updated_at";
+const baseInvoiceSelect = "id,invoice_code,manual_number,document_type,client_id,client_name,billing_address,project_id,project_name,issue_date,due_date,milestone,reference,additional_notes,bank_details,tax_rate,subtotal,tax_amount,total_amount,total_paid,currency,status,sent_at,created_at,updated_at";
+const invoiceSelect = `${baseInvoiceSelect},eway_bill_number,place_of_supply,place_of_supply_code,ship_to_name,ship_to_address,buyer_gstin,terms_and_conditions,organization_snapshot`;
 
 function effectiveInvoiceStatus(row: Record<string, unknown>) {
   if (["pending", "sent", "partial"].includes(String(row.status)) && String(row.due_date) < new Date().toISOString().slice(0, 10) && Number(row.total_paid) < Number(row.total_amount)) return "overdue";
@@ -11578,7 +11581,41 @@ function invoiceDto(row: Record<string, unknown>, items?: Record<string, unknown
     subtotal: Number(row.subtotal), taxAmount: Number(row.tax_amount), totalAmount: Number(row.total_amount),
     totalPaid: Number(row.total_paid), outstanding: Number(row.total_amount) - Number(row.total_paid), currency: row.currency,
     status: effectiveInvoiceStatus(row), storedStatus: row.status, sentAt: row.sent_at, createdAt: row.created_at, updatedAt: row.updated_at,
-    ...(items ? { items: items.map((item) => ({ id: item.id, position: item.position, description: item.description, quantity: Number(item.quantity), rate: Number(item.rate), amount: Number(item.amount) })) } : {}),
+    ewayBillNumber: row.eway_bill_number ? String(row.eway_bill_number) : null,
+    placeOfSupply: row.place_of_supply ? String(row.place_of_supply) : null,
+    placeOfSupplyCode: row.place_of_supply_code ? String(row.place_of_supply_code) : null,
+    shipToName: row.ship_to_name ? String(row.ship_to_name) : null,
+    shipToAddress: (row.ship_to_address as Record<string, unknown>) ?? null,
+    buyerGstin: row.buyer_gstin ? String(row.buyer_gstin) : null,
+    termsAndConditions: row.terms_and_conditions ? String(row.terms_and_conditions) : null,
+    organizationSnapshot: (row.organization_snapshot as Record<string, unknown>) ?? null,
+    ...(items ? { items: items.map((item) => {
+      const qty = Number(item.quantity) || 1;
+      const rate = Number(item.rate) || 0;
+      const taxable = item.taxable_amount !== null && item.taxable_amount !== undefined
+        ? Number(item.taxable_amount)
+        : Math.round(qty * rate * 100) / 100;
+      const tRate = item.tax_rate !== null && item.tax_rate !== undefined ? Number(item.tax_rate) : Number(row.tax_rate || 18);
+      const taxAmt = item.tax_amount !== null && item.tax_amount !== undefined
+        ? Number(item.tax_amount)
+        : Math.round((taxable * tRate) / 100 * 100) / 100;
+      const totalAmt = item.amount !== null && item.amount !== undefined && Number(item.amount) > taxable
+        ? Number(item.amount)
+        : Math.round((taxable + taxAmt) * 100) / 100;
+      return {
+        id: item.id,
+        position: item.position,
+        description: item.description,
+        quantity: qty,
+        rate: rate,
+        amount: totalAmt,
+        hsnSacCode: item.hsn_sac_code ? String(item.hsn_sac_code) : null,
+        unit: item.unit ? String(item.unit) : "NOS",
+        taxRate: tRate,
+        taxAmount: taxAmt,
+        taxableAmount: taxable,
+      };
+    }) } : {}),
     ...(payments ? { payments: payments.map((payment) => ({ id: payment.id, amount: Number(payment.amount), paidAt: payment.paid_at, method: payment.method, reference: payment.reference, notes: payment.notes, createdAt: payment.created_at })) } : {}),
   };
 }
@@ -11600,8 +11637,40 @@ async function listInvoices(request: NextRequest, supabase: SupabaseClient, id: 
     const safe = search.replace(/[%_,()]/g, " ");
     query = query.or(`invoice_code.ilike.%${safe}%,manual_number.ilike.%${safe}%,project_name.ilike.%${safe}%,client_name.ilike.%${safe}%`);
   }
-  const result = await query;
-  if (result.error) return fail("INTERNAL_ERROR", "Invoices could not be loaded.", 500, id);
+  let result = await query;
+  if (result.error && (result.error.code === "42703" || result.error.code === "PGRST204")) {
+    let fallbackQuery = supabase.from("invoices").select(baseInvoiceSelect, { count: "exact" }).eq("workspace_id", scoped.access.workspaceId)
+      .is("archived_at", null).order("updated_at", { ascending: false }).range(from, to);
+    if (type && ["invoice", "pro_forma", "quote"].includes(type)) fallbackQuery = fallbackQuery.eq("document_type", type);
+    if (projectId) fallbackQuery = fallbackQuery.eq("project_id", projectId);
+    if (status === "overdue") fallbackQuery = fallbackQuery.in("status", ["pending", "sent", "partial"]).lt("due_date", new Date().toISOString().slice(0, 10));
+    else if (status && ["draft", "pending", "sent", "accepted", "partial", "paid", "void"].includes(status)) fallbackQuery = fallbackQuery.eq("status", status);
+    if (search) {
+      const safe = search.replace(/[%_,()]/g, " ");
+      fallbackQuery = fallbackQuery.or(`invoice_code.ilike.%${safe}%,manual_number.ilike.%${safe}%,project_name.ilike.%${safe}%,client_name.ilike.%${safe}%`);
+    }
+    const fallbackResult = await fallbackQuery;
+    if (fallbackResult.error) return fail("INTERNAL_ERROR", "Invoices could not be loaded.", 500, id);
+    const fallbackTotal = fallbackResult.count ?? 0;
+    return ok({
+      items: (fallbackResult.data ?? []).map((row) => invoiceDto(row as Record<string, unknown>)),
+      page,
+      pageSize,
+      total: fallbackTotal,
+      hasMore: to + 1 < fallbackTotal,
+    }, 200, id);
+  }
+  if (result.error) {
+    console.error(JSON.stringify({
+      requestId: id,
+      event: "invoice_list_failed",
+      code: result.error.code,
+      message: result.error.message,
+      details: result.error.details,
+      hint: result.error.hint,
+    }));
+    return fail("INTERNAL_ERROR", result.error.message || "Invoices could not be loaded.", 500, id);
+  }
   const total = result.count ?? 0;
   return ok({ items: (result.data ?? []).map((row) => invoiceDto(row as Record<string, unknown>)), page, pageSize, total, hasMore: to + 1 < total }, 200, id);
 }
@@ -11622,15 +11691,134 @@ async function invoiceSummary(supabase: SupabaseClient, id: string) {
   }, 200, id);
 }
 
+async function organizationInvoiceDefaults(supabase: SupabaseClient, workspaceId: string) {
+  const [workspaceRes, profileRes, settingsRes] = await Promise.all([
+    supabase.from("workspaces").select("id,name,currency,country").eq("id", workspaceId).maybeSingle(),
+    supabase.from("workspace_profiles").select("*").eq("workspace_id", workspaceId).maybeSingle(),
+    supabase.from("workspace_settings").select("boq_costing,branding").eq("workspace_id", workspaceId).maybeSingle(),
+  ]);
+
+  const workspace = (workspaceRes.data ?? {}) as Record<string, unknown>;
+  const profile = (profileRes.data ?? {}) as Record<string, unknown>;
+  const settings = (settingsRes.data?.boq_costing ?? {}) as Record<string, unknown>;
+  const branding = (settingsRes.data?.branding ?? {}) as Record<string, unknown>;
+  const business = ((settings.businessInfo || settings.business_info || {}) as Record<string, unknown>);
+  const address = String(profile.address || "");
+  const postalCode = String(profile.postal_code || settings.postalCode || "");
+  const state = String(profile.state || settings.state || "");
+  const country = String(profile.country || workspace.country || "India");
+  const gstin = String(business.gstNumber || profile.tax_id || "");
+  const pan = String(business.pan || (gstin.length >= 12 ? gstin.slice(2, 12).toUpperCase() : ""));
+  const companyName = String(business.tradeName || business.legalName || branding.companyName || workspace.name || "Your Company");
+  const logoUrl = String(branding.primaryLogo || branding.logoUrl || branding.lightLogo || "");
+  const signatureUrl = String(branding.signature || "");
+
+  const bankDetails = {
+    bankName: String(business.bankName || ""),
+    accountHolder: String(business.tradeName || business.legalName || workspace.name || ""),
+    accountNumber: String(business.accountNumber || ""),
+    ifscCode: String(business.ifscCode || ""),
+    branch: String(business.branch || ""),
+  };
+
+  const organizationSnapshot = {
+    name: companyName,
+    legalName: String(business.legalName || ""),
+    tradeName: String(business.tradeName || ""),
+    gstin,
+    pan,
+    address: {
+      line1: address,
+      city: String(profile.city || ""),
+      state,
+      pincode: postalCode,
+      country,
+    },
+    bankDetails,
+    logoUrl: logoUrl || null,
+    signatureUrl: signatureUrl || null,
+  };
+
+  return {
+    billingAddress: {
+      line1: address,
+      city: String(profile.city || ""),
+      state,
+      pincode: postalCode,
+      country,
+    },
+    bankDetails,
+    organizationSnapshot,
+  };
+}
+
 async function loadInvoice(supabase: SupabaseClient, workspaceId: string, invoiceId: string) {
-  const invoice = await supabase.from("invoices").select(invoiceSelect).eq("workspace_id", workspaceId).eq("id", invoiceId).is("archived_at", null).single();
+  let invoice = await supabase.from("invoices").select(invoiceSelect).eq("workspace_id", workspaceId).eq("id", invoiceId).is("archived_at", null).single();
+  if (invoice.error && (invoice.error.code === "42703" || invoice.error.code === "PGRST204")) {
+    invoice = await supabase.from("invoices").select(baseInvoiceSelect).eq("workspace_id", workspaceId).eq("id", invoiceId).is("archived_at", null).single();
+  }
   if (invoice.error) return null;
-  const [items, payments] = await Promise.all([
-    supabase.from("invoice_items").select("id,position,description,quantity,rate,amount").eq("workspace_id", workspaceId).eq("invoice_id", invoiceId).order("position"),
+  const extendedItems = await supabase.from("invoice_items").select("id,position,description,quantity,rate,amount,hsn_sac_code,unit,tax_rate,tax_amount,taxable_amount").eq("workspace_id", workspaceId).eq("invoice_id", invoiceId).order("position");
+  const items = extendedItems.error && (extendedItems.error.code === "42703" || extendedItems.error.code === "PGRST204")
+    ? await supabase.from("invoice_items").select("id,position,description,quantity,rate,amount").eq("workspace_id", workspaceId).eq("invoice_id", invoiceId).order("position")
+    : extendedItems;
+  const [payments] = await Promise.all([
     supabase.from("invoice_payments").select("id,amount,paid_at,method,reference,notes,created_at").eq("workspace_id", workspaceId).eq("invoice_id", invoiceId).order("paid_at", { ascending: false }),
   ]);
   if (items.error || payments.error) return null;
-  return invoiceDto(invoice.data as Record<string, unknown>, (items.data ?? []) as Record<string, unknown>[], (payments.data ?? []) as Record<string, unknown>[]);
+  const row = { ...(invoice.data as Record<string, unknown>) };
+  const defaults = await organizationInvoiceDefaults(supabase, workspaceId);
+  const rawAddress = (row.billing_address as Record<string, unknown>) || {};
+
+  // Extract packed fields if not present on row columns
+  if (!row.buyer_gstin && rawAddress.buyerGstin) row.buyer_gstin = rawAddress.buyerGstin;
+  if (!row.eway_bill_number && rawAddress.ewayBillNumber) row.eway_bill_number = rawAddress.ewayBillNumber;
+  if (!row.place_of_supply && (rawAddress.placeOfSupply || rawAddress.state)) row.place_of_supply = rawAddress.placeOfSupply || rawAddress.state;
+  if (!row.place_of_supply_code && rawAddress.placeOfSupplyCode) row.place_of_supply_code = rawAddress.placeOfSupplyCode;
+  if (!row.ship_to_name && rawAddress.shipToName) row.ship_to_name = rawAddress.shipToName;
+  if (!row.ship_to_address && rawAddress.shipToAddress) row.ship_to_address = rawAddress.shipToAddress;
+  if (!row.terms_and_conditions && rawAddress.termsAndConditions) row.terms_and_conditions = rawAddress.termsAndConditions;
+  if (!row.organization_snapshot && rawAddress.organizationSnapshot) row.organization_snapshot = rawAddress.organizationSnapshot;
+
+  // Set default termsAndConditions if still empty so downloaded PDF matches preview
+  if (!row.terms_and_conditions) {
+    row.terms_and_conditions = "1. Payment is due within 15 days of invoice issue date.\n2. Interest @ 18% p.a. will be charged on overdue payments.\n3. Goods once sold will not be taken back or exchanged.";
+  }
+
+  // Clean buyer billing address - DO NOT leak organization's address into buyer's billing address!
+  row.billing_address = {
+    line1: String(rawAddress.line1 || ""),
+    line2: String(rawAddress.line2 || ""),
+    city: String(rawAddress.city || ""),
+    state: String(rawAddress.state || ""),
+    pincode: String(rawAddress.pincode || ""),
+    country: String(rawAddress.country || "India"),
+  };
+
+  const savedBank = row.bank_details as Record<string, unknown> | null;
+  row.bank_details = {
+    bankName: String(savedBank?.bankName || defaults.bankDetails.bankName || ""),
+    accountHolder: String(savedBank?.accountHolder || defaults.bankDetails.accountHolder || ""),
+    accountNumber: String(savedBank?.accountNumber || defaults.bankDetails.accountNumber || ""),
+    ifscCode: String(savedBank?.ifscCode || defaults.bankDetails.ifscCode || ""),
+    branch: String(savedBank?.branch || defaults.bankDetails.branch || ""),
+  };
+  row.organization_snapshot = row.organization_snapshot || defaults.organizationSnapshot;
+
+  // Merge item metadata if packed
+  const itemsList = ((items.data ?? []) as Record<string, unknown>[]).map((it, idx) => {
+    const meta = Array.isArray(rawAddress.itemsMetadata) ? (rawAddress.itemsMetadata as Record<string, unknown>[])[idx] : null;
+    return {
+      ...it,
+      hsn_sac_code: it.hsn_sac_code ?? meta?.hsnSacCode ?? null,
+      unit: it.unit ?? meta?.unit ?? "NOS",
+      tax_rate: it.tax_rate ?? meta?.taxRate ?? row.tax_rate ?? 18,
+      tax_amount: it.tax_amount ?? meta?.taxAmount ?? null,
+      taxable_amount: it.taxable_amount ?? meta?.taxableAmount ?? null,
+    };
+  });
+
+  return invoiceDto(row, itemsList, (payments.data ?? []) as Record<string, unknown>[]);
 }
 
 async function getInvoice(supabase: SupabaseClient, id: string, invoiceId: string) {
@@ -11642,8 +11830,47 @@ async function getInvoice(supabase: SupabaseClient, id: string, invoiceId: strin
 async function createInvoice(request: Request, supabase: SupabaseClient, id: string) {
   const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response;
   const input = await parsed(request, invoiceCreateSchema, id); if (input.response) return input.response;
-  const saved = await supabase.rpc("save_invoice", { p_invoice: input.data, p_items: input.data.items, p_invoice_id: null });
-  if (saved.error || !saved.data) return fail(saved.error?.code === "23505" ? "CONFLICT" : "VALIDATION_ERROR", saved.error?.code === "23505" ? "Invoice number already exists." : "Invoice could not be created.", saved.error?.code === "23505" ? 409 : 400, id);
+  const defaults = await organizationInvoiceDefaults(supabase, scoped.access.workspaceId);
+  const billingAddressPayload = {
+    ...(input.data.billingAddress || {}),
+    buyerGstin: input.data.buyerGstin ?? null,
+    ewayBillNumber: input.data.ewayBillNumber ?? null,
+    placeOfSupply: input.data.placeOfSupply ?? null,
+    placeOfSupplyCode: input.data.placeOfSupplyCode ?? null,
+    shipToName: input.data.shipToName ?? null,
+    shipToAddress: input.data.shipToAddress ?? null,
+    termsAndConditions: input.data.termsAndConditions ?? null,
+    organizationSnapshot: input.data.organizationSnapshot ?? defaults.organizationSnapshot,
+    itemsMetadata: input.data.items?.map((it) => ({
+      hsnSacCode: it.hsnSacCode ?? null,
+      unit: it.unit ?? "NOS",
+      taxRate: it.taxRate,
+      taxAmount: it.taxAmount,
+      taxableAmount: it.taxableAmount,
+    })),
+  };
+  const mergedInput = {
+    ...input.data,
+    billingAddress: billingAddressPayload,
+    bankDetails: input.data.bankDetails || defaults.bankDetails,
+    organizationSnapshot: input.data.organizationSnapshot || defaults.organizationSnapshot,
+  };
+  const saved = await supabase.rpc("save_invoice", { p_invoice: mergedInput, p_items: mergedInput.items, p_invoice_id: null });
+  if (saved.error || !saved.data) {
+    console.error(JSON.stringify({
+      requestId: id,
+      event: "invoice_create_failed",
+      code: saved.error?.code,
+      message: saved.error?.message,
+      details: saved.error?.details,
+    }));
+    return fail(
+      saved.error?.code === "23505" ? "CONFLICT" : "VALIDATION_ERROR",
+      saved.error?.message || "Invoice could not be created.",
+      saved.error?.code === "23505" ? 409 : 400,
+      id
+    );
+  }
   const invoice = await loadInvoice(supabase, scoped.access.workspaceId, String(saved.data));
   if (!invoice) return fail("INTERNAL_ERROR", "Invoice was created but could not be reloaded.", 500, id);
   await audit(supabase, "invoice.created", id);
@@ -11657,15 +11884,42 @@ async function updateInvoice(request: Request, supabase: SupabaseClient, id: str
   if (!current) return fail("NOT_FOUND", "Invoice was not found.", 404, id);
   if (["paid", "void"].includes(String(current.storedStatus))) return fail("CONFLICT", "Paid or void invoices cannot be edited.", 409, id);
   const patch = input.data;
+  const bAddrPatch = patch.billingAddress ?? (current.billingAddress as Record<string, unknown>) ?? {};
+  const billingAddressPayload = {
+    ...(bAddrPatch || {}),
+    buyerGstin: patch.buyerGstin !== undefined ? patch.buyerGstin : current.buyerGstin,
+    ewayBillNumber: patch.ewayBillNumber !== undefined ? patch.ewayBillNumber : current.ewayBillNumber,
+    placeOfSupply: patch.placeOfSupply !== undefined ? patch.placeOfSupply : current.placeOfSupply,
+    placeOfSupplyCode: patch.placeOfSupplyCode !== undefined ? patch.placeOfSupplyCode : current.placeOfSupplyCode,
+    shipToName: patch.shipToName !== undefined ? patch.shipToName : current.shipToName,
+    shipToAddress: patch.shipToAddress !== undefined ? patch.shipToAddress : current.shipToAddress,
+    termsAndConditions: patch.termsAndConditions !== undefined ? patch.termsAndConditions : current.termsAndConditions,
+    organizationSnapshot: patch.organizationSnapshot !== undefined ? patch.organizationSnapshot : current.organizationSnapshot,
+    itemsMetadata: (patch.items ?? current.items)?.map((it: any) => ({
+      hsnSacCode: it.hsnSacCode ?? null,
+      unit: it.unit ?? "NOS",
+      taxRate: it.taxRate,
+      taxAmount: it.taxAmount,
+      taxableAmount: it.taxableAmount,
+    })),
+  };
   const merged = {
     type: patch.type ?? current.type, clientId: patch.clientId !== undefined ? patch.clientId : current.clientId,
-    clientName: patch.clientName ?? current.clientName, billingAddress: patch.billingAddress ?? current.billingAddress,
+    clientName: patch.clientName ?? current.clientName, billingAddress: billingAddressPayload,
     projectId: patch.projectId !== undefined ? patch.projectId : current.projectId, projectName: patch.projectName ?? current.projectName,
     invoiceNumber: patch.invoiceNumber !== undefined ? patch.invoiceNumber : current.manualNumber ?? undefined,
     issueDate: patch.issueDate ?? current.issueDate, dueDate: patch.dueDate ?? current.dueDate, milestone: patch.milestone ?? current.milestone,
     reference: patch.reference !== undefined ? patch.reference : current.reference, taxRate: patch.taxRate ?? current.taxRate,
     additionalNotes: patch.additionalNotes !== undefined ? patch.additionalNotes : current.additionalNotes,
     bankDetails: patch.bankDetails !== undefined ? patch.bankDetails : current.bankDetails,
+    ewayBillNumber: patch.ewayBillNumber !== undefined ? patch.ewayBillNumber : current.ewayBillNumber,
+    placeOfSupply: patch.placeOfSupply !== undefined ? patch.placeOfSupply : current.placeOfSupply,
+    placeOfSupplyCode: patch.placeOfSupplyCode !== undefined ? patch.placeOfSupplyCode : current.placeOfSupplyCode,
+    shipToName: patch.shipToName !== undefined ? patch.shipToName : current.shipToName,
+    shipToAddress: patch.shipToAddress !== undefined ? patch.shipToAddress : current.shipToAddress,
+    buyerGstin: patch.buyerGstin !== undefined ? patch.buyerGstin : current.buyerGstin,
+    termsAndConditions: patch.termsAndConditions !== undefined ? patch.termsAndConditions : current.termsAndConditions,
+    organizationSnapshot: patch.organizationSnapshot !== undefined ? patch.organizationSnapshot : current.organizationSnapshot,
     status: patch.status ?? current.storedStatus, items: patch.items ?? current.items,
   };
   if (String(merged.dueDate) < String(merged.issueDate)) return fail("VALIDATION_ERROR", "Due date cannot be before issue date.", 400, id, { dueDate: ["Due date cannot be before issue date."] });
@@ -11706,7 +11960,7 @@ async function archiveInvoice(supabase: SupabaseClient, id: string, invoiceId: s
 
 function basicInvoicePdf(invoice: Awaited<ReturnType<typeof loadInvoice>> & Record<string, unknown>) {
   const address = invoice.billingAddress as { line1?: string; line2?: string; city?: string; state?: string; pincode?: string } | null;
-  const bank = invoice.bankDetails as { bankName?: string; accountHolder?: string; accountNumber?: string; ifscCode?: string } | null;
+  const bank = invoice.bankDetails as { bankName?: string; accountHolder?: string; accountNumber?: string; ifscCode?: string; branch?: string } | null;
   const itemLines = ((invoice.items as Array<{ description: string; quantity: number; rate: number; amount: number }>) ?? []).slice(0, 16)
     .map((item) => `${item.description} | ${item.quantity} x ${item.rate.toFixed(2)} | ${item.amount.toFixed(2)}`);
   const lines = [
@@ -11717,7 +11971,7 @@ function basicInvoicePdf(invoice: Awaited<ReturnType<typeof loadInvoice>> & Reco
     "Description | Qty x Rate | Amount", ...itemLines, "", `Subtotal: ${invoice.currency} ${Number(invoice.subtotal).toFixed(2)}`,
     `Tax (${invoice.taxRate}%): ${invoice.currency} ${Number(invoice.taxAmount).toFixed(2)}`, `Total: ${invoice.currency} ${Number(invoice.totalAmount).toFixed(2)}`,
     `Paid: ${invoice.currency} ${Number(invoice.totalPaid).toFixed(2)}`, `Outstanding: ${invoice.currency} ${Number(invoice.outstanding).toFixed(2)}`,
-    ...(bank ? ["", `Bank: ${bank.bankName ?? ""}`, `Account holder: ${bank.accountHolder ?? ""}`, `Account: ${bank.accountNumber ?? ""}`, `IFSC: ${bank.ifscCode ?? ""}`] : []),
+    ...(bank ? ["", `Bank: ${bank.bankName ?? ""}`, `Account holder: ${bank.accountHolder ?? ""}`, `Account: ${bank.accountNumber ?? ""}`, `IFSC: ${bank.ifscCode ?? ""}`, `Branch: ${bank.branch ?? ""}`] : []),
   ];
   const commands = lines.map((line, index) => `BT /F1 ${index === 0 ? 17 : 10} Tf 40 ${770 - index * 22} Td (${pdfEscape(line).slice(0, 115)}) Tj ET`).join("\n");
   const objects = ["<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
@@ -11734,7 +11988,8 @@ async function invoicePdf(supabase: SupabaseClient, id: string, invoiceId: strin
   const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
   const invoice = await loadInvoice(supabase, scoped.access.workspaceId, invoiceId);
   if (!invoice) return fail("NOT_FOUND", "Invoice was not found.", 404, id);
-  return new Response(basicInvoicePdf(invoice as typeof invoice & Record<string, unknown>), {
+  const pdfBytes = await generateInvoicePdf(invoice as unknown as InvoicePdfData);
+  return new Response(Buffer.from(pdfBytes), {
     status: 200, headers: {
       "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename=\"${pdfEscape(invoice.invoiceNumber)}.pdf\"`,
       "Cache-Control": "private, no-store", "X-Request-Id": id,
@@ -14947,8 +15202,8 @@ async function organizationSettingsApi(request: Request, supabase: SupabaseClien
       phone: (wp.phone as string) || "",
       address: (wp.address as string) || "",
       country: (w.country as string) || "India",
-      state: (taxInfo.state as string) || (wp.state as string) || "Maharashtra",
-      postalCode: (wp.postal_code as string) || "",
+       state: (taxInfo.state as string) || (boqCosting.state as string) || (wp.state as string) || "Maharashtra",
+       postalCode: (boqCosting.postalCode as string) || (wp.postal_code as string) || "",
       currency: (w.currency as string) || "INR",
       timezone: (w.timezone as string) || "Asia/Kolkata",
       fiscalYearStart: (boqCosting.fiscalYearStart as string) || "April",
@@ -14964,6 +15219,7 @@ async function organizationSettingsApi(request: Request, supabase: SupabaseClien
       bankName: (businessInfo.bankName as string) || "",
       accountNumber: (businessInfo.accountNumber as string) || "",
       ifscCode: (businessInfo.ifscCode as string) || "",
+      branch: (businessInfo.branch as string) || "",
       paymentTerms: (businessInfo.paymentTerms as string) || (boqCosting.paymentTerms as string) || "Net 30",
 
       // GST & Tax
@@ -14985,6 +15241,7 @@ async function organizationSettingsApi(request: Request, supabase: SupabaseClien
   if (input.response) return input.response;
 
   const patch = input.data;
+  const db = createSupabaseAdminClient();
   const companyName = patch.companyName || patch.name || patch.tradeName;
 
   // 1. Update workspaces table
@@ -14995,7 +15252,7 @@ async function organizationSettingsApi(request: Request, supabase: SupabaseClien
   if (patch.country !== undefined) workspaceUpdates.country = patch.country;
 
   if (Object.keys(workspaceUpdates).length > 0) {
-    const wsRes = await supabase.from("workspaces").update(workspaceUpdates).eq("id", wid);
+    const wsRes = await db.from("workspaces").update(workspaceUpdates).eq("id", wid);
     if (wsRes.error) return fail("VALIDATION_ERROR", wsRes.error.message || "Failed to update workspace.", 400, id);
   }
 
@@ -15006,18 +15263,16 @@ async function organizationSettingsApi(request: Request, supabase: SupabaseClien
   if (email !== undefined) profileUpdates.business_email = email;
   if (patch.phone !== undefined) profileUpdates.phone = patch.phone;
   if (patch.address !== undefined) profileUpdates.address = patch.address;
-  if (patch.state !== undefined) profileUpdates.state = patch.state;
-  if (patch.postalCode !== undefined) profileUpdates.postal_code = patch.postalCode;
   const taxIdToUpdate = patch.taxId ?? patch.gstNumber ?? patch.gstin;
   if (taxIdToUpdate !== undefined) profileUpdates.tax_id = taxIdToUpdate;
 
   if (Object.keys(profileUpdates).length > 0) {
-    const existing = await supabase.from("workspace_profiles").select("workspace_id").eq("workspace_id", wid).maybeSingle();
+    const existing = await db.from("workspace_profiles").select("workspace_id").eq("workspace_id", wid).maybeSingle();
     if (existing.data) {
-      const profRes = await supabase.from("workspace_profiles").update(profileUpdates).eq("workspace_id", wid);
+      const profRes = await db.from("workspace_profiles").update(profileUpdates).eq("workspace_id", wid);
       if (profRes.error) return fail("VALIDATION_ERROR", profRes.error.message || "Failed to update workspace profile.", 400, id);
     } else {
-      const profRes = await supabase.from("workspace_profiles").insert({ workspace_id: wid, ...profileUpdates });
+      const profRes = await db.from("workspace_profiles").insert({ workspace_id: wid, ...profileUpdates });
       if (profRes.error) return fail("VALIDATION_ERROR", profRes.error.message || "Failed to insert workspace profile.", 400, id);
     }
   }
@@ -15040,6 +15295,7 @@ async function organizationSettingsApi(request: Request, supabase: SupabaseClien
     ...(patch.bankName !== undefined ? { bankName: patch.bankName } : {}),
     ...(patch.accountNumber !== undefined ? { accountNumber: patch.accountNumber } : {}),
     ...(patch.ifscCode !== undefined ? { ifscCode: patch.ifscCode } : {}),
+    ...(patch.branch !== undefined ? { branch: patch.branch } : {}),
     ...(patch.paymentTerms !== undefined ? { paymentTerms: patch.paymentTerms } : {}),
   };
 
@@ -15054,6 +15310,8 @@ async function organizationSettingsApi(request: Request, supabase: SupabaseClien
   const updatedBoqCosting: Record<string, unknown> = {
     ...currentBoqCosting,
     ...(patch.fiscalYearStart ? { fiscalYearStart: patch.fiscalYearStart } : {}),
+    ...(patch.state !== undefined ? { state: patch.state } : {}),
+    ...(patch.postalCode !== undefined ? { postalCode: patch.postalCode } : {}),
     ...(patch.paymentTerms ? { paymentTerms: patch.paymentTerms } : {}),
     ...(patch.registeredUnderGst !== undefined ? { registeredUnderGst: patch.registeredUnderGst } : {}),
     ...(patch.taxRegime !== undefined ? { taxRegime: patch.taxRegime } : {}),
@@ -15087,9 +15345,15 @@ async function organizationSettingsApi(request: Request, supabase: SupabaseClien
   };
 
   if (existingSettings.data) {
-    await supabase.from("workspace_settings").update(settingsUpdates).eq("workspace_id", wid);
+    const settingsRes = await db.from("workspace_settings").update(settingsUpdates).eq("workspace_id", wid);
+    if (settingsRes.error) {
+      return fail("VALIDATION_ERROR", settingsRes.error.message || "Failed to update workspace settings.", 400, id);
+    }
   } else {
-    await supabase.from("workspace_settings").insert({ workspace_id: wid, ...settingsUpdates });
+    const settingsRes = await db.from("workspace_settings").insert({ workspace_id: wid, ...settingsUpdates });
+    if (settingsRes.error) {
+      return fail("VALIDATION_ERROR", settingsRes.error.message || "Failed to create workspace settings.", 400, id);
+    }
   }
 
   await audit(supabase, "settings.organization.updated", id);

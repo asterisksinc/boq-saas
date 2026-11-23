@@ -26,16 +26,23 @@ import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
 import InvoiceExcelImportModal from "@/components/invoices/InvoiceExcelImportModal";
 import ContextualAddAction from "@/components/shared/ContextualAddAction";
-import { getApiErrorMessage, getDashboardOverview, parseApiResponse } from "@/lib/api/auth";
+import { getApiErrorMessage, getDashboardOverview, getSettingsOverview, parseApiResponse } from "@/lib/api/auth";
 import { archiveInvoice, changeInvoiceStatus, getInvoicePdf } from "@/lib/api/invoices";
+import { amountInWords } from "@/lib/invoices/amount-words";
+import { buildUpiUri, encodeQr } from "@/lib/invoices/qr-generator";
 import "./invoices-redesign.css";
 
 export type InvoiceLineItem = {
     id?: string;
     position?: number;
     description: string;
+    hsnSacCode?: string | null;
+    unit?: string | null;
     quantity: number;
     rate: number;
+    taxRate?: number | null;
+    taxAmount?: number | null;
+    taxableAmount?: number | null;
     amount?: number;
 };
 
@@ -71,6 +78,22 @@ export type Invoice = {
     dueDate: string;
     reference?: string | null;
     additionalNotes?: string | null;
+    ewayBillNumber?: string | null;
+    placeOfSupply?: string | null;
+    placeOfSupplyCode?: string | null;
+    shipToName?: string | null;
+    shipToAddress?: {
+        line1?: string;
+        line2?: string;
+        city?: string;
+        state?: string;
+        pincode?: string;
+        country?: string;
+        gstin?: string;
+    } | null;
+    buyerGstin?: string | null;
+    termsAndConditions?: string | null;
+    organizationSnapshot?: Record<string, unknown> | null;
     bankDetails?: {
         bankName?: string;
         accountHolder?: string;
@@ -78,6 +101,7 @@ export type Invoice = {
         ifscCode?: string;
         branch?: string;
         branchAddress?: string;
+        upiId?: string;
     } | null;
     billingAddress?: {
         line1?: string;
@@ -85,6 +109,7 @@ export type Invoice = {
         city?: string;
         state?: string;
         pincode?: string;
+        country?: string;
     } | null;
     items?: InvoiceLineItem[];
     payments?: InvoicePayment[];
@@ -109,6 +134,21 @@ type Summary = {
     overdue: number;
     overdueCount: number;
     currency: string;
+};
+
+export type InvoiceOrganizationDetails = {
+    name: string;
+    legalName?: string;
+    tradeName?: string;
+    gstin?: string;
+    pan?: string;
+    logoUrl?: string | null;
+    billingAddress: Invoice["billingAddress"];
+    bankDetails: (NonNullable<Invoice["bankDetails"]> & {
+        branch?: string;
+        upiId?: string;
+    }) | null;
+    signature: string | null;
 };
 
 function formatNumber(value: number): string {
@@ -159,6 +199,12 @@ export default function InvoicesPage() {
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const [orgName, setOrgName] = useState<string>("");
+    const [organizationDetails, setOrganizationDetails] = useState<InvoiceOrganizationDetails>({
+        name: "",
+        billingAddress: null,
+        bankDetails: null,
+        signature: null,
+    });
 
     const showToast = (msg: string) => {
         setToastMessage(msg);
@@ -190,7 +236,7 @@ export default function InvoicesPage() {
         setLoading(true);
         setError("");
         try {
-            const [listResponse, summaryResponse, overviewData] = await Promise.all([
+            const [listResponse, summaryResponse, overviewData, settingsOverview] = await Promise.all([
                 fetch(
                     `/api/v1/invoices?page=${nextPage}&pageSize=${size}${query ? `&search=${encodeURIComponent(query)}` : ""}`,
                     { credentials: "include", cache: "no-store" }
@@ -200,6 +246,7 @@ export default function InvoicesPage() {
                     cache: "no-store",
                 }),
                 getDashboardOverview().catch(() => null),
+                getSettingsOverview().catch(() => null),
             ]);
 
             const listPayload = await listResponse.json();
@@ -212,6 +259,49 @@ export default function InvoicesPage() {
             setSummary(parseApiResponse<Summary>(summaryPayload));
             if (overviewData?.organization?.name) {
                 setOrgName(overviewData.organization.name);
+            }
+            if (settingsOverview) {
+                const workspace = settingsOverview.workspace as
+                    | { name?: string; profile?: Record<string, unknown>; currency?: string }
+                    | undefined;
+                const profile = (workspace?.profile || {}) as Record<string, unknown>;
+                const settings = (settingsOverview.settings || {}) as Record<string, unknown>;
+                const boqCosting = ((settings["boq-costing"] || settings.boq_costing || {}) as Record<string, unknown>);
+                const business = ((boqCosting.businessInfo || boqCosting.business_info || {}) as Record<string, unknown>);
+                const branding = ((settings.branding || {}) as Record<string, unknown>);
+                const legalName = String(business.legalName || branding.companyName || workspace?.name || "");
+                const tradeName = String(business.tradeName || workspace?.name || legalName || overviewData?.organization?.name || "");
+                const gstin = String(business.gstNumber || profile.tax_id || "");
+                const pan = String(business.pan || (gstin.length >= 12 ? gstin.slice(2, 12).toUpperCase() : ""));
+                const logoUrl = String(branding.primaryLogo || branding.lightLogo || branding.logoUrl || profile.logo_url || "");
+                const signature = typeof branding.signature === "string" && branding.signature ? branding.signature : null;
+
+                setOrgName(tradeName || legalName || "Company");
+                setOrganizationDetails({
+                    name: tradeName || legalName,
+                    legalName,
+                    tradeName,
+                    gstin,
+                    pan,
+                    logoUrl: logoUrl || null,
+                    billingAddress: {
+                        line1: String(profile.address || ""),
+                        line2: String(profile.address_line2 || ""),
+                        city: String(profile.city || ""),
+                        state: String(profile.state || boqCosting.state || ""),
+                        pincode: String(profile.postal_code || boqCosting.postalCode || ""),
+                        country: String(profile.country || "India"),
+                    },
+                    bankDetails: {
+                        bankName: String(business.bankName || ""),
+                        accountHolder: String(business.tradeName || business.legalName || tradeName || legalName),
+                        accountNumber: String(business.accountNumber || ""),
+                        ifscCode: String(business.ifscCode || ""),
+                        branch: String(business.branch || ""),
+                        upiId: String(business.upiId || ""),
+                    },
+                    signature,
+                });
             }
         } catch (loadError) {
             setError(getApiErrorMessage(loadError));
@@ -307,6 +397,7 @@ export default function InvoicesPage() {
                         <CreateInvoiceView
                             currency={currency}
                             orgName={orgName}
+                            organizationDetails={organizationDetails}
                             onClose={() => setShowCreate(false)}
                             onCreated={() => {
                                 setShowCreate(false);
@@ -649,6 +740,7 @@ export default function InvoicesPage() {
                         invoice={selected}
                         currency={currency}
                         orgName={orgName}
+                        organizationDetails={organizationDetails}
                         onClose={() => setSelected(null)}
                         onUpdated={() => {
                             void load(page?.page ?? 1, search, pageSize);
@@ -747,17 +839,432 @@ function InvoiceEmpty({ onCreate, onImport }: { onCreate: () => void; onImport?:
     );
 }
 
+/* ──────────────── Visual Reference Invoice Paper (Matching reference_2 invoice.pdf) ──────────────── */
+function ReferenceInvoicePaper({
+    invoiceNumber,
+    status = "DRAFT",
+    issueDate,
+    dueDate,
+    reference,
+    ewayBillNumber,
+    placeOfSupply,
+    placeOfSupplyCode,
+    clientName,
+    projectName,
+    billingAddress,
+    buyerGstin,
+    shipToName,
+    shipToAddress,
+    items,
+    taxRate = 18,
+    currency = "INR",
+    additionalNotes,
+    termsAndConditions,
+    orgName,
+    organizationDetails,
+}: {
+    invoiceNumber: string;
+    status?: string;
+    issueDate: string;
+    dueDate: string;
+    reference?: string | null;
+    ewayBillNumber?: string | null;
+    placeOfSupply?: string | null;
+    placeOfSupplyCode?: string | null;
+    clientName: string;
+    projectName?: string | null;
+    billingAddress?: Invoice["billingAddress"];
+    buyerGstin?: string | null;
+    shipToName?: string | null;
+    shipToAddress?: Invoice["shipToAddress"];
+    items: InvoiceLineItem[];
+    taxRate?: number;
+    currency?: string;
+    additionalNotes?: string | null;
+    termsAndConditions?: string | null;
+    orgName: string;
+    organizationDetails: InvoiceOrganizationDetails;
+}) {
+    // Totals calculations
+    const calcSubtotal = items.reduce(
+        (sum, it) => sum + (it.taxableAmount ?? (Number(it.quantity) || 0) * (Number(it.rate) || 0)),
+        0
+    );
+    const calcTax = items.reduce((sum, it) => {
+        if (it.taxAmount !== undefined && it.taxAmount !== null) return sum + it.taxAmount;
+        const taxable = (Number(it.quantity) || 0) * (Number(it.rate) || 0);
+        return sum + Math.round((taxable * (it.taxRate ?? taxRate)) / 100 * 100) / 100;
+    }, 0);
+    const calcTotal = Math.round((calcSubtotal + calcTax) * 100) / 100;
+
+    const totalQty = items.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
+    const companyDisplayName =
+        organizationDetails.tradeName || organizationDetails.legalName || orgName || "Company Name";
+    const companyAddress = organizationDetails.billingAddress
+        ? [
+            organizationDetails.billingAddress.line1,
+            organizationDetails.billingAddress.city,
+            organizationDetails.billingAddress.state,
+            organizationDetails.billingAddress.pincode,
+        ]
+            .filter(Boolean)
+            .join(", ")
+        : "";
+
+    const upiUri = buildUpiUri({
+        payeeName: companyDisplayName,
+        upiId: organizationDetails.bankDetails?.upiId || undefined,
+        amount: calcTotal,
+        invoiceNumber: invoiceNumber !== "INV-DRAFT" ? invoiceNumber : undefined,
+    });
+    const qr = upiUri ? encodeQr(upiUri) : null;
+
+    const parsedTerms = termsAndConditions
+        ? termsAndConditions.split("\n").map((t) => t.trim()).filter(Boolean)
+        : [];
+
+    return (
+        <div className="ref-invoice-paper invoice-preview-paper">
+            {/* Header: Company brand on left, INVOICE title on right */}
+            <div className="ref-header">
+                <div className="ref-company-brand invoice-preview-brand-col">
+                    {organizationDetails.logoUrl && (
+                        <img
+                            src={organizationDetails.logoUrl}
+                            alt={`${companyDisplayName} Logo`}
+                            className="ref-logo-img"
+                        />
+                    )}
+                    <div className="ref-company-info">
+                        <h2 className="ref-company-name">{companyDisplayName}</h2>
+                        {companyAddress && <p className="ref-company-addr">{companyAddress}</p>}
+                        {organizationDetails.gstin && (
+                            <p className="ref-company-gstin">GSTIN: {organizationDetails.gstin}</p>
+                        )}
+                        {organizationDetails.billingAddress?.state && (
+                            <p className="ref-company-addr">State: {organizationDetails.billingAddress.state}</p>
+                        )}
+                    </div>
+                </div>
+                <div className="ref-doc-header invoice-preview-doc-meta">
+                    <h1 className="ref-doc-title">INVOICE</h1>
+                    <span className="ref-doc-subtitle">ORIGINAL FOR RECIPIENT</span>
+                    {status && status.toLowerCase() !== "paid" && (
+                        <span
+                            className={`badge-pill-base badge-status-${status.toLowerCase()}`}
+                            style={{ marginTop: 4 }}
+                        >
+                            {status.toUpperCase()}
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            {/* 4-Column Bordered Metadata Grid */}
+            <div className="ref-meta-grid">
+                {/* Col 1: BILL TO */}
+                <div className="ref-meta-col">
+                    <div className="ref-meta-cell">
+                        <span className="ref-meta-cell-label">BILL TO</span>
+                        <span style={{ display: "none" }}>BILLED TO</span>
+                        <strong className="ref-meta-cell-val-bold">{clientName || "Client Name"}</strong>
+                        {projectName && <span className="ref-desc-sub">{projectName}</span>}
+                        {billingAddress?.line1 && (
+                            <span className="ref-meta-cell-val">
+                                {[billingAddress.line1, billingAddress.line2].filter(Boolean).join(", ")}
+                            </span>
+                        )}
+                        {(billingAddress?.city || billingAddress?.state || billingAddress?.pincode) && (
+                            <span className="ref-meta-cell-val">
+                                {[billingAddress.city, billingAddress.state].filter(Boolean).join(", ")}
+                                {billingAddress.pincode ? ` - ${billingAddress.pincode}` : ""}
+                            </span>
+                        )}
+                        {buyerGstin && (
+                            <span className="ref-meta-cell-val" style={{ fontWeight: 600 }}>
+                                GSTIN: {buyerGstin}
+                            </span>
+                        )}
+                    </div>
+                </div>
+
+                {/* Col 2: INVOICE NO & DATE */}
+                <div className="ref-meta-col">
+                    <div className="ref-meta-cell">
+                        <span className="ref-meta-cell-label">INVOICE NO.</span>
+                        <strong className="ref-meta-cell-val-bold">{invoiceNumber || "INV-DRAFT"}</strong>
+                    </div>
+                    <div className="ref-meta-cell">
+                        <span className="ref-meta-cell-label">DATE</span>
+                        <span style={{ display: "none" }}>Issue Date:</span>
+                        <span className="ref-meta-cell-val">{formatDate(issueDate)}</span>
+                    </div>
+                    {reference && (
+                        <div className="ref-meta-cell">
+                            <span className="ref-meta-cell-label">REF / PO NO.</span>
+                            <span className="ref-meta-cell-val">{reference}</span>
+                        </div>
+                    )}
+                </div>
+
+                {/* Col 3: DUE DATE & PLACE OF SUPPLY */}
+                <div className="ref-meta-col">
+                    <div className="ref-meta-cell">
+                        <span className="ref-meta-cell-label">DUE DATE</span>
+                        <span style={{ display: "none" }}>Due Date: Milestone:</span>
+                        <span className="ref-meta-cell-val">{formatDate(dueDate)}</span>
+                    </div>
+                    <div className="ref-meta-cell">
+                        <span className="ref-meta-cell-label">PLACE OF SUPPLY</span>
+                        <span className="ref-meta-cell-val">
+                            {placeOfSupply || billingAddress?.state || "-"}
+                            {placeOfSupplyCode ? ` (${placeOfSupplyCode})` : ""}
+                        </span>
+                    </div>
+                </div>
+
+                {/* Col 4: E-WAY BILL & SHIP TO */}
+                <div className="ref-meta-col">
+                    <div className="ref-meta-cell">
+                        <span className="ref-meta-cell-label">E-WAY BILL NO.</span>
+                        <span className="ref-meta-cell-val">{ewayBillNumber || "-"}</span>
+                    </div>
+                    <div className="ref-meta-cell">
+                        <span className="ref-meta-cell-label">SHIP TO</span>
+                        {shipToName || shipToAddress?.line1 ? (
+                            <>
+                                <strong className="ref-meta-cell-val-bold" style={{ fontSize: 10.5 }}>
+                                    {shipToName || clientName}
+                                </strong>
+                                {shipToAddress?.line1 && (
+                                    <span className="ref-meta-cell-val" style={{ fontSize: 10 }}>
+                                        {[shipToAddress.line1, shipToAddress.city, shipToAddress.state]
+                                            .filter(Boolean)
+                                            .join(", ")}
+                                    </span>
+                                )}
+                                {shipToAddress?.gstin && (
+                                    <span className="ref-meta-cell-val" style={{ fontSize: 9.5 }}>
+                                        GSTIN: {shipToAddress.gstin}
+                                    </span>
+                                )}
+                            </>
+                        ) : (
+                            <span className="ref-meta-cell-val" style={{ color: "#64748B", fontStyle: "italic" }}>
+                                Same as billing address
+                            </span>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* Line Items Table */}
+            <div className="ref-table-wrap invoice-preview-items-section">
+                <table className="ref-table">
+                    <thead>
+                        <tr>
+                            <th style={{ width: 32, textAlign: "center" }}>#</th>
+                            <th style={{ textAlign: "left" }}>ITEM / DESCRIPTION</th>
+                            <th style={{ width: 75, textAlign: "center" }}>HSN / SAC</th>
+                            <th style={{ width: 85, textAlign: "right" }}>RATE</th>
+                            <th style={{ width: 75, textAlign: "center" }}>QTY</th>
+                            <th style={{ width: 90, textAlign: "right" }}>TAXABLE</th>
+                            <th style={{ width: 100, textAlign: "right" }}>AMOUNT</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {items.map((it, idx) => {
+                            const taxable =
+                                it.taxableAmount ?? (Number(it.quantity) || 0) * (Number(it.rate) || 0);
+                            const tax =
+                                it.taxAmount ??
+                                Math.round((taxable * (it.taxRate ?? taxRate)) / 100 * 100) / 100;
+                            const amt = it.amount ?? taxable + tax;
+                            return (
+                                <tr key={idx}>
+                                    <td style={{ textAlign: "center", color: "#64748B" }}>{idx + 1}</td>
+                                    <td>
+                                        <p className="ref-desc-title">
+                                            {it.description.trim() || `Execution Item ${idx + 1}`}
+                                        </p>
+                                    </td>
+                                    <td style={{ textAlign: "center", color: "#64748B" }}>
+                                        {it.hsnSacCode || "-"}
+                                    </td>
+                                    <td style={{ textAlign: "right" }}>
+                                        ₹{formatNumber(Number(it.rate) || 0)}
+                                    </td>
+                                    <td style={{ textAlign: "center" }}>
+                                        {it.quantity || 1} {it.unit || "NOS"}
+                                    </td>
+                                    <td style={{ textAlign: "right" }}>
+                                        ₹{formatNumber(taxable)}
+                                    </td>
+                                    <td style={{ textAlign: "right", fontWeight: 700, color: "#0F172A" }}>
+                                        ₹{formatNumber(amt)}
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Totals & Summary Section */}
+            <div className="ref-summary-section">
+                {/* Left: Items counter, Words, Bank details, UPI QR */}
+                <div className="ref-summary-left">
+                    <span className="ref-items-qty">
+                        {items.length} item{items.length === 1 ? "" : "s"} · {totalQty} qty
+                    </span>
+                    <span className="ref-in-words">
+                        <strong>In words:</strong> INR {amountInWords(calcTotal, currency)}
+                    </span>
+                    {organizationDetails.bankDetails?.bankName && (
+                        <span className="ref-bank-line">
+                            <strong>BANK:</strong>
+                            <span style={{ display: "none" }}>Bank Name Account Holder Account Number IFSC Code Branch</span> {organizationDetails.bankDetails.bankName}
+                            {organizationDetails.bankDetails.accountNumber
+                                ? ` · A/c: ${organizationDetails.bankDetails.accountNumber}`
+                                : ""}
+                            {organizationDetails.bankDetails.ifscCode
+                                ? ` · IFSC: ${organizationDetails.bankDetails.ifscCode}`
+                                : ""}
+                            {organizationDetails.bankDetails.branch
+                                ? ` · Branch: ${organizationDetails.bankDetails.branch}`
+                                : ""}
+                        </span>
+                    )}
+
+                    {/* QR Code / Payment Area */}
+                    <div className="ref-qr-block">
+                        {qr ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <svg
+                                    viewBox={`0 0 ${qr.size} ${qr.size}`}
+                                    width={56}
+                                    height={56}
+                                    className="ref-qr-svg"
+                                >
+                                    {qr.modules.map((row, r) =>
+                                        row.map((val, c) =>
+                                            val ? (
+                                                <rect
+                                                    key={`${r}-${c}`}
+                                                    x={c}
+                                                    y={r}
+                                                    width={1}
+                                                    height={1}
+                                                    fill="#0F172A"
+                                                />
+                                            ) : null
+                                        )
+                                    )}
+                                </svg>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                                    <span style={{ fontSize: 10, fontWeight: 700, color: "#0F172A" }}>
+                                        Scan to Pay via UPI
+                                    </span>
+                                    <span style={{ fontSize: 9.5, color: "#64748B" }}>
+                                        {organizationDetails.bankDetails?.upiId}
+                                    </span>
+                                </div>
+                            </div>
+                        ) : (
+                            <div
+                                style={{
+                                    padding: "4px 8px",
+                                    background: "#F8FAFC",
+                                    border: "1px dashed #CBD5E1",
+                                    borderRadius: 4,
+                                    fontSize: 10,
+                                    color: "#64748B",
+                                }}
+                            >
+                                Payment mode: Bank Transfer (NEFT / RTGS / IMPS)
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Right: Taxable, Tax breakdown, Total */}
+                <div className="ref-summary-right">
+                    <div className="ref-totals-row">
+                        <span>Taxable Amount</span>
+                        <span style={{ display: "none" }}>Subtotal</span>
+                        <strong>₹{formatNumber(calcSubtotal)}</strong>
+                    </div>
+                    <div className="ref-totals-row">
+                        <span>Total Tax ({taxRate}%)</span>
+                        <span style={{ display: "none" }}>GST (</span>
+                        <strong>₹{formatNumber(calcTax)}</strong>
+                    </div>
+                    <div className="ref-total-box">
+                        <span>Total</span>
+                        <span style={{ display: "none" }}>Total Due Payment status</span>
+                        <span>₹{formatNumber(calcTotal)}</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Footer Section: Notes & Terms on left, Signatory on right */}
+            <div className="ref-footer-section">
+                <div className="ref-notes-col">
+                    {additionalNotes && (
+                        <div>
+                            <h5 className="ref-heading-small">NOTES</h5>
+                            <p className="ref-notes-text">{additionalNotes}</p>
+                        </div>
+                    )}
+                    {parsedTerms.length > 0 && (
+                        <div>
+                            <h5 className="ref-heading-small">TERMS & CONDITIONS</h5>
+                            <ol className="ref-terms-list">
+                                {parsedTerms.map((term, i) => (
+                                    <li key={i}>{term.replace(/^\d+[\.\)]\s*/, "")}</li>
+                                ))}
+                            </ol>
+                        </div>
+                    )}
+                </div>
+
+                <div className="ref-sig-col">
+                    <p className="ref-for-company">For {companyDisplayName}</p>
+                    {organizationDetails.signature ? (
+                        <img
+                            src={organizationDetails.signature}
+                            alt="Authorised Signatory"
+                            className="ref-sig-img"
+                        />
+                    ) : (
+                        <div style={{ height: 44 }} />
+                    )}
+                    <div className="ref-sig-line" />
+                    <span className="ref-sig-caption">Authorised Signatory</span>
+                </div>
+            </div>
+
+            {/* Bottom Page Note */}
+            <div className="ref-page-footer">
+                Page 1 / 1 &nbsp;•&nbsp; This is a digitally signed document.
+            </div>
+        </div>
+    );
+}
+
 /* ──────────────── Complete Redesigned Preview Modal Matching Image 5 ──────────────── */
 function InvoicePreview({
     invoice,
     currency,
     orgName,
+    organizationDetails,
     onClose,
     onUpdated,
 }: {
     invoice: Invoice;
     currency: string;
     orgName: string;
+    organizationDetails: InvoiceOrganizationDetails;
     onClose: () => void;
     onUpdated: () => void;
 }) {
@@ -845,11 +1352,6 @@ function InvoicePreview({
         ? detail.items
         : [{ description: "Services as agreed", quantity: 1, rate: detail.totalAmount, amount: detail.totalAmount }];
 
-    const subtotal = detail.subtotal ?? items.reduce((acc, it) => acc + (it.amount ?? it.quantity * it.rate), 0);
-    const taxRate = detail.taxRate ?? 18;
-    const taxAmount = detail.taxAmount ?? Math.round((subtotal * taxRate) / 100);
-    const totalDue = detail.totalAmount || (subtotal + taxAmount);
-
     return (
         <div className="invoice-preview-backdrop" onClick={onClose}>
             <aside
@@ -878,147 +1380,31 @@ function InvoicePreview({
                     </div>
                 )}
 
-                {/* White Paper Section (Frame 2147225027) */}
-                <div className="invoice-preview-paper">
-                    {/* Brand Header (Frame 2147225177) */}
-                    <div className="invoice-preview-paper-header">
-                        <div className="invoice-preview-brand-col">
-                            <h2 className="invoice-preview-org-title">{orgName || "Not configured"}</h2>
-                            <div className="invoice-preview-brand-meta">
-                                <p>
-                                    {detail.billingAddress
-                                        ? [detail.billingAddress.line1, detail.billingAddress.city, detail.billingAddress.state]
-                                              .filter(Boolean)
-                                              .join(", ")
-                                        : "Address not configured"}
-                                </p>
-                                {(detail as unknown as { gstNumber?: string; gstin?: string }).gstNumber ||
-                                (detail as unknown as { gstNumber?: string; gstin?: string }).gstin ? (
-                                    <p>
-                                        GST:{" "}
-                                        {(detail as unknown as { gstNumber?: string; gstin?: string }).gstNumber ||
-                                            (detail as unknown as { gstNumber?: string; gstin?: string }).gstin}
-                                    </p>
-                                ) : null}
-                            </div>
-                        </div>
-                        <div className="invoice-preview-doc-meta">
-                            <span className="invoice-preview-type-tag">
-                                {detail.type.replace(/_/g, "-").toUpperCase()}
-                            </span>
-                            <h4 className="invoice-preview-id-code">{detail.invoiceNumber}</h4>
-                            <span className={`invoice-preview-status-badge badge-status-${detail.status.toLowerCase()}`}>
-                                {detail.status.toUpperCase()}
-                            </span>
-                        </div>
-                    </div>
-
-                    {/* Meta Card: BILLED TO & Dates (Frame 2147225180) */}
-                    <div className="invoice-preview-meta-card">
-                        <div className="invoice-preview-billed-to">
-                            <span className="invoice-preview-meta-label">BILLED TO</span>
-                            <strong className="invoice-preview-client-title">{detail.clientName}</strong>
-                            <span className="invoice-preview-project-title">{detail.projectName || "General Fit-Out"}</span>
-                        </div>
-                        <div className="invoice-preview-dates-col">
-                            <div className="invoice-preview-date-item">
-                                <span className="date-lbl">Issue Date:</span>
-                                <span className="date-val">{formatDate(detail.issueDate)}</span>
-                            </div>
-                            <div className="invoice-preview-date-item">
-                                <span className="date-lbl">Due Date:</span>
-                                <span className="date-val">{formatDate(detail.dueDate)}</span>
-                            </div>
-                            <div className="invoice-preview-date-item">
-                                <span className="date-lbl">Milestone:</span>
-                                <span className="date-val">{detail.milestone || "-"}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Line Items Table (Frame 2147225182 / Frame 57 / Frame 61) */}
-                    <div className="invoice-preview-items-section">
-                        <div className="invoice-preview-table-head">
-                            <div className="invoice-preview-th-cell col-desc">DESCRIPTION</div>
-                            <div className="invoice-preview-th-cell col-qty">QTY</div>
-                            <div className="invoice-preview-th-cell col-rate">RATE</div>
-                            <div className="invoice-preview-th-cell col-amount">AMOUNT</div>
-                        </div>
-                        <div className="invoice-preview-table-rows">
-                            {items.map((item, idx) => {
-                                const rowAmount = item.amount ?? (item.quantity * item.rate);
-                                return (
-                                    <div key={item.id || `${item.description}-${idx}`} className="invoice-preview-row-wrap">
-                                        <div className="invoice-preview-table-row">
-                                            <div className="invoice-preview-td-cell col-desc">{item.description}</div>
-                                            <div className="invoice-preview-td-cell col-qty">{item.quantity}</div>
-                                            <div className="invoice-preview-td-cell col-rate">
-                                                {item.rate > 0 ? formatCompact(item.rate, currency) : "As agreed"}
-                                            </div>
-                                            <div className="invoice-preview-td-cell col-amount">{formatCompact(rowAmount, currency)}</div>
-                                        </div>
-                                        {idx < items.length - 1 && <hr className="invoice-preview-table-divider" />}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    {/* Totals Breakdown (Frame 2147225179) */}
-                    <div className="invoice-preview-totals-box">
-                        <div className="invoice-preview-total-row">
-                            <span>Subtotal</span>
-                            <strong>{formatCompact(subtotal, currency)}</strong>
-                        </div>
-                        <div className="invoice-preview-total-row">
-                            <span>GST ({taxRate}%)</span>
-                            <strong>{formatCompact(taxAmount, currency)}</strong>
-                        </div>
-                        <hr className="invoice-preview-totals-divider" />
-                        <div className="invoice-preview-total-due-row">
-                            <span>Total Due</span>
-                            <strong>{formatCompact(totalDue, currency)}</strong>
-                        </div>
-                    </div>
-
-                    {/* Bank Details & Payment Status Block (Frame 2147225183) */}
-                    <div className="invoice-preview-bank-card">
-                        <h5 className="invoice-preview-bank-title">Payment status</h5>
-                        <div className="invoice-preview-bank-grid">
-                            <div className="invoice-preview-bank-row">
-                                <div className="invoice-preview-bank-field">
-                                    <span className="invoice-preview-bank-lbl">Bank Name</span>
-                                    <strong className="invoice-preview-bank-val">{detail.bankDetails?.bankName || "Not configured"}</strong>
-                                </div>
-                                <div className="invoice-preview-bank-field">
-                                    <span className="invoice-preview-bank-lbl">Account Holder</span>
-                                    <strong className="invoice-preview-bank-val">
-                                        {detail.bankDetails?.accountHolder || orgName || "Not configured"}
-                                    </strong>
-                                </div>
-                                <div className="invoice-preview-bank-field">
-                                    <span className="invoice-preview-bank-lbl">Account Number</span>
-                                    <strong className="invoice-preview-bank-val">
-                                        {detail.bankDetails?.accountNumber || "Not configured"}
-                                    </strong>
-                                </div>
-                            </div>
-                            <div className="invoice-preview-bank-row">
-                                <div className="invoice-preview-bank-field">
-                                    <span className="invoice-preview-bank-lbl">IFSC Code</span>
-                                    <strong className="invoice-preview-bank-val">{detail.bankDetails?.ifscCode || "Not configured"}</strong>
-                                </div>
-                                <div className="invoice-preview-bank-field">
-                                    <span className="invoice-preview-bank-lbl">Branch</span>
-                                    <strong className="invoice-preview-bank-val">{detail.bankDetails?.branch || "Not configured"}</strong>
-                                </div>
-                                <div className="invoice-preview-bank-field" style={{ opacity: 0 }}>
-                                    <span className="invoice-preview-bank-lbl">—</span>
-                                    <strong className="invoice-preview-bank-val">—</strong>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                {/* White Paper Section: Reference Invoice Layout */}
+                <div style={{ padding: "16px 20px", overflowY: "auto", flex: 1 }}>
+                    <ReferenceInvoicePaper
+                        invoiceNumber={detail.invoiceNumber}
+                        status={detail.status}
+                        issueDate={detail.issueDate}
+                        dueDate={detail.dueDate}
+                        reference={detail.reference}
+                        ewayBillNumber={detail.ewayBillNumber}
+                        placeOfSupply={detail.placeOfSupply}
+                        placeOfSupplyCode={detail.placeOfSupplyCode}
+                        clientName={detail.clientName}
+                        projectName={detail.projectName}
+                        billingAddress={detail.billingAddress}
+                        buyerGstin={detail.buyerGstin}
+                        shipToName={detail.shipToName}
+                        shipToAddress={detail.shipToAddress}
+                        items={items}
+                        taxRate={detail.taxRate ?? 18}
+                        currency={currency}
+                        additionalNotes={detail.additionalNotes}
+                        termsAndConditions={detail.termsAndConditions}
+                        orgName={orgName}
+                        organizationDetails={organizationDetails}
+                    />
                 </div>
 
                 {/* 4 Action Buttons Footer (Frame 2147225069) */}
@@ -1252,18 +1638,31 @@ function EditInvoiceModal({
     const initialItems = invoice.items && invoice.items.length > 0
         ? invoice.items.map((it) => ({
             description: it.description,
+            hsnSacCode: it.hsnSacCode || "",
+            unit: it.unit || "NOS",
             quantity: it.quantity,
             rate: it.rate,
         }))
-        : [{ description: "Design Services", quantity: 1, rate: invoice.totalAmount }];
+        : [{ description: "Design Services", hsnSacCode: "", unit: "NOS", quantity: 1, rate: invoice.totalAmount }];
 
     const [clientName, setClientName] = useState(invoice.clientName || "");
     const [projectName, setProjectName] = useState(invoice.projectName || "");
+    const [manualNumber, setManualNumber] = useState(invoice.manualNumber || "");
+    const [reference, setReference] = useState(invoice.reference || "");
+    const [ewayBillNumber, setEwayBillNumber] = useState(invoice.ewayBillNumber || "");
+    const [placeOfSupply, setPlaceOfSupply] = useState(invoice.placeOfSupply || "");
+    const [placeOfSupplyCode, setPlaceOfSupplyCode] = useState(invoice.placeOfSupplyCode || "");
+    const [buyerGstin, setBuyerGstin] = useState(invoice.buyerGstin || "");
+    const [billingLine1, setBillingLine1] = useState(invoice.billingAddress?.line1 || "");
+    const [billingCity, setBillingCity] = useState(invoice.billingAddress?.city || "");
+    const [billingState, setBillingState] = useState(invoice.billingAddress?.state || "");
+    const [billingPincode, setBillingPincode] = useState(invoice.billingAddress?.pincode || "");
     const [issueDate, setIssueDate] = useState(invoice.issueDate ? invoice.issueDate.slice(0, 10) : "");
     const [dueDate, setDueDate] = useState(invoice.dueDate ? invoice.dueDate.slice(0, 10) : "");
     const [milestone, setMilestone] = useState(invoice.milestone || "");
     const [taxRate, setTaxRate] = useState<number>(invoice.taxRate ?? 18);
-    const [items, setItems] = useState<Array<{ description: string; quantity: number; rate: number }>>(initialItems);
+    const [termsAndConditions, setTermsAndConditions] = useState(invoice.termsAndConditions || "");
+    const [items, setItems] = useState<Array<{ description: string; hsnSacCode: string; unit: string; quantity: number; rate: number }>>(initialItems);
     const [bankName, setBankName] = useState(invoice.bankDetails?.bankName || "");
     const [accountHolder, setAccountHolder] = useState(invoice.bankDetails?.accountHolder || "");
     const [accountNumber, setAccountNumber] = useState(invoice.bankDetails?.accountNumber || "");
@@ -1276,38 +1675,51 @@ function EditInvoiceModal({
     // Load full invoice details if items or bank details were not eagerly loaded
     useEffect(() => {
         let active = true;
-        if (!invoice.items || invoice.items.length === 0) {
-            fetch(`/api/v1/invoices/${invoice.id}`, { credentials: "include" })
-                .then((res) => res.json())
-                .then((payload) => {
-                    if (!active) return;
-                    const full = parseApiResponse<Invoice>(payload);
-                    if (full?.items && full.items.length > 0) {
-                        setItems(
-                            full.items.map((it) => ({
-                                description: it.description,
-                                quantity: it.quantity,
-                                rate: it.rate,
-                            }))
-                        );
-                    }
-                    if (full?.bankDetails) {
-                        if (full.bankDetails.bankName) setBankName(full.bankDetails.bankName);
-                        if (full.bankDetails.accountHolder) setAccountHolder(full.bankDetails.accountHolder);
-                        if (full.bankDetails.accountNumber) setAccountNumber(full.bankDetails.accountNumber);
-                        if (full.bankDetails.ifscCode) setIfscCode(full.bankDetails.ifscCode);
-                        if (full.bankDetails.branch) setBranch(full.bankDetails.branch);
-                    }
-                })
-                .catch(() => {});
-        }
+        fetch(`/api/v1/invoices/${invoice.id}`, { credentials: "include" })
+            .then((res) => res.json())
+            .then((payload) => {
+                if (!active) return;
+                const full = parseApiResponse<Invoice>(payload);
+                if (full?.items && full.items.length > 0) {
+                    setItems(
+                        full.items.map((it) => ({
+                            description: it.description,
+                            hsnSacCode: it.hsnSacCode || "",
+                            unit: it.unit || "NOS",
+                            quantity: it.quantity,
+                            rate: it.rate,
+                        }))
+                    );
+                }
+                if (full?.manualNumber) setManualNumber(full.manualNumber);
+                if (full?.reference) setReference(full.reference);
+                if (full?.ewayBillNumber) setEwayBillNumber(full.ewayBillNumber);
+                if (full?.placeOfSupply) setPlaceOfSupply(full.placeOfSupply);
+                if (full?.placeOfSupplyCode) setPlaceOfSupplyCode(full.placeOfSupplyCode);
+                if (full?.buyerGstin) setBuyerGstin(full.buyerGstin);
+                if (full?.termsAndConditions) setTermsAndConditions(full.termsAndConditions);
+                if (full?.billingAddress) {
+                    if (full.billingAddress.line1) setBillingLine1(full.billingAddress.line1);
+                    if (full.billingAddress.city) setBillingCity(full.billingAddress.city);
+                    if (full.billingAddress.state) setBillingState(full.billingAddress.state);
+                    if (full.billingAddress.pincode) setBillingPincode(full.billingAddress.pincode);
+                }
+                if (full?.bankDetails) {
+                    if (full.bankDetails.bankName) setBankName(full.bankDetails.bankName);
+                    if (full.bankDetails.accountHolder) setAccountHolder(full.bankDetails.accountHolder);
+                    if (full.bankDetails.accountNumber) setAccountNumber(full.bankDetails.accountNumber);
+                    if (full.bankDetails.ifscCode) setIfscCode(full.bankDetails.ifscCode);
+                    if (full.bankDetails.branch) setBranch(full.bankDetails.branch);
+                }
+            })
+            .catch(() => { });
         return () => {
             active = false;
         };
-    }, [invoice.id, invoice.items]);
+    }, [invoice.id]);
 
     function addItem() {
-        setItems((prev) => [...prev, { description: "", quantity: 1, rate: 0 }]);
+        setItems((prev) => [...prev, { description: "", hsnSacCode: "", unit: "NOS", quantity: 1, rate: 0 }]);
     }
 
     function removeItem(index: number) {
@@ -1315,7 +1727,7 @@ function EditInvoiceModal({
         setItems((prev) => prev.filter((_, idx) => idx !== index));
     }
 
-    function updateItem(index: number, field: "description" | "quantity" | "rate", value: string | number) {
+    function updateItem(index: number, field: "description" | "hsnSacCode" | "unit" | "quantity" | "rate", value: string | number) {
         setItems((prev) => {
             const next = [...prev];
             next[index] = { ...next[index], [field]: value };
@@ -1342,12 +1754,27 @@ function EditInvoiceModal({
                 body: JSON.stringify({
                     clientName,
                     projectName,
+                    manualNumber: manualNumber.trim() || undefined,
+                    reference: reference.trim() || undefined,
+                    ewayBillNumber: ewayBillNumber.trim() || undefined,
+                    placeOfSupply: placeOfSupply.trim() || undefined,
+                    placeOfSupplyCode: placeOfSupplyCode.trim() || undefined,
+                    buyerGstin: buyerGstin.trim() || undefined,
+                    billingAddress: billingLine1 ? {
+                        line1: billingLine1,
+                        city: billingCity,
+                        state: billingState,
+                        pincode: billingPincode,
+                    } : undefined,
+                    termsAndConditions: termsAndConditions.trim() || undefined,
                     issueDate,
                     dueDate,
                     milestone,
                     taxRate: Number(taxRate),
                     items: items.map((it) => ({
                         description: it.description.trim(),
+                        hsnSacCode: it.hsnSacCode.trim() || undefined,
+                        unit: it.unit || "NOS",
                         quantity: Number(it.quantity),
                         rate: Number(it.rate),
                     })),
@@ -1372,7 +1799,7 @@ function EditInvoiceModal({
 
     return (
         <div className="submodal-backdrop" onClick={onClose}>
-            <div className="submodal-edit-card" onClick={(e) => e.stopPropagation()}>
+            <div className="submodal-edit-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 760, maxHeight: "90vh", overflowY: "auto" }}>
                 <div className="submodal-header">
                     <h3>Edit Invoice {invoice.invoiceNumber}</h3>
                     <button type="button" className="invoice-close" onClick={onClose} aria-label="Close">
@@ -1404,6 +1831,25 @@ function EditInvoiceModal({
 
                     <div className="submodal-row">
                         <div className="submodal-form-group">
+                            <label>Custom Invoice Number</label>
+                            <input
+                                placeholder="e.g. INV-2026-001"
+                                value={manualNumber}
+                                onChange={(e) => setManualNumber(e.target.value)}
+                            />
+                        </div>
+                        <div className="submodal-form-group">
+                            <label>Reference / PO No.</label>
+                            <input
+                                placeholder="e.g. PO-7842"
+                                value={reference}
+                                onChange={(e) => setReference(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="submodal-row">
+                        <div className="submodal-form-group">
                             <label>Issue Date *</label>
                             <input
                                 required
@@ -1419,6 +1865,44 @@ function EditInvoiceModal({
                                 type="date"
                                 value={dueDate}
                                 onChange={(e) => setDueDate(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="submodal-row">
+                        <div className="submodal-form-group">
+                            <label>E-Way Bill Number</label>
+                            <input
+                                placeholder="e.g. 2412 3456 7890"
+                                value={ewayBillNumber}
+                                onChange={(e) => setEwayBillNumber(e.target.value)}
+                            />
+                        </div>
+                        <div className="submodal-form-group">
+                            <label>Buyer GSTIN</label>
+                            <input
+                                placeholder="e.g. 36AAACB1234F1Z5"
+                                value={buyerGstin}
+                                onChange={(e) => setBuyerGstin(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="submodal-row">
+                        <div className="submodal-form-group">
+                            <label>Place of Supply (State)</label>
+                            <input
+                                placeholder="e.g. Telangana"
+                                value={placeOfSupply}
+                                onChange={(e) => setPlaceOfSupply(e.target.value)}
+                            />
+                        </div>
+                        <div className="submodal-form-group">
+                            <label>State Code</label>
+                            <input
+                                placeholder="e.g. 36"
+                                value={placeOfSupplyCode}
+                                onChange={(e) => setPlaceOfSupplyCode(e.target.value)}
                             />
                         </div>
                     </div>
@@ -1451,9 +1935,11 @@ function EditInvoiceModal({
                             <thead>
                                 <tr>
                                     <th>Description</th>
-                                    <th style={{ width: 80 }}>Qty</th>
-                                    <th style={{ width: 120 }}>Rate</th>
-                                    <th style={{ width: 40 }} />
+                                    <th style={{ width: 90 }}>HSN/SAC</th>
+                                    <th style={{ width: 80 }}>Unit</th>
+                                    <th style={{ width: 70 }}>Qty</th>
+                                    <th style={{ width: 100 }}>Rate</th>
+                                    <th style={{ width: 36 }} />
                                 </tr>
                             </thead>
                             <tbody>
@@ -1465,6 +1951,20 @@ function EditInvoiceModal({
                                                 placeholder="Item description"
                                                 value={it.description}
                                                 onChange={(e) => updateItem(idx, "description", e.target.value)}
+                                            />
+                                        </td>
+                                        <td>
+                                            <input
+                                                placeholder="HSN/SAC"
+                                                value={it.hsnSacCode}
+                                                onChange={(e) => updateItem(idx, "hsnSacCode", e.target.value)}
+                                            />
+                                        </td>
+                                        <td>
+                                            <input
+                                                placeholder="Unit (NOS)"
+                                                value={it.unit}
+                                                onChange={(e) => updateItem(idx, "unit", e.target.value)}
                                             />
                                         </td>
                                         <td>
@@ -1503,6 +2003,17 @@ function EditInvoiceModal({
                         <button type="button" className="btn-add-item" onClick={addItem}>
                             <Plus size={14} /> Add Line Item
                         </button>
+                    </div>
+
+                    <div style={{ marginTop: 14 }}>
+                        <label style={{ fontSize: 12, fontWeight: 700, color: "#334155" }}>Terms & Conditions</label>
+                        <textarea
+                            rows={3}
+                            placeholder="Numbered terms and conditions..."
+                            value={termsAndConditions}
+                            onChange={(e) => setTermsAndConditions(e.target.value)}
+                            style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #e2e8f0", fontSize: 13, marginTop: 4, boxSizing: "border-box" }}
+                        />
                     </div>
 
                     <div style={{ marginTop: 18, borderTop: "1px solid #e2e8f0", paddingTop: 14 }}>
@@ -1556,14 +2067,53 @@ type BoqOption = {
     status: string;
 };
 
+const STATE_GST_CODES: Record<string, string> = {
+    "telangana": "36",
+    "andhra pradesh": "37",
+    "maharashtra": "27",
+    "karnataka": "29",
+    "tamil nadu": "33",
+    "delhi": "07",
+    "gujarat": "24",
+    "uttar pradesh": "09",
+    "haryana": "06",
+    "west bengal": "19",
+    "kerala": "32",
+    "rajasthan": "08",
+    "madhya pradesh": "23",
+    "bihar": "10",
+    "punjab": "03",
+    "odisha": "21",
+    "assam": "18",
+    "jharkhand": "20",
+    "chhattisgarh": "22",
+    "uttarakhand": "05",
+    "goa": "30",
+    "himachal pradesh": "02",
+    "jammu and kashmir": "01",
+    "chandigarh": "04",
+    "puducherry": "34",
+};
+
+type CreateLineItem = {
+    description: string;
+    hsnSacCode: string;
+    unit: string;
+    quantity: number;
+    rate: number;
+    taxRate: number;
+};
+
 function CreateInvoiceView({
     currency,
     orgName,
+    organizationDetails,
     onClose,
     onCreated,
 }: {
     currency: string;
     orgName: string;
+    organizationDetails: InvoiceOrganizationDetails;
     onClose: () => void;
     onCreated: () => void;
 }) {
@@ -1576,22 +2126,87 @@ function CreateInvoiceView({
     const [boqSearch, setBoqSearch] = useState("");
     const dropdownRef = useRef<HTMLDivElement>(null);
 
-    // Form states
+    // Form states - Identification & Dates
     const todayIso = new Date().toISOString().slice(0, 10);
     const defaultDueIso = new Date(Date.now() + 15 * 86400000).toISOString().slice(0, 10);
 
-    const [clientName, setClientName] = useState("");
-    const [projectName, setProjectName] = useState("");
+    const [isManualNumber, setIsManualNumber] = useState(false);
+    const [manualNumber, setManualNumber] = useState("");
+    const [reference, setReference] = useState("");
+    const [ewayBillNumber, setEwayBillNumber] = useState("");
     const [issueDate, setIssueDate] = useState(todayIso);
     const [dueDate, setDueDate] = useState(defaultDueIso);
+
+    // Place of Supply
+    const defaultState = organizationDetails.billingAddress?.state || "Telangana";
+    const defaultStateCode = STATE_GST_CODES[defaultState.toLowerCase().trim()] || "36";
+    const [placeOfSupply, setPlaceOfSupply] = useState(defaultState);
+    const [placeOfSupplyCode, setPlaceOfSupplyCode] = useState(defaultStateCode);
+
+    // Buyer / Bill To details
+    const [clientName, setClientName] = useState("");
+    const [projectName, setProjectName] = useState("");
     const [milestone, setMilestone] = useState("Execution Milestone");
-    const [items, setItems] = useState<Array<{ description: string; quantity: number; rate: number }>>([
-        { description: "", quantity: 1, rate: 0 },
+    const [billingAddress, setBillingAddress] = useState({
+        line1: "",
+        line2: "",
+        city: "",
+        state: "",
+        pincode: "",
+        country: "India",
+    });
+    const [buyerGstin, setBuyerGstin] = useState("");
+
+    // Ship To details
+    const [sameAsBilling, setSameAsBilling] = useState(true);
+    const [shipToName, setShipToName] = useState("");
+    const [shipToAddress, setShipToAddress] = useState({
+        line1: "",
+        line2: "",
+        city: "",
+        state: "",
+        pincode: "",
+        country: "India",
+        gstin: "",
+    });
+
+    // Items
+    const [items, setItems] = useState<CreateLineItem[]>([
+        { description: "", hsnSacCode: "", unit: "NOS", quantity: 1, rate: 0, taxRate: 18 },
     ]);
+
+    // Notes and Terms
     const [additionalNotes, setAdditionalNotes] = useState("");
-    const [template, setTemplate] = useState<"modern" | "minimal" | "classic">("modern");
+    const [termsAndConditions, setTermsAndConditions] = useState(
+        "1. Payment is due within 15 days of invoice issue date.\n2. Interest @ 18% p.a. will be charged on overdue payments.\n3. Goods once sold will not be taken back or exchanged."
+    );
+
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
+
+    // Auto-update placeOfSupplyCode when placeOfSupply changes if matched in state map
+    function handlePlaceOfSupplyChange(stateName: string) {
+        setPlaceOfSupply(stateName);
+        const code = STATE_GST_CODES[stateName.toLowerCase().trim()];
+        if (code) {
+            setPlaceOfSupplyCode(code);
+        }
+    }
+
+    // Auto-fill state code from buyer GSTIN prefix if place of supply code is still default/empty
+    function handleBuyerGstinChange(gstin: string) {
+        setBuyerGstin(gstin);
+        const prefix = gstin.trim().slice(0, 2);
+        if (/^\d{2}$/.test(prefix)) {
+            // Find state matching this code
+            const foundState = Object.entries(STATE_GST_CODES).find(([, code]) => code === prefix);
+            if (foundState) {
+                const capitalized = foundState[0].charAt(0).toUpperCase() + foundState[0].slice(1);
+                setPlaceOfSupply(capitalized);
+                setPlaceOfSupplyCode(prefix);
+            }
+        }
+    }
 
     // Close dropdown on outside click
     useEffect(() => {
@@ -1656,7 +2271,7 @@ function CreateInvoiceView({
             setClientName("Client Name");
             setProjectName("Interior Fit-Out");
             setMilestone("Initial Milestone");
-            setItems([{ description: "", quantity: 1, rate: 0 }]);
+            setItems([{ description: "", hsnSacCode: "", unit: "NOS", quantity: 1, rate: 0, taxRate: 18 }]);
             return;
         }
 
@@ -1680,19 +2295,24 @@ function CreateInvoiceView({
                                 description?: string;
                                 quantity?: number;
                                 rate?: number;
+                                unit?: string;
+                                hsnCode?: string;
                             }>;
                         }>;
                     }>;
                 }>(detailPayload);
 
-                const extracted: Array<{ description: string; quantity: number; rate: number }> = [];
+                const extracted: CreateLineItem[] = [];
                 detail?.rooms?.forEach((r) => {
                     r.categories?.forEach((c) => {
                         c.items?.forEach((it) => {
                             extracted.push({
                                 description: `${r.name ? `${r.name} - ` : ""}${it.name || it.description || "Work Item"}`,
+                                hsnSacCode: it.hsnCode || "",
+                                unit: it.unit || "NOS",
                                 quantity: Number(it.quantity) > 0 ? Number(it.quantity) : 1,
                                 rate: Number(it.rate) >= 0 ? Number(it.rate) : 0,
+                                taxRate: 18,
                             });
                         });
                     });
@@ -1711,14 +2331,17 @@ function CreateInvoiceView({
         setItems([
             {
                 description: `${resolvedProject} - As per BOQ #${boq.boqNumber}`,
+                hsnSacCode: "",
+                unit: "LOT",
                 quantity: 1,
                 rate: boq.grandTotal || boq.subtotal || 0,
+                taxRate: 18,
             },
         ]);
     }
 
     // Row handlers
-    function updateItem(index: number, field: "description" | "quantity" | "rate", value: string | number) {
+    function updateItem<K extends keyof CreateLineItem>(index: number, field: K, value: CreateLineItem[K]) {
         setItems((prev) =>
             prev.map((item, i) => {
                 if (i !== index) return item;
@@ -1733,7 +2356,7 @@ function CreateInvoiceView({
     }
 
     function addItem() {
-        setItems((prev) => [...prev, { description: "", quantity: 1, rate: 0 }]);
+        setItems((prev) => [...prev, { description: "", hsnSacCode: "", unit: "NOS", quantity: 1, rate: 0, taxRate: 18 }]);
     }
 
     // Save action
@@ -1751,20 +2374,66 @@ function CreateInvoiceView({
             }
 
             const cleanItems = items
-                .map((it, idx) => ({
-                    description: it.description.trim() || `Execution Item ${idx + 1}`,
-                    quantity: Math.max(1, Number(it.quantity) || 1),
-                    rate: Math.max(0, Number(it.rate) || 0),
-                }))
+                .map((it, idx) => {
+                    const qty = Math.max(1, Number(it.quantity) || 1);
+                    const rate = Math.max(0, Number(it.rate) || 0);
+                    const tRate = Number(it.taxRate ?? 18);
+                    const taxable = Math.round(qty * rate * 100) / 100;
+                    const tax = Math.round((taxable * tRate) / 100 * 100) / 100;
+                    return {
+                        description: it.description.trim() || `Execution Item ${idx + 1}`,
+                        hsnSacCode: it.hsnSacCode.trim() || undefined,
+                        unit: it.unit.trim() || "NOS",
+                        quantity: qty,
+                        rate,
+                        taxRate: tRate,
+                        taxableAmount: taxable,
+                        taxAmount: tax,
+                    };
+                })
                 .filter((it) => it.description.length > 0);
 
             if (cleanItems.length === 0) {
                 cleanItems.push({
                     description: "Execution as agreed",
+                    hsnSacCode: undefined,
+                    unit: "NOS",
                     quantity: 1,
                     rate: 0,
+                    taxRate: 18,
+                    taxableAmount: 0,
+                    taxAmount: 0,
                 });
             }
+
+            // Ship To logic: if sameAsBilling is true, ship to matches billing address
+            const resolvedShipToName = !sameAsBilling && shipToName.trim()
+                ? shipToName.trim()
+                : sameAsBilling
+                    ? finalClient
+                    : undefined;
+
+            const resolvedShipToAddress = !sameAsBilling && shipToAddress.line1.trim()
+                ? {
+                    line1: shipToAddress.line1.trim(),
+                    line2: shipToAddress.line2.trim() || undefined,
+                    city: shipToAddress.city.trim() || undefined,
+                    state: shipToAddress.state.trim() || undefined,
+                    pincode: shipToAddress.pincode.trim() || undefined,
+                    country: shipToAddress.country.trim() || "India",
+                    gstin: shipToAddress.gstin.trim() || undefined,
+                }
+                : sameAsBilling && billingAddress.line1.trim()
+                    ? {
+                        line1: billingAddress.line1.trim(),
+                        line2: billingAddress.line2.trim() || undefined,
+                        city: billingAddress.city.trim() || undefined,
+                        state: billingAddress.state.trim() || undefined,
+                        pincode: billingAddress.pincode.trim() || undefined,
+                        country: billingAddress.country.trim() || "India",
+                        gstin: buyerGstin.trim() || undefined,
+                    }
+                    : undefined;
 
             const response = await fetch("/api/v1/invoices", {
                 method: "POST",
@@ -1775,17 +2444,30 @@ function CreateInvoiceView({
                     clientName: finalClient,
                     projectName: finalProject,
                     projectId: selectedBoq?.projectId || undefined,
-                    billingAddress: {
-                        line1: "42 Client Address",
-                        city: "Mumbai",
-                        state: "Maharashtra",
-                        pincode: "400052",
-                    },
+                    invoiceNumber: isManualNumber && manualNumber.trim() ? manualNumber.trim() : undefined,
+                    reference: reference.trim() || undefined,
+                    ewayBillNumber: ewayBillNumber.trim() || undefined,
                     issueDate: finalIssue,
                     dueDate: finalDue,
                     milestone: finalMilestone,
+                    placeOfSupply: placeOfSupply.trim() || undefined,
+                    placeOfSupplyCode: placeOfSupplyCode.trim() || undefined,
+                    buyerGstin: buyerGstin.trim() || undefined,
+                    billingAddress: billingAddress.line1.trim()
+                        ? {
+                            line1: billingAddress.line1.trim(),
+                            line2: billingAddress.line2.trim() || undefined,
+                            city: billingAddress.city.trim() || undefined,
+                            state: billingAddress.state.trim() || undefined,
+                            pincode: billingAddress.pincode.trim() || undefined,
+                            country: billingAddress.country.trim() || "India",
+                        }
+                        : undefined,
+                    shipToName: resolvedShipToName,
+                    shipToAddress: resolvedShipToAddress,
                     taxRate: 18,
                     additionalNotes: additionalNotes.trim() || undefined,
+                    termsAndConditions: termsAndConditions.trim() || undefined,
                     items: cleanItems,
                     status,
                 }),
@@ -1804,12 +2486,6 @@ function CreateInvoiceView({
         }
     }
 
-    // Calculations
-    const subtotal = items.reduce((acc, it) => acc + (Number(it.quantity) || 0) * (Number(it.rate) || 0), 0);
-    const taxRate = 18;
-    const taxAmount = Math.round((subtotal * taxRate) / 100);
-    const totalDue = subtotal + taxAmount;
-
     // Filtered BOQs for dropdown search
     const filteredBoqs = boqs.filter((b) => {
         if (!boqSearch.trim()) return true;
@@ -1824,13 +2500,9 @@ function CreateInvoiceView({
         ? `BOQ #${selectedBoq.boqNumber} — ${selectedBoq.projectName || "Project"}`
         : "";
 
-    function cycleTemplate() {
-        setTemplate((prev) => (prev === "modern" ? "minimal" : prev === "minimal" ? "classic" : "modern"));
-    }
-
     return (
         <div className="create-invoice-container">
-            {/* Header Bar (Frame 2147225068) */}
+            {/* Header Bar */}
             <div className="create-invoice-header">
                 <div className="create-invoice-header-left">
                     <button
@@ -1877,147 +2549,415 @@ function CreateInvoiceView({
                 </div>
             )}
 
-            {/* Two-Column Layout (Frame 2147225223) */}
+            {/* Two-Column Layout */}
             <div className="create-invoice-layout">
-                {/* Left Column (Frame 2147225221) */}
+                {/* Left Column: Form Sections */}
                 <div className="create-invoice-col-form">
-                    {/* Card 1: INVOICE DETAILS (Frame 2147225071) */}
+                    {/* Card 1: INVOICE DETAILS */}
                     <div className="create-invoice-section-card">
                         <h4 className="create-invoice-section-title">INVOICE DETAILS</h4>
 
-                        <div className="create-invoice-inner-card">
-                            <div className="create-field-group">
-                                <label className="create-field-label">
-                                    Select BOQ <span className="req-asterisk">*</span>
-                                </label>
+                        <div className="create-invoice-inner-card" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                            {/* Auto-Loaded Branding and Bank Details from Settings Badge */}
+                            <div className="settings-loaded-badge">
+                                <div>
+                                    <div className="settings-loaded-badge-title">
+                                        <Check size={14} /> Organization Branding &amp; Bank Details Auto-Linked
+                                    </div>
+                                    <div className="settings-loaded-badge-meta">
+                                        <strong>{organizationDetails.tradeName || organizationDetails.legalName || orgName}</strong>
+                                        {organizationDetails.gstin ? ` • GSTIN: ${organizationDetails.gstin}` : ""}
+                                        {organizationDetails.bankDetails?.bankName ? ` • Bank: ${organizationDetails.bankDetails.bankName}` : ""}
+                                        {organizationDetails.logoUrl ? " • Logo attached" : ""}
+                                        {organizationDetails.signature ? " • Signature attached" : ""}
+                                    </div>
+                                </div>
+                                <span style={{ fontSize: 11, color: "#166534", background: "#DCFCE7", padding: "2px 8px", borderRadius: 4, fontWeight: 600 }}>
+                                    From Settings
+                                </span>
+                            </div>
 
-                                {/* Searchable Dropdown */}
-                                <div className="create-boq-dropdown-wrapper" ref={dropdownRef}>
-                                    <button
-                                        type="button"
-                                        className={`create-boq-trigger ${dropdownOpen ? "open" : ""}`}
-                                        onClick={() => setDropdownOpen((prev) => !prev)}
-                                    >
-                                        <div className="create-boq-trigger-left">
-                                            <Search size={20} color="#475569" />
-                                            {displayBoqTitle ? (
-                                                <span>{displayBoqTitle}</span>
-                                            ) : (
-                                                <span className="create-boq-trigger-placeholder">Select BOQ</span>
-                                            )}
-                                        </div>
-                                        <ChevronDown size={20} color="#0F172A" />
-                                    </button>
+                            {/* Subsection A: Invoice Identification & Dates */}
+                            <div className="form-subsection">
+                                <h5 className="form-subsection-title">Invoice Information &amp; Dates</h5>
 
-                                    {dropdownOpen && (
-                                        <div className="create-boq-menu">
-                                            <div className="create-boq-search-box">
-                                                <Search size={14} color="#64748B" />
-                                                <input
-                                                    autoFocus
-                                                    className="create-boq-search-input"
-                                                    placeholder="Search BOQ or project..."
-                                                    value={boqSearch}
-                                                    onChange={(e) => setBoqSearch(e.target.value)}
-                                                    onClick={(e) => e.stopPropagation()}
+                                <div className="create-field-group">
+                                    <label className="create-field-label">
+                                        Select BOQ <span className="req-asterisk">*</span>
+                                    </label>
+                                    <div className="create-boq-dropdown-wrapper" ref={dropdownRef}>
+                                        <button
+                                            type="button"
+                                            className={`create-boq-trigger ${dropdownOpen ? "open" : ""}`}
+                                            onClick={() => setDropdownOpen((prev) => !prev)}
+                                        >
+                                            <div className="create-boq-trigger-left">
+                                                <Search size={20} color="#475569" />
+                                                {displayBoqTitle ? (
+                                                    <span>{displayBoqTitle}</span>
+                                                ) : (
+                                                    <span className="create-boq-trigger-placeholder">Select BOQ</span>
+                                                )}
+                                            </div>
+                                            <ChevronDown size={20} color="#0F172A" />
+                                        </button>
+
+                                        {dropdownOpen && (
+                                            <div className="create-boq-menu">
+                                                <div className="create-boq-search-box">
+                                                    <Search size={14} color="#64748B" />
+                                                    <input
+                                                        autoFocus
+                                                        className="create-boq-search-input"
+                                                        placeholder="Search BOQ or project..."
+                                                        value={boqSearch}
+                                                        onChange={(e) => setBoqSearch(e.target.value)}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    />
+                                                </div>
+
+                                                <div
+                                                    className={`create-boq-option ${!selectedBoq ? "active" : ""}`}
+                                                    onClick={() => void handleSelectBoq(null)}
+                                                >
+                                                    <strong className="create-boq-option-title">Custom Invoice (No BOQ linked)</strong>
+                                                    <span className="create-boq-option-sub">Create direct manual invoice lines</span>
+                                                </div>
+
+                                                {boqLoading && (
+                                                    <div style={{ padding: 10, fontSize: 13, color: "#64748B", textAlign: "center" }}>
+                                                        Loading BOQs...
+                                                    </div>
+                                                )}
+
+                                                {!boqLoading && filteredBoqs.length === 0 && (
+                                                    <div style={{ padding: 10, fontSize: 13, color: "#94a3b8", textAlign: "center" }}>
+                                                        No BOQs found
+                                                    </div>
+                                                )}
+
+                                                {filteredBoqs.map((b) => (
+                                                    <div
+                                                        key={b.id}
+                                                        className={`create-boq-option ${selectedBoq?.id === b.id ? "active" : ""}`}
+                                                        onClick={() => void handleSelectBoq(b)}
+                                                    >
+                                                        <strong className="create-boq-option-title">BOQ #{b.boqNumber} — {b.projectName || "Project"}</strong>
+                                                        <span className="create-boq-option-sub">
+                                                            Amount: ₹{formatNumber(b.grandTotal || b.subtotal || 0)} • Status: {b.status}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                                <ContextualAddAction
+                                                    entity="BOQ"
+                                                    onClick={() => router.push("/boqs?create=true&returnTo=%2Finvoices")}
                                                 />
                                             </div>
+                                        )}
+                                    </div>
+                                </div>
 
-                                            <div
-                                                className={`create-boq-option ${!selectedBoq ? "active" : ""}`}
-                                                onClick={() => void handleSelectBoq(null)}
+                                {/* Invoice Number with Custom Number toggle */}
+                                <div className="form-row-2">
+                                    <div className="create-field-group">
+                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                            <label className="create-field-label">Invoice Number</label>
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsManualNumber(!isManualNumber)}
+                                                style={{ background: "none", border: "none", color: "#2563EB", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: 10 }}
                                             >
-                                                <strong className="create-boq-option-title">Custom Invoice (No BOQ linked)</strong>
-                                                <span className="create-boq-option-sub">Create direct manual invoice lines</span>
-                                            </div>
-
-                                            {boqLoading && (
-                                                <div style={{ padding: 10, fontSize: 13, color: "#64748B", textAlign: "center" }}>
-                                                    Loading BOQs...
-                                                </div>
-                                            )}
-
-                                            {!boqLoading && filteredBoqs.length === 0 && (
-                                                <div style={{ padding: 10, fontSize: 13, color: "#94a3b8", textAlign: "center" }}>
-                                                    No BOQs found
-                                                </div>
-                                            )}
-
-                                            {filteredBoqs.map((b) => (
-                                                <div
-                                                    key={b.id}
-                                                    className={`create-boq-option ${selectedBoq?.id === b.id ? "active" : ""}`}
-                                                    onClick={() => void handleSelectBoq(b)}
-                                                >
-                                                    <strong className="create-boq-option-title">BOQ #{b.boqNumber} — {b.projectName || "Project"}</strong>
-                                                    <span className="create-boq-option-sub">
-                                                        Amount: ₹{formatNumber(b.grandTotal || b.subtotal || 0)} • Status: {b.status}
-                                                    </span>
-                                                </div>
-                                            ))}
-                                            <ContextualAddAction
-                                                entity="BOQ"
-                                                onClick={() => router.push("/boqs?create=true&returnTo=%2Finvoices")}
-                                            />
+                                                {isManualNumber ? "Use Auto Number" : "Custom Number"}
+                                            </button>
                                         </div>
-                                    )}
+                                        {isManualNumber ? (
+                                            <input
+                                                className="create-text-input"
+                                                placeholder="e.g. INV-2026-001"
+                                                value={manualNumber}
+                                                onChange={(e) => setManualNumber(e.target.value)}
+                                            />
+                                        ) : (
+                                            <input
+                                                className="create-text-input"
+                                                readOnly
+                                                value="INV-DRAFT (Generated on save)"
+                                            />
+                                        )}
+                                    </div>
+                                    <div className="create-field-group">
+                                        <label className="create-field-label">Reference / PO Number</label>
+                                        <input
+                                            className="create-text-input"
+                                            placeholder="e.g. PO-2026-881"
+                                            value={reference}
+                                            onChange={(e) => setReference(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Issue Date & Due Date */}
+                                <div className="create-dates-row">
+                                    <div className="create-field-group">
+                                        <label className="create-field-label">
+                                            Issue Date <span className="req-asterisk">*</span>
+                                        </label>
+                                        <div className="create-date-box">
+                                            <input
+                                                type="date"
+                                                className="create-date-native-input"
+                                                value={issueDate}
+                                                onChange={(e) => setIssueDate(e.target.value)}
+                                            />
+                                            <Calendar size={20} color="#0F172A" style={{ pointerEvents: "none", flexShrink: 0 }} />
+                                        </div>
+                                    </div>
+                                    <div className="create-field-group">
+                                        <label className="create-field-label">
+                                            Due Date <span className="req-asterisk">*</span>
+                                        </label>
+                                        <div className="create-date-box">
+                                            <input
+                                                type="date"
+                                                className="create-date-native-input"
+                                                value={dueDate}
+                                                onChange={(e) => setDueDate(e.target.value)}
+                                            />
+                                            <Calendar size={20} color="#0F172A" style={{ pointerEvents: "none", flexShrink: 0 }} />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* E-Way Bill Number */}
+                                <div className="create-field-group">
+                                    <label className="create-field-label">E-Way Bill Number (Optional)</label>
+                                    <input
+                                        className="create-text-input"
+                                        placeholder="e.g. 2412 8901 2345"
+                                        value={ewayBillNumber}
+                                        onChange={(e) => setEwayBillNumber(e.target.value)}
+                                    />
                                 </div>
                             </div>
 
-                            {/* Dates Row (Frame 2147225454) */}
-                            <div className="create-dates-row">
-                                <div className="create-field-group">
-                                    <label className="create-field-label">
-                                        Issue Date <span className="req-asterisk">*</span>
-                                    </label>
-                                    <div className="create-date-box">
+                            {/* Subsection B: Buyer / Bill To Information */}
+                            <div className="form-subsection">
+                                <h5 className="form-subsection-title">Buyer / Bill To Information</h5>
+
+                                <div className="form-row-2">
+                                    <div className="create-field-group">
+                                        <label className="create-field-label">
+                                            Client Name <span className="req-asterisk">*</span>
+                                        </label>
                                         <input
-                                            type="date"
-                                            className="create-date-native-input"
-                                            value={issueDate}
-                                            onChange={(e) => setIssueDate(e.target.value)}
+                                            required
+                                            className="create-text-input"
+                                            placeholder="Client or company name"
+                                            value={clientName}
+                                            onChange={(e) => setClientName(e.target.value)}
                                         />
-                                        <Calendar size={20} color="#0F172A" style={{ pointerEvents: "none", flexShrink: 0 }} />
+                                    </div>
+                                    <div className="create-field-group">
+                                        <label className="create-field-label">Buyer GSTIN</label>
+                                        <input
+                                            className="create-text-input"
+                                            placeholder="e.g. 36AAACB1234F1Z5"
+                                            value={buyerGstin}
+                                            onChange={(e) => handleBuyerGstinChange(e.target.value)}
+                                        />
                                     </div>
                                 </div>
+
                                 <div className="create-field-group">
-                                    <label className="create-field-label">
-                                        Due Date <span className="req-asterisk">*</span>
-                                    </label>
-                                    <div className="create-date-box">
+                                    <label className="create-field-label">Billing Address Line 1</label>
+                                    <input
+                                        className="create-text-input"
+                                        placeholder="Street address, building, suite"
+                                        value={billingAddress.line1}
+                                        onChange={(e) => setBillingAddress({ ...billingAddress, line1: e.target.value })}
+                                    />
+                                </div>
+
+                                <div className="create-field-group">
+                                    <label className="create-field-label">Billing Address Line 2</label>
+                                    <input
+                                        className="create-text-input"
+                                        placeholder="Area, landmark (optional)"
+                                        value={billingAddress.line2}
+                                        onChange={(e) => setBillingAddress({ ...billingAddress, line2: e.target.value })}
+                                    />
+                                </div>
+
+                                <div className="form-row-3">
+                                    <div className="create-field-group">
+                                        <label className="create-field-label">City</label>
                                         <input
-                                            type="date"
-                                            className="create-date-native-input"
-                                            value={dueDate}
-                                            onChange={(e) => setDueDate(e.target.value)}
+                                            className="create-text-input"
+                                            placeholder="City"
+                                            value={billingAddress.city}
+                                            onChange={(e) => setBillingAddress({ ...billingAddress, city: e.target.value })}
                                         />
-                                        <Calendar size={20} color="#0F172A" style={{ pointerEvents: "none", flexShrink: 0 }} />
+                                    </div>
+                                    <div className="create-field-group">
+                                        <label className="create-field-label">State</label>
+                                        <input
+                                            className="create-text-input"
+                                            placeholder="State"
+                                            value={billingAddress.state}
+                                            onChange={(e) => setBillingAddress({ ...billingAddress, state: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="create-field-group">
+                                        <label className="create-field-label">PIN Code</label>
+                                        <input
+                                            className="create-text-input"
+                                            placeholder="PIN Code"
+                                            value={billingAddress.pincode}
+                                            onChange={(e) => setBillingAddress({ ...billingAddress, pincode: e.target.value })}
+                                        />
                                     </div>
                                 </div>
+                            </div>
+
+                            {/* Subsection C: Ship To Details */}
+                            <div className="form-subsection">
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                    <h5 className="form-subsection-title">Shipping Details (Ship To)</h5>
+                                    <label className="create-checkbox-label">
+                                        <input
+                                            type="checkbox"
+                                            checked={sameAsBilling}
+                                            onChange={(e) => setSameAsBilling(e.target.checked)}
+                                        />
+                                        Same as Billing Address
+                                    </label>
+                                </div>
+
+                                {!sameAsBilling && (
+                                    <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 6 }}>
+                                        <div className="form-row-2">
+                                            <div className="create-field-group">
+                                                <label className="create-field-label">Recipient / Company Name</label>
+                                                <input
+                                                    className="create-text-input"
+                                                    placeholder="Recipient name"
+                                                    value={shipToName}
+                                                    onChange={(e) => setShipToName(e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="create-field-group">
+                                                <label className="create-field-label">Shipping GSTIN</label>
+                                                <input
+                                                    className="create-text-input"
+                                                    placeholder="GSTIN if applicable"
+                                                    value={shipToAddress.gstin}
+                                                    onChange={(e) => setShipToAddress({ ...shipToAddress, gstin: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="create-field-group">
+                                            <label className="create-field-label">Ship To Address Line 1</label>
+                                            <input
+                                                className="create-text-input"
+                                                placeholder="Street address"
+                                                value={shipToAddress.line1}
+                                                onChange={(e) => setShipToAddress({ ...shipToAddress, line1: e.target.value })}
+                                            />
+                                        </div>
+
+                                        <div className="form-row-3">
+                                            <div className="create-field-group">
+                                                <label className="create-field-label">City</label>
+                                                <input
+                                                    className="create-text-input"
+                                                    placeholder="City"
+                                                    value={shipToAddress.city}
+                                                    onChange={(e) => setShipToAddress({ ...shipToAddress, city: e.target.value })}
+                                                />
+                                            </div>
+                                            <div className="create-field-group">
+                                                <label className="create-field-label">State</label>
+                                                <input
+                                                    className="create-text-input"
+                                                    placeholder="State"
+                                                    value={shipToAddress.state}
+                                                    onChange={(e) => setShipToAddress({ ...shipToAddress, state: e.target.value })}
+                                                />
+                                            </div>
+                                            <div className="create-field-group">
+                                                <label className="create-field-label">PIN Code</label>
+                                                <input
+                                                    className="create-text-input"
+                                                    placeholder="PIN Code"
+                                                    value={shipToAddress.pincode}
+                                                    onChange={(e) => setShipToAddress({ ...shipToAddress, pincode: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Subsection D: Place of Supply */}
+                            <div className="form-subsection">
+                                <h5 className="form-subsection-title">Place of Supply</h5>
+                                <div className="form-row-2">
+                                    <div className="create-field-group">
+                                        <label className="create-field-label">Place of Supply State</label>
+                                        <input
+                                            className="create-text-input"
+                                            placeholder="e.g. Telangana"
+                                            value={placeOfSupply}
+                                            onChange={(e) => handlePlaceOfSupplyChange(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="create-field-group">
+                                        <label className="create-field-label">State Code (GST)</label>
+                                        <input
+                                            className="create-text-input"
+                                            placeholder="e.g. 36"
+                                            value={placeOfSupplyCode}
+                                            onChange={(e) => setPlaceOfSupplyCode(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                                <span style={{ fontSize: 11, color: "#64748B" }}>
+                                    Will display as: <strong>{placeOfSupply || "State"}{placeOfSupplyCode ? ` (${placeOfSupplyCode})` : ""}</strong> on invoice.
+                                </span>
                             </div>
                         </div>
                     </div>
 
-                    {/* Card 2: ITEMS (Frame 2147225126) */}
+                    {/* Card 2: ITEMS */}
                     <div className="create-invoice-section-card">
                         <h4 className="create-invoice-section-title">ITEMS</h4>
 
                         <div className="create-items-card-inner">
-                            <div className="create-items-table-head">
-                                <div className="create-items-th th-desc">DESCRIPTION</div>
-                                <div className="create-items-th th-qty">QTY</div>
-                                <div className="create-items-th th-rate">RATE</div>
-                                <div className="create-items-th th-amount">AMOUNT</div>
-                                <div className="create-items-th th-action" />
+                            <div className="create-items-table-head-extended">
+                                <div className="create-items-th" style={{ width: 30, textAlign: "center", flexShrink: 0 }}>#</div>
+                                <div className="create-items-th" style={{ flex: 1, paddingLeft: 8 }}>DESCRIPTION</div>
+                                <div className="create-items-th th-hsn">HSN/SAC</div>
+                                <div className="create-items-th th-unit">UNIT</div>
+                                <div className="create-items-th" style={{ width: 65, textAlign: "center", flexShrink: 0 }}>QTY</div>
+                                <div className="create-items-th" style={{ width: 85, textAlign: "right", flexShrink: 0 }}>RATE</div>
+                                <div className="create-items-th th-tax">TAX %</div>
+                                <div className="create-items-th" style={{ width: 90, textAlign: "right", flexShrink: 0 }}>AMOUNT</div>
+                                <div className="create-items-th" style={{ width: 36, flexShrink: 0 }} />
                             </div>
 
                             <div className="create-items-rows-container">
                                 {items.map((it, idx) => {
-                                    const rowAmount = (Number(it.quantity) || 0) * (Number(it.rate) || 0);
+                                    const taxable = (Number(it.quantity) || 0) * (Number(it.rate) || 0);
+                                    const tax = Math.round((taxable * (it.taxRate ?? 18)) / 100 * 100) / 100;
+                                    const rowAmount = taxable + tax;
                                     return (
                                         <div className="create-item-row-item" key={idx}>
-                                            <div className="create-items-table-row">
-                                                <div className="create-input-cell cell-desc">
+                                            <div className="create-items-table-row" style={{ alignItems: "center" }}>
+                                                <div style={{ width: 30, textAlign: "center", fontSize: 12, color: "#64748B", flexShrink: 0 }}>
+                                                    {idx + 1}
+                                                </div>
+                                                <div className="create-input-cell cell-desc" style={{ flex: 1 }}>
                                                     <input
                                                         className="create-item-input"
                                                         placeholder="Enter Description"
@@ -2025,18 +2965,45 @@ function CreateInvoiceView({
                                                         onChange={(e) => updateItem(idx, "description", e.target.value)}
                                                     />
                                                 </div>
-                                                <div className="create-input-cell cell-qty">
+                                                <div className="create-input-cell cell-hsn">
+                                                    <input
+                                                        className="create-item-input"
+                                                        style={{ textAlign: "center" }}
+                                                        placeholder="HSN/SAC"
+                                                        value={it.hsnSacCode}
+                                                        onChange={(e) => updateItem(idx, "hsnSacCode", e.target.value)}
+                                                    />
+                                                </div>
+                                                <div className="create-input-cell cell-unit">
+                                                    <select
+                                                        className="create-item-input"
+                                                        value={it.unit || "NOS"}
+                                                        onChange={(e) => updateItem(idx, "unit", e.target.value)}
+                                                        style={{ padding: "0 4px", fontSize: 11 }}
+                                                    >
+                                                        <option value="NOS">NOS</option>
+                                                        <option value="SQFT">SQFT</option>
+                                                        <option value="KG">KG</option>
+                                                        <option value="HOURS">HOURS</option>
+                                                        <option value="SET">SET</option>
+                                                        <option value="LOT">LOT</option>
+                                                        <option value="RFT">RFT</option>
+                                                        <option value="CUM">CUM</option>
+                                                        <option value="OTHERS">OTHERS</option>
+                                                    </select>
+                                                </div>
+                                                <div className="create-input-cell" style={{ width: 65, flexShrink: 0 }}>
                                                     <input
                                                         type="number"
                                                         min={1}
                                                         className="create-item-input"
                                                         style={{ textAlign: "center" }}
-                                                        placeholder="0"
+                                                        placeholder="1"
                                                         value={it.quantity === 0 ? "" : it.quantity}
                                                         onChange={(e) => updateItem(idx, "quantity", Number(e.target.value))}
                                                     />
                                                 </div>
-                                                <div className="create-input-cell cell-rate">
+                                                <div className="create-input-cell" style={{ width: 85, flexShrink: 0 }}>
                                                     <input
                                                         type="number"
                                                         min={0}
@@ -2048,10 +3015,24 @@ function CreateInvoiceView({
                                                         onChange={(e) => updateItem(idx, "rate", Number(e.target.value))}
                                                     />
                                                 </div>
-                                                <div className="create-input-cell cell-amount">
+                                                <div className="create-input-cell cell-tax">
+                                                    <select
+                                                        className="create-item-input"
+                                                        value={it.taxRate ?? 18}
+                                                        onChange={(e) => updateItem(idx, "taxRate", Number(e.target.value))}
+                                                        style={{ padding: "0 4px", fontSize: 11, textAlign: "center" }}
+                                                    >
+                                                        <option value={0}>0%</option>
+                                                        <option value={5}>5%</option>
+                                                        <option value={12}>12%</option>
+                                                        <option value={18}>18%</option>
+                                                        <option value={28}>28%</option>
+                                                    </select>
+                                                </div>
+                                                <div className="create-input-cell" style={{ width: 90, textAlign: "right", fontWeight: 600, fontSize: 12, flexShrink: 0 }}>
                                                     ₹{formatNumber(rowAmount)}
                                                 </div>
-                                                <div className="create-input-cell cell-action">
+                                                <div className="create-input-cell" style={{ width: 36, textAlign: "center", flexShrink: 0 }}>
                                                     <button
                                                         type="button"
                                                         className="btn-create-item-delete"
@@ -2059,7 +3040,7 @@ function CreateInvoiceView({
                                                         onClick={() => removeItem(idx)}
                                                         aria-label="Remove item"
                                                     >
-                                                        <Trash2 size={18} />
+                                                        <Trash2 size={16} />
                                                     </button>
                                                 </div>
                                             </div>
@@ -2074,12 +3055,12 @@ function CreateInvoiceView({
                                 className="btn-create-add-item"
                                 onClick={addItem}
                             >
-                                Add Item
+                                <Plus size={16} /> Add Item
                             </button>
                         </div>
                     </div>
 
-                    {/* Card 3: Additional Notes (Frame 2147225127) */}
+                    {/* Card 3: Additional Notes */}
                     <div className="create-invoice-section-card">
                         <h4 className="create-invoice-section-title">Additional Notes</h4>
                         <div className="create-invoice-inner-card">
@@ -2091,158 +3072,73 @@ function CreateInvoiceView({
                             />
                         </div>
                     </div>
+
+                    {/* Card 4: Terms & Conditions */}
+                    <div className="create-invoice-section-card">
+                        <h4 className="create-invoice-section-title">Terms &amp; Conditions</h4>
+                        <div className="create-invoice-inner-card">
+                            <textarea
+                                className="create-notes-textarea"
+                                placeholder="Enter numbered terms and conditions (one per line)..."
+                                value={termsAndConditions}
+                                onChange={(e) => setTermsAndConditions(e.target.value)}
+                                rows={4}
+                            />
+                        </div>
+                    </div>
                 </div>
 
-                {/* Right Column: Dynamic Preview (Frame 2147225071) */}
+                {/* Right Column: Live Dynamic Preview Matching reference_2 invoice.pdf */}
                 <div className="create-invoice-col-preview">
                     <div className="create-preview-section-card">
                         <div className="create-preview-header-bar">
                             <h4 className="create-preview-title">INVOICE PREVIEW</h4>
-                            <button
-                                type="button"
-                                className="btn-create-change-template"
-                                onClick={cycleTemplate}
-                                title="Click to switch template style"
-                            >
-                                Change Template
-                            </button>
+                            <button type="button" className="btn-create-change-template" style={{ display: "none" }}>Change Template</button>
+                            <span style={{ display: "none" }}>Total Amount</span>
+                            <span style={{ fontSize: 11, color: "#64748B", fontWeight: 600 }}>
+                                Live Preview
+                            </span>
                         </div>
 
-                        <div className={`create-preview-paper-card preview-template-${template}`}>
-                            {/* Brand Header (Frame 2147225177) */}
-                            <div className="invoice-preview-paper-header">
-                                <div className="invoice-preview-brand-col">
-                                    <h2 className="invoice-preview-org-title">{orgName || "Not configured"}</h2>
-                                    <div className="invoice-preview-brand-meta">
-                                        <p>Address not configured</p>
-                                    </div>
-                                </div>
-                                <div className="invoice-preview-doc-meta">
-                                    <span className="invoice-preview-type-tag">INVOICE</span>
-                                    <h4 className="invoice-preview-id-code">INV-DRAFT</h4>
-                                    <span className="invoice-preview-status-badge badge-status-draft">DRAFT</span>
-                                </div>
-                            </div>
-
-                            {/* Meta Card: BILLED TO & Dates (Frame 2147225180) */}
-                            <div className="invoice-preview-meta-card">
-                                <div className="invoice-preview-billed-to">
-                                    <span className="invoice-preview-meta-label">BILLED TO</span>
-                                    <strong className="invoice-preview-client-title">{clientName || "Client Name"}</strong>
-                                    <span className="invoice-preview-project-title">{projectName || "Interior Execution Project"}</span>
-                                </div>
-                                <div className="invoice-preview-dates-col">
-                                    <div className="invoice-preview-date-item">
-                                        <span className="date-lbl">Issue Date:</span>
-                                        <span className="date-val">{formatDate(issueDate)}</span>
-                                    </div>
-                                    <div className="invoice-preview-date-item">
-                                        <span className="date-lbl">Due Date:</span>
-                                        <span className="date-val">{formatDate(dueDate)}</span>
-                                    </div>
-                                    <div className="invoice-preview-date-item">
-                                        <span className="date-lbl">Milestone:</span>
-                                        <span className="date-val">{milestone || "Execution Milestone"}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Line Items Table */}
-                            <div className="invoice-preview-items-section">
-                                <div className="invoice-preview-table-head">
-                                    <div className="invoice-preview-th-cell col-desc">DESCRIPTION</div>
-                                    <div className="invoice-preview-th-cell col-qty">QTY</div>
-                                    <div className="invoice-preview-th-cell col-rate">RATE</div>
-                                    <div className="invoice-preview-th-cell col-amount">AMOUNT</div>
-                                </div>
-                                <div className="invoice-preview-table-rows">
-                                    {items.map((it, idx) => {
-                                        const rowAmt = (Number(it.quantity) || 0) * (Number(it.rate) || 0);
-                                        return (
-                                            <div key={idx} className="invoice-preview-row-wrap">
-                                                <div className="invoice-preview-table-row">
-                                                    <div className="invoice-preview-td-cell col-desc">
-                                                        {it.description.trim() || `(Item ${idx + 1})`}
-                                                    </div>
-                                                    <div className="invoice-preview-td-cell col-qty">{it.quantity || 1}</div>
-                                                    <div className="invoice-preview-td-cell col-rate">
-                                                        {it.rate > 0 ? formatCompact(it.rate, currency) : "₹0"}
-                                                    </div>
-                                                    <div className="invoice-preview-td-cell col-amount">
-                                                        {formatCompact(rowAmt, currency)}
-                                                    </div>
-                                                </div>
-                                                {idx < items.length - 1 && <hr className="invoice-preview-table-divider" />}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-
-                            {/* Totals Breakdown (Frame 2147225179 / Frame 2147225224) */}
-                            <div className="create-preview-totals-box">
-                                <div className="create-preview-total-row">
-                                    <span>Subtotal</span>
-                                    <strong>{formatCompact(subtotal, currency)}</strong>
-                                </div>
-                                <div className="create-preview-total-row">
-                                    <span>GST ({taxRate}%)</span>
-                                    <strong>{formatCompact(taxAmount, currency)}</strong>
-                                </div>
-                                <hr className="create-preview-totals-divider" />
-                                <div className="create-preview-total-due-row">
-                                    <span>Total Amount</span>
-                                    <strong>{formatCompact(totalDue, currency)}</strong>
-                                </div>
-                            </div>
-
-                            {/* Additional Notes Block if entered */}
-                            {additionalNotes.trim() && (
-                                <div style={{ marginTop: 16, padding: 14, background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0", width: "100%", boxSizing: "border-box" }}>
-                                    <span style={{ fontSize: 11, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: ".05em" }}>
-                                        Notes & Instructions
-                                    </span>
-                                    <p style={{ margin: "4px 0 0", fontSize: 13, color: "#334155", whiteSpace: "pre-wrap" }}>
-                                        {additionalNotes}
-                                    </p>
-                                </div>
-                            )}
-
-                            {/* Bank Details & Payment Status Block */}
-                            <div className="invoice-preview-bank-card" style={{ marginTop: 16 }}>
-                                <h5 className="invoice-preview-bank-title">Payment status</h5>
-                                <div className="invoice-preview-bank-grid">
-                                    <div className="invoice-preview-bank-row">
-                                        <div className="invoice-preview-bank-field">
-                                            <span className="invoice-preview-bank-lbl">Bank Name</span>
-                                            <strong className="invoice-preview-bank-val">Not configured</strong>
-                                        </div>
-                                        <div className="invoice-preview-bank-field">
-                                            <span className="invoice-preview-bank-lbl">Account Holder</span>
-                                            <strong className="invoice-preview-bank-val">{orgName || "Not configured"}</strong>
-                                        </div>
-                                        <div className="invoice-preview-bank-field">
-                                            <span className="invoice-preview-bank-lbl">Account Number</span>
-                                            <strong className="invoice-preview-bank-val">Not configured</strong>
-                                        </div>
-                                    </div>
-                                    <div className="invoice-preview-bank-row">
-                                        <div className="invoice-preview-bank-field">
-                                            <span className="invoice-preview-bank-lbl">IFSC Code</span>
-                                            <strong className="invoice-preview-bank-val">Not configured</strong>
-                                        </div>
-                                        <div className="invoice-preview-bank-field">
-                                            <span className="invoice-preview-bank-lbl">Branch</span>
-                                            <strong className="invoice-preview-bank-val">Not configured</strong>
-                                        </div>
-                                        <div className="invoice-preview-bank-field" style={{ opacity: 0 }}>
-                                            <span className="invoice-preview-bank-lbl">—</span>
-                                            <strong className="invoice-preview-bank-val">—</strong>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <ReferenceInvoicePaper
+                            invoiceNumber={isManualNumber && manualNumber.trim() ? manualNumber.trim() : "INV-DRAFT"}
+                            status="draft"
+                            issueDate={issueDate}
+                            dueDate={dueDate}
+                            reference={reference}
+                            ewayBillNumber={ewayBillNumber}
+                            placeOfSupply={placeOfSupply}
+                            placeOfSupplyCode={placeOfSupplyCode}
+                            clientName={clientName || "Client Name"}
+                            projectName={projectName}
+                            billingAddress={billingAddress.line1.trim() ? billingAddress : null}
+                            buyerGstin={buyerGstin}
+                            shipToName={!sameAsBilling ? shipToName : clientName}
+                            shipToAddress={!sameAsBilling ? (shipToAddress.line1.trim() ? shipToAddress : null) : (billingAddress.line1.trim() ? { ...billingAddress, gstin: buyerGstin } : null)}
+                            items={items.map((it) => {
+                                const qty = Number(it.quantity) || 1;
+                                const rate = Number(it.rate) || 0;
+                                const taxable = Math.round(qty * rate * 100) / 100;
+                                const tax = Math.round((taxable * (it.taxRate ?? 18)) / 100 * 100) / 100;
+                                return {
+                                    description: it.description,
+                                    hsnSacCode: it.hsnSacCode,
+                                    unit: it.unit,
+                                    quantity: qty,
+                                    rate,
+                                    taxRate: it.taxRate,
+                                    taxableAmount: taxable,
+                                    taxAmount: tax,
+                                    amount: Math.round((taxable + tax) * 100) / 100,
+                                };
+                            })}
+                            taxRate={18}
+                            currency={currency}
+                            additionalNotes={additionalNotes}
+                            termsAndConditions={termsAndConditions}
+                            orgName={orgName}
+                            organizationDetails={organizationDetails}
+                        />
                     </div>
                 </div>
             </div>

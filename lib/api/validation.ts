@@ -465,6 +465,7 @@ export const organizationPatchSchema = z
     bankName: z.string().trim().max(160).nullable().optional(),
     accountNumber: z.string().trim().max(80).nullable().optional(),
     ifscCode: z.string().trim().max(40).nullable().optional(),
+    branch: z.string().trim().max(160).nullable().optional(),
     paymentTerms: z.string().trim().max(100).nullable().optional(),
 
     // GST & Tax fields
@@ -868,6 +869,12 @@ const invoiceItemSchema = z
       .finite()
       .min(0)
       .max(999999999999),
+
+    hsnSacCode: z.string().trim().max(50).nullable().optional(),
+    unit: z.string().trim().max(50).nullable().optional(),
+    taxRate: z.coerce.number().finite().min(0).max(100).optional(),
+    taxAmount: z.coerce.number().finite().min(0).optional(),
+    taxableAmount: z.coerce.number().finite().min(0).optional(),
   })
   .strict();
 
@@ -895,13 +902,15 @@ const invoiceBaseSchema = z
 
     billingAddress: z
       .object({
-        line1: z.string().trim().min(1).max(240),
+        line1: z.string().trim().max(240).optional(),
         line2: z.string().trim().max(240).nullable().optional(),
-        city: z.string().trim().min(1).max(120),
-        state: z.string().trim().min(1).max(120),
-        pincode: z.string().trim().min(3).max(20),
+        city: z.string().trim().max(120).optional(),
+        state: z.string().trim().max(120).optional(),
+        pincode: z.string().trim().max(20).optional(),
+        country: z.string().trim().max(100).optional(),
       })
-      .strict(),
+      .strict()
+      .optional(),
 
     projectId: optionalNullableUuid,
 
@@ -960,6 +969,67 @@ const invoiceBaseSchema = z
         branchAddress: z.string().trim().max(300).nullable().optional(),
       })
       .strict()
+      .nullable()
+      .optional(),
+
+    ewayBillNumber: z
+      .string()
+      .trim()
+      .max(100)
+      .nullable()
+      .optional(),
+
+    placeOfSupply: z
+      .string()
+      .trim()
+      .max(100)
+      .nullable()
+      .optional(),
+
+    placeOfSupplyCode: z
+      .string()
+      .trim()
+      .max(10)
+      .nullable()
+      .optional(),
+
+    shipToName: z
+      .string()
+      .trim()
+      .max(200)
+      .nullable()
+      .optional(),
+
+    shipToAddress: z
+      .object({
+        line1: z.string().trim().max(240).optional(),
+        line2: z.string().trim().max(240).nullable().optional(),
+        city: z.string().trim().max(120).optional(),
+        state: z.string().trim().max(120).optional(),
+        pincode: z.string().trim().max(20).optional(),
+        country: z.string().trim().max(100).optional(),
+        gstin: z.string().trim().max(30).nullable().optional(),
+      })
+      .strict()
+      .nullable()
+      .optional(),
+
+    buyerGstin: z
+      .string()
+      .trim()
+      .max(30)
+      .nullable()
+      .optional(),
+
+    termsAndConditions: z
+      .string()
+      .trim()
+      .max(5000)
+      .nullable()
+      .optional(),
+
+    organizationSnapshot: z
+      .record(z.string(), z.unknown())
       .nullable()
       .optional(),
 

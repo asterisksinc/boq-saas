@@ -1206,6 +1206,7 @@ export type OrganizationInput = {
     bankName?: string | null;
     accountNumber?: string | null;
     ifscCode?: string | null;
+    branch?: string | null;
     paymentTerms?: string | null;
 
     // GST & Tax

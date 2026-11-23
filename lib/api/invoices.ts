@@ -35,11 +35,24 @@ export async function getInvoiceSummary(): Promise<InvoiceSummary> {
 }
 
 export async function createInvoice(input: {
-    type?: string; clientName: string; clientId?: string; billingAddress?: Record<string, string>;
+    type?: string; clientName: string; clientId?: string; billingAddress?: Record<string, unknown>;
     projectId?: string; projectName?: string; invoiceNumber?: string;
     issueDate: string; dueDate: string; milestone?: string; reference?: string;
-    taxRate?: number; additionalNotes?: string; bankDetails?: Record<string, string>;
-    items: Array<{ description: string; quantity: number; rate: number }>;
+    taxRate?: number; additionalNotes?: string; bankDetails?: Record<string, unknown>;
+    ewayBillNumber?: string; placeOfSupply?: string; placeOfSupplyCode?: string;
+    shipToName?: string; shipToAddress?: Record<string, unknown>;
+    buyerGstin?: string; termsAndConditions?: string; organizationSnapshot?: Record<string, unknown>;
+    items: Array<{
+        description: string;
+        quantity: number;
+        rate: number;
+        hsnSacCode?: string;
+        unit?: string;
+        taxRate?: number;
+        taxAmount?: number;
+        taxableAmount?: number;
+    }>;
+    status?: "draft" | "pending";
 }): Promise<Invoice> {
     return fetchApi<Invoice>("/api/v1/invoices", { method: "POST", body: JSON.stringify(input) });
 }

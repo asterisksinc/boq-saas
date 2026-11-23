@@ -15,6 +15,7 @@ interface NavItem {
 const navItems: NavItem[] = [
     { route: "/dashboard", icon: "dashboard-overview-active", label: "Overview" },
     { route: "/projects", icon: "dashboard-projects", label: "Projects" },
+    { route: "/mood-boards", icon: "dashboard-moodboards", label: "Mood Boards" },
     { route: "/boqs", icon: "dashboard-boqs", label: "Bill of Quantities" },
     { route: "/costs", icon: "dashboard-costs", label: "Costing" },
     { route: "/templates", icon: "dashboard-templates", label: "Templates" },
