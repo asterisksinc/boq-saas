@@ -61,6 +61,16 @@ const darkBlocks = [
   },
 ];
 
+// Positions are the icon-cell centres in integrations.png (850×446), as percentages.
+const integrationIcons = [
+  { name: "Razorpay", file: "razorpay", x: 35.29, y: 22.2 },
+  { name: "Email", file: "email", x: 19.53, y: 49.9 },
+  { name: "WhatsApp", file: "whatsapp", x: 35.29, y: 77.35 },
+  { name: "Google Ads", file: "google-ads", x: 64.7, y: 22.2 },
+  { name: "Meta Ads", file: "meta-ads", x: 80.35, y: 49.9 },
+  { name: "Custom Forms", file: "custom-forms", x: 64.7, y: 77.35 },
+];
+
 const testimonials = {
   jenny: { quote: "Caleo transformed our workflow, saving hours each week while boosting productivity.", name: "Jenny Elsi", role: "Marketing Manager", avatar: "/assets/home/avatar-1.png" },
   rafiq: {
@@ -302,7 +312,16 @@ export default function Home() {
           <Tag>Smart Integrations</Tag>
           <h2 className="rv-h2">Connect your platforms</h2>
         </div>
-        <img src="/assets/home/integrations.png" alt="Connected platform integrations" width={850} height={446} loading="lazy" />
+        <div className="rv-integrations-art">
+          <img src="/assets/home/integrations.png" alt="" width={850} height={446} loading="lazy" />
+          <ul aria-label="Integrations">
+            {integrationIcons.map((icon) => (
+              <li key={icon.file} style={{ left: `${icon.x}%`, top: `${icon.y}%` }} title={icon.name}>
+                <img src={`/assets/home/integrations/${icon.file}.svg`} alt={icon.name} />
+              </li>
+            ))}
+          </ul>
+        </div>
         <div className="rv-integrations-body">
           <p className="rv-lead">
             Easily connect your favorite tools and platforms with seamless integrations—streamlining workflows, improving efficiency, and keeping
