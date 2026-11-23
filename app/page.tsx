@@ -1,161 +1,83 @@
-import { ArrowRight, BadgeCheck, Check, ChevronDown, Code2, Globe2, Star, Tag as TagIcon } from "lucide-react";
-import { MarketingNav } from "@/components/MarketingChrome";
+import { ChevronRight } from "lucide-react";
+import DarkWorkflowIndex from "@/components/home/DarkWorkflowIndex";
+import HomeNav from "@/components/home/HomeNav";
+import HomePricing from "@/components/home/HomePricing";
+import { marketingSolutions } from "@/lib/marketing-solutions";
+import "./home.css";
 
-const figma = "/figma/";
+// Rebuilt from Figma "BOQ DESIGN ARENA" › PUBLIC PAGES › Home (node 327:10705).
+// Images live in /public/assets/home (exported from Figma); the hero background (/public/assets/home/hero-bg.jpg) is a web-sized copy of /public/assets/herosection-ryvo-image.png.
 
-const partnerLogos = [
-  ["mark-a", "LOGOIPSUM"],
-  ["mark-b", "LOGOIPSUM"],
-  ["mark-c", "Logoipsum"],
-  ["mark-d", "LOGOIPSUM"],
+const topFeatures = [
+  ["Build Structured BOQs", "An intelligent assistant that collaborates, learns, and works alongside your team"],
+  ["Integrate effortlessly", "Easily connect your favorite tools and platforms with seamless integrations"],
+  ["Track performance in real time", "Track your progress and gain actionable insights in real time"],
 ];
 
-const bentoCards = [
-  { title: "Build structured BOQs faster than spreadsheets can scale.", className: "wide" },
-  { title: "Turn scattered material pricing into a controlled cost intelligence layer.", className: "tall" },
-  {
-    title:
-      "Bring leads, communication, payments, and client updates into your workflow through connected forms, WhatsApp, email, and Razorpay integrations.",
-    className: "color",
-  },
-  { title: "Get approvals without losing commercial traceability.", className: "blank" },
-  { title: "Measure margin before execution exposes it.", className: "full" },
-];
-
-const stats = [
-  ["12B+", "Line Items Managed"],
-  ["100K+", "Projects & Workflows"],
-  ["98%", "Workflow Visibility"],
-  ["4.3K+", "Teams & Users"],
-];
-
-const stages = [
+const bottomFeatures = [
   [
-    "Work Faster",
-    "Create reusable BOQ structures, costing templates, and workflows instead of rebuilding the same commercial processes for every project.",
+    "Smart & easy order handling",
+    "Easily manage, track, and fulfill all your orders from one intuitive dashboard keeping your business running smoothly.",
   ],
   [
-    "Stay Accurate",
-    "Keep rates, quantities, revisions, approvals, and commercial information connected so your team spends less time reconciling conflicting versions.",
-  ],
-  [
-    "Know Your Margin",
-    "Track project costs, pricing, approvals, procurement movement, and margin exposure from one connected workspace.",
+    "Export data instantly. Report with ease.",
+    "Export your data effortlessly and generate detailed reports in just a few clicks giving you the clarity to make smarter business decisions.",
   ],
 ];
 
-const modules = [
+const workflowPoints = [
+  ["Safe, and Scalable.", "Secure, reliable solutions designed to scale with businesses."],
+  ["Trusted and Protected", "Your data and operations remain secure, reliable, and protected."],
+  ["Track performance in real time", "Monitor and analyze business instantly with real-time insights that help."],
+];
+
+const darkBlocks = [
   {
-    title: "BOQ Builder",
-    copy: "Build structured project estimates without Excel dependency.",
-    items: ["Structured BOQ hierarchy", "Templates & Excel import", "Revisions & version control"],
-    position: "right",
+    id: "planning",
+    label: "Planning",
+    title: ["Centralize priorities", "before execution begins."],
+    copy: "Organize projects, timelines, ownership, and documentation inside one operational layer designed to keep teams aligned from the start.",
+    image: "/assets/home/dark-plan.jpg",
+    alt: "Project plan board with workflow stages and sticky notes",
+    padded: true,
   },
   {
-    title: "Costing & Materials",
-    copy: "Create a reliable pricing foundation for every estimate.",
-    items: ["Material cost library", "Vendor-linked rates", "GST, margin & costing logic"],
-    position: "left",
+    id: "coordination",
+    label: "Coordination",
+    title: ["Keep teams connected", "without operational overhead."],
+    copy: "Discussions, updates, files, and decisions stay attached to execution workflows so teams maintain clarity without relying on endless meetings.",
+    image: "/assets/home/dark-crm.jpg",
+    alt: "Team dashboard showing deal metrics, ongoing tasks and project progress",
+    padded: false,
   },
   {
-    title: "Approvals & Procurement",
-    copy: "Move approved costs into actionable project workflows.",
-    items: ["Client approvals", "Vendor comparison", "Procurement handoff"],
-    position: "right",
-  },
-  {
-    title: "Project Intelligence",
-    copy: "See what is happening across projects and commercials.",
-    items: ["Project dashboards", "Cost & margin visibility", "Documents & activity tracking"],
-    position: "left",
+    id: "execution",
+    label: "Execution",
+    title: ["Track progress, blockers,", "and delivery in real time."],
+    copy: "Cube provides shared operational visibility across projects, ownership, and execution progress so teams can move faster with confidence.",
+    image: "/assets/home/dark-table.jpg",
+    alt: "Task table with type, rating, duration and assignees",
+    padded: false,
   },
 ];
 
-const plans = [
-  {
-    title: "For Growing Teams",
-    price: "₹1,499",
-    cta: "Start Today",
-    popular: false,
-    copy: "Everything you need to bring your BOQ workflow into one system.",
-    items: ["BOQ Builder", "Costing & Materials", "Projects & Documents", "Approvals", "Core Integrations"],
+const testimonials = {
+  jenny: { quote: "Caleo transformed our workflow, saving hours each week while boosting productivity.", name: "Jenny Elsi", role: "Marketing Manager", avatar: "/assets/home/avatar-1.png" },
+  rafiq: {
+    quote: "The team’s expertise transformed how we work. Projects are faster, smarter, and more efficient than ever, delivering measurable business success.",
+    name: "Rafiq Ahmed",
+    role: "Head of Product Development",
+    avatar: "/assets/home/avatar-2.png",
   },
-  {
-    title: "Enterprise",
-    price: "₹2,799",
-    cta: "Get Enterprise Now",
-    popular: true,
-    copy: "Advanced commercial control for larger project teams.",
-    items: ["Everything in Professional", "Advanced Project Controls", "Advanced Integrations", "Advanced Reporting", "Priority Support"],
+  ethan: { quote: "An indispensable platform that simplifies operations and drives measurable business growth.", name: "Ethan Blake", role: "Sales Director", avatar: "/assets/home/avatar-3.png" },
+  andrew: { quote: "Our team collaborates seamlessly, and projects are completed more efficiently than ever.", name: "Andrew James", role: "Project Manager", avatar: "/assets/home/avatar-4.png" },
+  ayesha: {
+    quote: "Caleo’s tools streamlined our processes, allowing us to focus on growth. Results were immediate, impressive, and exceeded all expectations.",
+    name: "Ayesha Karim",
+    role: "Chief Operating Officer",
+    avatar: "/assets/home/avatar-5.png",
   },
-];
-
-const logoGlyphs = ["K", "N", "G", "+", "O", "A", "GH", "L", "M.", "■"];
-
-const integrationFeatures = [
-  ["Google Ad Forms", "Connect Google Ads lead forms and bring new enquiries into your workflow automatically."],
-  ["Meta Ad Forms", "Capture leads from Facebook and Instagram campaigns directly inside RVYO."],
-  ["Custom Forms", "Create custom forms with your own fields and embed them directly into your website."],
-  ["WhatsApp Business", "Send timely project and client updates through WhatsApp without losing context."],
-  ["Email", "Connect email communication to keep clients informed across key project touchpoints."],
-  ["RazorPay", "Connect Razorpay and collect payments directly against invoices created in RVYO."],
-];
-
-const comparisonRows = [
-  ["BOQ Management", "Structured", "Spreadsheets"],
-  ["Costing Logic", "Centralised", "Manual"],
-  ["Revisions", "Controlled", "Scattered"],
-  ["Client Approvals", "Tracked", "Informal"],
-  ["Project Visibility", "Real-Time", "Fragmented"],
-  ["Commercial Control", "Centralized", "Disconnected"],
-  ["Scalable Infrastructure", "Unlimited", "Limited"],
-];
-
-const testimonials = [
-  [
-    "David R.",
-    "NovaTech",
-    "The difference is having one structured version of the project. Our team spends less time searching for information and more time controlling the project.",
-  ],
-  [
-    "James C.",
-    "Vertex Labs",
-    "RVYO has helped us bring our BOQs, costing, approvals, and project information into one workflow instead of managing everything across multiple files.",
-  ],
-  [
-    "Liam F.",
-    "Altura",
-    "We wanted something more controlled than Excel without a complicated ERP. RVYO gives us that middle ground.",
-  ],
-];
-
-const faqs = [
-  "Can I import my existing Excel BOQs?",
-  "Is RVYO built specifically for interior design businesses?",
-  "Can my clients approve BOQs online?",
-  "Can I manage BOQ revisions?",
-  "Can I track project margins?",
-  "Can I connect my existing lead-generation tools?",
-];
-
-const footerColumns = [
-  [
-    "Product",
-    ["Product Overview", "BOQ Builder", "Costing Library", "Material Management", "Client Approvals", "Project Management", "Documents", "Reports & Analytics", "Integrations", "Pricing"],
-  ],
-  [
-    "Solutions",
-    ["Interior Designers", "Interior Design Studios", "Architecture Firms", "Turnkey Contractors", "Design-Build Firms", "Modular Furniture Companies", "Interior Contractors", "Growing Project Teams"],
-  ],
-  ["Integrations", ["Google Ad Forms", "Meta Ad Forms", "Custom Forms", "WhatsApp", "Email", "Razorpay", "All Integrations"]],
-  ["Company", ["About RVYO", "Customers", "Contact", "Book a Demo", "Support"]],
-];
-
-const footerSecondary = [
-  ["Features", ["BOQ Creation", "Excel Import", "BOQ Templates", "Costing", "Material Library", "Client Approvals", "Project Documents", "Project Activities", "Margin Tracking", "Reporting", "Notifications", "Revision Management"]],
-  ["Resources", ["Resource Center", "Blog", "BOQ Templates", "Costing Templates", "Guides", "Case Studies", "Product Updates", "Help Center", "FAQs"]],
-  ["Legal", ["Privacy Policy", "Terms of Service", "Cookie Policy", "Refund Policy", "Data Processing", "Security", "Acceptable Use Policy"]],
-];
+};
 
 const legalLinks: Record<string, string> = {
   "Privacy Policy": "/privacy-policy",
@@ -167,149 +89,206 @@ const legalLinks: Record<string, string> = {
   "Acceptable Use Policy": "/acceptable-use-policy",
 };
 
+type FooterGroup = [string, string[]];
+
+const footerColumns: FooterGroup[][] = [
+  [["Product", ["Product Overview", "BOQ Builder", "Costing Library", "Material Management", "Client Approvals", "Project Management", "Documents", "Reports & Analytics", "Integrations", "Pricing"]]],
+  [
+    ["Solutions", ["Interior Designers", "Interior Design Studios", "Architecture Firms", "Turnkey Contractors", "Design-Build Firms", "Modular Furniture Companies", "Interior Contractors", "Growing Project Teams"]],
+    ["Features", ["BOQ Creation", "Excel Import", "BOQ Templates", "Costing", "Material Library", "Client Approvals", "Project Documents", "Project Activities", "Margin Tracking", "Reporting", "Notifications", "Revision Management"]],
+  ],
+  [
+    ["Integrations", ["Google Ad Forms", "Meta Ad Forms", "Custom Forms", "WhatsApp", "Email", "Razorpay", "All Integrations"]],
+    ["Resources", ["Resource Center", "Blog", "BOQ Templates", "Costing Templates", "Guides", "Case Studies", "Product Updates", "Help Center", "FAQs"]],
+  ],
+  [
+    ["Company", ["About RVYO", "Customers", "Contact", "Book a Demo", "Support"]],
+    ["Legal", Object.keys(legalLinks)],
+  ],
+];
+
+function footerHref(group: string, item: string) {
+  if (group === "Legal") return legalLinks[item];
+  if (group === "Solutions") {
+    const solution = marketingSolutions.find((entry) => entry.title === item.replace("-", " "));
+    return solution ? `/solutions/${solution.slug}` : "#solutions";
+  }
+  if (item === "Pricing") return "#pricing";
+  if (item === "All Integrations") return "#integrations";
+  if (item === "Book a Demo" || item === "Contact") return "#demo";
+  return "#";
+}
+
+function Tag({ children, arrow = false }: { children: React.ReactNode; arrow?: boolean }) {
+  return (
+    <span className="rv-tag">
+      {children}
+      {arrow && (
+        <svg viewBox="0 0 8 8" fill="none" aria-hidden="true">
+          <path d="M1 4h6M4.5 1.5 7 4 4.5 6.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )}
+    </span>
+  );
+}
+
+function Quote({ data, size }: { data: (typeof testimonials)[keyof typeof testimonials]; size: "short" | "tall" }) {
+  return (
+    <figure className={`rv-quote is-${size}`} style={{ margin: 0 }}>
+      <div className="rv-quote-top">
+        <img src="/assets/home/stars.svg" alt="Rated 5 out of 5" />
+        <blockquote>“{data.quote}”</blockquote>
+      </div>
+      <figcaption className="rv-author">
+        <img src={data.avatar} alt="" loading="lazy" />
+        <div>
+          <strong>{data.name}</strong>
+          <span>{data.role}</span>
+        </div>
+      </figcaption>
+    </figure>
+  );
+}
+
 export default function Home() {
   return (
-    <main className="site home-page rvyo-page">
-      <MarketingNav />
+    <main className="rv-home">
+      <HomeNav />
 
-      <section className="home-hero rail">
-        <Tag>RVYO is now live</Tag>
-        <h1>The commercial operating system for interior design teams.</h1>
-        <p>
-          Build structured BOQs, control project costing, compare vendors, collect client approvals, manage documents, and
-          track commercial performance all from one platform built for interior project workflows.
-        </p>
-        <div className="hero-actions">
-          <a className="button dark" href="/register">
-            Start Now
-          </a>
-          <a className="button blue" href="#demo">
-            Book a Demo
-          </a>
+      {/* Hero */}
+      <section className="rv-hero" id="product">
+        <div className="rv-hero-inner">
+          <div className="rv-hero-copy">
+            <Tag arrow>RVYO is now live</Tag>
+            <h1>
+              The Commercial Operating System
+              <br />
+              for Interior Design teams.
+            </h1>
+            <p className="rv-lead">
+              Streamline your sales process with powerful automation insights—helping you close deals faster, boost efficiency, and scale your
+              business with confidence.
+            </p>
+            <div className="rv-hero-actions">
+              <a className="rv-btn rv-btn-brand" href="#demo">
+                <span className="rv-btn-dot" aria-hidden="true" />
+                Talk to Sales
+              </a>
+              <a className="rv-btn rv-btn-dark" href="/register">
+                Start Free Trial
+              </a>
+            </div>
+          </div>
+          <div className="rv-hero-dashboard">
+            <img src="/assets/home/hero-dashboard.png" alt="RVYO overview dashboard with project analytics" width={1222} height={654} />
+          </div>
         </div>
-        <small>No complex setup. Start with your first project.</small>
-      </section>
-
-      <section className="hero-visual rail" aria-label="RVYO dashboard preview">
-        <div className="blue-grain" />
-        <div className="dashboard-frame">
-          <img src={`${figma}hero-dashboard.png`} alt="RVYO dashboard with commercial project metrics" />
-        </div>
-      </section>
-
-      <section className="trusted rail">
-        <p>Used by interior design studios, firms, architects, estimators, and procurement teams.</p>
-        <div>
-          {partnerLogos.map(([mark, label]) => (
-            <span className="partner-logo" key={mark}>
-              <i className={mark} />
-              {label}
-            </span>
-          ))}
-        </div>
-      </section>
-
-      <section className="bento rail" id="product">
-        <div className="bento-grid">
-          {bentoCards.map((card) => (
-            <article className={`bento-card ${card.className}`} key={card.title}>
-              <h3>{card.title}</h3>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="metrics rail" id="features">
-        <Tag>Built for scale</Tag>
-        <h2>More control at every stage of the project.</h2>
-        <div className="stat-grid">
-          {stats.map(([value, label]) => (
-            <article key={value}>
-              <strong>{value}</strong>
-              <span>{label}</span>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="stage rail">
-        <Tag>Why RVYO</Tag>
-        <h2>
-          Stop managing projects.
-          <br />
-          Start controlling them.
-        </h2>
-        <div className="stage-visuals">
-          {stages.map(([title, copy], index) => (
-            <article key={title}>
-              <div className={`stage-art stage-art-${index + 1}`} />
-              <h3>{title}</h3>
-              <p>{copy}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="purpose rail" id="solutions">
-        <Tag>The RVYO stack</Tag>
-        <h2>Purpose-built modules work together to take a project from initial scope to controlled execution.</h2>
-        <div className="module-grid">
-          {modules.map((card) => (
-            <article className={`module-card ${card.position}`} key={card.title}>
-              <div>
-                <h3>{card.title}</h3>
-                <p>{card.copy}</p>
-              </div>
-              <ul>
-                {card.items.map((item) => (
-                  <li key={item}>
-                    <Check />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="pricing-intro rail" id="pricing">
-        <Tag>Simple pricing</Tag>
-        <h2>Choose the plan that fits your team today. Upgrade when your projects and operations grow.</h2>
-        <div className="billing-toggle" aria-label="Billing frequency">
-          <span>Yearly</span>
-          <b />
-          <span>Monthly</span>
-        </div>
-        <div className="pricing-grid">
-          {plans.map((plan) => (
-            <PriceCard key={plan.title} {...plan} />
-          ))}
-        </div>
-      </section>
-
-      <section className="integrations" id="insights">
-        <div className="integration-rail">
-          <Tag>Connected workflow</Tag>
-          <h2>Bring every client touchpoint into RVYO.</h2>
-          <p className="section-subcopy">
-            Connect the tools your team already uses to capture leads, communicate with clients, and collect project
-            payments without breaking your workflow.
+        <div className="rv-trusted rv-container">
+          <p>
+            Trusted by <span>1000+ marketing teams</span>
           </p>
-          <div className="logo-row">
-            {logoGlyphs.map((glyph, index) => (
-              <span key={`${glyph}-${index}`}>{glyph}</span>
+          <div className="rv-logos" aria-label="Customer logos">
+            <div className="rv-logos-track">
+              <img src="/assets/home/logos.svg" alt="" />
+              <img src="/assets/home/logos.svg" alt="" aria-hidden="true" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="rv-grid-strip rv-container" aria-hidden="true" />
+
+      {/* Core features */}
+      <section className="rv-features rv-container" id="features">
+        <div className="rv-section-head">
+          <Tag>Core Features</Tag>
+          <h2 className="rv-h2">Simplify management. Amplify growth.</h2>
+          <p className="rv-lead">
+            See everything that matters at a glance. Track your sales, revenue, profits, and customer behavior in real time — always up to date.
+          </p>
+        </div>
+        <div className="rv-feature-grid">
+          <div className="rv-feature-row is-top">
+            {topFeatures.map(([title, copy]) => (
+              <article className="rv-feature-card" key={title}>
+                <h3>{title}</h3>
+                <p className="rv-lead">{copy}</p>
+              </article>
             ))}
           </div>
-          <div className="dark-feature-grid">
-            {integrationFeatures.map(([title, copy]) => (
-              <article key={title}>
-                <span>
-                  <Code2 />
-                </span>
-                <div>
-                  <h3>{title}</h3>
-                  <p>{copy}</p>
+          <div className="rv-feature-row is-bottom">
+            {bottomFeatures.map(([title, copy]) => (
+              <article className="rv-feature-card" key={title}>
+                <h3>{title}</h3>
+                <p className="rv-lead">{copy}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Smarter workflows */}
+      <section className="rv-workflow" id="solutions">
+        <div className="rv-workflow-bg">
+          <div className="rv-workflow-head rv-container">
+            <div className="rv-workflow-head-left">
+              <Tag>Lead generation to customer</Tag>
+              <h2 className="rv-h2">
+                Smarter workflows.
+                <br />
+                Infinite growth.
+              </h2>
+            </div>
+            <div className="rv-workflow-head-right">
+              <p className="rv-lead">Streamline your sales process with powerful automation insights—helping you close deals faster.</p>
+              <a className="rv-btn rv-btn-dark" href="#features">
+                <span className="rv-btn-dot" aria-hidden="true" />
+                Explore Our Features
+              </a>
+            </div>
+          </div>
+          <div className="rv-workflow-shot rv-container">
+            <img src="/assets/home/workflow-dashboard.png" alt="Settings and billing screen inside the product" loading="lazy" />
+            <img className="rv-workflow-arrow" src="/assets/home/workflow-arrow.svg" alt="" aria-hidden="true" />
+            <a className="rv-play" href="#demo" aria-label="Watch main features">
+              <svg viewBox="0 0 30 30" fill="currentColor" aria-hidden="true">
+                <path d="M10 7.8c0-1.1 1.2-1.8 2.2-1.2l10.4 6.4c.9.6.9 1.9 0 2.4l-10.4 6.4c-1 .6-2.2-.1-2.2-1.2z" />
+              </svg>
+            </a>
+          </div>
+        </div>
+        <div className="rv-workflow-points rv-container">
+          {workflowPoints.map(([title, copy]) => (
+            <div className="rv-point" key={title}>
+              <img src="/assets/home/bulb.png" alt="" aria-hidden="true" />
+              <div>
+                <h3>{title}</h3>
+                <p className="rv-lead">{copy}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Dark workflow */}
+      <section className="rv-dark" aria-label="How teams work in RVYO">
+        <div className="rv-dark-frame rv-container">
+          <aside className="rv-dark-index">
+            <DarkWorkflowIndex items={darkBlocks.map(({ id, label }) => ({ id, label }))} />
+          </aside>
+          <div>
+            {darkBlocks.map((block) => (
+              <article className="rv-dark-block" id={block.id} key={block.id}>
+                <div className="rv-dark-title">
+                  <h3>
+                    {block.title[0]}
+                    <br />
+                    {block.title[1]}
+                  </h3>
+                  <p>{block.copy}</p>
+                </div>
+                <div className={`rv-dark-media ${block.padded ? "is-padded" : ""}`}>
+                  <img src={block.image} alt={block.alt} loading="lazy" />
                 </div>
               </article>
             ))}
@@ -317,224 +296,164 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="comparison rail">
-        <Tag>The switch</Tag>
-        <h2>RVYO gives your team a structured workflow where BOQs, costing, approvals, documents, and project information stay connected.</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Capability</th>
-              <th>
-                Ryvo <span className="tiny-mark">✣</span>
-              </th>
-              <th>Other Apps</th>
-            </tr>
-          </thead>
-          <tbody>
-            {comparisonRows.map(([label, ryvo, other]) => (
-              <tr key={label}>
-                <td>{label}</td>
-                <td>
-                  <BadgeCheck />
-                  {ryvo}
-                </td>
-                <td>
-                  <span className="x-icon">×</span>
-                  {other}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-
-      <section className="testimonials rail">
-        <Tag>From the people using RVYO</Tag>
-        <h2>
-          Built around how project
-          <br />
-          teams actually work.
-        </h2>
-        <div className="testimonial-grid">
-          {testimonials.map(([name, company, quote], index) => (
-            <article key={name}>
-              <p>“{quote}”</p>
-              <div className="testimonial-person">
-                <span className={`avatar avatar-${index + 1}`} />
-                <div>
-                  <strong>{name}</strong>
-                  <small>{company}</small>
-                </div>
-                <span className="stars">
-                  {Array.from({ length: index === 2 ? 2 : 5 }, (_, starIndex) => (
-                    <Star key={starIndex} />
-                  ))}
-                </span>
-              </div>
-            </article>
-          ))}
+      {/* Integrations */}
+      <section className="rv-integrations" id="integrations">
+        <div className="rv-section-head">
+          <Tag>Smart Integrations</Tag>
+          <h2 className="rv-h2">Connect your platforms</h2>
         </div>
-      </section>
-
-      <section className="faq rail">
-        <Tag>Questions, answered</Tag>
-        <h2>
-          Everything you need to know
-          <br />
-          before getting started.
-        </h2>
-        <div className="faq-grid">
-          {faqs.map((question, index) => (
-            <details key={`${question}-${index}`}>
-              <summary>
-                {question}
-                <ChevronDown />
-              </summary>
-              <p>Yes. RVYO is built to keep BOQs, costing, approvals, documents, and project communication connected.</p>
-            </details>
-          ))}
-        </div>
-      </section>
-
-      <section className="final-cta rail" id="demo">
-        <div className="blue-grain" />
-        <h2>Your projects are growing. Your workflow should too.</h2>
-        <p>Bring BOQs, costing, approvals, documents, integrations, and commercial visibility into one system built for modern interior project teams.</p>
-        <div>
-          <a className="button soft" href="/register">
-            Start Creating BOQ
-          </a>
-          <a className="button dark" href="#demo">
-            Book a Demo
+        <img src="/assets/home/integrations.png" alt="Connected platform integrations" width={850} height={446} loading="lazy" />
+        <div className="rv-integrations-body">
+          <p className="rv-lead">
+            Easily connect your favorite tools and platforms with seamless integrations—streamlining workflows, improving efficiency, and keeping
+            your data and processes fully in sync.
+          </p>
+          <a className="rv-btn rv-btn-dark" href="/integrations">
+            <span className="rv-btn-dot" aria-hidden="true" />
+            Explore Our Integrations
           </a>
         </div>
       </section>
 
-      <footer className="home-footer rail" id="company">
-        <div className="footer-topline">
-          <h2>
-            Build better projects.
+      {/* Pricing */}
+      <section className="rv-pricing rv-container" id="pricing">
+        <div className="rv-section-head">
+          <Tag>Simple pricing</Tag>
+          <h2 className="rv-h2">
+            Flexible pricing built to
             <br />
-            Run a better business.
+            scale with your team.
           </h2>
-          <p>RVYO brings the commercial workflow of interior design teams into one connected platform</p>
-          <a className="button blue" href="/register">
-            Get Started
-            <ArrowRight />
-          </a>
+          <p className="rv-lead">Choose from flexible plans tailored to fit your team’s needs</p>
         </div>
-        <FooterCard icon={<TagIcon />} title="Find Your Right Plan" copy="Choose a plan that fits your team today and scales with your workflow tomorrow." link="View Pricing" />
-        <FooterCard icon={<Code2 />} title="Connect Your Workflow" copy="Connect forms, communication, and payments with the tools your business already uses." link="Explore Integrations" />
-        <div className="footer-columns">
-          {footerColumns.map(([title, items]) => (
-            <div className="footer-column" key={title as string}>
-              <h3>{title}</h3>
-              {(items as string[]).map((item) => (
-                <a href="#" key={item}>
-                  {item}
-                </a>
-              ))}
+        <HomePricing />
+      </section>
+
+      {/* Testimonials */}
+      <section className="rv-testimonials" id="insights">
+        <div className="rv-container">
+          <div className="rv-section-head">
+            <Tag>Testimonial</Tag>
+            <h2 className="rv-h2">Voices of our customers</h2>
+            <p className="rv-lead">
+              Caleo empowers teams with smart, intuitive tools designed to simplify workflows, enhance collaboration, and drive measurable results.
+            </p>
+          </div>
+          <div className="rv-testimonial-grid">
+            <div className="rv-testimonial-col">
+              <Quote data={testimonials.jenny} size="short" />
+              <Quote data={testimonials.rafiq} size="tall" />
             </div>
-          ))}
-          <div className="footer-column footer-column-sub">
-            <h3>{footerSecondary[0][0] as string}</h3>
-            {(footerSecondary[0][1] as string[]).map((item) => (
-              <a href="#" key={item}>
-                {item}
-              </a>
-            ))}
+            <div className="rv-testimonial-col">
+              <div className="rv-testimonial-photo">
+                <img src="/assets/home/testimonial-photo.jpg" alt="Person sitting on a misty green hillside" loading="lazy" />
+              </div>
+              <Quote data={testimonials.ethan} size="short" />
+            </div>
+            <div className="rv-testimonial-col">
+              <Quote data={testimonials.andrew} size="short" />
+              <Quote data={testimonials.ayesha} size="tall" />
+            </div>
           </div>
-          <div className="footer-column footer-column-sub">
-            <h3>{footerSecondary[1][0] as string}</h3>
-            {(footerSecondary[1][1] as string[]).map((item) => (
-              <a href="#" key={item}>
-                {item}
-              </a>
-            ))}
-          </div>
-          <div className="footer-column footer-column-sub footer-legal">
-            <h3>{footerSecondary[2][0] as string}</h3>
-            {(footerSecondary[2][1] as string[]).map((item) => (
-              <a href={legalLinks[item]} key={item}>
-                {item}
-              </a>
-            ))}
-            <a className="signin" href="/login">
-              Sign in <ArrowRight />
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="rv-cta rv-container" id="demo">
+        <div className="rv-cta-inner">
+          <h2>Your projects are growing. Your workflow should too.</h2>
+          <p>Bring BOQs, costing, approvals, documents, integrations, and commercial visibility into one system built for modern interior project teams.</p>
+          <div className="rv-cta-actions">
+            <a className="rv-cta-light" href="/register">
+              Start Creating BOQ
+            </a>
+            <a className="rv-cta-dark" href="/register">
+              Book a Demo
             </a>
           </div>
         </div>
-        <div className="footer-bottomline">
-          <div>
-            <a href="#">
-              <Globe2 /> India (English)
-            </a>
-            <span>© 2026 Ryvo, Pvt. Ltd.</span>
+      </section>
+
+      <div className="rv-grid-strip is-narrow" style={{ marginInline: "auto" }} aria-hidden="true" />
+
+      {/* Footer */}
+      <footer className="rv-footer" id="company">
+        <div className="rv-footer-top">
+          <div className="rv-footer-shell">
+            <div className="rv-footer-intro">
+              <div>
+                <h2>
+                  Build better projects.
+                  <br />
+                  Run a better business.
+                </h2>
+                <p>RVYO brings the commercial workflow of interior design teams into one connected platform</p>
+              </div>
+              <a className="rv-footer-start" href="/register">
+                Get Started <ChevronRight />
+              </a>
+            </div>
+            <div className="rv-footer-cards">
+              <div className="rv-footer-card">
+                <span className="rv-footer-card-icon">
+                  <img src="/assets/home/footer-tag.svg" alt="" aria-hidden="true" />
+                </span>
+                <h3>Find Your Right Plan</h3>
+                <p>Choose a plan that fits your team today and scales with your workflow tomorrow.</p>
+                <a className="rv-footer-link" href="#pricing">
+                  View Pricing <ChevronRight />
+                </a>
+              </div>
+              <div className="rv-footer-card">
+                <span className="rv-footer-card-icon">
+                  <img src="/assets/home/footer-code.svg" alt="" aria-hidden="true" />
+                </span>
+                <h3>Connect Your Workflow</h3>
+                <p>Connect forms, communication, and payments with the tools your business already uses.</p>
+                <a className="rv-footer-link" href="#integrations">
+                  Explore Integrations <ChevronRight />
+                </a>
+              </div>
+            </div>
           </div>
-          <i />
+        </div>
+
+        <div className="rv-footer-shell">
+          <div className="rv-footer-columns">
+            {footerColumns.map((groups, index) => (
+              <div className="rv-footer-col" key={index}>
+                {groups.map(([title, items]) => (
+                  <div className="rv-footer-group" key={title}>
+                    <h3>{title}</h3>
+                    <ul>
+                      {items.map((item) => (
+                        <li key={item}>
+                          <a href={footerHref(title, item)}>{item}</a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+                {index === footerColumns.length - 1 && (
+                  <a className="rv-footer-link" href="/login">
+                    Sign in <ChevronRight />
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="rv-footer-bottom">
+            <div>
+              <a className="rv-footer-locale" href="#">
+                <img src="/assets/home/globe.svg" alt="" aria-hidden="true" />
+                India (English)
+              </a>
+              <small>© 2026 Rvyo, Pvt. Ltd.</small>
+            </div>
+            <img src="/assets/home/footer-mark.svg" alt="" aria-hidden="true" />
+          </div>
         </div>
       </footer>
     </main>
-  );
-}
-
-function Tag({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="tag">
-      <i />
-      {children}
-    </span>
-  );
-}
-
-function PriceCard({
-  title,
-  price,
-  cta,
-  copy,
-  items,
-  popular,
-}: {
-  title: string;
-  price: string;
-  cta: string;
-  copy: string;
-  items: string[];
-  popular: boolean;
-}) {
-  return (
-    <article className={`price ${popular ? "popular" : ""}`}>
-      {popular && <b className="popular-label">Most Popular</b>}
-      <h3>{title}</h3>
-      <p>{copy}</p>
-      <div>
-        <strong>{price}</strong>
-        <small>/ mo</small>
-      </div>
-      <a className={popular ? "primary" : ""} href="/register">
-        {cta}
-      </a>
-      <ul>
-        {items.map((item) => (
-          <li key={item}>
-            <Check />
-            {item}
-          </li>
-        ))}
-      </ul>
-    </article>
-  );
-}
-
-function FooterCard({ icon, title, copy, link }: { icon: React.ReactNode; title: string; copy: string; link: string }) {
-  return (
-    <article>
-      <span>{icon}</span>
-      <h3>{title}</h3>
-      <p>{copy}</p>
-      <a href="#">
-        {link} <ArrowRight />
-      </a>
-    </article>
   );
 }
