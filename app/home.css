@@ -290,7 +290,79 @@
   position: relative;
   overflow: hidden;
   padding: 100px 0 20px;
-  background: #ffffff url("/assets/home/hero-bg.jpg") center / cover no-repeat;
+  background: #ffffff;
+}
+
+/* Animated hero background: the hero image sliced into its five bands, each stretching leftward
+   and easing back in a staggered loop. The stage covers the hero like background-size: cover. */
+.rv-hero-anim {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  container-type: size;
+  pointer-events: none;
+}
+
+.rv-hero-stage {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100cqw, 158.02cqh);
+  aspect-ratio: 7680 / 4860;
+  transform: translate(-50%, -50%);
+}
+
+.rv-hero-band {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.rv-hero-band-art {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  background: url("/assets/home/hero-bg.jpg") center / 100% 100% no-repeat;
+  transform-origin: 100% 50%;
+  animation: rv-hero-reach 7s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+@keyframes rv-hero-reach {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(1.22);
+  }
+}
+
+.rv-hero-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 35%, rgba(255, 255, 255, 0.18) 50%, transparent 65%);
+  background-size: 250% 100%;
+  animation: rv-hero-sweep 14s linear infinite;
+  mix-blend-mode: screen;
+}
+
+@keyframes rv-hero-sweep {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rv-hero-band-art,
+  .rv-hero-stage::after {
+    animation: none;
+  }
 }
 
 .rv-hero::after {
@@ -1366,6 +1438,10 @@
 @media (max-width: 640px) {
   .rv-hero {
     padding-top: 64px;
+  }
+
+  .rv-hero::after {
+    height: 200px;
   }
 
   .rv-hero-dashboard {
