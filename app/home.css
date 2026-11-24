@@ -558,6 +558,8 @@
 }
 
 .rv-workflow-head {
+  position: relative;
+  z-index: 2; /* keep copy and CTA above the bottom white fade */
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
