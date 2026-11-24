@@ -425,8 +425,6 @@ export default function Home() {
         </div>
       </section>
 
-      <div className="rv-grid-strip is-squares rv-container" aria-hidden="true" />
-
       {/* Footer */}
       <footer className="rv-footer" id="company">
         <div className="rv-footer-top">
