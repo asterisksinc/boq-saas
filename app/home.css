@@ -1564,3 +1564,76 @@
   width: 62%;
   height: auto;
 }
+
+/* ---------- Motion: smooth scroll, entry and scroll animations ---------- */
+
+/* Lenis owns smooth scrolling while active */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+/* Hero entry: copy, then dashboard, rise in with a short stagger */
+@keyframes rv-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rv-hero-copy > *,
+.rv-hero-dashboard {
+  animation: rv-rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.rv-hero-copy > :nth-child(2) {
+  animation-delay: 0.08s;
+}
+
+.rv-hero-copy > :nth-child(3) {
+  animation-delay: 0.16s;
+}
+
+.rv-hero-copy > :nth-child(4) {
+  animation-delay: 0.24s;
+}
+
+.rv-hero-dashboard {
+  animation-delay: 0.36s;
+  animation-duration: 1s;
+}
+
+/* Scroll reveal (class added by HomeEffects) */
+.rv-reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1) var(--rv-delay, 0ms),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1) var(--rv-delay, 0ms);
+}
+
+.rv-reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rv-hero-copy > *,
+  .rv-hero-dashboard {
+    animation: none;
+  }
+
+  .rv-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}

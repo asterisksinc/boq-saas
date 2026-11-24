@@ -1,5 +1,6 @@
 import { ChevronRight } from "lucide-react";
 import DarkWorkflowIndex from "@/components/home/DarkWorkflowIndex";
+import HomeEffects from "@/components/home/HomeEffects";
 import HomeNav from "@/components/home/HomeNav";
 import HomePricing from "@/components/home/HomePricing";
 import { marketingSolutions } from "@/lib/marketing-solutions";
@@ -180,6 +181,7 @@ function Quote({ data, size }: { data: (typeof testimonials)[keyof typeof testim
 export default function Home() {
   return (
     <main className="rv-home">
+      <HomeEffects />
       <HomeNav />
 
       {/* Hero */}
