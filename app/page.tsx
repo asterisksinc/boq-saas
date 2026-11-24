@@ -398,17 +398,18 @@ export default function Home() {
           <h2>Bring clarity to your interior design business.</h2>
           <p>Manage leads, BOQs, costs, projects, invoices, and client communication in one connected platform.</p>
           <div className="rv-cta-actions">
-            <a className="rv-cta-light" href="/register">
+            <a className="rv-btn rv-btn-light" href="/register">
+              <span className="rv-btn-dot" aria-hidden="true" />
               Start Free
             </a>
-            <a className="rv-cta-dark" href="/register">
+            <a className="rv-btn rv-btn-dark" href="/register">
               Book a Demo
             </a>
           </div>
         </div>
       </section>
 
-      <div className="rv-grid-strip is-narrow" style={{ marginInline: "auto" }} aria-hidden="true" />
+      <div className="rv-grid-strip is-squares rv-container" aria-hidden="true" />
 
       {/* Footer */}
       <footer className="rv-footer" id="company">

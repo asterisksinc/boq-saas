@@ -993,27 +993,26 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 15px;
-  max-width: 1076px;
+  gap: 20px;
+  max-width: 760px;
   padding: 40px;
 }
 
+/* Same type scale and buttons as the other section heads. */
 .rv-cta h2 {
-  max-width: 996px;
   color: #ffffff;
-  font-size: clamp(38px, 5.6vw, 72px);
-  font-weight: 400;
-  line-height: 1;
-  letter-spacing: -0.05em;
+  font-size: clamp(30px, 3.4vw, 42px);
+  font-weight: 500;
+  line-height: 1.19;
+  letter-spacing: -0.048em;
+  text-wrap: balance;
 }
 
 .rv-cta p {
-  max-width: 462px;
-  margin-top: -7px;
-  color: #ffffff;
-  font-size: 14px;
-  line-height: 17px;
-  letter-spacing: -0.03em;
+  max-width: 600px;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 16px;
+  line-height: 24px;
 }
 
 .rv-cta-actions {
@@ -1021,28 +1020,16 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: 10px;
+  padding-top: 20px;
 }
 
-.rv-cta-actions a {
-  padding: 10px 16px;
-  font-size: 14px;
-  line-height: 17px;
-  letter-spacing: -0.03em;
-  transition: opacity 0.15s ease;
-}
-
-.rv-cta-actions a:hover {
-  opacity: 0.88;
-}
-
-.rv-cta-light {
+.rv-home a.rv-btn-light {
   background: #ffffff;
-  color: #000000 !important;
+  color: var(--rv-ink);
 }
 
-.rv-cta-dark {
-  background: #000000;
-  color: #ffffff !important;
+.rv-home a.rv-btn-light:hover {
+  background: #f2f5fc;
 }
 
 /* ---------- Footer ---------- */
@@ -1053,7 +1040,7 @@
 }
 
 .rv-footer-shell {
-  width: min(1200px, calc(100% - 32px));
+  width: min(var(--rv-container), calc(100% - 32px));
   margin-inline: auto;
   border-inline: 1px solid var(--rv-grid-line);
 }
@@ -1488,4 +1475,8 @@
   font-weight: 600;
   line-height: 1;
   letter-spacing: 0;
+}
+
+.rv-btn-light .rv-btn-dot {
+  background: var(--rv-brand);
 }
