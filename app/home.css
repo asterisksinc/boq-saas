@@ -658,18 +658,10 @@
   background: #101011;
 }
 
-.rv-dark-media.is-padded {
-  padding: 20px 0 20px 20px;
-}
-
 .rv-dark-media img {
-  width: 121.3%;
-  max-width: none;
+  display: block;
+  width: 100%;
   height: auto;
-}
-
-.rv-dark-media.is-padded img {
-  width: 117%;
 }
 
 .rv-dark-block:last-child .rv-dark-media {
@@ -1464,4 +1456,23 @@
 
 .rv-btn-light .rv-btn-dot {
   background: var(--rv-brand);
+}
+
+/* RVYO logo over the hub circle baked into integrations.png (circle centre 50%/50%, colour #043BB5). */
+.rv-integrations-hub {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 9%;
+  aspect-ratio: 1;
+  border-radius: 999px;
+  background: #043bb5;
+  transform: translate(-50%, -50%);
+}
+
+.rv-integrations-hub img {
+  width: 62%;
+  height: auto;
 }

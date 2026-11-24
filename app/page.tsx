@@ -26,34 +26,30 @@ const workflowPoints = [
   ["Client Sharing", "Share client-ready BOQs without manual formatting or follow-up."],
 ];
 
-// TODO: swap these images for real Leads / Invoices / Mood Boards screenshots.
 const darkBlocks = [
   {
     id: "leads",
     label: "Leads",
     title: ["Capture and convert", "every enquiry"],
     copy: "Create, manage, and track leads from first contact to won project.",
-    image: "/assets/home/dark-plan.jpg",
-    alt: "Lead pipeline board with stages",
-    padded: true,
+    image: "/assets/home/workflow-leads.jpg",
+    alt: "Lead detail screen with linked projects, BOQs, invoices and contact actions",
   },
   {
     id: "invoices",
     label: "Invoices",
     title: ["Stay on top of", "your finances"],
     copy: "Create, track, and manage invoices and project financials in one place.",
-    image: "/assets/home/dark-crm.jpg",
-    alt: "Financial dashboard with project metrics",
-    padded: false,
+    image: "/assets/home/workflow-invoices.jpg",
+    alt: "Invoices list with totals collected, outstanding and overdue",
   },
   {
     id: "mood-boards",
     label: "Mood Boards",
     title: ["Present design direction", "beautifully"],
     copy: "Create organised mood boards from images, templates, and categories in a few clicks.",
-    image: "/assets/home/dark-table.jpg",
-    alt: "Organised project board",
-    padded: false,
+    image: "/assets/home/workflow-mood-boards.jpg",
+    alt: "Mood board created successfully, ready to download",
   },
 ];
 
@@ -312,7 +308,7 @@ export default function Home() {
                   </h3>
                   <p>{block.copy}</p>
                 </div>
-                <div className={`rv-dark-media ${block.padded ? "is-padded" : ""}`}>
+                <div className="rv-dark-media">
                   <img src={block.image} alt={block.alt} loading="lazy" />
                 </div>
               </article>
@@ -336,6 +332,9 @@ export default function Home() {
               </li>
             ))}
           </ul>
+          <span className="rv-integrations-hub">
+            <img src="/assets/home/rvyo-logo.png" alt="RVYO" />
+          </span>
         </div>
         <div className="rv-integrations-body">
           <p className="rv-lead">
