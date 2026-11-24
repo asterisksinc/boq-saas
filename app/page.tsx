@@ -221,6 +221,10 @@ export default function Home() {
             <img src="/assets/home/hero-dashboard.png" alt="RVYO overview dashboard with project analytics" width={1222} height={654} />
           </div>
         </div>
+      </section>
+
+      {/* Trusted by sits on plain white, below the hero background */}
+      <section className="rv-trusted-wrap">
         <div className="rv-trusted rv-container">
           <p>
             Trusted by <span>Design Firms Throughout India</span>
