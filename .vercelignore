@@ -1,0 +1,15 @@
+# Never upload local secrets
+_env.local
+.env
+.env.*
+!.env.example
+
+# Not needed by the deployed app
+public/assets/herosection-ryvo-image.png
+*.docx
+project-import-test.*
+postman
+tests
+node_modules
+.next
+public/assets/addon

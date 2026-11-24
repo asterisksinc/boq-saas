@@ -13,3 +13,4 @@ node_modules
 # Local Supabase files
 supabase/.branches/
 supabase/.temp/
+.vercel
