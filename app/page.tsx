@@ -63,6 +63,14 @@ const integrationIcons = [
   { name: "Custom Forms", file: "custom-forms", x: 64.7, y: 77.35 },
 ];
 
+// Hero background bands (fractions of herosection-ryvo-image.png height). Each band is a slice of
+// /assets/home/hero-bg.jpg that stretches leftward and eases back in a staggered loop (see design/hero-loop-animation.html).
+const heroBandCuts = [0, 0.195, 0.391, 0.585, 0.78, 0.975, 1];
+const heroBands = heroBandCuts.slice(0, -1).map((top, index) => {
+  const height = heroBandCuts[index + 1] - top;
+  return { top, height, index };
+});
+
 const testimonials = {
   ananya: {
     quote: "RVYO helped us bring our project details, BOQs, and client communication into one place. It has made our workflow much more organised.",
@@ -176,6 +184,18 @@ export default function Home() {
 
       {/* Hero */}
       <section className="rv-hero" id="product">
+        <div className="rv-hero-anim" aria-hidden="true">
+          <div className="rv-hero-stage">
+            {heroBands.map(({ top, height, index }) => (
+              <div className="rv-hero-band" key={index} style={{ top: `${top * 100}%`, height: `${height * 100}%` }}>
+                <div
+                  className="rv-hero-band-art"
+                  style={{ top: `${(-top / height) * 100}%`, height: `${100 / height}%`, animationDelay: `${index * -0.9}s` }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
         <div className="rv-hero-inner">
           <div className="rv-hero-copy">
             <Tag arrow>Interior Design OS</Tag>
