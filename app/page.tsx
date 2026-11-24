@@ -64,7 +64,7 @@ const integrationIcons = [
 ];
 
 // Hero background bands (fractions of herosection-ryvo-image.png height). Each band is a slice of
-// /assets/home/hero-bg.jpg that stretches leftward and eases back in a staggered loop (see design/hero-loop-animation.html).
+// /assets/home/hero-bg.jpg that stretches leftward and eases back in a staggered 4s loop (see design/hero-loop-animation.html).
 const heroBandCuts = [0, 0.195, 0.391, 0.585, 0.78, 0.975, 1];
 const heroBands = heroBandCuts.slice(0, -1).map((top, index) => {
   const height = heroBandCuts[index + 1] - top;
@@ -190,7 +190,7 @@ export default function Home() {
               <div className="rv-hero-band" key={index} style={{ top: `${top * 100}%`, height: `${height * 100}%` }}>
                 <div
                   className="rv-hero-band-art"
-                  style={{ top: `${(-top / height) * 100}%`, height: `${100 / height}%`, animationDelay: `${index * -0.9}s` }}
+                  style={{ top: `${(-top / height) * 100}%`, height: `${100 / height}%`, animationDelay: `${index * -0.5}s` }}
                 />
               </div>
             ))}
