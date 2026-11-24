@@ -977,7 +977,7 @@
   place-items: center;
   overflow: hidden;
   border: 1px solid var(--rv-grid-line);
-  border-radius: 16px 16px 0 0;
+  border-radius: 16px;
   background: var(--rv-brand) url("/assets/home/cta-bg.png") center / cover no-repeat;
   text-align: center;
 }
