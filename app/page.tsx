@@ -200,9 +200,9 @@ export default function Home() {
           <div className="rv-hero-copy">
             <Tag arrow>Interior Design OS</Tag>
             <h1>
-              Run your interior design
+              Run your Interior Design
               <br />
-              business with clarity.
+              Business with clarity.
             </h1>
             <p className="rv-lead">
               Manage leads, BOQs, costs, vendors, projects, invoices, and client communication in one connected platform.
@@ -233,8 +233,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
-      <div className="rv-grid-strip is-squares rv-container" aria-hidden="true" />
 
       {/* Core features */}
       <section className="rv-features rv-container" id="features">
