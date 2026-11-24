@@ -947,6 +947,7 @@
   width: 50px;
   height: 50px;
   border-radius: 999px;
+  object-fit: cover;
 }
 
 .rv-author strong {
@@ -1459,22 +1460,6 @@
   .rv-play {
     transition: none;
   }
-}
-
-/* Testimonial initials (no customer photos yet) */
-.rv-author .rv-avatar {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 50px;
-  height: 50px;
-  border-radius: 999px;
-  background: #e8eefb;
-  color: var(--rv-brand);
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: 0;
 }
 
 .rv-btn-light .rv-btn-dot {

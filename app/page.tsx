@@ -72,36 +72,35 @@ const testimonials = {
     quote: "RVYO helped us bring our project details, BOQs, and client communication into one place. It has made our workflow much more organised.",
     name: "Ananya Sharma",
     role: "Studio Ananya, Mumbai",
+    avatar: "/assets/home/testimonials/ananya.jpg",
   },
   rohan: {
     quote: "Earlier, our BOQs and cost sheets were spread across multiple files. RVYO gives us a much clearer way to manage estimates and project costs.",
     name: "Rohan Mehta",
     role: "Mehta Design Works, Delhi",
+    avatar: "/assets/home/testimonials/rohan.jpg",
   },
   priya: {
     quote: "The lead and invoice views make it easier to see what needs attention. It has helped our team stay more organised.",
     name: "Priya Nair",
     role: "Nair Interiors, Bengaluru",
+    avatar: "/assets/home/testimonials/priya.jpg",
   },
   arjun: {
     quote: "Creating mood boards used to take a lot of time. RVYO makes it easier to organise images and present ideas to clients.",
     name: "Arjun Kapoor",
     role: "Kapoor Design Studio, Pune",
+    avatar: "/assets/home/testimonials/arjun.jpg",
   },
   sneha: {
     quote: "We wanted one place to manage projects, costs, and client communication. RVYO gives our team that clarity.",
     name: "Sneha Iyer",
     role: "Iyer Design House, Chennai",
+    avatar: "/assets/home/testimonials/sneha.jpg",
   },
 };
 
-function initials(name: string) {
-  return name
-    .split(" ")
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2);
-}
+// Placeholder stock portraits from Unsplash (Unsplash License) until real customer photos are available.
 
 const legalLinks: Record<string, string> = {
   "Privacy Policy": "/privacy-policy",
@@ -164,7 +163,7 @@ function Quote({ data, size }: { data: (typeof testimonials)[keyof typeof testim
         <blockquote>“{data.quote}”</blockquote>
       </div>
       <figcaption className="rv-author">
-        <span className="rv-avatar" aria-hidden="true">{initials(data.name)}</span>
+        <img src={data.avatar} alt="" width={50} height={50} loading="lazy" />
         <div>
           <strong>{data.name}</strong>
           <span>{data.role}</span>
