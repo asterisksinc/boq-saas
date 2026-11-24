@@ -208,7 +208,7 @@ export default function Home() {
         </div>
         <div className="rv-trusted rv-container">
           <p>
-            Trusted by <span>1000+ marketing teams</span>
+            Trusted by <span>Design Firms Throughout India</span>
           </p>
           <div className="rv-logos" aria-label="Customer logos">
             <div className="rv-logos-track">
@@ -219,7 +219,7 @@ export default function Home() {
         </div>
       </section>
 
-      <div className="rv-grid-strip rv-container" aria-hidden="true" />
+      <div className="rv-grid-strip is-squares rv-container" aria-hidden="true" />
 
       {/* Core features */}
       <section className="rv-features rv-container" id="features">
