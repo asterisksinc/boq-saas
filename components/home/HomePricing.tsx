@@ -4,30 +4,34 @@ import { useState } from "react";
 
 type Billing = "monthly" | "yearly";
 
-// Figma only specifies monthly prices. Yearly is shown as 12 × monthly until real yearly pricing is decided.
-const plans = {
-  standard: {
-    title: "Standard Plan",
-    copy: "Ideal for small to mid-sized teams streamlining daily operations.",
-    monthly: 25,
+// Copy from the "Landing Page Copy" doc. Premium price is not decided yet (copy says ₹[Price]),
+// so `monthly: null` shows "Coming soon" instead of a number.
+// TODO: set the Premium price, its yearly price and confirm its feature list.
+const plans: Record<"free" | "premium", { title: string; copy: string; monthly: number | null; cta: string; items: string[] }> = {
+  free: {
+    title: "Start Free",
+    copy: "Get organised and manage your first projects with confidence.",
+    monthly: 0,
+    cta: "Start Free",
     items: [
-      "Automate up to 10 workflows",
-      "Access core integration tools",
-      "Real-time analytics dashboard",
-      "Basic customer support",
-      "10 user accounts included",
+      "Manage leads and enquiries",
+      "Create projects and BOQs",
+      "Track basic project costs",
+      "Create and manage invoices",
+      "Access core project workflows",
     ],
   },
   premium: {
-    title: "Premium Plan",
-    copy: "Built for growing businesses that demand advanced automation and insights.",
-    monthly: 65,
+    title: "RVYO Premium",
+    copy: "Run a more organised, profitable, and scalable design business.",
+    monthly: null,
+    cta: "Start Premium",
     items: [
-      "Unlimited workflows & integrations",
-      "Advanced analytics & reporting",
-      "Priority support & onboarding",
-      "Collaboration tools for large teams",
-      "Dedicated account manager",
+      "Everything in Start Free",
+      "Mood boards",
+      "Cost and margin tracking",
+      "Client-ready BOQ sharing",
+      "Integrations: WhatsApp, Email, Razorpay, ad forms",
     ],
   },
 };
@@ -35,7 +39,7 @@ const plans = {
 type Plan = (typeof plans)[keyof typeof plans];
 
 function PlanContent({ plan, billing }: { plan: Plan; billing: Billing }) {
-  const amount = billing === "monthly" ? plan.monthly : plan.monthly * 12;
+  const amount = plan.monthly === null ? null : billing === "monthly" ? plan.monthly : plan.monthly * 12;
 
   return (
     <div className="rv-plan-content">
@@ -47,12 +51,18 @@ function PlanContent({ plan, billing }: { plan: Plan; billing: Billing }) {
         <div>
           <p className="rv-lead">Starting at</p>
           <div className="rv-plan-amount">
-            <strong>${amount}</strong>
-            <span>/{billing === "monthly" ? "month" : "year"}</span>
+            {amount === null ? (
+              <strong>Coming soon</strong>
+            ) : (
+              <>
+                <strong>₹{amount.toLocaleString("en-IN")}</strong>
+                <span>/{billing === "monthly" ? "month" : "year"}</span>
+              </>
+            )}
           </div>
         </div>
         <a className="rv-btn rv-btn-dark" href="/register">
-          Get Started Now
+          {plan.cta}
         </a>
       </div>
       <div className="rv-plan-list">
@@ -86,7 +96,7 @@ export default function HomePricing() {
 
       <div className="rv-plans">
         <article className="rv-plan is-standard">
-          <PlanContent plan={plans.standard} billing={billing} />
+          <PlanContent plan={plans.free} billing={billing} />
         </article>
         <article className="rv-plan is-premium">
           <PlanContent plan={plans.premium} billing={billing} />

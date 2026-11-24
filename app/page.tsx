@@ -8,55 +8,51 @@ import "./home.css";
 // Rebuilt from Figma "BOQ DESIGN ARENA" › PUBLIC PAGES › Home (node 327:10705).
 // Images live in /public/assets/home (exported from Figma); the hero background (/public/assets/home/hero-bg.jpg) is a web-sized copy of /public/assets/herosection-ryvo-image.png.
 
+// Copy: "Landing Page Copy" doc (sections 01–08).
 const topFeatures = [
-  ["Build Structured BOQs", "An intelligent assistant that collaborates, learns, and works alongside your team"],
-  ["Integrate effortlessly", "Easily connect your favorite tools and platforms with seamless integrations"],
-  ["Track performance in real time", "Track your progress and gain actionable insights in real time"],
+  ["Lead Management", "Capture, track, and convert enquiries from first contact to won project."],
+  ["BOQ Builder", "Create structured, client-ready BOQs without starting from scratch."],
+  ["Cost Control", "Track project costs, quantities, rates, and margins with clarity."],
 ];
 
 const bottomFeatures = [
-  [
-    "Smart & easy order handling",
-    "Easily manage, track, and fulfill all your orders from one intuitive dashboard keeping your business running smoothly.",
-  ],
-  [
-    "Export data instantly. Report with ease.",
-    "Export your data effortlessly and generate detailed reports in just a few clicks giving you the clarity to make smarter business decisions.",
-  ],
+  ["Invoicing", "Create, send, and track invoices connected to your project workflow."],
+  ["Mood Boards", "Create, organise, and present design mood boards in a few clicks."],
 ];
 
 const workflowPoints = [
-  ["Safe, and Scalable.", "Secure, reliable solutions designed to scale with businesses."],
-  ["Trusted and Protected", "Your data and operations remain secure, reliable, and protected."],
-  ["Track performance in real time", "Monitor and analyze business instantly with real-time insights that help."],
+  ["Project Creation", "Start every project with organised client and project details."],
+  ["BOQ Creation", "Build clear, structured BOQs with quantities, rates, and items."],
+  ["Client Sharing", "Share client-ready BOQs without manual formatting or follow-up."],
 ];
 
+// TODO: swap these images for real Leads / Invoices / Mood Boards screenshots.
 const darkBlocks = [
   {
-    id: "planning",
-    label: "Planning",
-    title: ["Centralize priorities", "before execution begins."],
-    copy: "Organize projects, timelines, ownership, and documentation inside one operational layer designed to keep teams aligned from the start.",
+    id: "leads",
+    label: "Leads",
+    title: ["Capture and convert", "every enquiry"],
+    copy: "Create, manage, and track leads from first contact to won project.",
     image: "/assets/home/dark-plan.jpg",
-    alt: "Project plan board with workflow stages and sticky notes",
+    alt: "Lead pipeline board with stages",
     padded: true,
   },
   {
-    id: "coordination",
-    label: "Coordination",
-    title: ["Keep teams connected", "without operational overhead."],
-    copy: "Discussions, updates, files, and decisions stay attached to execution workflows so teams maintain clarity without relying on endless meetings.",
+    id: "invoices",
+    label: "Invoices",
+    title: ["Stay on top of", "your finances"],
+    copy: "Create, track, and manage invoices and project financials in one place.",
     image: "/assets/home/dark-crm.jpg",
-    alt: "Team dashboard showing deal metrics, ongoing tasks and project progress",
+    alt: "Financial dashboard with project metrics",
     padded: false,
   },
   {
-    id: "execution",
-    label: "Execution",
-    title: ["Track progress, blockers,", "and delivery in real time."],
-    copy: "Cube provides shared operational visibility across projects, ownership, and execution progress so teams can move faster with confidence.",
+    id: "mood-boards",
+    label: "Mood Boards",
+    title: ["Present design direction", "beautifully"],
+    copy: "Create organised mood boards from images, templates, and categories in a few clicks.",
     image: "/assets/home/dark-table.jpg",
-    alt: "Task table with type, rating, duration and assignees",
+    alt: "Organised project board",
     padded: false,
   },
 ];
@@ -72,22 +68,40 @@ const integrationIcons = [
 ];
 
 const testimonials = {
-  jenny: { quote: "Caleo transformed our workflow, saving hours each week while boosting productivity.", name: "Jenny Elsi", role: "Marketing Manager", avatar: "/assets/home/avatar-1.png" },
-  rafiq: {
-    quote: "The team’s expertise transformed how we work. Projects are faster, smarter, and more efficient than ever, delivering measurable business success.",
-    name: "Rafiq Ahmed",
-    role: "Head of Product Development",
-    avatar: "/assets/home/avatar-2.png",
+  ananya: {
+    quote: "RVYO helped us bring our project details, BOQs, and client communication into one place. It has made our workflow much more organised.",
+    name: "Ananya Sharma",
+    role: "Studio Ananya, Mumbai",
   },
-  ethan: { quote: "An indispensable platform that simplifies operations and drives measurable business growth.", name: "Ethan Blake", role: "Sales Director", avatar: "/assets/home/avatar-3.png" },
-  andrew: { quote: "Our team collaborates seamlessly, and projects are completed more efficiently than ever.", name: "Andrew James", role: "Project Manager", avatar: "/assets/home/avatar-4.png" },
-  ayesha: {
-    quote: "Caleo’s tools streamlined our processes, allowing us to focus on growth. Results were immediate, impressive, and exceeded all expectations.",
-    name: "Ayesha Karim",
-    role: "Chief Operating Officer",
-    avatar: "/assets/home/avatar-5.png",
+  rohan: {
+    quote: "Earlier, our BOQs and cost sheets were spread across multiple files. RVYO gives us a much clearer way to manage estimates and project costs.",
+    name: "Rohan Mehta",
+    role: "Mehta Design Works, Delhi",
+  },
+  priya: {
+    quote: "The lead and invoice views make it easier to see what needs attention. It has helped our team stay more organised.",
+    name: "Priya Nair",
+    role: "Nair Interiors, Bengaluru",
+  },
+  arjun: {
+    quote: "Creating mood boards used to take a lot of time. RVYO makes it easier to organise images and present ideas to clients.",
+    name: "Arjun Kapoor",
+    role: "Kapoor Design Studio, Pune",
+  },
+  sneha: {
+    quote: "We wanted one place to manage projects, costs, and client communication. RVYO gives our team that clarity.",
+    name: "Sneha Iyer",
+    role: "Iyer Design House, Chennai",
   },
 };
+
+function initials(name: string) {
+  return name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2);
+}
 
 const legalLinks: Record<string, string> = {
   "Privacy Policy": "/privacy-policy",
@@ -150,7 +164,7 @@ function Quote({ data, size }: { data: (typeof testimonials)[keyof typeof testim
         <blockquote>“{data.quote}”</blockquote>
       </div>
       <figcaption className="rv-author">
-        <img src={data.avatar} alt="" loading="lazy" />
+        <span className="rv-avatar" aria-hidden="true">{initials(data.name)}</span>
         <div>
           <strong>{data.name}</strong>
           <span>{data.role}</span>
@@ -169,23 +183,22 @@ export default function Home() {
       <section className="rv-hero" id="product">
         <div className="rv-hero-inner">
           <div className="rv-hero-copy">
-            <Tag arrow>RVYO is now live</Tag>
+            <Tag arrow>Interior Design OS</Tag>
             <h1>
-              The Commercial Operating System
+              Run your interior design
               <br />
-              for Interior Design teams.
+              business with clarity.
             </h1>
             <p className="rv-lead">
-              Streamline your sales process with powerful automation insights—helping you close deals faster, boost efficiency, and scale your
-              business with confidence.
+              Manage leads, BOQs, costs, vendors, projects, invoices, and client communication in one connected platform.
             </p>
             <div className="rv-hero-actions">
-              <a className="rv-btn rv-btn-brand" href="#demo">
+              <a className="rv-btn rv-btn-brand" href="/register">
                 <span className="rv-btn-dot" aria-hidden="true" />
-                Talk to Sales
+                Start Free
               </a>
-              <a className="rv-btn rv-btn-dark" href="/register">
-                Start Free Trial
+              <a className="rv-btn rv-btn-dark" href="#solutions">
+                See How It Works
               </a>
             </div>
           </div>
@@ -211,10 +224,10 @@ export default function Home() {
       {/* Core features */}
       <section className="rv-features rv-container" id="features">
         <div className="rv-section-head">
-          <Tag>Core Features</Tag>
-          <h2 className="rv-h2">Simplify management. Amplify growth.</h2>
+          <Tag>Everything Connected</Tag>
+          <h2 className="rv-h2">One platform for your entire design business</h2>
           <p className="rv-lead">
-            See everything that matters at a glance. Track your sales, revenue, profits, and customer behavior in real time — always up to date.
+            From the first enquiry to the final invoice, RVYO keeps your projects, costs, clients, and team aligned.
           </p>
         </div>
         <div className="rv-feature-grid">
@@ -242,25 +255,28 @@ export default function Home() {
         <div className="rv-workflow-bg">
           <div className="rv-workflow-head rv-container">
             <div className="rv-workflow-head-left">
-              <Tag>Lead generation to customer</Tag>
+              <Tag>From Project to BOQ</Tag>
               <h2 className="rv-h2">
-                Smarter workflows.
+                Create a project. Build a BOQ.
                 <br />
-                Infinite growth.
+                Send it to your client.
               </h2>
             </div>
             <div className="rv-workflow-head-right">
-              <p className="rv-lead">Streamline your sales process with powerful automation insights—helping you close deals faster.</p>
-              <a className="rv-btn rv-btn-dark" href="#features">
+              <p className="rv-lead">
+                Create a project, build a structured BOQ, and share it with your client—without rebuilding spreadsheets, chasing details, or spending
+                hours formatting documents.
+              </p>
+              <a className="rv-btn rv-btn-dark" href="#how-it-works">
                 <span className="rv-btn-dot" aria-hidden="true" />
-                Explore Our Features
+                See How It Works
               </a>
             </div>
           </div>
-          <div className="rv-workflow-shot rv-container">
+          <div className="rv-workflow-shot rv-container" id="how-it-works">
             <img src="/assets/home/workflow-dashboard.png" alt="Settings and billing screen inside the product" loading="lazy" />
             <img className="rv-workflow-arrow" src="/assets/home/workflow-arrow.svg" alt="" aria-hidden="true" />
-            <a className="rv-play" href="#demo" aria-label="Watch main features">
+            <a className="rv-play" href="#demo" aria-label="Watch how it works">
               <svg viewBox="0 0 30 30" fill="currentColor" aria-hidden="true">
                 <path d="M10 7.8c0-1.1 1.2-1.8 2.2-1.2l10.4 6.4c.9.6.9 1.9 0 2.4l-10.4 6.4c-1 .6-2.2-.1-2.2-1.2z" />
               </svg>
@@ -281,7 +297,7 @@ export default function Home() {
       </section>
 
       {/* Dark workflow */}
-      <section className="rv-dark" aria-label="How teams work in RVYO">
+      <section className="rv-dark" aria-label="Built for your workflow">
         <div className="rv-dark-frame rv-container">
           <aside className="rv-dark-index">
             <DarkWorkflowIndex items={darkBlocks.map(({ id, label }) => ({ id, label }))} />
@@ -309,7 +325,7 @@ export default function Home() {
       {/* Integrations */}
       <section className="rv-integrations" id="integrations">
         <div className="rv-section-head">
-          <Tag>Smart Integrations</Tag>
+          <Tag>Works With Your Workflow</Tag>
           <h2 className="rv-h2">Connect your platforms</h2>
         </div>
         <div className="rv-integrations-art">
@@ -324,12 +340,11 @@ export default function Home() {
         </div>
         <div className="rv-integrations-body">
           <p className="rv-lead">
-            Easily connect your favorite tools and platforms with seamless integrations—streamlining workflows, improving efficiency, and keeping
-            your data and processes fully in sync.
+            Connect the tools you already use to capture leads, communicate with clients, and collect payments.
           </p>
           <a className="rv-btn rv-btn-dark" href="/integrations">
             <span className="rv-btn-dot" aria-hidden="true" />
-            Explore Our Integrations
+            Explore Integrations
           </a>
         </div>
       </section>
@@ -337,13 +352,13 @@ export default function Home() {
       {/* Pricing */}
       <section className="rv-pricing rv-container" id="pricing">
         <div className="rv-section-head">
-          <Tag>Simple pricing</Tag>
+          <Tag>Simple Pricing</Tag>
           <h2 className="rv-h2">
-            Flexible pricing built to
+            Start free. Upgrade when
             <br />
-            scale with your team.
+            your business is ready.
           </h2>
-          <p className="rv-lead">Choose from flexible plans tailored to fit your team’s needs</p>
+          <p className="rv-lead">Choose the plan that fits your studio today, with room to grow as your projects and team expand.</p>
         </div>
         <HomePricing />
       </section>
@@ -352,26 +367,26 @@ export default function Home() {
       <section className="rv-testimonials" id="insights">
         <div className="rv-container">
           <div className="rv-section-head">
-            <Tag>Testimonial</Tag>
-            <h2 className="rv-h2">Voices of our customers</h2>
+            <Tag>Loved by Design Businesses</Tag>
+            <h2 className="rv-h2">Built for the way interior design businesses work</h2>
             <p className="rv-lead">
-              Caleo empowers teams with smart, intuitive tools designed to simplify workflows, enhance collaboration, and drive measurable results.
+              See how design studios and business owners use RVYO to bring clarity to their projects, clients, and operations.
             </p>
           </div>
           <div className="rv-testimonial-grid">
             <div className="rv-testimonial-col">
-              <Quote data={testimonials.jenny} size="short" />
-              <Quote data={testimonials.rafiq} size="tall" />
+              <Quote data={testimonials.priya} size="short" />
+              <Quote data={testimonials.ananya} size="tall" />
             </div>
             <div className="rv-testimonial-col">
               <div className="rv-testimonial-photo">
                 <img src="/assets/home/testimonial-photo.jpg" alt="Person sitting on a misty green hillside" loading="lazy" />
               </div>
-              <Quote data={testimonials.ethan} size="short" />
+              <Quote data={testimonials.sneha} size="short" />
             </div>
             <div className="rv-testimonial-col">
-              <Quote data={testimonials.andrew} size="short" />
-              <Quote data={testimonials.ayesha} size="tall" />
+              <Quote data={testimonials.arjun} size="short" />
+              <Quote data={testimonials.rohan} size="tall" />
             </div>
           </div>
         </div>
@@ -380,11 +395,11 @@ export default function Home() {
       {/* CTA */}
       <section className="rv-cta rv-container" id="demo">
         <div className="rv-cta-inner">
-          <h2>Your projects are growing. Your workflow should too.</h2>
-          <p>Bring BOQs, costing, approvals, documents, integrations, and commercial visibility into one system built for modern interior project teams.</p>
+          <h2>Bring clarity to your interior design business.</h2>
+          <p>Manage leads, BOQs, costs, projects, invoices, and client communication in one connected platform.</p>
           <div className="rv-cta-actions">
             <a className="rv-cta-light" href="/register">
-              Start Creating BOQ
+              Start Free
             </a>
             <a className="rv-cta-dark" href="/register">
               Book a Demo
