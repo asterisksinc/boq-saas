@@ -418,6 +418,9 @@
   margin-top: 80px;
   overflow: hidden;
   border-radius: 8px 8px 0 0;
+  /* Fade the screenshot into the page so there is no hard bottom edge */
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%);
 }
 
 .rv-hero-dashboard img {
@@ -431,7 +434,7 @@
   display: flex;
   flex-direction: column;
   gap: 32px;
-  margin-top: 56px;
+  margin-top: -24px;
   text-align: center;
 }
 
