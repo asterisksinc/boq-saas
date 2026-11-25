@@ -24,18 +24,18 @@ export const navGroups: NavGroup[] = [
     {
         title: "Relationship & Projects",
         items: [
-            { route: "/leads", icon: "dashboard-leads", label: "Leads" },
+            { route: "/leads", icon: "nav-leads", label: "Leads" },
             { route: "/projects", icon: "dashboard-projects", label: "Projects" },
-            { route: "/mood-boards", icon: "dashboard-moodboards", label: "Moodboards" },
-            { route: "/activities", icon: "dashboard-activities-active", label: "Activities" },
-            { route: "/documents", icon: "dashboard-reports", label: "Documents" },
+            { route: "/mood-boards", icon: "nav-moodboards", label: "Moodboards" },
+            { route: "/activities", icon: "nav-activities", label: "Activities" },
+            { route: "/documents", icon: "nav-documents", label: "Documents" },
         ],
     },
     {
         title: "Design & Estimation",
         items: [
             { route: "/boqs", icon: "dashboard-boqs", label: "Bill of Quantities" },
-            { route: "/costs", icon: "dashboard-costs", label: "Costing" },
+            { route: "/costs", icon: "nav-costing", label: "Costing" },
             { route: "/templates", icon: "dashboard-templates", label: "Templates" },
         ],
     },
@@ -63,8 +63,6 @@ const systemItems: NavItem[] = [
     { route: "/help", icon: "dashboard-help", label: "Help" },
     { route: "/settings", icon: "dashboard-settings", label: "Settings" },
 ];
-
-const navItems: NavItem[] = navGroups.flatMap((group) => group.items);
 
 function setSidebarExpanded(expanded: boolean) {
     const root = document.documentElement;
@@ -97,72 +95,52 @@ export default function DashboardRail({ current }: DashboardRailProps) {
 
     const goHome = () => navigate("/dashboard");
 
+    const renderIcon = (item: NavItem) => {
+        const active = isCurrent(item.route);
+        const label = item.route === "/help" ? "Help & Support" : item.label;
+        return (
+            <button
+                key={item.route}
+                type="button"
+                className={`fig-side-rail-item${active ? " is-current" : ""}`}
+                aria-label={label}
+                aria-current={active ? "page" : undefined}
+                title={label}
+                onClick={() => navigate(item.route)}
+            >
+                <img src={`/assets/dashboard/${item.icon}.svg`} alt="" />
+            </button>
+        );
+    };
+
     return (
         <>
-            {/* Collapsed icon rail (default) */}
-            <aside className="fig-dashboard-rail" aria-label="Dashboard navigation">
-                <div
-                    className="fig-dashboard-logo"
-                    role="button"
-                    tabIndex={0}
-                    style={{ cursor: "pointer" }}
-                    onClick={goHome}
-                    onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") goHome();
-                    }}
-                    aria-label="Go to Dashboard"
-                >
-                    <span>
+            {/* Collapsed icon rail (default) — Figma "Side menu" 2760:865 */}
+            <aside className="fig-side-rail" aria-label="Dashboard navigation">
+                <div className="fig-side-rail-top">
+                    <button type="button" className="fig-side-menu-logo" onClick={goHome} aria-label="Go to Dashboard">
                         <img src="/assets/boq-logo-small.svg" alt="BOQ" />
-                    </span>
+                    </button>
+                    <button
+                        type="button"
+                        className="fig-rail-expand"
+                        aria-label="Expand sidebar"
+                        title="Expand sidebar"
+                        onClick={() => setSidebarExpanded(true)}
+                    >
+                        <ChevronsRight size={14} aria-hidden="true" />
+                    </button>
                 </div>
-                <button
-                    type="button"
-                    className="fig-rail-expand"
-                    aria-label="Expand sidebar"
-                    title="Expand sidebar"
-                    onClick={() => setSidebarExpanded(true)}
-                >
-                    <ChevronsRight size={14} aria-hidden="true" />
-                </button>
-
-                <nav className="fig-dashboard-menu" aria-label="Main menu">
-                    {navItems.map((item) => {
-                        const active = isCurrent(item.route);
-                        return (
-                            <button
-                                key={item.route}
-                                type="button"
-                                className={active ? "is-current" : ""}
-                                aria-label={item.label}
-                                aria-current={active ? "page" : undefined}
-                                title={item.label}
-                                onClick={() => navigate(item.route)}
-                            >
-                                <img src={`/assets/dashboard/${item.icon}.svg`} alt="" />
-                            </button>
-                        );
-                    })}
+                <nav className="fig-side-rail-nav" aria-label="Main menu">
+                    {navGroups.map((group) => (
+                        <div key={group.title} className="fig-side-rail-group" role="group" aria-label={group.title}>
+                            {group.items.map(renderIcon)}
+                        </div>
+                    ))}
+                    <div className="fig-side-rail-group fig-side-rail-system" role="group" aria-label="System">
+                        {systemItems.map(renderIcon)}
+                    </div>
                 </nav>
-
-                <div className="fig-dashboard-tools" aria-label="User tools">
-                    {systemItems.map((item) => {
-                        const active = isCurrent(item.route);
-                        return (
-                            <button
-                                key={item.route}
-                                type="button"
-                                className={active ? "is-current" : ""}
-                                aria-label={item.route === "/help" ? "Help & Support" : item.label}
-                                aria-current={active ? "page" : undefined}
-                                title={item.route === "/help" ? "Help & Support" : item.label}
-                                onClick={() => navigate(item.route)}
-                            >
-                                <img src={`/assets/dashboard/${item.icon}.svg`} alt="" />
-                            </button>
-                        );
-                    })}
-                </div>
             </aside>
 
             {/* Expanded grouped side menu */}

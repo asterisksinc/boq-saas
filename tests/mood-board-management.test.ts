@@ -44,7 +44,7 @@ describe("Mood Board Management — Architecture, Navigation & Figma Design Veri
     it("verifies Mood Boards is placed immediately after Projects and before Bill of Quantities", () => {
       const railContent = readFileSync(railPath, "utf-8");
       expect(railContent).toContain('route: "/mood-boards"');
-      expect(railContent).toContain('icon: "dashboard-moodboards"');
+      expect(railContent).toContain('icon: "nav-moodboards"');
       // Figma "Side menu" (2760:120) labels this item "Moodboards".
       expect(railContent).toContain('label: "Moodboards"');
 
