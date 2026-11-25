@@ -1,0 +1,578 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import * as XLSX from "xlsx";
+import { ArrowLeft, ChevronDown, Phone, Plus, StickyNote } from "lucide-react";
+import DashboardRail from "@/components/DashboardRail";
+import DashboardHeader from "@/components/DashboardHeader";
+import { CallLogDrawer, LeadFormDrawer, NoteDrawer } from "@/components/leads/LeadDrawers";
+import { Avatar, EmptyState, Pagination, Pill, RowMenu, Toast, humanize, stageTone, statusTone } from "@/components/leads/LeadUi";
+import {
+    CALL_STATUSES, NOTE_TYPES, deleteLead, deleteLeadCallLog, deleteLeadNote, formatCompactMoney, formatDate, formatMoney,
+    getLead, listLeadCallLogs, listLeadNotes, listLeadRelated, relativeDays,
+    type LeadCallLog, type LeadDetail, type LeadNote, type LeadRelatedTab,
+} from "@/lib/api/leads";
+import { loadMoodBoards, type MoodBoard } from "@/lib/mood-boards";
+import "../leads.css";
+
+const TABS = [
+    { key: "projects", label: "Projects" },
+    { key: "boqs", label: "BOQs" },
+    { key: "proposals", label: "Proposals" },
+    { key: "invoices", label: "Invoices" },
+    { key: "moodboards", label: "Moodboards" },
+    { key: "tasks", label: "Tasks" },
+    { key: "approvals", label: "Approvals" },
+    { key: "call-logs", label: "Call Logs" },
+    { key: "notes", label: "Notes" },
+] as const;
+type TabKey = (typeof TABS)[number]["key"];
+
+const NOTE_TONES: Record<string, "blue" | "amber" | "green" | "gray" | "purple"> = {
+    boq: "blue", invoice: "amber", project: "green", meeting: "purple", follow_up: "gray", general: "gray",
+};
+
+type Row = Record<string, any>;
+
+export default function LeadDetailPage() {
+    const { id } = useParams<{ id: string }>();
+    const router = useRouter();
+    const [lead, setLead] = useState<LeadDetail | null>(null);
+    const [loadError, setLoadError] = useState<string | null>(null);
+    const [tab, setTab] = useState<TabKey>("projects");
+    const [rows, setRows] = useState<Row[]>([]);
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+    const [total, setTotal] = useState(0);
+    const [tabLoading, setTabLoading] = useState(true);
+    const [tabError, setTabError] = useState<string | null>(null);
+    const [moodBoards, setMoodBoards] = useState<MoodBoard[]>([]);
+    const [editOpen, setEditOpen] = useState(false);
+    const [callLog, setCallLog] = useState<{ open: boolean; log: LeadCallLog | null }>({ open: false, log: null });
+    const [note, setNote] = useState<{ open: boolean; note: LeadNote | null }>({ open: false, note: null });
+    const [entryOpen, setEntryOpen] = useState(false);
+    const [toast, setToast] = useState<{ message: string; tone: "success" | "error" } | null>(null);
+    const entryRef = useRef<HTMLDivElement>(null);
+
+    const notify = (message: string, tone: "success" | "error" = "success") => setToast({ message, tone });
+
+    const loadLead = useCallback(async () => {
+        try {
+            setLead(await getLead(id));
+            setLoadError(null);
+        } catch (err) {
+            setLoadError(err instanceof Error ? err.message : "Lead could not be loaded.");
+        }
+    }, [id]);
+
+    useEffect(() => { void loadLead(); }, [loadLead]);
+
+    // Mood boards live in browser storage; match them by lead or by any of the lead's projects.
+    useEffect(() => {
+        if (!lead) return;
+        try {
+            const projectIds = new Set(lead.projectIds);
+            setMoodBoards(loadMoodBoards().filter((b) => String(b.status).toLowerCase() !== "archived" && (b.leadId === lead.id || projectIds.has(b.projectId))));
+        } catch {
+            setMoodBoards([]);
+        }
+    }, [lead]);
+
+    const loadTab = useCallback(async () => {
+        if (tab === "moodboards") { setTabLoading(false); return; }
+        setTabLoading(true);
+        setTabError(null);
+        try {
+            const result = tab === "call-logs"
+                ? await listLeadCallLogs(id, page, pageSize)
+                : tab === "notes"
+                    ? await listLeadNotes(id, page, pageSize)
+                    : await listLeadRelated<Row>(id, tab as LeadRelatedTab, page, pageSize);
+            setRows(result.items as Row[]);
+            setTotal(result.total);
+        } catch (err) {
+            setTabError(err instanceof Error ? err.message : "Records could not be loaded.");
+        } finally {
+            setTabLoading(false);
+        }
+    }, [id, tab, page, pageSize]);
+
+    useEffect(() => { void loadTab(); }, [loadTab]);
+
+    useEffect(() => {
+        if (!entryOpen) return;
+        const close = (event: MouseEvent) => {
+            if (entryRef.current && !entryRef.current.contains(event.target as Node)) setEntryOpen(false);
+        };
+        document.addEventListener("mousedown", close);
+        return () => document.removeEventListener("mousedown", close);
+    }, [entryOpen]);
+
+    const switchTab = (key: TabKey) => {
+        setTab(key);
+        setPage(1);
+        setRows([]);
+    };
+
+    const exportLead = () => {
+        if (!lead) return;
+        const book = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([
+            ["Lead ID", lead.leadCode], ["Name", lead.name], ["Email", lead.email ?? ""], ["Phone", lead.phone ?? ""],
+            ["Location", lead.location ?? ""], ["Stage", lead.stageLabel], ["Source", lead.sourceLabel],
+            ["Linked Project", lead.project?.name ?? ""], ["Assigned To", lead.assignee?.name ?? ""],
+            ["Last Contacted", lead.lastContactedAt ? formatDate(lead.lastContactedAt) : ""], ["Created", formatDate(lead.createdAt)],
+            [], ["Projects", lead.stats.projects], ["BOQ Value", lead.stats.boqValue],
+            ["Invoices Paid", `${lead.stats.invoicesPaid} of ${lead.stats.invoicesTotal}`], ["Outstanding Amount", lead.stats.outstandingAmount],
+        ]), "Lead");
+        XLSX.writeFile(book, `${lead.leadCode}.xlsx`);
+    };
+
+    const removeLead = async () => {
+        if (!lead || !window.confirm(`Delete lead "${lead.name}"?`)) return;
+        try {
+            await deleteLead(lead.id);
+            router.push("/leads");
+        } catch (err) {
+            notify(err instanceof Error ? err.message : "Lead could not be deleted.", "error");
+        }
+    };
+
+    const removeCallLog = async (log: LeadCallLog) => {
+        if (!window.confirm(`Delete call log "${log.title}"?`)) return;
+        try {
+            await deleteLeadCallLog(id, log.id);
+            notify("Call log deleted.");
+            void loadTab();
+        } catch (err) {
+            notify(err instanceof Error ? err.message : "Call log could not be deleted.", "error");
+        }
+    };
+
+    const removeNote = async (item: LeadNote) => {
+        if (!window.confirm(`Delete note "${item.title}"?`)) return;
+        try {
+            await deleteLeadNote(id, item.id);
+            notify("Note deleted.");
+            void loadTab();
+        } catch (err) {
+            notify(err instanceof Error ? err.message : "Note could not be deleted.", "error");
+        }
+    };
+
+    const currency = lead?.stats.currency ?? "INR";
+    const lastContacted = relativeDays(lead?.lastContactedAt ?? null);
+
+    if (loadError) {
+        return (
+            <Shell>
+                <div className="ld-error" role="alert">
+                    <span>{loadError}</span>
+                    <button type="button" className="ld-btn" onClick={() => router.push("/leads")}>Back to Leads</button>
+                </div>
+            </Shell>
+        );
+    }
+
+    return (
+        <Shell>
+            <button type="button" className="ld-back" onClick={() => router.push("/leads")}>
+                <ArrowLeft size={20} /> Back
+            </button>
+
+            <section className="ld-detail-head">
+                <div className="ld-detail-identity">
+                    <span className="ld-detail-logo">
+                        {lead?.avatarUrl ? <img src={lead.avatarUrl} alt="" /> : <Avatar name={lead?.name} size={40} />}
+                    </span>
+                    <div>
+                        <h2>
+                            {lead?.name ?? "Loading…"}
+                            {lead ? <Pill tone={stageTone(lead.stage)}>{lead.stage === "new" ? "New Lead" : lead.stageLabel}</Pill> : null}
+                        </h2>
+                        <p>{lead ? `${lead.leadCode} · ${lead.sourceLabel}` : ""}</p>
+                    </div>
+                </div>
+                <div className="ld-detail-actions">
+                    {lead ? (
+                        <span className={`ld-last-contacted${lastContacted ? "" : " is-never"}`}>
+                            {lastContacted ? `Last Contacted ${lastContacted}` : "Not contacted yet"}
+                        </span>
+                    ) : null}
+                    <button type="button" className="ld-btn" onClick={exportLead} disabled={!lead}>Export</button>
+                    <button type="button" className="ld-btn" onClick={() => setEditOpen(true)} disabled={!lead}>Edit Lead</button>
+                    <div className="ld-entry" ref={entryRef}>
+                        <button type="button" className="ld-btn ld-btn--primary" aria-haspopup="menu" aria-expanded={entryOpen} onClick={() => setEntryOpen((v) => !v)} disabled={!lead}>
+                            <Plus size={18} /> New Entry <ChevronDown size={16} />
+                        </button>
+                        {entryOpen ? (
+                            <div className="ld-menu-list ld-entry-list" role="menu">
+                                <button type="button" role="menuitem" onClick={() => { setEntryOpen(false); setCallLog({ open: true, log: null }); }}>
+                                    <Phone size={16} /> Call Log
+                                </button>
+                                <button type="button" role="menuitem" onClick={() => { setEntryOpen(false); setNote({ open: true, note: null }); }}>
+                                    <StickyNote size={16} /> Note
+                                </button>
+                                <button type="button" role="menuitem" className="is-danger" onClick={() => { setEntryOpen(false); void removeLead(); }}>
+                                    Delete Lead
+                                </button>
+                            </div>
+                        ) : null}
+                    </div>
+                </div>
+            </section>
+
+            <section className="ld-stats" aria-label="Lead summary">
+                <Stat label="Projects" value={lead ? String(lead.stats.projects) : "—"} />
+                <Stat label="BOQ Value" value={lead ? formatMoney(lead.stats.boqValue, currency) : "—"} />
+                <Stat label="Invoices" value={lead ? (lead.stats.invoicesTotal ? `${lead.stats.invoicesPaid} Paid of ${lead.stats.invoicesTotal}` : "0") : "—"} />
+                <Stat label="Moodboards" value={lead ? String(moodBoards.length) : "—"} />
+                <Stat label="Outstanding Amount" value={lead ? formatMoney(lead.stats.outstandingAmount, currency) : "—"} />
+            </section>
+
+            <div className="ld-detail-body">
+                <aside className="ld-card ld-info">
+                    <h3>Lead Information</h3>
+                    {lead ? (
+                        <dl>
+                            <InfoRow label="Lead ID" value={lead.leadCode} />
+                            <InfoRow label="Email" value={lead.email ? <a href={`mailto:${lead.email}`}>{lead.email}</a> : null} />
+                            <InfoRow label="Phone" value={lead.phone ? <a href={`tel:${lead.phone}`}>{lead.phone}</a> : null} />
+                            <InfoRow label="Location" value={lead.location} />
+                            <InfoRow label="Stage" value={<Pill tone={stageTone(lead.stage)}>{lead.stageLabel}</Pill>} />
+                            <InfoRow label="Lead Source" value={<Pill tone="blue">{lead.sourceLabel}</Pill>} />
+                            <InfoRow
+                                label="Linked Project"
+                                value={lead.project ? (
+                                    <button type="button" className="ld-link" onClick={() => router.push(`/projects/${lead.project!.id}`)}>
+                                        {lead.project.name}{lead.project.projectCode ? ` · ${lead.project.projectCode}` : ""}
+                                    </button>
+                                ) : null}
+                            />
+                            <InfoRow
+                                label="Assigned To"
+                                value={lead.assignee ? (
+                                    <span className="ld-person">
+                                        <Avatar name={lead.assignee.name} src={lead.assignee.avatarUrl} size={28} />
+                                        <span>
+                                            <span className="ld-person-name">{lead.assignee.name}</span>
+                                            {lead.assignee.role ? <span className="ld-person-role">{lead.assignee.role}</span> : null}
+                                        </span>
+                                    </span>
+                                ) : null}
+                            />
+                            <InfoRow label="Last Contacted" value={lead.lastContactedAt ? formatDate(lead.lastContactedAt) : null} />
+                            <InfoRow label="Created On" value={formatDate(lead.createdAt)} />
+                        </dl>
+                    ) : (
+                        <div className="ld-info-skeleton"><span /><span /><span /><span /></div>
+                    )}
+                </aside>
+
+                <section className="ld-card ld-tabs-card">
+                    <div className="ld-tabs" role="tablist" aria-label="Lead records">
+                        {TABS.map((t) => (
+                            <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} className={tab === t.key ? "is-current" : ""} onClick={() => switchTab(t.key)}>
+                                {t.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    {tabError ? (
+                        <div className="ld-error" role="alert">
+                            <span>{tabError}</span>
+                            <button type="button" className="ld-btn" onClick={() => void loadTab()}>Retry</button>
+                        </div>
+                    ) : tab === "moodboards" ? (
+                        <MoodBoardList boards={moodBoards} onOpen={(boardId) => router.push(`/mood-boards/${boardId}`)} />
+                    ) : tab === "notes" ? (
+                        <NotesGrid
+                            notes={rows as LeadNote[]}
+                            loading={tabLoading}
+                            onOpen={(n) => setNote({ open: true, note: n })}
+                            onDelete={removeNote}
+                            onCreate={() => setNote({ open: true, note: null })}
+                        />
+                    ) : (
+                        <RecordsTable
+                            tab={tab}
+                            rows={rows}
+                            loading={tabLoading}
+                            currency={currency}
+                            onOpen={(row) => {
+                                if (tab === "call-logs") setCallLog({ open: true, log: row as LeadCallLog });
+                                else if (tab === "projects") router.push(`/projects/${row.id}`);
+                                else if (tab === "boqs") router.push(`/boqs?boq=${row.id}`);
+                                else if (tab === "proposals") router.push(`/proposals?proposal=${row.id}`);
+                                else if (tab === "invoices") router.push(`/invoices?invoice=${row.id}`);
+                                else router.push(`/activities?tab=${tab}`);
+                            }}
+                            onDeleteCallLog={removeCallLog}
+                            onCreateCallLog={() => setCallLog({ open: true, log: null })}
+                        />
+                    )}
+
+                    {tab !== "moodboards" && !tabError && total > 0 ? (
+                        <Pagination
+                            page={page}
+                            pageSize={pageSize}
+                            total={total}
+                            label={`Total ${TABS.find((t) => t.key === tab)?.label}`}
+                            onPage={setPage}
+                            onPageSize={(n) => { setPageSize(n); setPage(1); }}
+                        />
+                    ) : null}
+                </section>
+            </div>
+
+            {lead ? (
+                <>
+                    <LeadFormDrawer
+                        open={editOpen}
+                        lead={lead}
+                        onClose={() => setEditOpen(false)}
+                        onSaved={() => { setEditOpen(false); notify("Lead updated."); void loadLead(); void loadTab(); }}
+                    />
+                    <CallLogDrawer
+                        open={callLog.open}
+                        leadId={lead.id}
+                        log={callLog.log}
+                        onClose={() => setCallLog({ open: false, log: null })}
+                        onSaved={() => {
+                            const created = !callLog.log;
+                            setCallLog({ open: false, log: null });
+                            notify(created ? "Call log added." : "Call log updated.");
+                            void loadLead();
+                            if (tab === "call-logs") void loadTab(); else switchTab("call-logs");
+                        }}
+                    />
+                    <NoteDrawer
+                        open={note.open}
+                        leadId={lead.id}
+                        note={note.note}
+                        onClose={() => setNote({ open: false, note: null })}
+                        onSaved={() => {
+                            const created = !note.note;
+                            setNote({ open: false, note: null });
+                            notify(created ? "Note added." : "Note updated.");
+                            if (tab === "notes") void loadTab(); else switchTab("notes");
+                        }}
+                    />
+                </>
+            ) : null}
+            <Toast message={toast?.message ?? null} tone={toast?.tone} onDone={() => setToast(null)} />
+        </Shell>
+    );
+}
+
+function Shell({ children }: { children: React.ReactNode }) {
+    return (
+        <main className="fig-dashboard leads-page">
+            <div className="fig-dashboard-glow" />
+            <DashboardRail current="/leads" />
+            <div className="fig-dashboard-main">
+                <DashboardHeader title="Leads" onNew={undefined} />
+                {children}
+            </div>
+        </main>
+    );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+    return (
+        <div className="ld-stat">
+            <span>{label}</span>
+            <strong>{value}</strong>
+        </div>
+    );
+}
+
+function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
+    return (
+        <div className="ld-info-row">
+            <dt>{label}</dt>
+            <dd>{value ?? <span className="ld-muted">—</span>}</dd>
+        </div>
+    );
+}
+
+function RecordsTable({
+    tab, rows, loading, currency, onOpen, onDeleteCallLog, onCreateCallLog,
+}: {
+    tab: TabKey; rows: Row[]; loading: boolean; currency: string; onOpen: (row: Row) => void;
+    onDeleteCallLog: (log: LeadCallLog) => void; onCreateCallLog: () => void;
+}) {
+    const columns = useMemo<Array<{ label: string; render: (row: Row) => React.ReactNode }>>(() => {
+        const project = (row: Row) => row.projectName ?? "—";
+        switch (tab) {
+            case "projects":
+                return [
+                    { label: "Project", render: (r) => <span className="ld-two-line"><strong>{r.name}</strong><span className="ld-small">{[r.projectCode, r.areaSqft ? `${Number(r.areaSqft).toLocaleString("en-IN")} sqft` : null].filter(Boolean).join(" · ")}</span></span> },
+                    { label: "Type", render: (r) => <span className="ld-muted">{r.projectType ?? "—"}</span> },
+                    { label: "Stage", render: (r) => (r.stage ? <Pill tone="gray">{humanize(r.stage)}</Pill> : <span className="ld-muted">—</span>) },
+                    { label: "Status", render: (r) => <Pill tone={statusTone(r.status)}>{humanize(r.status).toUpperCase()}</Pill> },
+                    { label: "Designer", render: (r) => <span className="ld-muted">{r.designer ?? "—"}</span> },
+                    { label: "BOQs", render: (r) => <strong className="ld-strong">{formatCompactMoney(Number(r.boqValue ?? 0), currency)}</strong> },
+                    { label: "Margin", render: (r) => <span className="ld-muted">{r.margin != null ? `${Math.round(Number(r.margin))}%` : "—"}</span> },
+                    { label: "Due Date", render: (r) => <span className="ld-muted">{formatDate(r.dueDate)}</span> },
+                ];
+            case "boqs":
+                return [
+                    { label: "BOQ", render: (r) => <strong className="ld-strong">{r.code}</strong> },
+                    { label: "Version", render: (r) => <span className="ld-muted">{r.version}</span> },
+                    { label: "Project", render: project },
+                    { label: "Status", render: (r) => <Pill tone={statusTone(r.status)}>{humanize(r.status)}</Pill> },
+                    { label: "Updated", render: (r) => <span className="ld-muted">{formatDate(r.updatedAt)}</span> },
+                ];
+            case "proposals":
+                return [
+                    { label: "Proposal", render: (r) => <strong className="ld-strong">{r.code}</strong> },
+                    { label: "Project", render: project },
+                    { label: "Value", render: (r) => formatMoney(Number(r.value ?? 0), r.currency ?? currency) },
+                    { label: "Status", render: (r) => <Pill tone={statusTone(r.status)}>{humanize(r.status)}</Pill> },
+                    { label: "Expiry", render: (r) => <span className="ld-muted">{formatDate(r.expiryDate)}</span> },
+                ];
+            case "invoices":
+                return [
+                    { label: "Invoice", render: (r) => <strong className="ld-strong">{r.code}</strong> },
+                    { label: "Project", render: project },
+                    { label: "Total", render: (r) => formatMoney(Number(r.total ?? 0), r.currency ?? currency) },
+                    { label: "Paid", render: (r) => <span className="ld-muted">{formatMoney(Number(r.paid ?? 0), r.currency ?? currency)}</span> },
+                    { label: "Status", render: (r) => <Pill tone={statusTone(r.status)}>{humanize(r.status)}</Pill> },
+                    { label: "Due Date", render: (r) => <span className="ld-muted">{formatDate(r.dueDate)}</span> },
+                ];
+            case "tasks":
+            case "approvals":
+                return [
+                    { label: tab === "tasks" ? "Task" : "Approval", render: (r) => <strong className="ld-strong">{r.name}</strong> },
+                    { label: "Project", render: project },
+                    { label: tab === "tasks" ? "Assignee" : "Approver", render: (r) => <span className="ld-muted">{r.person ?? "—"}</span> },
+                    ...(tab === "tasks" ? [{ label: "Priority", render: (r: Row) => <Pill tone={r.priority === "high" || r.priority === "critical" ? "red" : "gray"}>{humanize(r.priority)}</Pill> }] : []),
+                    { label: "Status", render: (r) => <Pill tone={statusTone(r.status)}>{humanize(r.status)}</Pill> },
+                    { label: "Due Date", render: (r) => <span className="ld-muted">{formatDate(r.dueDate)}</span> },
+                ];
+            case "call-logs":
+                return [
+                    { label: "Call Purpose", render: (r) => <strong className="ld-strong">{r.title}</strong> },
+                    { label: "Type", render: (r) => <span className="ld-muted">{r.callType === "inbound" ? "In-Bound" : "Out-Bound"}</span> },
+                    { label: "Status", render: (r) => <Pill tone={statusTone(r.status)}>{CALL_STATUSES.find((s) => s.value === r.status)?.label ?? humanize(r.status)}</Pill> },
+                    { label: "Duration", render: (r) => <span className="ld-muted">{r.durationMinutes != null ? `${r.durationMinutes} Minutes` : "—"}</span> },
+                    { label: "Created On", render: (r) => <strong className="ld-strong">{formatDate(r.calledAt)}</strong> },
+                ];
+            default:
+                return [];
+        }
+    }, [tab, currency]);
+
+    const isCallLogs = tab === "call-logs";
+    const emptyLabel = TABS.find((t) => t.key === tab)?.label.toLowerCase() ?? "records";
+
+    return (
+        <div className="ld-table-scroll">
+            <table className="ld-table ld-table--compact">
+                <thead>
+                    <tr>
+                        {columns.map((c) => <th key={c.label}>{c.label}</th>)}
+                        {isCallLogs ? <th aria-label="Actions" /> : null}
+                    </tr>
+                </thead>
+                <tbody>
+                    {loading && !rows.length ? (
+                        Array.from({ length: 4 }, (_, i) => <tr key={i} className="ld-skeleton-row"><td colSpan={columns.length + 1}><span /></td></tr>)
+                    ) : rows.length ? (
+                        rows.map((row) => (
+                            <tr key={row.id} onClick={() => onOpen(row)}>
+                                {columns.map((c) => <td key={c.label}>{c.render(row)}</td>)}
+                                {isCallLogs ? (
+                                    <td className="ld-col-menu">
+                                        <RowMenu
+                                            label={`Actions for ${row.title}`}
+                                            actions={[
+                                                { label: "View Call Log", onSelect: () => onOpen(row) },
+                                                { label: "Delete Call Log", onSelect: () => onDeleteCallLog(row as LeadCallLog), danger: true },
+                                            ]}
+                                        />
+                                    </td>
+                                ) : null}
+                            </tr>
+                        ))
+                    ) : (
+                        <tr>
+                            <td colSpan={columns.length + 1}>
+                                <EmptyState
+                                    title={`No ${emptyLabel} yet`}
+                                    text={isCallLogs ? "Log calls with this lead to keep a history of every conversation." : "Records from this lead's linked projects will show up here."}
+                                    action={isCallLogs ? <button type="button" className="ld-btn ld-btn--primary" onClick={onCreateCallLog}><Plus size={18} /> New Call Log</button> : undefined}
+                                />
+                            </td>
+                        </tr>
+                    )}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+function NotesGrid({
+    notes, loading, onOpen, onDelete, onCreate,
+}: {
+    notes: LeadNote[]; loading: boolean; onOpen: (note: LeadNote) => void; onDelete: (note: LeadNote) => void; onCreate: () => void;
+}) {
+    if (loading && !notes.length) return <div className="ld-notes-grid">{[0, 1, 2].map((i) => <div key={i} className="ld-note-card is-skeleton" />)}</div>;
+    if (!notes.length) {
+        return (
+            <EmptyState
+                title="No notes yet"
+                text="Capture meeting notes, follow-ups and decisions for this lead."
+                action={<button type="button" className="ld-btn ld-btn--primary" onClick={onCreate}><Plus size={18} /> New Note</button>}
+            />
+        );
+    }
+    return (
+        <div className="ld-notes-grid">
+            {notes.map((n) => (
+                <article key={n.id} className="ld-note-card" role="button" tabIndex={0} onClick={() => onOpen(n)} onKeyDown={(e) => e.key === "Enter" && onOpen(n)}>
+                    <header>
+                        <h4>{n.title}</h4>
+                        <Pill tone={NOTE_TONES[n.noteType] ?? "gray"}>{NOTE_TYPES.find((t) => t.value === n.noteType)?.label ?? humanize(n.noteType)}</Pill>
+                        <RowMenu
+                            label={`Actions for ${n.title}`}
+                            actions={[
+                                { label: "View Note", onSelect: () => onOpen(n) },
+                                { label: "Delete Note", onSelect: () => onDelete(n), danger: true },
+                            ]}
+                        />
+                    </header>
+                    <dl>
+                        <div><dt>Linked BOQ</dt><dd>{n.boqCode ?? "-"}</dd></div>
+                        <div><dt>Linked Project</dt><dd>{n.projectName ?? "-"}</dd></div>
+                        <div><dt>Visibility</dt><dd>{n.visibility === "private" ? "Private" : "Team"}</dd></div>
+                        <div><dt>Invoice</dt><dd>{n.invoiceCode ?? "-"}</dd></div>
+                    </dl>
+                </article>
+            ))}
+        </div>
+    );
+}
+
+function MoodBoardList({ boards, onOpen }: { boards: MoodBoard[]; onOpen: (id: string) => void }) {
+    if (!boards.length) return <EmptyState title="No moodboards yet" text="Moodboards for this lead or its projects will show up here." />;
+    return (
+        <div className="ld-table-scroll">
+            <table className="ld-table ld-table--compact">
+                <thead><tr><th>Moodboard</th><th>Project</th><th>Status</th><th>Updated</th></tr></thead>
+                <tbody>
+                    {boards.map((b) => (
+                        <tr key={b.id} onClick={() => onOpen(b.id)}>
+                            <td><strong className="ld-strong">{b.name}</strong></td>
+                            <td>{b.projectName || "—"}</td>
+                            <td><Pill tone={statusTone(b.status)}>{humanize(b.status)}</Pill></td>
+                            <td className="ld-muted">{formatDate(b.updatedAt)}</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}

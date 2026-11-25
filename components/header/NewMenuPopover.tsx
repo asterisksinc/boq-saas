@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
-import { Folder, FileText, Receipt, CheckSquare, Bookmark, Box } from "lucide-react";
+import { Folder, FileText, Receipt, CheckSquare, Bookmark, Box, Users } from "lucide-react";
 
 interface NewMenuPopoverProps {
     isOpen: boolean;
@@ -15,10 +15,17 @@ export default function NewMenuPopover({ isOpen, onClose, onNew }: NewMenuPopove
 
     if (!isOpen) return null;
 
-    const handleAction = (type: "project" | "boq" | "invoice" | "task" | "approval" | "item") => {
+    const handleAction = (type: "lead" | "project" | "boq" | "invoice" | "task" | "approval" | "item") => {
         onClose();
 
         switch (type) {
+            case "lead":
+                if (pathname === "/leads" && onNew) {
+                    onNew();
+                } else {
+                    router.push("/leads?create=true");
+                }
+                break;
             case "project":
                 if (pathname === "/projects" && onNew) {
                     onNew();
@@ -59,6 +66,16 @@ export default function NewMenuPopover({ isOpen, onClose, onNew }: NewMenuPopove
             aria-label="New creation actions"
             onClick={(e) => e.stopPropagation()}
         >
+            <button
+                type="button"
+                role="menuitem"
+                className="fig-new-menu-item"
+                onClick={() => handleAction("lead")}
+            >
+                <Users size={18} className="fig-new-menu-icon" />
+                <span className="fig-new-menu-label">Create Lead</span>
+            </button>
+
             <button
                 type="button"
                 role="menuitem"

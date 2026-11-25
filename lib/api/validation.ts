@@ -1304,3 +1304,70 @@ export function fieldErrors(error: z.ZodError) {
 
 
 
+
+// ---------------------------------------------------------------------------
+// Leads
+// ---------------------------------------------------------------------------
+
+export const LEAD_STAGES = ["new", "contacted", "interested", "qualified", "unqualified", "lost", "won", "churned"] as const;
+export const LEAD_SOURCES = ["meta_ads", "google_ads", "custom_website", "referral", "walk_in", "other"] as const;
+
+const optionalText = (max: number) =>
+  z.string().trim().max(max).nullable().optional().transform((value) => (value ? value : null));
+
+const leadFields = {
+  name: z.string().trim().min(1).max(160),
+  avatarUrl: z.string().trim().max(2_000_000).nullable().optional(),
+  email: z.union([email, z.literal(""), z.null()]).optional().transform((value) => value || null),
+  phone: optionalText(40),
+  location: optionalText(200),
+  projectId: uuid,
+  source: z.enum(LEAD_SOURCES),
+  stage: z.enum(LEAD_STAGES),
+  assignedTo: optionalNullableUuid,
+};
+
+export const leadCreateSchema = z.object({ ...leadFields, stage: leadFields.stage.default("new") }).strict();
+
+export const leadPatchSchema = z
+  .object({ ...leadFields, sortOrder: z.coerce.number().finite() })
+  .partial()
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, "At least one field is required.");
+
+const leadCallLogShape = {
+  title: z.string().trim().min(1).max(200),
+  callType: z.enum(["inbound", "outbound"]),
+  status: z.enum(["connected", "no_answer", "busy", "voicemail", "scheduled"]),
+  durationMinutes: z.coerce.number().int().min(0).max(1440).nullable().optional(),
+  notes: optionalText(10_000),
+  calledAt: z.string().datetime({ offset: true }),
+};
+
+export const leadCallLogSchema = z
+  .object({ ...leadCallLogShape, callType: leadCallLogShape.callType.default("outbound"), calledAt: leadCallLogShape.calledAt.optional() })
+  .strict();
+
+// Patch schemas are built from default-free shapes: Zod 4 applies defaults even inside .partial().
+export const leadCallLogPatchSchema = z.object(leadCallLogShape).partial().strict();
+
+const leadAttachment = z
+  .object({ name: z.string().trim().min(1).max(255), url: z.string().trim().min(1).max(2_000_000) })
+  .strict();
+
+const leadNoteShape = {
+  title: z.string().trim().min(1).max(200),
+  body: optionalText(20_000),
+  noteType: z.enum(["general", "meeting", "follow_up", "boq", "project", "invoice"]),
+  visibility: z.enum(["private", "team"]),
+  boqId: optionalNullableUuid,
+  projectId: optionalNullableUuid,
+  invoiceId: optionalNullableUuid,
+  attachments: z.array(leadAttachment).max(10),
+};
+
+export const leadNoteSchema = z
+  .object({ ...leadNoteShape, noteType: leadNoteShape.noteType.default("general"), attachments: leadNoteShape.attachments.default([]) })
+  .strict();
+
+export const leadNotePatchSchema = z.object(leadNoteShape).partial().strict();
