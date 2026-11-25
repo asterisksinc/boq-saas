@@ -8,6 +8,7 @@ import "./boq-usage-redesign.css";
 import "./boq-versions-redesign.css";
 import "./boq-activity-redesign.css";
 import { PermissionsProvider } from "@/components/PermissionsProvider";
+import { sidebarInitScript } from "@/lib/sidebar";
 
 export const metadata: Metadata = {
   title: "BOQ-SAAS",
@@ -24,7 +25,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: sidebarInitScript }} />
+      </head>
       <body><PermissionsProvider>{children}</PermissionsProvider></body>
     </html>
   );

@@ -45,7 +45,8 @@ describe("Mood Board Management — Architecture, Navigation & Figma Design Veri
       const railContent = readFileSync(railPath, "utf-8");
       expect(railContent).toContain('route: "/mood-boards"');
       expect(railContent).toContain('icon: "dashboard-moodboards"');
-      expect(railContent).toContain('label: "Mood Boards"');
+      // Figma "Side menu" (2760:120) labels this item "Moodboards".
+      expect(railContent).toContain('label: "Moodboards"');
 
       // Check sequence
       const projectsIndex = railContent.indexOf('route: "/projects"');
