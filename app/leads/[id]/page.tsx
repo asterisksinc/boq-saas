@@ -79,7 +79,10 @@ export default function LeadDetailPage() {
         }
     }, [lead]);
 
+    // Each load gets a token; responses from a tab the user has already left are ignored.
+    const tabRequest = useRef(0);
     const loadTab = useCallback(async () => {
+        const token = ++tabRequest.current;
         if (tab === "moodboards") { setTabLoading(false); return; }
         setTabLoading(true);
         setTabError(null);
@@ -89,12 +92,14 @@ export default function LeadDetailPage() {
                 : tab === "notes"
                     ? await listLeadNotes(id, page, pageSize)
                     : await listLeadRelated<Row>(id, tab as LeadRelatedTab, page, pageSize);
+            if (token !== tabRequest.current) return;
             setRows(result.items as Row[]);
             setTotal(result.total);
         } catch (err) {
+            if (token !== tabRequest.current) return;
             setTabError(err instanceof Error ? err.message : "Records could not be loaded.");
         } finally {
-            setTabLoading(false);
+            if (token === tabRequest.current) setTabLoading(false);
         }
     }, [id, tab, page, pageSize]);
 
@@ -245,9 +250,13 @@ export default function LeadDetailPage() {
                             <InfoRow
                                 label="Linked Project"
                                 value={lead.project ? (
-                                    <button type="button" className="ld-link" onClick={() => router.push(`/projects/${lead.project!.id}`)}>
-                                        {lead.project.name}{lead.project.projectCode ? ` · ${lead.project.projectCode}` : ""}
-                                    </button>
+                                    lead.project.id ? (
+                                        <button type="button" className="ld-link" onClick={() => router.push(`/projects/${lead.project!.id}`)}>
+                                            {lead.project.name}{lead.project.projectCode ? ` · ${lead.project.projectCode}` : ""}
+                                        </button>
+                                    ) : (
+                                        <span>{lead.project.name}{lead.project.projectCode ? ` · ${lead.project.projectCode}` : ""}</span>
+                                    )
                                 ) : null}
                             />
                             <InfoRow

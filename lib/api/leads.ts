@@ -1,4 +1,12 @@
 import { getApiErrorMessage, parseApiResponse } from "./auth";
+import { localLeads, type Lookups } from "@/lib/leads/local-store";
+
+/**
+ * The Leads backend is not built yet. Until it is, every call below is served by a browser-only store
+ * (lib/leads/local-store.ts) that follows the same contract. To switch to the real API, set
+ * NEXT_PUBLIC_LEADS_BACKEND=api — the fetch paths below are the endpoints the backend should expose.
+ */
+export const LEADS_BACKEND_ENABLED = process.env.NEXT_PUBLIC_LEADS_BACKEND === "api";
 
 export const LEAD_STAGES = [
     { value: "new", label: "New" },
@@ -161,30 +169,45 @@ function query(params: Record<string, string | number | undefined>) {
 }
 
 export function listLeads(params: LeadFilters & { page?: number; pageSize?: number }) {
+    if (!LEADS_BACKEND_ENABLED) return localLeads.list(params);
     return fetchApi<Paged<Lead>>(`/api/v1/leads${query({ ...params })}`);
 }
 
 export function listLeadBoard(params: LeadFilters) {
+    if (!LEADS_BACKEND_ENABLED) return localLeads.board(params);
     return fetchApi<{ items: Lead[]; total: number }>(`/api/v1/leads${query({ ...params, view: "board" })}`);
 }
 
-export function getLead(leadId: string) {
+export async function getLead(leadId: string) {
+    if (!LEADS_BACKEND_ENABLED) {
+        const lead = await localLeads.get(leadId, await lookups());
+        if (lead.projectId) {
+            // BOQ value comes from the live Projects API; invoice figures need the Leads backend.
+            const project = await fetchApi<{ boqValue?: number; currency?: string }>(`/api/v1/projects/${lead.projectId}`).catch(() => null);
+            if (project) lead.stats = { ...lead.stats, boqValue: Number(project.boqValue ?? 0), currency: project.currency ?? lead.stats.currency };
+        }
+        return lead;
+    }
     return fetchApi<LeadDetail>(`/api/v1/leads/${leadId}`);
 }
 
-export function createLead(input: LeadInput) {
+export async function createLead(input: LeadInput) {
+    if (!LEADS_BACKEND_ENABLED) return localLeads.create(input, await lookups());
     return fetchApi<Lead>("/api/v1/leads", { method: "POST", body: JSON.stringify(input) });
 }
 
-export function updateLead(leadId: string, input: Partial<LeadInput> & { sortOrder?: number }) {
+export async function updateLead(leadId: string, input: Partial<LeadInput> & { sortOrder?: number }) {
+    if (!LEADS_BACKEND_ENABLED) return localLeads.update(leadId, input, await lookups());
     return fetchApi<Lead>(`/api/v1/leads/${leadId}`, { method: "PATCH", body: JSON.stringify(input) });
 }
 
 export function deleteLead(leadId: string) {
+    if (!LEADS_BACKEND_ENABLED) return localLeads.remove(leadId);
     return fetchApi<{ archived: true }>(`/api/v1/leads/${leadId}`, { method: "DELETE" });
 }
 
 export async function exportLeads(filters: LeadFilters) {
+    if (!LEADS_BACKEND_ENABLED) return localLeads.exportXlsx(filters);
     const response = await fetch(`/api/v1/leads/export${query({ ...filters })}`, { credentials: "include" });
     if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
@@ -193,7 +216,8 @@ export async function exportLeads(filters: LeadFilters) {
     return response.blob();
 }
 
-export function importLeads(file: File) {
+export async function importLeads(file: File) {
+    if (!LEADS_BACKEND_ENABLED) return localLeads.importFile(file, await lookups());
     const form = new FormData();
     form.append("file", file);
     return fetchApi<{ imported: number; skipped: number; errors: Array<{ row: number; message: string }> }>("/api/v1/leads/import", {
@@ -210,15 +234,18 @@ export function uploadLeadAvatar(file: File) {
 
 export type LeadRelatedTab = "projects" | "boqs" | "proposals" | "invoices" | "tasks" | "approvals";
 
-export function listLeadRelated<T = Record<string, unknown>>(leadId: string, tab: LeadRelatedTab, page = 1, pageSize = 10) {
+export async function listLeadRelated<T = Record<string, unknown>>(leadId: string, tab: LeadRelatedTab, page = 1, pageSize = 10): Promise<Paged<T>> {
+    if (!LEADS_BACKEND_ENABLED) return localRelated<T>(leadId, tab, page, pageSize);
     return fetchApi<Paged<T>>(`/api/v1/leads/${leadId}/${tab}${query({ page, pageSize })}`);
 }
 
 export function listLeadCallLogs(leadId: string, page = 1, pageSize = 10) {
+    if (!LEADS_BACKEND_ENABLED) return localLeads.callLogs(leadId, page, pageSize);
     return fetchApi<Paged<LeadCallLog>>(`/api/v1/leads/${leadId}/call-logs${query({ page, pageSize })}`);
 }
 
 export function saveLeadCallLog(leadId: string, input: Record<string, unknown>, logId?: string) {
+    if (!LEADS_BACKEND_ENABLED) return localLeads.saveCallLog(leadId, input, logId);
     return fetchApi<LeadCallLog>(`/api/v1/leads/${leadId}/call-logs${logId ? `/${logId}` : ""}`, {
         method: logId ? "PATCH" : "POST",
         body: JSON.stringify(input),
@@ -226,14 +253,17 @@ export function saveLeadCallLog(leadId: string, input: Record<string, unknown>, 
 }
 
 export function deleteLeadCallLog(leadId: string, logId: string) {
+    if (!LEADS_BACKEND_ENABLED) return localLeads.deleteCallLog(leadId, logId);
     return fetchApi<{ deleted: true }>(`/api/v1/leads/${leadId}/call-logs/${logId}`, { method: "DELETE" });
 }
 
 export function listLeadNotes(leadId: string, page = 1, pageSize = 10) {
+    if (!LEADS_BACKEND_ENABLED) return localLeads.notes(leadId, page, pageSize);
     return fetchApi<Paged<LeadNote>>(`/api/v1/leads/${leadId}/notes${query({ page, pageSize })}`);
 }
 
-export function saveLeadNote(leadId: string, input: Record<string, unknown>, noteId?: string) {
+export async function saveLeadNote(leadId: string, input: Record<string, unknown>, noteId?: string) {
+    if (!LEADS_BACKEND_ENABLED) return localLeads.saveNote(leadId, input, await lookups(), noteId);
     return fetchApi<LeadNote>(`/api/v1/leads/${leadId}/notes${noteId ? `/${noteId}` : ""}`, {
         method: noteId ? "PATCH" : "POST",
         body: JSON.stringify(input),
@@ -241,7 +271,46 @@ export function saveLeadNote(leadId: string, input: Record<string, unknown>, not
 }
 
 export function deleteLeadNote(leadId: string, noteId: string) {
+    if (!LEADS_BACKEND_ENABLED) return localLeads.deleteNote(leadId, noteId);
     return fetchApi<{ deleted: true }>(`/api/v1/leads/${leadId}/notes/${noteId}`, { method: "DELETE" });
+}
+
+/** Projects and team members from the existing (live) APIs, cached briefly for the local store. */
+let lookupCache: { at: number; value: Promise<Lookups> } | null = null;
+function lookups(): Promise<Lookups> {
+    if (lookupCache && Date.now() - lookupCache.at < 60_000) return lookupCache.value;
+    const value = listLeadFormOptions()
+        .then(({ projects, members }) => ({
+            projects: projects.map((p) => ({ id: p.id, name: p.name, projectCode: p.projectCode ?? null })),
+            members: members.map((m) => ({ id: m.id, name: m.name, role: m.role ?? null, avatarUrl: m.avatarUrl ?? null })),
+        }))
+        .catch(() => ({ projects: [], members: [] }));
+    lookupCache = { at: Date.now(), value };
+    return value;
+}
+
+/**
+ * Until the Leads backend exists, the Projects tab shows the lead's linked project from the live Projects API.
+ * BOQs, proposals, invoices, tasks and approvals for a lead need the backend and show empty states for now.
+ */
+async function localRelated<T>(leadId: string, tab: LeadRelatedTab, page: number, pageSize: number): Promise<Paged<T>> {
+    const empty = { items: [] as T[], page, pageSize, total: 0, hasMore: false };
+    if (tab !== "projects") return empty;
+    const lead = await localLeads.get(leadId, await lookups()).catch(() => null);
+    if (!lead?.projectId) return empty;
+    try {
+        const p = await fetchApi<Record<string, any>>(`/api/v1/projects/${lead.projectId}`);
+        const project = (p.project ?? p) as Record<string, any>;
+        const row = {
+            id: project.id, projectCode: project.projectCode, name: project.name, projectType: project.projectType,
+            status: project.status, stage: project.stage ?? project.currentPhase ?? null, areaSqft: project.areaSqft,
+            designer: project.leadDesigner ?? null, boqValue: project.boqValue ?? 0, margin: project.margin ?? null,
+            dueDate: project.targetCompletionDate ?? null,
+        };
+        return { items: [row as T], page: 1, pageSize, total: 1, hasMore: false };
+    } catch {
+        return empty;
+    }
 }
 
 /** Options for the Linked Project and Assign to dropdowns. */
