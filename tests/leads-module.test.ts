@@ -121,6 +121,6 @@ describe("Leads — pages and grouped sidebar", () => {
         expect(rail.indexOf('route: "/leads"')).toBeLessThan(rail.indexOf('route: "/projects"'));
         expect(rail).toContain("fig-side-menu");
         expect(read("app", "layout.tsx")).toContain("sidebarInitScript");
-        expect(read("app", "globals.css")).toContain('html[data-sidebar="expanded"] .fig-dashboard-main');
+        expect(read("app", "globals.css")).toContain('html[data-sidebar="expanded"] body:has(.fig-side-menu) .fig-dashboard-main');
     });
 });
