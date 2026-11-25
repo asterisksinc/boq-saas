@@ -59,6 +59,9 @@ export const navGroups: NavGroup[] = [
     },
 ];
 
+/** Overview sits on its own above the groups (no heading), as in the collapsed Figma rail. */
+const overviewItem: NavItem = { route: "/dashboard", icon: "dashboard-overview-active", label: "Overview" };
+
 const systemItems: NavItem[] = [
     { route: "/help", icon: "dashboard-help", label: "Help" },
     { route: "/settings", icon: "dashboard-settings", label: "Settings" },
@@ -132,6 +135,7 @@ export default function DashboardRail({ current }: DashboardRailProps) {
                     </button>
                 </div>
                 <nav className="fig-side-rail-nav" aria-label="Main menu">
+                    <div className="fig-side-rail-group" role="group" aria-label="Overview">{renderIcon(overviewItem)}</div>
                     {navGroups.map((group) => (
                         <div key={group.title} className="fig-side-rail-group" role="group" aria-label={group.title}>
                             {group.items.map(renderIcon)}
@@ -161,9 +165,9 @@ export default function DashboardRail({ current }: DashboardRailProps) {
                 </div>
 
                 <nav className="fig-side-menu-nav" aria-label="Main menu">
-                    {[...navGroups, { title: "System", items: systemItems }].map((group) => (
-                        <div key={group.title} className="fig-side-menu-group">
-                            <p className="fig-side-menu-heading">{group.title}</p>
+                    {[{ title: "", items: [overviewItem] }, ...navGroups, { title: "System", items: systemItems }].map((group) => (
+                        <div key={group.title || "overview"} className="fig-side-menu-group">
+                            {group.title ? <p className="fig-side-menu-heading">{group.title}</p> : null}
                             {group.items.map((item) => {
                                 const active = isCurrent(item.route);
                                 return (

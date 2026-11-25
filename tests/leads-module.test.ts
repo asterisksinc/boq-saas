@@ -41,7 +41,7 @@ describe("Leads — pages and grouped sidebar", () => {
         expect(list).toContain("Import Excel");
         expect(detail).toContain("Lead Information");
         // Figma lead detail: contact actions, breadcrumb, per-tab create action; no Lead Source row in Lead Information.
-        for (const text of ["WhatsApp", "ld-breadcrumb", "All Leads", "Create Project", 'label="Assign to"']) expect(detail).toContain(text);
+        for (const text of ["WhatsApp", "ld-breadcrumb", "All Leads", "ld-square-btn--primary", "runTabAction", 'label="Assign to"']) expect(detail).toContain(text);
         expect(detail).not.toContain('label="Lead Source"');
         for (const tab of ["Projects", "BOQs", "Proposals", "Invoices", "Moodboards", "Tasks", "Approvals", "Call Logs", "Notes"]) {
             expect(detail).toContain(`label: "${tab}"`);
@@ -63,6 +63,7 @@ describe("Leads — pages and grouped sidebar", () => {
         }
         expect(rail.indexOf('route: "/leads"')).toBeLessThan(rail.indexOf('route: "/projects"'));
         expect(rail).toContain("fig-side-menu");
+        expect(rail).toContain('{ route: "/dashboard", icon: "dashboard-overview-active", label: "Overview" }');
         expect(read("app", "layout.tsx")).toContain("sidebarInitScript");
         expect(read("app", "globals.css")).toContain('html[data-sidebar="expanded"] body:has(.fig-side-menu) .fig-dashboard-main');
     });

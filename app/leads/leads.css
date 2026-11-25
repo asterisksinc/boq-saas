@@ -1267,11 +1267,11 @@
 
 .ld-info-row {
     display: grid;
-    grid-template-columns: 120px minmax(0, 1fr);
+    grid-template-columns: 128px minmax(0, 1fr);
     align-items: center;
     gap: 12px;
-    min-height: 44px;
-    padding: 6px 0;
+    min-height: 36px;
+    padding: 8px 0;
 }
 
 .ld-info-row dt {
@@ -1308,8 +1308,21 @@
 .ld-info-row .ld-link {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+    max-width: 100%;
+    padding: 0;
     font-size: 15px;
+    text-align: left;
+}
+
+.ld-info-row .ld-link span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ld-info-row .ld-link svg {
+    flex: 0 0 auto;
 }
 
 .ld-assign {
@@ -1364,21 +1377,40 @@
     padding: 8px 20px 20px;
 }
 
+.ld-tab-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.ld-tab-bar .ld-tabs {
+    flex: 0 1 auto;
+}
+
+/* Boxed tab strip with a global search and add action (Figma lead detail). */
 .ld-tabs {
     display: flex;
     gap: 4px;
+    min-width: 0;
     max-width: 100%;
+    padding: 6px;
     overflow-x: auto;
-    border-bottom: 1px solid var(--ld-line);
-    scrollbar-width: thin;
+    border: 1px solid var(--ld-line);
+    border-radius: 8px;
+    background: #fff;
+    scrollbar-width: none;
+}
+
+.ld-tabs::-webkit-scrollbar {
+    display: none;
 }
 
 .ld-tabs button {
-    flex: 1 0 auto;
-    padding: 14px 10px;
+    flex: 0 0 auto;
+    padding: 9px 12px;
     border: 0;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
+    border-radius: 6px;
     background: none;
     color: var(--ld-slate);
     font: 500 15px 'Urbanist', Inter, sans-serif;
@@ -1391,47 +1423,61 @@
 }
 
 .ld-tabs button.is-current {
-    border-bottom-color: var(--ld-blue);
+    background: var(--ld-head);
     color: var(--ld-blue);
-}
-
-.ld-tab-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
-}
-
-.ld-tab-head h3 {
-    margin: 0;
-    font-size: 20px;
-    font-weight: 500;
-}
-
-.ld-tab-head p {
-    margin: 4px 0 0;
-    color: var(--ld-muted);
-    font-size: 15px;
-    font-weight: 500;
 }
 
 .ld-tab-tools {
     display: flex;
     align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
+    gap: 10px;
+    margin-left: auto;
+}
+
+.ld-square-btn {
+    display: grid;
+    width: 52px;
+    height: 52px;
+    flex: 0 0 auto;
+    place-items: center;
+    padding: 0;
+    border: 6px solid #f1f5fb;
+    border-radius: 8px;
+    background: #fff;
+    color: var(--ld-ink);
+    cursor: pointer;
+    transition: background .15s;
+}
+
+.ld-square-btn:hover:not(:disabled) {
+    background: #f8fafc;
+}
+
+.ld-square-btn--primary {
+    border: 0;
+    background: var(--ld-blue);
+    color: #fff;
+}
+
+.ld-square-btn--primary:hover:not(:disabled) {
+    background: #1d4ed8;
+}
+
+.ld-square-btn:disabled {
+    cursor: not-allowed;
+    opacity: .6;
 }
 
 .ld-tab-search {
     display: flex;
     align-items: center;
-    gap: 10px;
-    width: 280px;
-    height: 42px;
+    gap: 8px;
+    width: 220px;
+    height: 52px;
     padding: 0 12px;
-    border-radius: 6px;
-    background: #eef2f9;
+    border: 1px solid var(--ld-line);
+    border-radius: 8px;
+    background: #fff;
     color: var(--ld-slate);
 }
 
@@ -1445,8 +1491,15 @@
     outline: 0;
 }
 
-.ld-tab-tools .ld-btn {
-    height: 42px;
+.ld-tab-search-clear {
+    display: grid;
+    place-items: center;
+    padding: 2px;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    color: var(--ld-muted);
+    cursor: pointer;
 }
 
 .ld-project-cell {
@@ -1638,8 +1691,13 @@
         width: 100%;
     }
 
+    .ld-tab-bar {
+        flex-wrap: wrap;
+    }
+
     .ld-tab-tools {
         width: 100%;
+        justify-content: flex-end;
     }
 
     .ld-info-row {

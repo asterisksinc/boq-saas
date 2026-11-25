@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import {
     BadgeCheck, Calculator, ChevronDown, Download, ExternalLink, FileText, Folder, Image as ImageIcon, ListChecks, Mail, MapPin,
-    MoreHorizontal, NotebookPen, Pencil, Phone, Plus, Receipt, Search, StickyNote, Trash2, User,
+    MoreHorizontal, NotebookPen, Pencil, Phone, Plus, Receipt, Search, StickyNote, Trash2, User, X,
 } from "lucide-react";
 import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
@@ -57,6 +57,7 @@ export default function LeadDetailPage() {
     const [entryOpen, setEntryOpen] = useState(false);
     const [counts, setCounts] = useState<Partial<Record<TabKey, number>>>({});
     const [query, setQuery] = useState("");
+    const [searchOpen, setSearchOpen] = useState(false);
     const [members, setMembers] = useState<LeadPerson[]>([]);
     const [assigning, setAssigning] = useState(false);
     const [toast, setToast] = useState<{ message: string; tone: "success" | "error" } | null>(null);
@@ -158,6 +159,7 @@ export default function LeadDetailPage() {
         setPage(1);
         setRows([]);
         setQuery("");
+        setSearchOpen(false);
     };
 
     const exportLead = () => {
@@ -340,7 +342,7 @@ export default function LeadDetailPage() {
                                 value={lead.project ? (
                                     lead.project.id ? (
                                         <button type="button" className="ld-link" onClick={() => router.push(`/projects/${lead.project!.id}`)}>
-                                            {lead.project.name} <ExternalLink size={18} />
+                                            <span>{lead.project.name}</span> <ExternalLink size={18} aria-hidden="true" />
                                         </button>
                                     ) : (
                                         <span>{lead.project.name}</span>
@@ -376,29 +378,40 @@ export default function LeadDetailPage() {
                 </aside>
 
                 <section className="ld-card ld-tabs-card">
-                    <div className="ld-tabs" role="tablist" aria-label="Lead records">
-                        {TABS.map((t) => {
-                            const count = countOf(t.key);
-                            return (
+                    <div className="ld-tab-bar">
+                        <div className="ld-tabs" role="tablist" aria-label="Lead records">
+                            {TABS.map((t) => (
                                 <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} className={tab === t.key ? "is-current" : ""} onClick={() => switchTab(t.key)}>
-                                    {t.label}{count != null ? ` (${count})` : ""}
+                                    {t.label}
                                 </button>
-                            );
-                        })}
-                    </div>
-
-                    <div className="ld-tab-head">
-                        <div>
-                            <h3>{tabMeta.title}</h3>
-                            <p>{tabMeta.text}</p>
+                            ))}
                         </div>
                         <div className="ld-tab-tools">
-                            <label className="ld-tab-search">
-                                <Search size={20} aria-hidden="true" />
-                                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Search ${tabMeta.label.toLowerCase()}...`} aria-label={`Search ${tabMeta.label.toLowerCase()}`} />
-                            </label>
-                            <button type="button" className="ld-btn ld-btn--primary" onClick={runTabAction} disabled={!lead}>
-                                <Plus size={18} /> {tabMeta.action}
+                            {searchOpen || query ? (
+                                <label className="ld-tab-search">
+                                    <Search size={18} aria-hidden="true" />
+                                    <input
+                                        autoFocus
+                                        value={query}
+                                        onChange={(e) => setQuery(e.target.value)}
+                                        onBlur={() => { if (!query) setSearchOpen(false); }}
+                                        onKeyDown={(e) => { if (e.key === "Escape") { setQuery(""); setSearchOpen(false); } }}
+                                        placeholder={`Search ${tabMeta.label.toLowerCase()}...`}
+                                        aria-label={`Search ${tabMeta.label.toLowerCase()}`}
+                                    />
+                                    {query ? (
+                                        <button type="button" className="ld-tab-search-clear" aria-label="Clear search" onMouseDown={(e) => e.preventDefault()} onClick={() => { setQuery(""); setSearchOpen(false); }}>
+                                            <X size={16} />
+                                        </button>
+                                    ) : null}
+                                </label>
+                            ) : (
+                                <button type="button" className="ld-square-btn" aria-label={`Search ${tabMeta.label.toLowerCase()}`} title={`Search ${tabMeta.label.toLowerCase()}`} onClick={() => setSearchOpen(true)}>
+                                    <Search size={20} />
+                                </button>
+                            )}
+                            <button type="button" className="ld-square-btn ld-square-btn--primary" aria-label={tabMeta.action} title={tabMeta.action} onClick={runTabAction} disabled={!lead}>
+                                <Plus size={22} />
                             </button>
                         </div>
                     </div>
