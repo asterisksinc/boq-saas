@@ -40,6 +40,9 @@ describe("Leads — pages and grouped sidebar", () => {
         expect(list).toContain("Export Excel");
         expect(list).toContain("Import Excel");
         expect(detail).toContain("Lead Information");
+        // Figma lead detail: contact actions, breadcrumb, per-tab create action; no Lead Source row in Lead Information.
+        for (const text of ["WhatsApp", "ld-breadcrumb", "All Leads", "Create Project", 'label="Assign to"']) expect(detail).toContain(text);
+        expect(detail).not.toContain('label="Lead Source"');
         for (const tab of ["Projects", "BOQs", "Proposals", "Invoices", "Moodboards", "Tasks", "Approvals", "Call Logs", "Notes"]) {
             expect(detail).toContain(`label: "${tab}"`);
         }

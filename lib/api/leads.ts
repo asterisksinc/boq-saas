@@ -305,7 +305,8 @@ async function localRelated<T>(leadId: string, tab: LeadRelatedTab, page: number
             id: project.id, projectCode: project.projectCode, name: project.name, projectType: project.projectType,
             status: project.status, stage: project.stage ?? project.currentPhase ?? null, areaSqft: project.areaSqft,
             designer: project.leadDesigner ?? null, boqValue: project.boqValue ?? 0, margin: project.margin ?? null,
-            dueDate: project.targetCompletionDate ?? null,
+            dueDate: project.targetCompletionDate ?? null, imageUrl: project.imageUrl ?? project.coverImage ?? null,
+            updatedAt: project.updatedAt ?? null,
         };
         return { items: [row as T], page: 1, pageSize, total: 1, hasMore: false };
     } catch {

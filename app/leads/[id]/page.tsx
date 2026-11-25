@@ -3,29 +3,32 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
-import { ArrowLeft, ChevronDown, Phone, Plus, StickyNote } from "lucide-react";
+import {
+    BadgeCheck, Calculator, ChevronDown, Download, ExternalLink, FileText, Folder, Image as ImageIcon, ListChecks, Mail, MapPin,
+    MoreHorizontal, NotebookPen, Pencil, Phone, Plus, Receipt, Search, StickyNote, Trash2, User,
+} from "lucide-react";
 import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
 import { CallLogDrawer, LeadFormDrawer, NoteDrawer } from "@/components/leads/LeadDrawers";
 import { Avatar, EmptyState, Pagination, Pill, RowMenu, Toast, humanize, stageTone, statusTone } from "@/components/leads/LeadUi";
 import {
     CALL_STATUSES, NOTE_TYPES, deleteLead, deleteLeadCallLog, deleteLeadNote, formatCompactMoney, formatDate, formatMoney,
-    getLead, listLeadCallLogs, listLeadNotes, listLeadRelated, relativeDays,
-    type LeadCallLog, type LeadDetail, type LeadNote, type LeadRelatedTab,
+    getLead, listLeadCallLogs, listLeadFormOptions, listLeadNotes, listLeadRelated, updateLead,
+    type LeadCallLog, type LeadPerson, type LeadDetail, type LeadNote, type LeadRelatedTab,
 } from "@/lib/api/leads";
 import { loadMoodBoards, type MoodBoard } from "@/lib/mood-boards";
 import "../leads.css";
 
 const TABS = [
-    { key: "projects", label: "Projects" },
-    { key: "boqs", label: "BOQs" },
-    { key: "proposals", label: "Proposals" },
-    { key: "invoices", label: "Invoices" },
-    { key: "moodboards", label: "Moodboards" },
-    { key: "tasks", label: "Tasks" },
-    { key: "approvals", label: "Approvals" },
-    { key: "call-logs", label: "Call Logs" },
-    { key: "notes", label: "Notes" },
+    { key: "projects", label: "Projects", icon: Folder, title: "Projects", text: "All projects linked with this lead.", action: "Create Project", href: "/projects?create=true" },
+    { key: "boqs", label: "BOQs", icon: Calculator, title: "BOQs", text: "Bills of quantities across this lead's projects.", action: "Create BOQ", href: "/boqs?create=true" },
+    { key: "proposals", label: "Proposals", icon: FileText, title: "Proposals", text: "Proposals shared with this lead.", action: "Create Proposal", href: "/proposals?create=true" },
+    { key: "invoices", label: "Invoices", icon: Receipt, title: "Invoices", text: "Invoices raised for this lead's projects.", action: "Create Invoice", href: "/invoices?create=true" },
+    { key: "moodboards", label: "Moodboards", icon: ImageIcon, title: "Moodboards", text: "Moodboards for this lead and its projects.", action: "Create Moodboard", href: "/mood-boards" },
+    { key: "tasks", label: "Tasks", icon: ListChecks, title: "Tasks", text: "Tasks on this lead's projects.", action: "Create Task", href: "/activities?tab=tasks&create=true" },
+    { key: "approvals", label: "Approvals", icon: BadgeCheck, title: "Approvals", text: "Approvals requested on this lead's projects.", action: "Request Approval", href: "/activities?tab=approvals&create=true" },
+    { key: "call-logs", label: "Call Logs", icon: Phone, title: "Call Logs", text: "Every call made with this lead.", action: "New Call Log", href: null },
+    { key: "notes", label: "Notes", icon: NotebookPen, title: "Notes", text: "Meeting notes, follow-ups and decisions.", action: "New Note", href: null },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -52,6 +55,10 @@ export default function LeadDetailPage() {
     const [callLog, setCallLog] = useState<{ open: boolean; log: LeadCallLog | null }>({ open: false, log: null });
     const [note, setNote] = useState<{ open: boolean; note: LeadNote | null }>({ open: false, note: null });
     const [entryOpen, setEntryOpen] = useState(false);
+    const [counts, setCounts] = useState<Partial<Record<TabKey, number>>>({});
+    const [query, setQuery] = useState("");
+    const [members, setMembers] = useState<LeadPerson[]>([]);
+    const [assigning, setAssigning] = useState(false);
     const [toast, setToast] = useState<{ message: string; tone: "success" | "error" } | null>(null);
     const entryRef = useRef<HTMLDivElement>(null);
 
@@ -105,6 +112,38 @@ export default function LeadDetailPage() {
 
     useEffect(() => { void loadTab(); }, [loadTab]);
 
+    // Record counts for the stat cards and tab labels.
+    const loadCounts = useCallback(async () => {
+        const keys = TABS.map((t) => t.key).filter((k) => k !== "moodboards");
+        const totals = await Promise.all(keys.map((key) => {
+            const req = key === "call-logs" ? listLeadCallLogs(id, 1, 1) : key === "notes" ? listLeadNotes(id, 1, 1) : listLeadRelated(id, key as LeadRelatedTab, 1, 1);
+            return req.then((r) => r.total).catch(() => 0);
+        }));
+        setCounts(Object.fromEntries(keys.map((k, i) => [k, totals[i]])));
+    }, [id]);
+
+    useEffect(() => { void loadCounts(); }, [loadCounts]);
+
+    useEffect(() => {
+        listLeadFormOptions()
+            .then(({ members: list }) => setMembers(list.map((m) => ({ id: m.id, name: m.name, role: m.role ?? null, avatarUrl: m.avatarUrl ?? null }))))
+            .catch(() => setMembers([]));
+    }, []);
+
+    const assign = async (memberId: string) => {
+        if (!lead) return;
+        setAssigning(true);
+        try {
+            await updateLead(lead.id, { assignedTo: memberId || null });
+            notify(memberId ? "Lead assigned." : "Lead unassigned.");
+            await loadLead();
+        } catch (err) {
+            notify(err instanceof Error ? err.message : "Lead could not be assigned.", "error");
+        } finally {
+            setAssigning(false);
+        }
+    };
+
     useEffect(() => {
         if (!entryOpen) return;
         const close = (event: MouseEvent) => {
@@ -118,6 +157,7 @@ export default function LeadDetailPage() {
         setTab(key);
         setPage(1);
         setRows([]);
+        setQuery("");
     };
 
     const exportLead = () => {
@@ -150,6 +190,7 @@ export default function LeadDetailPage() {
             await deleteLeadCallLog(id, log.id);
             notify("Call log deleted.");
             void loadTab();
+            void loadCounts();
         } catch (err) {
             notify(err instanceof Error ? err.message : "Call log could not be deleted.", "error");
         }
@@ -161,13 +202,26 @@ export default function LeadDetailPage() {
             await deleteLeadNote(id, item.id);
             notify("Note deleted.");
             void loadTab();
+            void loadCounts();
         } catch (err) {
             notify(err instanceof Error ? err.message : "Note could not be deleted.", "error");
         }
     };
 
     const currency = lead?.stats.currency ?? "INR";
-    const lastContacted = relativeDays(lead?.lastContactedAt ?? null);
+    const countOf = (key: TabKey) => (key === "moodboards" ? moodBoards.length : counts[key]);
+    const tabMeta = TABS.find((t) => t.key === tab)!;
+    const q = query.trim().toLowerCase();
+    const visibleRows = q ? rows.filter((r) => JSON.stringify(r).toLowerCase().includes(q)) : rows;
+    const visibleBoards = q ? moodBoards.filter((b) => `${b.name} ${b.projectName ?? ""}`.toLowerCase().includes(q)) : moodBoards;
+    const phoneDigits = lead?.phone?.replace(/\D/g, "") ?? "";
+    const whatsappNumber = phoneDigits.length === 10 ? `91${phoneDigits}` : phoneDigits;
+
+    const runTabAction = () => {
+        if (tab === "call-logs") setCallLog({ open: true, log: null });
+        else if (tab === "notes") setNote({ open: true, note: null });
+        else if (tabMeta.href) router.push(tabMeta.href);
+    };
 
     if (loadError) {
         return (
@@ -182,45 +236,66 @@ export default function LeadDetailPage() {
 
     return (
         <Shell>
-            <button type="button" className="ld-back" onClick={() => router.push("/leads")}>
-                <ArrowLeft size={20} /> Back
-            </button>
+            <nav className="ld-breadcrumb" aria-label="Breadcrumb">
+                <button type="button" onClick={() => router.push("/leads")}>Leads</button>
+                <span aria-hidden="true">/</span>
+                <button type="button" onClick={() => router.push("/leads")}>All Leads</button>
+                <span aria-hidden="true">/</span>
+                <span aria-current="page">{lead?.leadCode.toUpperCase() ?? "…"}</span>
+            </nav>
 
-            <section className="ld-detail-head">
-                <div className="ld-detail-identity">
-                    <span className="ld-detail-logo">
-                        {lead?.avatarUrl ? <img src={lead.avatarUrl} alt="" /> : <Avatar name={lead?.name} size={40} />}
+            <section className="ld-card ld-profile">
+                <div className="ld-profile-identity">
+                    <span className="ld-profile-avatar">
+                        {lead?.avatarUrl ? <img src={lead.avatarUrl} alt="" /> : initialsOf(lead?.name)}
                     </span>
-                    <div>
-                        <h2>
-                            {lead?.name ?? "Loading…"}
-                            {lead ? <Pill tone={stageTone(lead.stage)}>{lead.stage === "new" ? "New Lead" : lead.stageLabel}</Pill> : null}
-                        </h2>
-                        <p>{lead ? `${lead.leadCode} · ${lead.sourceLabel}` : ""}</p>
+                    <div className="ld-profile-text">
+                        <h2>{lead?.name ?? "Loading…"}</h2>
+                        <p>{lead ? `${lead.leadCode.toUpperCase()} · Created ${formatDate(lead.createdAt)}` : ""}</p>
+                        {lead ? (
+                            <div className="ld-profile-tags">
+                                <Pill tone={stageTone(lead.stage)}>{lead.stage === "new" ? "New Lead" : lead.stageLabel}</Pill>
+                                <Pill tone="blue">{lead.sourceLabel}</Pill>
+                            </div>
+                        ) : null}
                     </div>
                 </div>
-                <div className="ld-detail-actions">
-                    {lead ? (
-                        <span className={`ld-last-contacted${lastContacted ? "" : " is-never"}`}>
-                            {lastContacted ? `Last Contacted ${lastContacted}` : "Not contacted yet"}
-                        </span>
-                    ) : null}
-                    <button type="button" className="ld-btn" onClick={exportLead} disabled={!lead}>Export</button>
-                    <button type="button" className="ld-btn" onClick={() => setEditOpen(true)} disabled={!lead}>Edit Lead</button>
+                <div className="ld-profile-actions">
+                    <a className={`ld-btn ld-btn--outline${lead?.phone ? "" : " is-disabled"}`} href={lead?.phone ? `tel:${lead.phone}` : undefined} aria-disabled={!lead?.phone}>
+                        <Phone size={18} className="ld-icon-blue" /> Call
+                    </a>
+                    <a className={`ld-btn ld-btn--outline${lead?.email ? "" : " is-disabled"}`} href={lead?.email ? `mailto:${lead.email}` : undefined} aria-disabled={!lead?.email}>
+                        <Mail size={18} /> Email
+                    </a>
+                    <a
+                        className={`ld-btn ld-btn--outline${whatsappNumber ? "" : " is-disabled"}`}
+                        href={whatsappNumber ? `https://wa.me/${whatsappNumber}` : undefined}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-disabled={!whatsappNumber}
+                    >
+                        <WhatsAppIcon /> WhatsApp
+                    </a>
+                    <button type="button" className="ld-btn ld-btn--outline" onClick={() => setEditOpen(true)} disabled={!lead}>
+                        <Pencil size={17} /> Edit Lead
+                    </button>
                     <div className="ld-entry" ref={entryRef}>
-                        <button type="button" className="ld-btn ld-btn--primary" aria-haspopup="menu" aria-expanded={entryOpen} onClick={() => setEntryOpen((v) => !v)} disabled={!lead}>
-                            <Plus size={18} /> New Entry <ChevronDown size={16} />
+                        <button type="button" className="ld-btn ld-btn--outline ld-btn--icon" aria-label="More actions" aria-haspopup="menu" aria-expanded={entryOpen} onClick={() => setEntryOpen((v) => !v)} disabled={!lead}>
+                            <MoreHorizontal size={20} />
                         </button>
                         {entryOpen ? (
-                            <div className="ld-menu-list ld-entry-list" role="menu">
+                            <div className="ld-pop-menu" role="menu">
                                 <button type="button" role="menuitem" onClick={() => { setEntryOpen(false); setCallLog({ open: true, log: null }); }}>
-                                    <Phone size={16} /> Call Log
+                                    <Phone size={20} /> New Call Log
                                 </button>
                                 <button type="button" role="menuitem" onClick={() => { setEntryOpen(false); setNote({ open: true, note: null }); }}>
-                                    <StickyNote size={16} /> Note
+                                    <StickyNote size={20} /> New Note
+                                </button>
+                                <button type="button" role="menuitem" onClick={() => { setEntryOpen(false); exportLead(); }}>
+                                    <Download size={20} /> Export Lead
                                 </button>
                                 <button type="button" role="menuitem" className="is-danger" onClick={() => { setEntryOpen(false); void removeLead(); }}>
-                                    Delete Lead
+                                    <Trash2 size={20} /> Delete Lead
                                 </button>
                             </div>
                         ) : null}
@@ -229,50 +304,71 @@ export default function LeadDetailPage() {
             </section>
 
             <section className="ld-stats" aria-label="Lead summary">
-                <Stat label="Projects" value={lead ? String(lead.stats.projects) : "—"} />
-                <Stat label="BOQ Value" value={lead ? formatMoney(lead.stats.boqValue, currency) : "—"} />
-                <Stat label="Invoices" value={lead ? (lead.stats.invoicesTotal ? `${lead.stats.invoicesPaid} Paid of ${lead.stats.invoicesTotal}` : "0") : "—"} />
-                <Stat label="Moodboards" value={lead ? String(moodBoards.length) : "—"} />
-                <Stat label="Outstanding Amount" value={lead ? formatMoney(lead.stats.outstandingAmount, currency) : "—"} />
+                {TABS.map((t) => {
+                    const Icon = t.icon;
+                    const value = lead ? countOf(t.key) : undefined;
+                    return (
+                        <button key={t.key} type="button" className={`ld-stat${tab === t.key ? " is-current" : ""}`} onClick={() => switchTab(t.key)}>
+                            <Icon size={24} strokeWidth={1.6} className="ld-stat-icon" />
+                            <span className="ld-stat-text">
+                                <span>{t.label}</span>
+                                <strong>{value == null ? "—" : String(value).padStart(2, "0")}</strong>
+                            </span>
+                        </button>
+                    );
+                })}
             </section>
 
             <div className="ld-detail-body">
                 <aside className="ld-card ld-info">
-                    <h3>Lead Information</h3>
+                    <header className="ld-info-head">
+                        <h3>Lead Information</h3>
+                        <button type="button" className="ld-icon-btn" aria-label="Edit lead information" onClick={() => setEditOpen(true)} disabled={!lead}>
+                            <Pencil size={20} />
+                        </button>
+                    </header>
                     {lead ? (
                         <dl>
-                            <InfoRow label="Lead ID" value={lead.leadCode} />
-                            <InfoRow label="Email" value={lead.email ? <a href={`mailto:${lead.email}`}>{lead.email}</a> : null} />
-                            <InfoRow label="Phone" value={lead.phone ? <a href={`tel:${lead.phone}`}>{lead.phone}</a> : null} />
-                            <InfoRow label="Location" value={lead.location} />
-                            <InfoRow label="Stage" value={<Pill tone={stageTone(lead.stage)}>{lead.stageLabel}</Pill>} />
-                            <InfoRow label="Lead Source" value={<Pill tone="blue">{lead.sourceLabel}</Pill>} />
+                            <InfoRow icon={<User size={20} />} label="Name" value={lead.name} />
+                            <InfoRow icon={<Mail size={20} />} label="Email" value={lead.email ? <a href={`mailto:${lead.email}`}>{lead.email}</a> : null} />
+                            <InfoRow icon={<Phone size={20} />} label="Phone" value={lead.phone ? <a href={`tel:${lead.phone}`}>{lead.phone}</a> : null} />
+                            <InfoRow icon={<MapPin size={20} />} label="Location" value={lead.location} />
+                            <hr />
                             <InfoRow
+                                icon={<Folder size={20} />}
                                 label="Linked Project"
                                 value={lead.project ? (
                                     lead.project.id ? (
                                         <button type="button" className="ld-link" onClick={() => router.push(`/projects/${lead.project!.id}`)}>
-                                            {lead.project.name}{lead.project.projectCode ? ` · ${lead.project.projectCode}` : ""}
+                                            {lead.project.name} <ExternalLink size={18} />
                                         </button>
                                     ) : (
-                                        <span>{lead.project.name}{lead.project.projectCode ? ` · ${lead.project.projectCode}` : ""}</span>
+                                        <span>{lead.project.name}</span>
                                     )
                                 ) : null}
                             />
                             <InfoRow
-                                label="Assigned To"
-                                value={lead.assignee ? (
-                                    <span className="ld-person">
-                                        <Avatar name={lead.assignee.name} src={lead.assignee.avatarUrl} size={28} />
-                                        <span>
-                                            <span className="ld-person-name">{lead.assignee.name}</span>
-                                            {lead.assignee.role ? <span className="ld-person-role">{lead.assignee.role}</span> : null}
-                                        </span>
+                                icon={<User size={20} />}
+                                label="Assign to"
+                                value={
+                                    <span className="ld-assign">
+                                        {lead.assignee ? <Avatar name={lead.assignee.name} src={lead.assignee.avatarUrl} size={28} /> : <User size={18} className="ld-assign-empty" />}
+                                        <select
+                                            aria-label="Assign to"
+                                            value={lead.assignedTo ?? ""}
+                                            disabled={assigning}
+                                            onChange={(e) => void assign(e.target.value)}
+                                        >
+                                            <option value="">Unassigned</option>
+                                            {lead.assignee && !members.some((m) => m.id === lead.assignedTo) ? (
+                                                <option value={lead.assignedTo ?? ""}>{lead.assignee.name}</option>
+                                            ) : null}
+                                            {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                                        </select>
+                                        <ChevronDown size={18} aria-hidden="true" />
                                     </span>
-                                ) : null}
+                                }
                             />
-                            <InfoRow label="Last Contacted" value={lead.lastContactedAt ? formatDate(lead.lastContactedAt) : null} />
-                            <InfoRow label="Created On" value={formatDate(lead.createdAt)} />
                         </dl>
                     ) : (
                         <div className="ld-info-skeleton"><span /><span /><span /><span /></div>
@@ -281,11 +377,30 @@ export default function LeadDetailPage() {
 
                 <section className="ld-card ld-tabs-card">
                     <div className="ld-tabs" role="tablist" aria-label="Lead records">
-                        {TABS.map((t) => (
-                            <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} className={tab === t.key ? "is-current" : ""} onClick={() => switchTab(t.key)}>
-                                {t.label}
+                        {TABS.map((t) => {
+                            const count = countOf(t.key);
+                            return (
+                                <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} className={tab === t.key ? "is-current" : ""} onClick={() => switchTab(t.key)}>
+                                    {t.label}{count != null ? ` (${count})` : ""}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    <div className="ld-tab-head">
+                        <div>
+                            <h3>{tabMeta.title}</h3>
+                            <p>{tabMeta.text}</p>
+                        </div>
+                        <div className="ld-tab-tools">
+                            <label className="ld-tab-search">
+                                <Search size={20} aria-hidden="true" />
+                                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Search ${tabMeta.label.toLowerCase()}...`} aria-label={`Search ${tabMeta.label.toLowerCase()}`} />
+                            </label>
+                            <button type="button" className="ld-btn ld-btn--primary" onClick={runTabAction} disabled={!lead}>
+                                <Plus size={18} /> {tabMeta.action}
                             </button>
-                        ))}
+                        </div>
                     </div>
 
                     {tabError ? (
@@ -294,10 +409,10 @@ export default function LeadDetailPage() {
                             <button type="button" className="ld-btn" onClick={() => void loadTab()}>Retry</button>
                         </div>
                     ) : tab === "moodboards" ? (
-                        <MoodBoardList boards={moodBoards} onOpen={(boardId) => router.push(`/mood-boards/${boardId}`)} />
+                        <MoodBoardList boards={visibleBoards} onOpen={(boardId) => router.push(`/mood-boards/${boardId}`)} />
                     ) : tab === "notes" ? (
                         <NotesGrid
-                            notes={rows as LeadNote[]}
+                            notes={visibleRows as LeadNote[]}
                             loading={tabLoading}
                             onOpen={(n) => setNote({ open: true, note: n })}
                             onDelete={removeNote}
@@ -306,7 +421,7 @@ export default function LeadDetailPage() {
                     ) : (
                         <RecordsTable
                             tab={tab}
-                            rows={rows}
+                            rows={visibleRows}
                             loading={tabLoading}
                             currency={currency}
                             onOpen={(row) => {
@@ -327,7 +442,7 @@ export default function LeadDetailPage() {
                             page={page}
                             pageSize={pageSize}
                             total={total}
-                            label={`Total ${TABS.find((t) => t.key === tab)?.label}`}
+                            label={`Total ${tabMeta.label}`}
                             onPage={setPage}
                             onPageSize={(n) => { setPageSize(n); setPage(1); }}
                         />
@@ -353,6 +468,7 @@ export default function LeadDetailPage() {
                             setCallLog({ open: false, log: null });
                             notify(created ? "Call log added." : "Call log updated.");
                             void loadLead();
+                            void loadCounts();
                             if (tab === "call-logs") void loadTab(); else switchTab("call-logs");
                         }}
                     />
@@ -365,6 +481,7 @@ export default function LeadDetailPage() {
                             const created = !note.note;
                             setNote({ open: false, note: null });
                             notify(created ? "Note added." : "Note updated.");
+                            void loadCounts();
                             if (tab === "notes") void loadTab(); else switchTab("notes");
                         }}
                     />
@@ -388,21 +505,27 @@ function Shell({ children }: { children: React.ReactNode }) {
     );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function initialsOf(name: string | null | undefined) {
+    const parts = String(name ?? "").trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return "";
+    return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
+}
+
+function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
     return (
-        <div className="ld-stat">
-            <span>{label}</span>
-            <strong>{value}</strong>
+        <div className="ld-info-row">
+            <dt><span className="ld-info-icon" aria-hidden="true">{icon}</span>{label}</dt>
+            <dd>{value ?? <span className="ld-muted">—</span>}</dd>
         </div>
     );
 }
 
-function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
+function WhatsAppIcon() {
     return (
-        <div className="ld-info-row">
-            <dt>{label}</dt>
-            <dd>{value ?? <span className="ld-muted">—</span>}</dd>
-        </div>
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="#25D366" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Z" />
+            <path fill="#fff" d="M17.3 14.4c-.3-.1-1.7-.8-1.9-.9-.3-.1-.5-.1-.7.1l-.9 1.1c-.2.2-.3.2-.6.1a7.6 7.6 0 0 1-3.8-3.3c-.3-.5.3-.5.8-1.6.1-.2 0-.4 0-.5l-.9-2.1c-.2-.6-.5-.5-.7-.5h-.6a1.1 1.1 0 0 0-.8.4 3.4 3.4 0 0 0-1 2.5 5.9 5.9 0 0 0 1.2 3.1 13.4 13.4 0 0 0 5.2 4.6c1.9.8 2.7.9 3.6.8a3.1 3.1 0 0 0 2-1.4 2.5 2.5 0 0 0 .2-1.4c-.1-.1-.3-.2-.6-.3Z" />
+        </svg>
     );
 }
 
@@ -417,14 +540,29 @@ function RecordsTable({
         switch (tab) {
             case "projects":
                 return [
-                    { label: "Project", render: (r) => <span className="ld-two-line"><strong>{r.name}</strong><span className="ld-small">{[r.projectCode, r.areaSqft ? `${Number(r.areaSqft).toLocaleString("en-IN")} sqft` : null].filter(Boolean).join(" · ")}</span></span> },
+                    {
+                        label: "Project",
+                        render: (r) => (
+                            <span className="ld-project-cell">
+                                <span className="ld-project-thumb">{r.imageUrl ? <img src={r.imageUrl} alt="" /> : <Folder size={20} />}</span>
+                                <span className="ld-two-line">
+                                    <strong>{r.name}</strong>
+                                    <span className="ld-small">{[r.projectCode, r.areaSqft ? `${Number(r.areaSqft).toLocaleString("en-IN")} sqft` : null].filter(Boolean).join(" · ")}</span>
+                                </span>
+                            </span>
+                        ),
+                    },
                     { label: "Type", render: (r) => <span className="ld-muted">{r.projectType ?? "—"}</span> },
                     { label: "Stage", render: (r) => (r.stage ? <Pill tone="gray">{humanize(r.stage)}</Pill> : <span className="ld-muted">—</span>) },
                     { label: "Status", render: (r) => <Pill tone={statusTone(r.status)}>{humanize(r.status).toUpperCase()}</Pill> },
-                    { label: "Designer", render: (r) => <span className="ld-muted">{r.designer ?? "—"}</span> },
-                    { label: "BOQs", render: (r) => <strong className="ld-strong">{formatCompactMoney(Number(r.boqValue ?? 0), currency)}</strong> },
-                    { label: "Margin", render: (r) => <span className="ld-muted">{r.margin != null ? `${Math.round(Number(r.margin))}%` : "—"}</span> },
-                    { label: "Due Date", render: (r) => <span className="ld-muted">{formatDate(r.dueDate)}</span> },
+                    { label: "BOQ Value", render: (r) => <strong className="ld-strong">{formatCompactMoney(Number(r.boqValue ?? 0), currency)}</strong> },
+                    {
+                        label: "Owner",
+                        render: (r) => (r.designer ? (
+                            <span className="ld-person"><Avatar name={r.designer} size={32} /><span className="ld-person-name">{r.designer}</span></span>
+                        ) : <span className="ld-muted">—</span>),
+                    },
+                    { label: "Updated", render: (r) => <span className="ld-muted ld-nowrap">{formatDate(r.updatedAt ?? r.dueDate)}</span> },
                 ];
             case "boqs":
                 return [
@@ -475,6 +613,7 @@ function RecordsTable({
     }, [tab, currency]);
 
     const isCallLogs = tab === "call-logs";
+    const hasMenu = isCallLogs || tab === "projects";
     const emptyLabel = TABS.find((t) => t.key === tab)?.label.toLowerCase() ?? "records";
 
     return (
@@ -483,7 +622,7 @@ function RecordsTable({
                 <thead>
                     <tr>
                         {columns.map((c) => <th key={c.label}>{c.label}</th>)}
-                        {isCallLogs ? <th aria-label="Actions" /> : null}
+                        {hasMenu ? <th aria-label="Actions" /> : null}
                     </tr>
                 </thead>
                 <tbody>
@@ -493,11 +632,11 @@ function RecordsTable({
                         rows.map((row) => (
                             <tr key={row.id} onClick={() => onOpen(row)}>
                                 {columns.map((c) => <td key={c.label}>{c.render(row)}</td>)}
-                                {isCallLogs ? (
+                                {hasMenu ? (
                                     <td className="ld-col-menu">
                                         <RowMenu
-                                            label={`Actions for ${row.title}`}
-                                            actions={[
+                                            label={`Actions for ${row.title ?? row.name}`}
+                                            actions={!isCallLogs ? [{ label: "Open Project", onSelect: () => onOpen(row) }] : [
                                                 { label: "View Call Log", onSelect: () => onOpen(row) },
                                                 { label: "Delete Call Log", onSelect: () => onDeleteCallLog(row as LeadCallLog), danger: true },
                                             ]}
