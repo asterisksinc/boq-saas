@@ -1,6 +1,8 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
+import { ChevronsLeft, ChevronsRight } from "lucide-react";
+import { SIDEBAR_STORAGE_KEY } from "@/lib/sidebar";
 
 export interface DashboardRailProps {
     current?: string;
@@ -12,21 +14,69 @@ interface NavItem {
     label: string;
 }
 
-const navItems: NavItem[] = [
-    { route: "/dashboard", icon: "dashboard-overview-active", label: "Overview" },
-    { route: "/projects", icon: "dashboard-projects", label: "Projects" },
-    { route: "/mood-boards", icon: "dashboard-moodboards", label: "Mood Boards" },
-    { route: "/boqs", icon: "dashboard-boqs", label: "Bill of Quantities" },
-    { route: "/costs", icon: "dashboard-costs", label: "Costing" },
-    { route: "/templates", icon: "dashboard-templates", label: "Templates" },
-    { route: "/proposals", icon: "dashboard-estimates", label: "Proposals" },
-    { route: "/invoices", icon: "dashboard-purchase-orders", label: "Invoices" },
-    { route: "/analytics", icon: "dashboard-analytics", label: "Analytics" },
-    { route: "/documents", icon: "dashboard-reports", label: "Documents" },
-    { route: "/integrations", icon: "dashboard-integrations", label: "Integrations" },
-    { route: "/billing", icon: "dashboard-billing", label: "Billing" },
-    { route: "/activities", icon: "dashboard-activities-active", label: "Activities" },
+interface NavGroup {
+    title: string;
+    items: NavItem[];
+}
+
+/** Sidebar groups from Figma "Side menu" (2760:120). The collapsed rail shows the same items in the same order. */
+export const navGroups: NavGroup[] = [
+    {
+        title: "Relationship & Projects",
+        items: [
+            { route: "/leads", icon: "nav-leads", label: "Leads" },
+            { route: "/projects", icon: "dashboard-projects", label: "Projects" },
+            { route: "/mood-boards", icon: "nav-moodboards", label: "Moodboards" },
+            { route: "/activities", icon: "nav-activities", label: "Activities" },
+            { route: "/documents", icon: "nav-documents", label: "Documents" },
+        ],
+    },
+    {
+        title: "Design & Estimation",
+        items: [
+            { route: "/boqs", icon: "dashboard-boqs", label: "Bill of Quantities" },
+            { route: "/costs", icon: "nav-costing", label: "Costing" },
+            { route: "/templates", icon: "dashboard-templates", label: "Templates" },
+        ],
+    },
+    {
+        title: "Sales & Finance",
+        items: [
+            { route: "/proposals", icon: "dashboard-estimates", label: "Proposals" },
+            { route: "/invoices", icon: "dashboard-purchase-orders", label: "Invoices" },
+        ],
+    },
+    {
+        title: "Insights",
+        items: [{ route: "/analytics", icon: "dashboard-analytics", label: "Analytics" }],
+    },
+    {
+        title: "Administration",
+        items: [
+            { route: "/integrations", icon: "dashboard-integrations", label: "Integrations" },
+            { route: "/billing", icon: "dashboard-billing", label: "Billing" },
+        ],
+    },
 ];
+
+/** Overview sits on its own above the groups (no heading), as in the collapsed Figma rail. */
+const overviewItem: NavItem = { route: "/dashboard", icon: "dashboard-overview-active", label: "Overview" };
+
+const systemItems: NavItem[] = [
+    { route: "/help", icon: "dashboard-help", label: "Help" },
+    { route: "/settings", icon: "dashboard-settings", label: "Settings" },
+];
+
+function setSidebarExpanded(expanded: boolean) {
+    const root = document.documentElement;
+    if (expanded) root.dataset.sidebar = "expanded";
+    else delete root.dataset.sidebar;
+    try {
+        localStorage.setItem(SIDEBAR_STORAGE_KEY, expanded ? "expanded" : "collapsed");
+    } catch {
+        // Storage can be unavailable (private mode); the toggle still works for this page view.
+    }
+}
 
 export default function DashboardRail({ current }: DashboardRailProps) {
     const router = useRouter();
@@ -35,12 +85,8 @@ export default function DashboardRail({ current }: DashboardRailProps) {
     const isCurrent = (itemRoute: string) => {
         if (current) return current === itemRoute;
         if (!pathname) return false;
-        if (itemRoute === "/dashboard") return pathname === "/dashboard";
         return pathname === itemRoute || pathname.startsWith(`${itemRoute}/`);
     };
-
-    const isHelpCurrent = current === "/help" || pathname === "/help" || Boolean(pathname?.startsWith("/help/"));
-    const isSettingsCurrent = current === "/settings" || pathname === "/settings" || Boolean(pathname?.startsWith("/settings/"));
 
     const navigate = (route: string) => {
         try {
@@ -50,62 +96,97 @@ export default function DashboardRail({ current }: DashboardRailProps) {
         }
     };
 
-    return (
-        <aside className="fig-dashboard-rail" aria-label="Dashboard navigation">
-            <div
-                className="fig-dashboard-logo"
-                role="button"
-                tabIndex={0}
-                style={{ cursor: "pointer" }}
-                onClick={() => navigate("/dashboard")}
-                onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") navigate("/dashboard");
-                }}
-                aria-label="Go to Dashboard"
+    const goHome = () => navigate("/dashboard");
+
+    const renderIcon = (item: NavItem) => {
+        const active = isCurrent(item.route);
+        const label = item.route === "/help" ? "Help & Support" : item.label;
+        return (
+            <button
+                key={item.route}
+                type="button"
+                className={`fig-side-rail-item${active ? " is-current" : ""}`}
+                aria-label={label}
+                aria-current={active ? "page" : undefined}
+                title={label}
+                onClick={() => navigate(item.route)}
             >
-                <span>
-                    <img src="/assets/boq-logo-small.svg" alt="BOQ" />
-                </span>
-            </div>
+                <img src={`/assets/dashboard/${item.icon}.svg`} alt="" />
+            </button>
+        );
+    };
 
-            <nav className="fig-dashboard-menu" aria-label="Main menu">
-                {navItems.map((item) => {
-                    const active = isCurrent(item.route);
-                    return (
-                        <button
-                            key={item.route}
-                            type="button"
-                            className={active ? "is-current" : ""}
-                            aria-label={item.label}
-                            title={item.label}
-                            onClick={() => navigate(item.route)}
-                        >
-                            <img src={`/assets/dashboard/${item.icon}.svg`} alt="" />
-                        </button>
-                    );
-                })}
-            </nav>
+    return (
+        <>
+            {/* Collapsed icon rail (default) — Figma "Side menu" 2760:865 */}
+            <aside className="fig-side-rail" aria-label="Dashboard navigation">
+                <div className="fig-side-rail-top">
+                    <button type="button" className="fig-side-menu-logo" onClick={goHome} aria-label="Go to Dashboard">
+                        <img src="/assets/boq-logo-small.svg" alt="BOQ" />
+                    </button>
+                    <button
+                        type="button"
+                        className="fig-rail-expand"
+                        aria-label="Expand sidebar"
+                        title="Expand sidebar"
+                        onClick={() => setSidebarExpanded(true)}
+                    >
+                        <ChevronsRight size={14} aria-hidden="true" />
+                    </button>
+                </div>
+                <nav className="fig-side-rail-nav" aria-label="Main menu">
+                    <div className="fig-side-rail-group" role="group" aria-label="Overview">{renderIcon(overviewItem)}</div>
+                    {navGroups.map((group) => (
+                        <div key={group.title} className="fig-side-rail-group" role="group" aria-label={group.title}>
+                            {group.items.map(renderIcon)}
+                        </div>
+                    ))}
+                    <div className="fig-side-rail-group fig-side-rail-system" role="group" aria-label="System">
+                        {systemItems.map(renderIcon)}
+                    </div>
+                </nav>
+            </aside>
 
-            <div className="fig-dashboard-tools" aria-label="User tools">
-                <button
-                    type="button"
-                    className={isHelpCurrent ? "is-current" : ""}
-                    aria-label="Help & Support"
-                    title="Help & Support"
-                    onClick={() => navigate("/help")}
-                >
-                    <img src="/assets/dashboard/dashboard-help.svg" alt="" />
-                </button>
-                <button
-                    type="button"
-                    className={isSettingsCurrent ? "is-current" : ""}
-                    aria-label="Settings"
-                    title="Settings"
-                    onClick={() => navigate("/settings")}
-                >
-                    <img src="/assets/dashboard/dashboard-settings.svg" alt="" />
-                </button>
-            </div>
-        </aside>
+            {/* Expanded grouped side menu */}
+            <aside className="fig-side-menu" aria-label="Dashboard navigation">
+                <div className="fig-side-menu-top">
+                    <button type="button" className="fig-side-menu-logo" onClick={goHome} aria-label="Go to Dashboard">
+                        <img src="/assets/boq-logo-small.svg" alt="BOQ" />
+                    </button>
+                    <button
+                        type="button"
+                        className="fig-side-menu-collapse"
+                        aria-label="Collapse sidebar"
+                        title="Collapse sidebar"
+                        onClick={() => setSidebarExpanded(false)}
+                    >
+                        <ChevronsLeft size={18} aria-hidden="true" />
+                    </button>
+                </div>
+
+                <nav className="fig-side-menu-nav" aria-label="Main menu">
+                    {[{ title: "", items: [overviewItem] }, ...navGroups, { title: "System", items: systemItems }].map((group) => (
+                        <div key={group.title || "overview"} className="fig-side-menu-group">
+                            {group.title ? <p className="fig-side-menu-heading">{group.title}</p> : null}
+                            {group.items.map((item) => {
+                                const active = isCurrent(item.route);
+                                return (
+                                    <button
+                                        key={item.route}
+                                        type="button"
+                                        className={`fig-side-menu-item${active ? " is-current" : ""}`}
+                                        aria-current={active ? "page" : undefined}
+                                        onClick={() => navigate(item.route)}
+                                    >
+                                        <img src={`/assets/dashboard/${item.icon}.svg`} alt="" />
+                                        <span>{item.label}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    ))}
+                </nav>
+            </aside>
+        </>
     );
 }

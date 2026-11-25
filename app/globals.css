@@ -61459,3 +61459,278 @@ input[type="number"]::-webkit-outer-spin-button {
   }
 }
 
+/* ------------------------------------------------------------------
+   Side menu (Figma "Side menu": collapsed 2760:865, expanded 2760:120)
+   Collapsed slim rail is the default; <html data-sidebar="expanded">
+   switches to the grouped labelled menu. Layout offsets are scoped with
+   :has() so pages using other rails (client portal) are unaffected.
+   ------------------------------------------------------------------ */
+.fig-side-rail,
+.fig-side-menu {
+    position: fixed;
+    z-index: 2;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    box-sizing: border-box;
+    font-family: 'Urbanist', Inter, sans-serif;
+}
+
+.fig-side-rail {
+    width: 70px;
+    align-items: center;
+    padding: 15px 16px 16px;
+}
+
+.fig-side-rail-top {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    padding-bottom: 30px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.fig-side-menu-logo {
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 1.5px solid #2563eb;
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+}
+
+.fig-side-menu-logo img {
+    width: 24px;
+    height: 24px;
+}
+
+.fig-rail-expand {
+    position: absolute;
+    top: 9px;
+    right: -26px;
+    z-index: 3;
+    width: 20px;
+    height: 20px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 1px solid #e2e8f0;
+    border-radius: 999px;
+    background: #fff;
+    color: #475569;
+    cursor: pointer;
+    opacity: 0;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .08);
+    transition: opacity .15s, color .15s;
+}
+
+.fig-side-rail:hover .fig-rail-expand,
+.fig-rail-expand:focus-visible {
+    opacity: 1;
+}
+
+.fig-rail-expand:hover {
+    color: #2563eb;
+}
+
+.fig-side-rail-nav {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    scrollbar-width: none;
+}
+
+.fig-side-rail-nav::-webkit-scrollbar {
+    display: none;
+}
+
+.fig-side-rail-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 20px 0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.fig-side-rail-system {
+    margin-top: auto;
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+/* The group before System keeps its divider; System sits at the bottom. */
+.fig-side-rail-group:nth-last-child(2) {
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.fig-side-rail-item {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    cursor: pointer;
+    transition: background .15s;
+}
+
+.fig-side-rail-item img {
+    width: 20px;
+    height: 20px;
+}
+
+.fig-side-rail-item:hover {
+    background: rgba(37, 99, 235, .08);
+}
+
+.fig-side-rail-item.is-current {
+    background: #2563eb;
+}
+
+.fig-side-rail-item.is-current:hover {
+    background: #1d4ed8;
+}
+
+.fig-side-rail-item.is-current img,
+.fig-side-menu-item.is-current img {
+    filter: brightness(0) invert(1);
+}
+
+.fig-side-menu {
+    display: none;
+    width: 240px;
+    gap: 24px;
+    padding: 15px 16px 16px;
+}
+
+html[data-sidebar="expanded"] .fig-side-rail {
+    display: none;
+}
+
+html[data-sidebar="expanded"] .fig-side-menu {
+    display: flex;
+}
+
+.fig-side-menu-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex: 0 0 auto;
+}
+
+.fig-side-menu-collapse {
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    background: #fff;
+    color: #0f172a;
+    cursor: pointer;
+}
+
+.fig-side-menu-collapse:hover {
+    background: #f1f5f9;
+}
+
+.fig-side-menu-nav {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.fig-side-menu-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.fig-side-menu-heading {
+    margin: 0 0 4px;
+    color: #404040;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 16px;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+}
+
+.fig-side-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: 38px;
+    padding: 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #475569;
+    font: 500 14px/18px 'Urbanist', Inter, sans-serif;
+    text-align: left;
+    cursor: pointer;
+    box-sizing: border-box;
+    transition: background .15s, color .15s;
+}
+
+.fig-side-menu-item img {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 auto;
+}
+
+.fig-side-menu-item:hover {
+    background: rgba(37, 99, 235, .08);
+}
+
+.fig-side-menu-item.is-current {
+    background: #2563eb;
+    color: #fff;
+}
+
+/* Content offsets: 16px gutter beside the 70px rail / 240px menu. */
+@media (min-width: 761px) {
+    body:has(.fig-side-rail) .fig-dashboard-main {
+        width: calc(100% - 102px) !important;
+        margin-left: 86px !important;
+    }
+
+    html[data-sidebar="expanded"] body:has(.fig-side-menu) .fig-dashboard-main {
+        width: calc(100% - 272px) !important;
+        margin-left: 256px !important;
+    }
+
+    body:has(.fig-side-rail) .plan-change-bar-wrapper {
+        left: 86px;
+    }
+
+    html[data-sidebar="expanded"] body:has(.fig-side-menu) .plan-change-bar-wrapper {
+        left: 256px;
+    }
+}
+
+@media (max-width: 760px) {
+    .fig-side-rail,
+    html[data-sidebar="expanded"] .fig-side-menu {
+        display: none;
+    }
+}

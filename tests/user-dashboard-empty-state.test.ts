@@ -26,19 +26,18 @@ describe("User Dashboard Figma Empty State & Architecture", () => {
         const railContent = readFileSync(railPath, "utf-8");
         const cssContent = readFileSync(cssPath, "utf-8");
 
-        // Rail structure
-        expect(railContent).toContain("fig-dashboard-rail");
-        expect(railContent).toContain("fig-dashboard-logo");
-        expect(railContent).toContain("fig-dashboard-menu");
-        expect(railContent).toContain("fig-dashboard-tools");
+        // Rail structure (Figma "Side menu" 2760:865 collapsed / 2760:120 expanded)
+        expect(railContent).toContain("fig-side-rail");
+        expect(railContent).toContain("fig-side-rail-group");
+        expect(railContent).toContain("fig-side-menu");
+        expect(railContent).toContain("systemItems");
 
-        // Dimensions in CSS
-        expect(cssContent).toContain(".fig-dashboard-rail {");
-        expect(cssContent).toContain("width: 66px;");
-        expect(cssContent).toContain(".fig-dashboard-logo {");
-        expect(cssContent).toContain("height: 66px;");
-        expect(cssContent).toContain(".fig-dashboard-tools {");
-        expect(cssContent).toContain("height: 120px;");
+        // Dimensions in CSS: 70px rail, 38px items, 240px expanded menu
+        expect(cssContent).toContain(".fig-side-rail {");
+        expect(cssContent).toContain("width: 70px;");
+        expect(cssContent).toContain(".fig-side-rail-item {");
+        expect(cssContent).toContain("height: 38px;");
+        expect(cssContent).toContain("width: 240px;");
     });
 
     it("verifies DashboardHeader matches Figma top toolbar specifications", () => {
