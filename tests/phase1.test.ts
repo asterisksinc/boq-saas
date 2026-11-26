@@ -4,7 +4,7 @@ import { emptyPage, pagination } from "../lib/domain/dashboard";
 import { permissionsFor } from "../lib/domain/permissions";
 import { consumeRateLimit } from "../lib/api/rate-limit";
 import { loginSchema, onboardingPatchSchema, registerSchema, userPatchSchema, verifyEmailOtpSchema } from "../lib/api/validation";
-import { isEmailOtpBypassed } from "../lib/auth/otp-bypass";
+import { isEmailOtpBypassed, isOtpBypassedUser } from "../lib/auth/otp-bypass";
 
 describe("Phase 1 request contracts", () => {
   it("normalizes registration email and rejects unknown fields", () => {
@@ -22,6 +22,11 @@ describe("Phase 1 request contracts", () => {
     expect(isEmailOtpBypassed(" DEMO@BOQ.COM ", "demo@boq.com")).toBe(true);
     expect(isEmailOtpBypassed("user@boq.com", "demo@boq.com")).toBe(false);
     expect(isEmailOtpBypassed("demo@boq.com", undefined)).toBe(false);
+  });
+
+  it("allows seeded users to opt out through Supabase app metadata", () => {
+    expect(isOtpBypassedUser("seed@example.com", { otp_bypass: true })).toBe(true);
+    expect(isOtpBypassedUser("seed@example.com", { otp_bypass: false })).toBe(false);
   });
 
   it("requires the email alongside a six-digit signup verification OTP", () => {

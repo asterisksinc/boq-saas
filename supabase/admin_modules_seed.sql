@@ -91,9 +91,9 @@ insert into auth.users (instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 values
   ('00000000-0000-0000-0000-000000000000', '90000000-0000-4000-8000-000000000001', 'authenticated', 'authenticated', 'admin@boq.com', crypt('Admin@12345', gen_salt('bf')), now(), '{"provider":"email","providers":["email"],"role":"admin","otp_bypass":true}'::jsonb, '{"display_name":"BOQ Platform Admin","company_name":"Arena Design Studio"}'::jsonb, now(), now()),
-  ('00000000-0000-0000-0000-000000000000', '90000000-0000-4000-8000-000000000002', 'authenticated', 'authenticated', 'designer@boq.com', crypt('Designer@12345', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{"display_name":"Aarav Designer","company_name":"Arena Design Studio"}'::jsonb, now(), now()),
-  ('00000000-0000-0000-0000-000000000000', '90000000-0000-4000-8000-000000000003', 'authenticated', 'authenticated', 'sales@boq.com', crypt('Sales@12345', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{"display_name":"Meera Sales","company_name":"Arena Design Studio"}'::jsonb, now(), now()),
-  ('00000000-0000-0000-0000-000000000000', '90000000-0000-4000-8000-000000000004', 'authenticated', 'authenticated', 'manager@boq.com', crypt('Manager@12345', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{"display_name":"Kabir Manager","company_name":"Arena Design Studio"}'::jsonb, now(), now())
+  ('00000000-0000-0000-0000-000000000000', '90000000-0000-4000-8000-000000000002', 'authenticated', 'authenticated', 'designer@boq.com', crypt('Designer@12345', gen_salt('bf')), now(), '{"provider":"email","providers":["email"],"otp_bypass":true}'::jsonb, '{"display_name":"Aarav Designer","company_name":"Arena Design Studio"}'::jsonb, now(), now()),
+  ('00000000-0000-0000-0000-000000000000', '90000000-0000-4000-8000-000000000003', 'authenticated', 'authenticated', 'sales@boq.com', crypt('Sales@12345', gen_salt('bf')), now(), '{"provider":"email","providers":["email"],"otp_bypass":true}'::jsonb, '{"display_name":"Meera Sales","company_name":"Arena Design Studio"}'::jsonb, now(), now()),
+  ('00000000-0000-0000-0000-000000000000', '90000000-0000-4000-8000-000000000004', 'authenticated', 'authenticated', 'manager@boq.com', crypt('Manager@12345', gen_salt('bf')), now(), '{"provider":"email","providers":["email"],"otp_bypass":true}'::jsonb, '{"display_name":"Kabir Manager","company_name":"Arena Design Studio"}'::jsonb, now(), now())
 on conflict (id) do update set
   email = excluded.email,
   encrypted_password = excluded.encrypted_password,
@@ -132,6 +132,10 @@ values
   ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','90000000-0000-4000-8000-000000000003','admin','active'),
   ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','90000000-0000-4000-8000-000000000004','member','active')
 on conflict (workspace_id, user_id) do update set role = excluded.role, status = excluded.status;
+
+insert into public.onboarding_progress (workspace_id, user_id, current_step, completed_steps, skipped_steps, status)
+values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','90000000-0000-4000-8000-000000000001','complete',array['account_created','company_setup','project_setup','boq_setup'],array[]::text[],'completed')
+on conflict (workspace_id, user_id) do update set current_step = excluded.current_step, completed_steps = excluded.completed_steps, skipped_steps = excluded.skipped_steps, status = excluded.status;
 
 -- ---------------------------------------------------------------------------
 -- Admin roles, plans, subscription, and workspace settings

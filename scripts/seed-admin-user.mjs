@@ -39,7 +39,7 @@ async function ensureUser(email, password, displayName, appRole = "member") {
       password,
       email_confirm: true,
       user_metadata: { display_name: displayName, company_name: "Arena Design Studio" },
-      app_metadata: { role: appRole, otp_bypass: email.toLowerCase() === ADMIN_EMAIL.toLowerCase() },
+      app_metadata: { role: appRole, otp_bypass: true },
     });
     if (repaired.error || !repaired.data.user) throw new Error(`repair ${email}: ${repaired.error?.message || "no user returned"}`);
     return repaired.data.user;
@@ -47,11 +47,11 @@ async function ensureUser(email, password, displayName, appRole = "member") {
   const users = assertOk("list auth users", listed);
   let user = users.users.find(item => item.email?.toLowerCase() === email.toLowerCase());
   if (!user) {
-    const created = await db.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { display_name: displayName, company_name: "Arena Design Studio" }, app_metadata: { role: appRole, otp_bypass: email.toLowerCase() === ADMIN_EMAIL.toLowerCase() } });
+    const created = await db.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { display_name: displayName, company_name: "Arena Design Studio" }, app_metadata: { role: appRole, otp_bypass: true } });
     if (created.error || !created.data.user) throw new Error(`create ${email}: ${created.error?.message || "no user returned"}`);
     user = created.data.user;
   } else {
-    const updated = await db.auth.admin.updateUserById(user.id, { password, email_confirm: true, user_metadata: { display_name: displayName, company_name: "Arena Design Studio" }, app_metadata: { role: appRole, otp_bypass: email.toLowerCase() === ADMIN_EMAIL.toLowerCase() } });
+    const updated = await db.auth.admin.updateUserById(user.id, { password, email_confirm: true, user_metadata: { display_name: displayName, company_name: "Arena Design Studio" }, app_metadata: { role: appRole, otp_bypass: true } });
     if (updated.error) throw new Error(`update ${email}: ${updated.error.message}`);
   }
   return user;
@@ -77,6 +77,14 @@ upsert("workspace_memberships", [
   { workspace_id: WORKSPACE_ID, user_id: designers[1].id, role: "admin", status: "active" },
   { workspace_id: WORKSPACE_ID, user_id: designers[2].id, role: "member", status: "active" },
 ], "workspace_id,user_id");
+upsert("onboarding_progress", [{
+  workspace_id: WORKSPACE_ID,
+  user_id: admin.id,
+  current_step: "complete",
+  completed_steps: ["account_created", "company_setup", "project_setup", "boq_setup"],
+  skipped_steps: [],
+  status: "completed",
+}], "workspace_id,user_id");
 
 const roleRows = [
   ["10000000-0000-4000-8000-000000000001", "Platform Admin", "Full access to workspace administration and all modules.", true, "admin"],

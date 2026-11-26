@@ -14,8 +14,11 @@ export function isEmailOtpBypassed(
 
 /** Seeded/QA users can opt out through Supabase Auth app metadata. */
 export function isOtpBypassedUser(
-  email: string,
+  _email: string,
   appMetadata?: Record<string, unknown> | null,
 ) {
-  return appMetadata?.otp_bypass === true || isEmailOtpBypassed(email);
+  // The source of truth is Supabase Auth app_metadata. This keeps OTP bypass
+  // scoped to explicitly seeded/QA users and avoids an email-based production
+  // bypass controlled by the web server environment.
+  return appMetadata?.otp_bypass === true;
 }

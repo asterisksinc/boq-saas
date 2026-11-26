@@ -81,6 +81,10 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL("/client/dashboard", request.url));
     }
 
+    if (user && (request.nextUrl.pathname === "/dashboard" || request.nextUrl.pathname.startsWith("/dashboard/")) && isPlatformAdmin(user)) {
+        return NextResponse.redirect(new URL("/admin", request.url));
+    }
+
     if (user && (request.nextUrl.pathname === "/admin" || request.nextUrl.pathname.startsWith("/admin/"))) {
         if (!isPlatformAdmin(user)) {
             const redirectPath = isClientUser(user) ? "/client/dashboard" : "/dashboard";
@@ -89,7 +93,7 @@ export async function middleware(request: NextRequest) {
     }
 
     if (user && (request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/register")) {
-        const redirectPath = isClientUser(user) ? "/client/dashboard" : "/dashboard";
+        const redirectPath = isClientUser(user) ? "/client/dashboard" : isPlatformAdmin(user) ? "/admin" : "/dashboard";
         return NextResponse.redirect(new URL(redirectPath, request.url));
     }
 

@@ -35,7 +35,7 @@ values
     'authenticated',
     'fixture-owner-a@seed.invalid',
     now(),
-    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{"provider":"email","providers":["email"],"otp_bypass":true}'::jsonb,
     '{"display_name":"Aarav Owner","company_name":"Arena Design Studio"}'::jsonb,
     now(),
     now()
@@ -47,7 +47,7 @@ values
     'authenticated',
     'diptishgohane04+member@gmail.com',
     now(),
-    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{"provider":"email","providers":["email"],"otp_bypass":true}'::jsonb,
     '{"display_name":"Meera Member","company_name":"Temporary Member Workspace"}'::jsonb,
     now(),
     now()

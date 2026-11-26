@@ -51,7 +51,7 @@ async function resolveUser() {
     password: PASSWORD,
     email_confirm: true,
     user_metadata: { display_name: "Demo User", company_name: "BOQ Demo Workspace" },
-    app_metadata: { role: USER_ROLE },
+    app_metadata: { role: USER_ROLE, otp_bypass: true },
   });
   if (created.error || !created.data.user) {
     throw new Error(`create demo user: ${created.error?.message ?? "no user returned"}`);
@@ -71,7 +71,7 @@ assertResult("normalize demo user credentials and metadata", await admin.auth.ad
   password: PASSWORD,
   email_confirm: true,
   user_metadata: { display_name: "Demo User", company_name: "Arena Design Studio" },
-  app_metadata: { role: USER_ROLE },
+  app_metadata: { role: USER_ROLE, otp_bypass: true },
 }));
 
 const workspace = assertResult(

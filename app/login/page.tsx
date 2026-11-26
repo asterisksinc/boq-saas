@@ -30,6 +30,11 @@ export default function LoginPage() {
                     return;
                 }
 
+                if (response.user?.role === "admin" || response.user?.role === "platform_admin") {
+                    router.push(nextPath?.startsWith("/admin") ? nextPath : "/admin");
+                    return;
+                }
+
                 // Check onboarding status for regular user
                 const onboarding = await getOnboardingState().catch(() => null);
                 const isComplete = onboarding?.isCompleted || onboarding?.status === "completed";
