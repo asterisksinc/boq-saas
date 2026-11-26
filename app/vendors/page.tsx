@@ -3,8 +3,8 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-    AlertCircle, ArrowLeft, Bookmark, ChevronDown, Crosshair, FileText, GitCompare, History, List as ListIcon, Lock, MapPin,
-    Plus, Search, Share2, SlidersHorizontal, Trash2, X,
+    AlertCircle, Armchair, ArrowLeft, Bookmark, Check, ChevronDown, ChevronRight, Crosshair, FileText, GitCompare, History, Lamp, Layers, LayoutGrid,
+    List as ListIcon, ListChecks, Lock, MapPin, Plus, Search, Share2, SlidersHorizontal, Sofa, Trash2, UtensilsCrossed, X,
 } from "lucide-react";
 import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
@@ -30,7 +30,7 @@ const TABS: Array<{ id: MarketTab; label: string; icon: typeof Search; title: st
     { id: "saved", label: "Saved Vendors", icon: Bookmark, title: "Saved Vendors", subtitle: "Vendors you have bookmarked, ready to compare." },
     { id: "recent", label: "Recently Viewed", icon: History, title: "Recently Viewed", subtitle: "Pick up where you left off." },
     { id: "requests", label: "Contact Requests", icon: Lock, title: "Contact Requests", subtitle: "History of OTP-verified contact disclosures." },
-    { id: "lists", label: "My Sourcing Lists", icon: ListIcon, title: "My Sourcing Lists", subtitle: "Organised collections of vendors by project and material." },
+    { id: "lists", label: "My Sourcing List", icon: ListIcon, title: "My Sourcing Lists", subtitle: "Organised collections of vendors by project and material." },
 ];
 
 const SEARCH_KEY = "boq.vendors.search";
@@ -71,7 +71,7 @@ function VendorMarketplaceInner() {
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [hoveredId, setHoveredId] = useState<string | null>(null);
     const [focus, setFocus] = useState<{ id: string; n: number } | null>(null);
-    const [outage, setOutage] = useState(false);
+    const [outage, setOutage] = useState(() => params.get("map") === "down"); // ?map=down previews the map-failure state
     const [mobileView, setMobileView] = useState<"list" | "map">("list");
     const restored = useRef(false);
 
@@ -91,6 +91,7 @@ function VendorMarketplaceInner() {
     useEffect(() => {
         if (restored.current) return;
         restored.current = true;
+        if (params.get("boq") === "1") setBoqOpen(true); // "Find from BOQ" on a vendor profile
         const q = params.get("q");
         const loc = params.get("loc");
         if (q || loc) {
@@ -134,8 +135,8 @@ function VendorMarketplaceInner() {
     const result = useMemo(() => (submitted ? searchVendors({ ...submitted, quick, advanced, sort }) : null), [submitted, quick, advanced, sort]);
     const closeFilters = useCallback(() => setFiltersOpen(false), []);
     const previewCount = useMemo(() => (submitted
-        ? (f: AdvancedFilters) => { const r = searchVendors({ ...submitted, quick, advanced: f, sort }); return r.exact.length + r.related.length; }
-        : undefined), [submitted, quick, sort]);
+        ? (f: AdvancedFilters, q: QuickFilter[]) => { const r = searchVendors({ ...submitted, quick: q, advanced: f, sort }); return r.exact.length + r.related.length; }
+        : undefined), [submitted, sort]);
     const hits = useMemo(() => (result ? [...result.exact, ...result.related] : []), [result]);
 
     const submit = (override?: Partial<Submitted>) => {
@@ -164,7 +165,6 @@ function VendorMarketplaceInner() {
         notify(`Searching “${q || "all vendors"}”${p ? ` near ${p.city || p.label}` : " in all cities"}`);
     };
 
-    const toggleQuick = (f: QuickFilter) => setQuick((qs) => (qs.includes(f) ? qs.filter((x) => x !== f) : [...qs, f]));
     const clearAll = () => { setQuick([]); setAdvanced(EMPTY_ADVANCED); };
     const filterCount = quick.length + countAdvanced(advanced);
 
@@ -193,25 +193,25 @@ function VendorMarketplaceInner() {
             <div className="fig-dashboard-glow" />
             <DashboardRail current="/vendors" />
             <div className="fig-dashboard-main">
-                <DashboardHeader title={meta.title} hideNew />
+                <DashboardHeader
+                    title={meta.title}
+                    subtitle={meta.subtitle}
+                    hideNew
+                    hideSearch
+                    actions={(
+                        <button type="button" className="vm-btn vm-head-btn" onClick={() => setBoqOpen(true)}>
+                            <ListChecks size={18} aria-hidden="true" /> Find from BOQ
+                        </button>
+                    )}
+                />
 
-                <div className="vm-tabbar">
                 <nav className="vm-tabs" aria-label="Vendor Marketplace">
-                    {TABS.map((t) => {
-                        const Icon = t.icon;
-                        return (
-                            <button key={t.id} type="button" className={tab === t.id ? "is-current" : ""} aria-current={tab === t.id ? "page" : undefined} onClick={() => setTab(t.id)}>
-                                <Icon size={16} aria-hidden="true" /> {t.label}
-                                {t.id === "saved" && store.saved.length ? <span className="vm-tab-count">{store.saved.length}</span> : null}
-                            </button>
-                        );
-                    })}
+                    {TABS.map((t) => (
+                        <button key={t.id} type="button" className={tab === t.id ? "is-current" : ""} aria-current={tab === t.id ? "page" : undefined} onClick={() => setTab(t.id)}>
+                            {t.label}
+                        </button>
+                    ))}
                 </nav>
-                    <span className="vm-tabbar-end">
-                        <span className="vm-tabbar-sub">{meta.subtitle}</span>
-                        <button type="button" className="vm-btn" onClick={() => setBoqOpen(true)}><FileText size={17} /> Find from BOQ</button>
-                    </span>
-                </div>
 
                 {tab === "discover" ? (
                     <>
@@ -219,7 +219,7 @@ function VendorMarketplaceInner() {
                             query={query} setQuery={setQuery} locText={locText} setLocText={(t) => { setLocText(t); setPlace(null); }}
                             place={place} onPickPlace={(p) => { setPlace(p); setLocText(p.label); setFormError(null); }}
                             radius={radius} setRadius={(r) => { setRadius(r); if (submitted) run({ ...submitted, radius: r }); }}
-                            quick={quick} toggleQuick={toggleQuick} filterCount={filterCount} onClear={clearAll}
+                            filterCount={filterCount}
                             onSubmit={() => submit()} onOpenFilters={() => setFiltersOpen(true)} error={formError} onNotify={notify}
                             onCurrentLocation={(p) => { setPlace(p); setLocText(p.label); }}
                         />
@@ -233,6 +233,8 @@ function VendorMarketplaceInner() {
                             <div className="vm-results" aria-live="polite" aria-busy={loading}>
                                 {!submitted ? (
                                     <DiscoverEmpty
+                                        query={query}
+                                        onExample={(q, p) => { setQuery(q); setPlace(p); setLocText(p.label); submit({ query: q, place: p }); }}
                                         onCategory={(label) => { setQuery(label); if (place) submit({ query: label, place }); }}
                                         onCity={(p) => { setPlace(p); setLocText(p.label); submit({ query, place: p }); }}
                                     />
@@ -250,6 +252,7 @@ function VendorMarketplaceInner() {
                                     />
                                 )}
                             </div>
+                            <div className="vm-map-card">
                             <VendorMap
                                 center={submitted?.center ?? null}
                                 radiusKm={radiusKm}
@@ -270,6 +273,7 @@ function VendorMarketplaceInner() {
                                     run({ query: submitted?.query ?? query.trim(), place: submitted?.place ?? place, center, radius: r, areaSearch: true });
                                 }}
                             />
+                            </div>
                         </section>
                     </>
                 ) : tab === "saved" ? (
@@ -297,7 +301,10 @@ function VendorMarketplaceInner() {
                 )}
             </div>
 
-            <FilterDrawer open={filtersOpen} value={advanced} onClose={closeFilters} onApply={(f) => { setAdvanced(f); setFiltersOpen(false); }} previewCount={previewCount} />
+            <FilterDrawer
+                open={filtersOpen} value={advanced} quick={quick} onClose={closeFilters} previewCount={previewCount}
+                onApply={(f, q) => { setAdvanced(f); setQuick(q); setFiltersOpen(false); }}
+            />
             <BoqModal open={boqOpen} onClose={() => setBoqOpen(false)} onFind={findFromBoq} />
             <AddToListModal
                 vendor={listFor}
@@ -316,10 +323,10 @@ function VendorMarketplaceInner() {
 function SearchPanel(props: {
     query: string; setQuery: (v: string) => void; locText: string; setLocText: (v: string) => void; place: Place | null;
     onPickPlace: (p: Place) => void; radius: RadiusOption; setRadius: (r: RadiusOption) => void;
-    quick: QuickFilter[]; toggleQuick: (f: QuickFilter) => void; filterCount: number; onClear: () => void;
+    filterCount: number;
     onSubmit: () => void; onOpenFilters: () => void; error: string | null; onNotify: (m: string) => void; onCurrentLocation: (p: Place) => void;
 }) {
-    const { query, setQuery, locText, setLocText, place, onPickPlace, radius, setRadius, quick, toggleQuick, filterCount, onClear, onSubmit, onOpenFilters, error } = props;
+    const { query, setQuery, locText, setLocText, place, onPickPlace, radius, setRadius, filterCount, onSubmit, onOpenFilters, error } = props;
     const [openBox, setOpenBox] = useState<"what" | "where" | "radius" | null>(null);
     const [cursor, setCursor] = useState(0);
     const panel = useRef<HTMLFormElement>(null);
@@ -357,7 +364,7 @@ function SearchPanel(props: {
                 <div className={`vm-search-field${openBox === "what" ? " is-focus" : ""}`}>
                     <Search size={18} aria-hidden="true" />
                     <label>
-                        <span>What are you sourcing?</span>
+                        <span>What are you Sourcing?</span>
                         <input
                             value={query}
                             onChange={(e) => { setQuery(e.target.value); setOpenBox("what"); }}
@@ -385,13 +392,13 @@ function SearchPanel(props: {
                 <div className={`vm-search-field${openBox === "where" ? " is-focus" : ""}`}>
                     <MapPin size={18} aria-hidden="true" />
                     <label>
-                        <span>Where are you sourcing?</span>
+                        <span>Where are you Sourcing?</span>
                         <input
                             value={locText}
                             onChange={(e) => { setLocText(e.target.value); setOpenBox("where"); }}
                             onFocus={() => setOpenBox("where")}
                             onKeyDown={(e) => keyNav(e, placeSuggestions.length, (i) => { onPickPlace(placeSuggestions[i]); setOpenBox(null); })}
-                            placeholder="City, area or pincode"
+                            placeholder="City, Area or Pincode"
                             role="combobox"
                             aria-expanded={openBox === "where"}
                             aria-controls="vm-where-list"
@@ -413,7 +420,7 @@ function SearchPanel(props: {
                 <div className="vm-search-field vm-search-radius">
                     <button type="button" aria-haspopup="listbox" aria-expanded={openBox === "radius"} onClick={() => setOpenBox(openBox === "radius" ? null : "radius")}>
                         <span>Radius</span>
-                        <strong>{radiusLabel}</strong>
+                        <strong>{radiusLabel.replace(/ km$/, " Kms")}</strong>
                         <ChevronDown size={16} aria-hidden="true" />
                     </button>
                     {openBox === "radius" ? (
@@ -428,46 +435,80 @@ function SearchPanel(props: {
                     ) : null}
                 </div>
 
-                <button type="submit" className="vm-btn vm-btn--primary vm-search-go"><Search size={18} /> Search</button>
-                <button type="button" className={`vm-btn vm-search-filters${filterCount ? " is-active" : ""}`} onClick={onOpenFilters}>
-                    <SlidersHorizontal size={17} /> Filters{filterCount ? ` (${filterCount})` : ""}
+                <button type="button" className={`vm-btn vm-search-filters${filterCount ? " is-active" : ""}`} onClick={onOpenFilters}
+                    aria-label={filterCount ? `Filters, ${filterCount} applied` : "Filters"} title="Filters">
+                    <SlidersHorizontal size={18} aria-hidden="true" />
+                    {filterCount ? <span className="vm-search-filters-count" aria-hidden="true">{filterCount}</span> : null}
                 </button>
+                <button type="submit" className="vm-btn vm-btn--primary vm-search-go"><Search size={18} aria-hidden="true" /> Search</button>
             </div>
             {error ? <p className="vm-error vm-search-error" role="alert">{error}</p> : null}
-            <div className="vm-quick" role="group" aria-label="Quick filters">
-                {QUICK_FILTERS.map((f) => (
-                    <button key={f.value} type="button" className={`vm-pill${quick.includes(f.value) ? " is-on" : ""}`} aria-pressed={quick.includes(f.value)} onClick={() => toggleQuick(f.value)}>
-                        {f.label}
-                    </button>
-                ))}
-                {filterCount ? <button type="button" className="vm-link vm-link--underline" onClick={onClear}>Clear filters</button> : null}
-            </div>
         </form>
     );
 }
 
 /* Discover states ------------------------------------------------------------------------------- */
 
-function DiscoverEmpty({ onCategory, onCity }: { onCategory: (label: string) => void; onCity: (p: Place) => void }) {
+const CATEGORY_ICONS: Record<string, typeof Search> = {
+    flooring: LayoutGrid, wood: Layers, furniture: Armchair, lighting: Lamp, fabrics: Sofa, kitchen: UtensilsCrossed,
+};
+
+/** Figma "Vendor Marketplace - Empty State": categories, popular locations and example searches. */
+const EXAMPLES: Array<{ query: string; placeId: string }> = [
+    { query: "Italian Marble", placeId: "blr" },
+    { query: "Plywood", placeId: "hyd" },
+    { query: "Decorative Lighting", placeId: "hyd" },
+];
+
+function DiscoverEmpty({ query, onCategory, onCity, onExample }: {
+    query: string; onCategory: (label: string) => void; onCity: (p: Place) => void; onExample: (query: string, p: Place) => void;
+}) {
     return (
         <div className="vm-empty-start">
-            <h3>Start your first sourcing search</h3>
-            <p>Enter a city, pick a material and RVYO shows verified local suppliers, ranked by relevance, with their locations on the map.</p>
-            <p className="vm-section-label">Popular categories</p>
-            <div className="vm-cat-grid">
-                {CATEGORIES.slice(0, 6).map((c) => (
-                    <button key={c.key} type="button" className="vm-cat" onClick={() => onCategory(c.subcategories.includes("Italian Marble") ? "Italian Marble" : c.label)}>
-                        <strong>{c.label}</strong>
-                        <span>{c.subcategories.slice(0, 3).join(" · ")}</span>
-                    </button>
-                ))}
+            <div className="vm-empty-intro">
+                <h3>Start your first sourcing search</h3>
+                <p>Enter a city, pick a material and RVYO shows verified local suppliers, ranked by relevance, with their locations on the map.</p>
             </div>
-            <p className="vm-section-label">Popular locations</p>
-            <div className="vm-chips">
-                {POPULAR_CITIES.map((id) => getPlace(id)!).map((p) => (
-                    <button key={p.id} type="button" className="vm-pill" onClick={() => onCity(p)}><MapPin size={14} /> {p.city}</button>
-                ))}
-            </div>
+            <section className="vm-empty-group" aria-label="Popular categories">
+                <h4>Popular Categories</h4>
+                <div className="vm-cat-grid">
+                    {CATEGORIES.slice(0, 6).map((c) => {
+                        const Icon = CATEGORY_ICONS[c.key] ?? LayoutGrid;
+                        const pick = c.subcategories.includes("Italian Marble") ? "Italian Marble" : c.label;
+                        const on = !!query && (query === pick || query === c.label);
+                        return (
+                            <button key={c.key} type="button" className={`vm-cat${on ? " is-on" : ""}`} aria-pressed={on} onClick={() => onCategory(pick)}>
+                                <Icon size={18} aria-hidden="true" />
+                                {on ? <Check size={11} strokeWidth={3} className="vm-cat-check" aria-hidden="true" /> : null}
+                                <strong>{c.label}</strong>
+                                <span>{c.subcategories.slice(0, 3).join(" · ")}</span>
+                            </button>
+                        );
+                    })}
+                </div>
+            </section>
+            <section className="vm-empty-group" aria-label="Popular locations">
+                <h4>Popular Locations</h4>
+                <div className="vm-loc-chips">
+                    {POPULAR_CITIES.map((id) => getPlace(id)!).map((p) => (
+                        <button key={p.id} type="button" className="vm-loc-chip" onClick={() => onCity(p)}><MapPin size={16} aria-hidden="true" /> {p.city}</button>
+                    ))}
+                </div>
+            </section>
+            <section className="vm-empty-group" aria-label="Example searches">
+                <h4>Try an Example</h4>
+                <div className="vm-examples">
+                    {EXAMPLES.map((ex) => {
+                        const p = getPlace(ex.placeId)!;
+                        return (
+                            <button key={ex.query + ex.placeId} type="button" className="vm-example" onClick={() => onExample(ex.query, p)}>
+                                <span><strong>{ex.query}</strong> in <strong>{p.city}</strong></span>
+                                <ChevronRight size={16} aria-hidden="true" />
+                            </button>
+                        );
+                    })}
+                </div>
+            </section>
         </div>
     );
 }
@@ -513,7 +554,7 @@ function Results({
     return (
         <>
             <div className="vm-results-head">
-                <p><strong>{total} vendor{total === 1 ? "" : "s"}</strong> {where}</p>
+                <p><strong>{total} Vendor{total === 1 ? "" : "s"}</strong> {where}</p>
                 <label className="vm-sort">
                     <span>Sort</span>
                     <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>

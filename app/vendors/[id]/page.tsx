@@ -2,18 +2,18 @@
 
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Award, Bookmark, BookmarkCheck, ChevronRight, Clock, Flag, ImageIcon, ListPlus, Lock, LockOpen, Mail, MapPin, Phone, Share2, ShieldCheck, Star, Truck, Wrench } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Bookmark, BookmarkCheck, Clock, Flag, ImageIcon, ListChecks, ListPlus, Lock, Mail, MapPin, Phone, Share2, ShieldCheck, Star, Truck, Wrench } from "lucide-react";
 import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
 import { AddToListModal, ContactAccessModal, ContactDetails } from "@/components/vendors/VendorDialogs";
-import { Modal, Rating, Toast, TrustBadges, VendorLogo, businessTypes, useVendorStore } from "@/components/vendors/VendorUi";
-import { BUSINESS_TYPE_LABEL, CATEGORY_LABEL, PLACES, getVendor, isCertified, isDiscoverable, type Vendor } from "@/lib/vendors/data";
+import { Modal, Rating, Toast, VendorLogo, businessTypes, useVendorStore } from "@/components/vendors/VendorUi";
+import { BUSINESS_TYPE_LABEL, CATEGORY_LABEL, getVendor, isCertified, isDiscoverable, type Vendor } from "@/lib/vendors/data";
 import { isOpenNow } from "@/lib/vendors/search";
 import { getUnlockedContact, isSaved, recordView, saveNote, toggleSaved } from "@/lib/vendors/store";
 import type { VendorContact } from "@/lib/vendors/contacts";
 import "../vendors.css";
 
-type ProfileTab = "overview" | "materials" | "portfolio" | "business" | "coverage" | "reviews";
+type ProfileTab = "overview" | "business" | "coverage" | "reviews";
 
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 
@@ -54,7 +54,17 @@ function VendorProfileInner() {
             <div className="fig-dashboard-glow" />
             <DashboardRail current="/vendors" />
             <div className="fig-dashboard-main">
-                <DashboardHeader title="Vendor Marketplace" hideNew />
+                <DashboardHeader
+                    title="Vendor Profile"
+                    subtitle="Evaluate the business before you connect."
+                    hideNew
+                    hideSearch
+                    actions={(
+                        <button type="button" className="vm-btn vm-head-btn" onClick={() => router.push("/vendors?tab=discover&boq=1")}>
+                            <ListChecks size={18} aria-hidden="true" /> Find from BOQ
+                        </button>
+                    )}
+                />
                 {children}
             </div>
             <Toast message={toast} onDone={() => setToast(null)} />
@@ -88,8 +98,6 @@ function VendorProfileInner() {
 
     const tabs: Array<{ id: ProfileTab; label: string }> = [
         { id: "overview", label: "Overview" },
-        { id: "materials", label: "Materials & Products" },
-        { id: "portfolio", label: "Portfolio" },
         { id: "business", label: "Business Information" },
         { id: "coverage", label: "Service Coverage" },
         { id: "reviews", label: `Reviews (${vendor.reviewCount})` },
@@ -97,83 +105,77 @@ function VendorProfileInner() {
 
     return shell(
         <>
-            <nav className="vm-crumbs" aria-label="Breadcrumb">
-                <button type="button" onClick={() => router.push("/vendors")}><ArrowLeft size={14} /> Vendor Marketplace</button>
-                <ChevronRight size={14} aria-hidden="true" />
-                <button type="button" onClick={() => router.push(`/vendors?tab=discover&loc=${PLACES.find((p) => p.kind === "city" && p.city === vendor.city)?.id ?? ""}&radius=city`)}>{vendor.city}</button>
-                <ChevronRight size={14} aria-hidden="true" />
-                <span aria-current="page">{vendor.name}</span>
-            </nav>
+            <button type="button" className="vm-back vm-back--lg" onClick={() => (window.history.length > 1 ? router.back() : router.push("/vendors"))}>
+                <ArrowLeft size={20} aria-hidden="true" /> Back
+            </button>
 
             <section className="vm-profile-head">
                 <div className="vm-profile-id">
-                    <VendorLogo vendor={vendor} size={72} />
+                    <VendorLogo vendor={vendor} size={54} />
                     <div>
-                        <p className="vm-eyebrow">Vendor profile / {vendor.city}</p>
-                        <h2>{vendor.name}</h2>
-                        <div className="vm-profile-meta">
-                            <TrustBadges certified={certified} verified={!!vendor.verifiedOn} verifiedLabel="Verified Business" />
-                            <span>{vendor.area}, {vendor.city} · {businessTypes(vendor)}</span>
+                        <div className="vm-profile-name">
+                            <h2>{vendor.name}</h2>
+                            {vendor.verifiedOn ? <span className="vm-tag vm-tag--green">Verified</span> : null}
+                            {certified ? <span className="vm-tag vm-tag--blue">RVYO Certified</span> : null}
                         </div>
-                        <Rating vendor={vendor} />
+                        <p className="vm-profile-meta">
+                            {vendor.area}, {vendor.city} · {businessTypes(vendor)}
+                            <span aria-hidden="true">·</span>
+                            <Rating vendor={vendor} />
+                        </p>
                     </div>
                 </div>
                 <div className="vm-profile-actions">
+                    <button type="button" className="vm-btn vm-icon-only" aria-label="Copy profile link" title="Copy profile link" onClick={share}><Share2 size={18} /></button>
                     <button type="button" className={`vm-btn${saved ? " is-active" : ""}`} aria-pressed={saved} onClick={() => notify(toggleSaved(vendor.id) ? `${vendor.name} saved.` : "Removed from saved vendors.")}>
-                        {saved ? <BookmarkCheck size={16} /> : <Bookmark size={16} />} {saved ? "Saved" : "Save Vendor"}
+                        {saved ? <BookmarkCheck size={18} /> : <Bookmark size={18} />} {saved ? "Saved" : "Save Vendor"}
                     </button>
-                    <button type="button" className="vm-btn" onClick={share}><Share2 size={16} /> Share</button>
-                    <button type="button" className="vm-btn" onClick={() => setReportOpen(true)}><Flag size={16} /> Report</button>
-                    {revealed ? null : <button type="button" className="vm-btn vm-btn--primary" onClick={() => setContactOpen(true)}><Lock size={16} /> Acquire Contact Information</button>}
+                    <button type="button" className="vm-btn" onClick={() => setReportOpen(true)}><Flag size={18} /> Report</button>
+                    {revealed ? null : <button type="button" className="vm-btn vm-btn--primary" onClick={() => setContactOpen(true)}><Lock size={18} /> Acquire Contact Information</button>}
                 </div>
-                <nav className="vm-profile-tabs" aria-label="Vendor profile sections">
-                    {tabs.map((t) => (
-                        <button key={t.id} type="button" className={tab === t.id ? "is-current" : ""} aria-current={tab === t.id ? "true" : undefined} onClick={() => setTab(t.id)}>{t.label}</button>
-                    ))}
-                </nav>
             </section>
 
+            <nav className="vm-tabs" aria-label="Vendor profile sections">
+                {tabs.map((t) => (
+                    <button key={t.id} type="button" className={tab === t.id ? "is-current" : ""} aria-current={tab === t.id ? "true" : undefined} onClick={() => setTab(t.id)}>{t.label}</button>
+                ))}
+            </nav>
+
             <div className="vm-profile-body">
-                <div className="vm-profile-main">
+                <div className="vm-profile-main vm-panel">
                     {tab === "overview" ? (
                         <>
-                            <Panel title="About the vendor"><p className="vm-body">{vendor.description}</p></Panel>
-                            <Panel title="Materials supplied"><Chips items={vendor.materials} /></Panel>
-                            <Panel title="Business information"><BusinessTable vendor={vendor} /></Panel>
+                            <Section title="About the vendor"><p className="vm-body">{vendor.description}</p></Section>
+                            <Section title="Materials & products"><Chips items={vendor.materials} /></Section>
+                            <Section title="Product categories"><Chips items={vendor.categories.map((c) => CATEGORY_LABEL[c] ?? c)} /></Section>
+                            <Section title="Brands">{vendor.brands.length ? <Chips items={vendor.brands} /> : <p className="vm-muted">The vendor hasn&apos;t listed the brands it supplies.</p>}</Section>
+                            <Section title="Portfolio">
+                                {vendor.portfolio.length ? (
+                                    <div className="vm-portfolio">
+                                        {vendor.portfolio.map((p, i) => (
+                                            <figure key={p.title}>
+                                                <div className={`vm-portfolio-img vm-portfolio-img--${i % 3}`} aria-hidden="true"><ImageIcon size={22} /></div>
+                                                <figcaption><strong>{p.title}</strong><span>{p.caption}</span></figcaption>
+                                            </figure>
+                                        ))}
+                                    </div>
+                                ) : <p className="vm-muted">This vendor hasn&apos;t added completed projects or showroom images yet.</p>}
+                            </Section>
+                            <Section title="Catalogue">{vendor.hasCatalogue ? <p className="vm-body">A product catalogue is available. Ask the vendor for the latest version after you connect.</p> : <p className="vm-muted">No catalogue published.</p>}</Section>
                         </>
-                    ) : tab === "materials" ? (
-                        <>
-                            <Panel title="Product categories"><Chips items={vendor.categories.map((c) => CATEGORY_LABEL[c] ?? c)} /></Panel>
-                            <Panel title="Materials & products"><Chips items={vendor.materials} /></Panel>
-                            <Panel title="Brands">{vendor.brands.length ? <Chips items={vendor.brands} /> : <p className="vm-muted">The vendor hasn&apos;t listed the brands it supplies.</p>}</Panel>
-                            <Panel title="Catalogue">{vendor.hasCatalogue ? <p className="vm-body">A product catalogue is available. Ask the vendor for the latest version after you connect.</p> : <p className="vm-muted">No catalogue published.</p>}</Panel>
-                        </>
-                    ) : tab === "portfolio" ? (
-                        <Panel title="Portfolio">
-                            {vendor.portfolio.length ? (
-                                <div className="vm-portfolio">
-                                    {vendor.portfolio.map((p, i) => (
-                                        <figure key={p.title}>
-                                            <div className={`vm-portfolio-img vm-portfolio-img--${i % 3}`} aria-hidden="true"><ImageIcon size={22} /></div>
-                                            <figcaption><strong>{p.title}</strong><span>{p.caption}</span></figcaption>
-                                        </figure>
-                                    ))}
-                                </div>
-                            ) : <p className="vm-muted">This vendor hasn&apos;t added completed projects or showroom images yet.</p>}
-                        </Panel>
                     ) : tab === "business" ? (
-                        <Panel title="Business information"><BusinessTable vendor={vendor} full /></Panel>
+                        <Section title="Business information"><BusinessTable vendor={vendor} full /></Section>
                     ) : tab === "coverage" ? (
-                        <Panel title="Service coverage">
+                        <Section title="Service coverage">
                             <dl className="vm-dl vm-dl--wide">
                                 <div><dt><MapPin size={14} /> Business location</dt><dd>{vendor.area}, {vendor.city} {vendor.pincode}{vendor.lat === null ? " (map pin pending confirmation)" : ""}</dd></div>
                                 <div><dt><Truck size={14} /> Delivery</dt><dd>{vendor.delivery.outstation ? `Local and outstation · ${vendor.serviceAreas.join(", ")}` : vendor.delivery.local ? `Local · ${vendor.city}` : "Not offered"}</dd></div>
                                 <div><dt><Wrench size={14} /> Installation</dt><dd>{vendor.installation ? vendor.installationAreas.join(", ") : "Not offered"}</dd></div>
                                 <div><dt><Clock size={14} /> Operating hours</dt><dd>{vendor.hours.days}, {vendor.hours.open}–{vendor.hours.close} · {isOpenNow(vendor, new Date()) ? "Open now" : "Closed now"}</dd></div>
                             </dl>
-                        </Panel>
+                        </Section>
                     ) : (
-                        <Panel title={`Reviews (${vendor.reviewCount})`}>
+                        <Section title={`Reviews (${vendor.reviewCount})`}>
                             {vendor.rating !== null ? <p className="vm-review-summary"><Star size={18} className="vm-star" /> <strong>{vendor.rating.toFixed(1)}</strong> average from {vendor.reviewCount} reviews</p> : null}
                             {vendor.reviews.length ? (
                                 <ul className="vm-reviews">
@@ -186,60 +188,66 @@ function VendorProfileInner() {
                                     ))}
                                 </ul>
                             ) : <p className="vm-muted">{vendor.reviewCount ? "Written reviews will appear here once moderated." : "No reviews yet. A vendor without reviews isn't ranked as lower quality."}</p>}
-                        </Panel>
+                        </Section>
                     )}
                 </div>
 
                 <aside className="vm-side">
                     {revealed ? (
-                        <div className="vm-panel">
-                            <div className="vm-panel-head"><h3>Contact information</h3><span className="vm-unlocked"><LockOpen size={14} /> Unlocked</span></div>
+                        <div className="vm-panel vm-side-card">
+                            <h3>Contact Information</h3>
                             <ContactDetails contact={revealed} onCopy={(t) => { void navigator.clipboard?.writeText(t).then(() => notify("Number copied."), () => notify("Couldn't copy.")); }} />
                             <p className="vm-fine">Access recorded in Contact Requests. Disclosure does not select or appoint this vendor for a project.</p>
                         </div>
                     ) : (
-                        <div className="vm-panel">
-                            <div className="vm-panel-head"><span className="vm-otp-icon"><Lock size={16} /></span><h3>Want to connect with this vendor?</h3></div>
-                            <p className="vm-body vm-muted">Verify your RVYO account to securely reveal the vendor&apos;s contact information.</p>
-                            <p className="vm-masked"><Phone size={14} /> +91 ••••• •••••</p>
-                            <p className="vm-masked"><Mail size={14} /> ••••••@••••••.in</p>
-                            <button type="button" className="vm-btn vm-btn--primary vm-btn--block" onClick={() => setContactOpen(true)}><Lock size={15} /> Acquire Vendor Contact Information</button>
+                        <div className="vm-panel vm-side-card">
+                            <div>
+                                <h3>Want to connect with this Vendor?</h3>
+                                <p className="vm-side-sub">Verify your RVYO account to securely reveal the vendor&apos;s contact information.</p>
+                            </div>
+                            {/* Masks are generic: no part of the real number or email reaches the browser before verification. */}
+                            <ul className="vm-masked-list" aria-label="Contact details, hidden until verified">
+                                <li><Phone size={18} aria-hidden="true" /> +91 9••••••••</li>
+                                <li><Mail size={18} aria-hidden="true" /> ••••••••••••@••••••.in</li>
+                                <li><MapPin size={18} aria-hidden="true" /> ••••••••••••, {vendor.city}, India</li>
+                            </ul>
+                            <button type="button" className="vm-btn vm-btn--primary vm-btn--block" onClick={() => setContactOpen(true)}><Lock size={18} /> Acquire Contact Information</button>
                             <p className="vm-fine vm-center">Contact details are protected by OTP verification.</p>
                         </div>
                     )}
 
-                    <div className="vm-panel">
-                        <div className="vm-panel-head"><h3>Sourcing</h3><button type="button" className="vm-link" onClick={() => setListOpen(true)}><ListPlus size={15} /> Add to list</button></div>
+                    <div className="vm-panel vm-side-card">
+                        <div className="vm-panel-head"><h3>Sourcing</h3><button type="button" className="vm-link" onClick={() => setListOpen(true)}><ListPlus size={18} /> Add to List</button></div>
                         {lists.length ? (
                             <ul className="vm-in-lists">
                                 {lists.map((l) => (
                                     <li key={l.id}><button type="button" className="vm-link" onClick={() => router.push(`/vendors?tab=lists&list=${l.id}`)}>{l.name}</button>{l.items.find((i) => i.vendorId === vendor.id)?.shortlisted ? <span className="vm-status vm-status--success">Shortlisted</span> : null}</li>
                                 ))}
                             </ul>
-                        ) : <p className="vm-muted">Not in any sourcing list yet.</p>}
+                        ) : null}
                         <label className="vm-field">
-                            <span>Internal note · visible only to your company</span>
+                            <span>Internal Note · Visible to your company</span>
                             <textarea
                                 className="vm-textarea"
-                                rows={3}
+                                rows={4}
                                 maxLength={1000}
                                 value={note}
                                 onChange={(e) => setNote(e.target.value)}
                                 onBlur={() => { if (note !== (store.notes[vendor.id] ?? "")) { saveNote(vendor.id, note); notify("Note saved."); } }}
-                                placeholder="e.g. Visited showroom. Need to confirm bulk pricing."
+                                placeholder="e.g. Visited showroom, need to confirm bulk pricing"
                             />
                         </label>
                     </div>
 
-                    <div className="vm-panel">
-                        <h3>Trust &amp; certification</h3>
+                    <div className="vm-panel vm-side-card">
+                        <h3>Trust &amp; Certification</h3>
                         <ul className="vm-trust">
                             <li>
-                                <ShieldCheck size={17} className={vendor.verifiedOn ? "is-ok" : ""} />
+                                <ShieldCheck size={20} className={vendor.verifiedOn ? "is-ok" : ""} />
                                 <span><strong>Verified Business</strong>{vendor.verifiedOn ? `RVYO checked business identity and documents on ${fmtDate(vendor.verifiedOn)}.` : "Business verification is pending."}</span>
                             </li>
                             <li>
-                                <Award size={17} className={certified ? "is-cert" : ""} />
+                                <BadgeCheck size={20} className={certified ? "is-cert" : ""} />
                                 <span>
                                     <strong>RVYO Certified</strong>
                                     {certified ? `Met additional certification criteria. Review due ${fmtDate(vendor.certification!.reviewDue)}.`
@@ -267,8 +275,8 @@ function VendorProfileInner() {
     );
 }
 
-function Panel({ title, children }: { title: string; children: ReactNode }) {
-    return <section className="vm-panel"><h3>{title}</h3>{children}</section>;
+function Section({ title, children }: { title: string; children: ReactNode }) {
+    return <section className="vm-profile-section"><h3>{title}</h3>{children}</section>;
 }
 
 function Chips({ items }: { items: string[] }) {

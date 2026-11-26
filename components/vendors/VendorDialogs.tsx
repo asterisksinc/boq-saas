@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Check, Copy, FileText, Lock, LockOpen, Mail, Phone, Plus, Search, ShieldCheck, X } from "lucide-react";
+import { Check, Copy, FileText, Lock, Mail, MessageSquareText, Phone, Plus, Search, X } from "lucide-react";
 import { BUSINESS_TYPES, BUSINESS_TYPE_LABEL, CATEGORIES, CATEGORY_LABEL, CURRENT_USER, SAMPLE_PROJECTS, getPlace, type Vendor } from "@/lib/vendors/data";
-import { EMPTY_ADVANCED, categoryCounts, type AdvancedFilters } from "@/lib/vendors/search";
+import { EMPTY_ADVANCED, QUICK_FILTERS, categoryCounts, type AdvancedFilters, type QuickFilter } from "@/lib/vendors/search";
 import {
     ContactAccessError, OTP_RULES, PROTOTYPE_OTP, addToList, createList, expireContactOtp, requestContactOtp, resendContactOtp, verifyContactOtp,
     type ChallengeView, type OtpMethod,
@@ -15,15 +15,16 @@ import { CertifiedBadge, Layer, Modal, VendorLogo, useVendorStore } from "./Vend
 
 const LANGUAGES = ["English", "Hindi", "Telugu", "Kannada", "Tamil", "Marathi", "Urdu"];
 
-export function FilterDrawer({ open, value, onApply, onClose, previewCount }: {
-    open: boolean; value: AdvancedFilters; onApply: (f: AdvancedFilters) => void; onClose: () => void;
+export function FilterDrawer({ open, value, quick, onApply, onClose, previewCount }: {
+    open: boolean; value: AdvancedFilters; quick: QuickFilter[]; onApply: (f: AdvancedFilters, quick: QuickFilter[]) => void; onClose: () => void;
     /** Live result count for the draft filters, when a search is active. */
-    previewCount?: (f: AdvancedFilters) => number;
+    previewCount?: (f: AdvancedFilters, quick: QuickFilter[]) => number;
 }) {
     const [draft, setDraft] = useState(value);
+    const [quickDraft, setQuickDraft] = useState(quick);
     const [allCats, setAllCats] = useState(false);
     const counts = useMemo(() => categoryCounts(), []);
-    useEffect(() => { if (open) setDraft(value); }, [open, value]);
+    useEffect(() => { if (open) { setDraft(value); setQuickDraft(quick); } }, [open, value, quick]);
     const panel = useRef<HTMLElement>(null);
     useEffect(() => {
         if (!open) return;
@@ -36,7 +37,7 @@ export function FilterDrawer({ open, value, onApply, onClose, previewCount }: {
             previous?.focus?.();
         };
     }, [open, onClose]);
-    const preview = useMemo(() => (open && previewCount ? previewCount(draft) : null), [open, previewCount, draft]);
+    const preview = useMemo(() => (open && previewCount ? previewCount(draft, quickDraft) : null), [open, previewCount, draft, quickDraft]);
     if (!open) return null;
 
     const toggle = <K extends "verification" | "categories" | "businessTypes" | "languages">(key: K, item: AdvancedFilters[K][number]) =>
@@ -59,6 +60,18 @@ export function FilterDrawer({ open, value, onApply, onClose, previewCount }: {
                     <button type="button" className="vm-icon-btn" aria-label="Close filters" onClick={onClose}><X size={18} /></button>
                 </header>
                 <div className="vm-drawer-body">
+                    <fieldset>
+                        <legend>Quick filters</legend>
+                        <div className="vm-chips">
+                            {QUICK_FILTERS.map((f) => {
+                                const on = quickDraft.includes(f.value);
+                                return (
+                                    <button key={f.value} type="button" className={`vm-chip vm-chip--toggle${on ? " is-on" : ""}`} aria-pressed={on}
+                                        onClick={() => setQuickDraft((qs) => (on ? qs.filter((x) => x !== f.value) : [...qs, f.value]))}>{f.label}</button>
+                                );
+                            })}
+                        </div>
+                    </fieldset>
                     <fieldset>
                         <legend>Vendor verification</legend>
                         {([["certified", "RVYO Certified"], ["verified", "Verified business"], ["profileComplete", "Profile complete (catalogue + portfolio)"]] as const).map(([k, label]) => (
@@ -122,8 +135,8 @@ export function FilterDrawer({ open, value, onApply, onClose, previewCount }: {
                     <p className="vm-fine">Price and minimum-order filters appear once vendors publish reliable pricing data.</p>
                 </div>
                 <footer className="vm-drawer-foot">
-                    <button type="button" className="vm-btn vm-btn--ghost" onClick={() => setDraft(EMPTY_ADVANCED)}>Clear all</button>
-                    <button type="button" className="vm-btn vm-btn--primary" onClick={() => onApply(draft)}>
+                    <button type="button" className="vm-btn vm-btn--ghost" onClick={() => { setDraft(EMPTY_ADVANCED); setQuickDraft([]); }}>Clear all</button>
+                    <button type="button" className="vm-btn vm-btn--primary" onClick={() => onApply(draft, quickDraft)}>
                         {preview === null ? "Apply filters" : preview === 0 ? "No matches — apply anyway" : `Show ${preview} vendor${preview === 1 ? "" : "s"}`}
                     </button>
                 </footer>
@@ -241,19 +254,18 @@ export function ContactAccessModal({ vendor, certified, open, onClose, onUnlocke
     const locked = step.kind === "otp" && step.challenge.attemptsLeft <= 0;
 
     return (
-        <Modal open={open} onClose={onClose} labelledBy="vm-contact-title">
+        <Modal open={open} onClose={onClose} labelledBy="vm-contact-title" sheet>
             {step.kind === "method" ? (
-                <div className="vm-otp">
-                    <span className="vm-otp-icon"><Lock size={18} /></span>
-                    <p className="vm-eyebrow">Verify your identity</p>
-                    <h2 id="vm-contact-title">Secure contact access</h2>
-                    <p className="vm-muted">Verify your RVYO account to reveal {vendor.name}&apos;s contact information.</p>
-                    <p className="vm-label">Choose verification method</p>
-                    <div className="vm-methods" role="radiogroup" aria-label="Verification method">
-                        {([["email", Mail, "Email verification", CURRENT_USER.maskedEmail, true], ["sms", Phone, "SMS verification", CURRENT_USER.maskedPhone, false]] as const).map(([value, Icon, label, dest, rec]) => (
+                <div className="vm-sheet">
+                    <header className="vm-sheet-head">
+                        <h2 id="vm-contact-title">Secure Contact Access</h2>
+                        <p>Verify your RVYO account to reveal {vendor.name}&apos;s contact information.</p>
+                    </header>
+                    <div className="vm-sheet-card vm-methods" role="radiogroup" aria-label="Verification method">
+                        {([["email", Mail, "Email Verification", CURRENT_USER.maskedEmail, true], ["sms", MessageSquareText, "SMS Verification", CURRENT_USER.maskedPhone, false]] as const).map(([value, Icon, label, dest, rec]) => (
                             <label key={value} className={`vm-method${method === value ? " is-on" : ""}`}>
                                 <input type="radio" name="vm-method" checked={method === value} onChange={() => setMethod(value)} />
-                                <Icon size={18} aria-hidden="true" />
+                                <Icon size={20} aria-hidden="true" />
                                 <span><strong>{label}</strong><small>{dest}</small></span>
                                 {rec ? <span className="vm-rec">Recommended</span> : null}
                             </label>
@@ -261,77 +273,82 @@ export function ContactAccessModal({ vendor, certified, open, onClose, onUnlocke
                     </div>
                     {error ? <p className="vm-error" role="alert">{error}</p> : null}
                     <button type="button" className="vm-btn vm-btn--primary vm-btn--block" onClick={send} disabled={busy}>{busy ? "Sending…" : "Send OTP"}</button>
-                    <p className="vm-fine vm-center">Your contact details are used only for account verification.</p>
+                    <p className="vm-sheet-fine">Verify your RVYO account to reveal {vendor.name}&apos;s contact information.</p>
                 </div>
             ) : step.kind === "otp" ? (
-                <div className="vm-otp">
-                    <span className="vm-otp-icon"><Lock size={18} /></span>
-                    <p className="vm-eyebrow">Enter verification code</p>
-                    <h2 id="vm-contact-title">{step.challenge.method === "email" ? "Check your inbox" : "Check your messages"}</h2>
-                    <p className="vm-muted">We sent a 6-digit OTP to <strong>{step.challenge.destination}</strong>. It expires in 5 minutes.</p>
-                    <div className="vm-otp-boxes" onPaste={(e) => { e.preventDefault(); setDigit(0, e.clipboardData.getData("text")); }}>
-                        {digits.map((d, i) => (
-                            <input
-                                key={i}
-                                ref={(el) => { inputs.current[i] = el; }}
-                                value={d}
-                                inputMode="numeric"
-                                autoComplete={i === 0 ? "one-time-code" : "off"}
-                                maxLength={OTP_RULES.length}
-                                aria-label={`Digit ${i + 1}`}
-                                disabled={expired || locked}
-                                className={error && !expired ? "has-error" : ""}
-                                onChange={(e) => setDigit(i, e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Backspace" && !d && i > 0) inputs.current[i - 1]?.focus();
-                                    if (e.key === "Enter" && digits.every(Boolean)) void verify();
-                                }}
-                            />
-                        ))}
+                <div className="vm-sheet">
+                    <header className="vm-sheet-head">
+                        <h2 id="vm-contact-title">Enter Verification Code</h2>
+                        <p>We sent a 6-digit OTP to <strong>{step.challenge.destination}</strong>. It expires in 5 minutes.</p>
+                    </header>
+                    <div className="vm-sheet-card">
+                        <div className="vm-otp-boxes" onPaste={(e) => { e.preventDefault(); setDigit(0, e.clipboardData.getData("text")); }}>
+                            {digits.map((d, i) => (
+                                <input
+                                    key={i}
+                                    ref={(el) => { inputs.current[i] = el; }}
+                                    value={d}
+                                    placeholder="0"
+                                    inputMode="numeric"
+                                    autoComplete={i === 0 ? "one-time-code" : "off"}
+                                    maxLength={OTP_RULES.length}
+                                    aria-label={`Digit ${i + 1}`}
+                                    disabled={expired || locked}
+                                    className={error && !expired ? "has-error" : ""}
+                                    onChange={(e) => setDigit(i, e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Backspace" && !d && i > 0) inputs.current[i - 1]?.focus();
+                                        if (e.key === "Enter" && digits.every(Boolean)) void verify();
+                                    }}
+                                />
+                            ))}
+                        </div>
                     </div>
                     {expired ? <p className="vm-error" role="alert">This code has expired. Request a new one.</p>
-                        : error ? <p className="vm-error" role="alert">{error}</p>
-                            : <p className="vm-fine">Prototype: use code <strong>{PROTOTYPE_OTP}</strong>.</p>}
+                        : error ? <p className="vm-error" role="alert">{error}</p> : null}
                     <button type="button" className="vm-btn vm-btn--primary vm-btn--block" onClick={verify} disabled={busy || expired || locked || !digits.every(Boolean)}>
                         {busy ? "Verifying…" : "Verify & Reveal Contact"}
                     </button>
                     <div className="vm-otp-foot">
-                        {resendIn > 0 && !expired ? <span className="vm-muted">Resend code in 00:{String(resendIn).padStart(2, "0")}</span>
+                        {resendIn > 0 && !expired
+                            ? <span className="vm-resend">Resend <b>00:{String(resendIn).padStart(2, "0")}s</b></span>
                             : <button type="button" className="vm-link" onClick={expired || locked ? send : resend}>{expired || locked ? "Send a new code" : "Resend code"}</button>}
-                        <button type="button" className="vm-link" onClick={() => { setStep({ kind: "method" }); setError(null); }}>Change method</button>
+                        <button type="button" className="vm-link" onClick={() => { setStep({ kind: "method" }); setError(null); }}>Change Method</button>
                     </div>
-                    {!expired ? <button type="button" className="vm-sim-link" onClick={() => { expireContactOtp(step.challenge.id); setNow(Date.now() + 1); }}>Simulate expired code</button> : null}
+                    <p className="vm-sheet-fine vm-sheet-fine--left">
+                        Prototype: use code <strong>{PROTOTYPE_OTP}</strong>.
+                        {!expired ? <> <button type="button" className="vm-sim-link" onClick={() => { expireContactOtp(step.challenge.id); setNow(Date.now() + 1); }}>Simulate expired code</button></> : null}
+                    </p>
                 </div>
             ) : (
-                <div className="vm-otp">
-                    <span className="vm-otp-icon vm-otp-icon--ok"><LockOpen size={18} /></span>
-                    <span className="vm-badge vm-badge--verified"><ShieldCheck size={12} /> Verified</span>
-                    <h2 id="vm-contact-title">Contact information unlocked</h2>
-                    <div className="vm-otp-vendor">
-                        <VendorLogo vendor={vendor} size={40} />
-                        <span><strong>{vendor.name}</strong>{certified ? <CertifiedBadge small /> : null}</span>
+                <div className="vm-sheet">
+                    <header className="vm-sheet-head">
+                        <span className="vm-tag vm-tag--green">OTP Verified</span>
+                        <h2 id="vm-contact-title">Contact Information Unlocked</h2>
+                    </header>
+                    <div className="vm-sheet-card">
+                        <ContactDetails contact={step.contact} onCopy={copy} actions={false} />
                     </div>
-                    <ContactDetails contact={step.contact} onCopy={copy} />
-                    <p className="vm-fine">Access is recorded for your company. This does not select the vendor for a project.</p>
+                    <p className="vm-sheet-fine vm-sheet-fine--left">Access is recorded for your company. This does not select the vendor for a project.</p>
                 </div>
             )}
         </Modal>
     );
 }
 
-export function ContactDetails({ contact, onCopy }: { contact: VendorContact; onCopy: (text: string) => void }) {
+export function ContactDetails({ contact, onCopy, actions = true }: { contact: VendorContact; onCopy: (text: string) => void; actions?: boolean }) {
     return (
         <>
             <dl className="vm-contact">
-                <div><dt>Contact number</dt><dd>{contact.phone}</dd></div>
-                <div><dt>Email address</dt><dd>{contact.email}</dd></div>
-                <div><dt>Business address</dt><dd>{contact.address}</dd></div>
+                <div><dt>Contact Number</dt><dd>{contact.phone}</dd></div>
+                <div><dt>Email Address</dt><dd>{contact.email}</dd></div>
+                <div><dt>Business Address</dt><dd>{contact.address}</dd></div>
             </dl>
-            <div className="vm-contact-actions">
+            {actions ? <div className="vm-contact-actions">
                 <a className="vm-btn vm-btn--primary" href={`tel:${contact.phone.replace(/\s/g, "")}`}><Phone size={16} /> Call</a>
                 <a className="vm-btn" href={`mailto:${contact.email}`}><Mail size={16} /> Email</a>
                 <button type="button" className="vm-btn" onClick={() => onCopy(contact.phone)}><Copy size={16} /> Copy</button>
-            </div>
+            </div> : null}
         </>
     );
 }
