@@ -136,7 +136,7 @@ export interface LeadInput {
     email?: string | null;
     phone?: string | null;
     location?: string | null;
-    projectId: string;
+    projectId?: string | null;
     source: LeadSource;
     stage?: LeadStage;
     assignedTo?: string | null;

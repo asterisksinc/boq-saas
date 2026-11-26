@@ -69,8 +69,7 @@ export function LeadFormDrawer({
 }: {
     open: boolean; lead?: Lead | null; onClose: () => void; onSaved: (lead: Lead, created: boolean) => void;
 }) {
-    const [form, setForm] = useState({ name: "", avatarUrl: "", email: "", phone: "", location: "", projectId: "", source: "", stage: "new", assignedTo: "" });
-    const [projects, setProjects] = useState<Option[]>([]);
+    const [form, setForm] = useState({ name: "", avatarUrl: "", email: "", phone: "", location: "", source: "", stage: "new", assignedTo: "" });
     const [members, setMembers] = useState<Option[]>([]);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [busy, setBusy] = useState(false);
@@ -83,15 +82,14 @@ export function LeadFormDrawer({
         setFormError(null);
         setForm({
             name: lead?.name ?? "", avatarUrl: lead?.avatarUrl ?? "", email: lead?.email ?? "", phone: lead?.phone ?? "",
-            location: lead?.location ?? "", projectId: lead?.projectId ?? "", source: lead?.source ?? "",
+            location: lead?.location ?? "", source: lead?.source ?? "",
             stage: lead?.stage ?? "new", assignedTo: lead?.assignedTo ?? "",
         });
         listLeadFormOptions()
-            .then(({ projects: p, members: m }) => {
-                setProjects(p.map((x) => ({ value: x.id, label: x.projectCode ? `${x.name} · ${x.projectCode}` : x.name })));
+            .then(({ members: m }) => {
                 setMembers(m.map((x) => ({ value: x.id, label: x.role ? `${x.name} · ${x.role}` : x.name })));
             })
-            .catch(() => setFormError("Projects and team members could not be loaded."));
+            .catch(() => setFormError("Team members could not be loaded."));
     }, [open, lead]);
 
     const set = (key: keyof typeof form) => (value: string) => {
@@ -115,19 +113,18 @@ export function LeadFormDrawer({
         }
     };
 
-    const valid = form.name.trim() && form.projectId && form.source;
+    const valid = form.name.trim() && form.source;
 
     const submit = async () => {
         const next: Record<string, string> = {};
         if (!form.name.trim()) next.name = "Lead name is required.";
         if (form.email && !EMAIL_RE.test(form.email.trim())) next.email = "Enter a valid email address.";
-        if (!form.projectId) next.projectId = "Choose a project.";
         if (!form.source) next.source = "Choose a lead source.";
         setErrors(next);
         if (Object.values(next).some(Boolean)) return;
         const payload: LeadInput = {
             name: form.name.trim(), avatarUrl: form.avatarUrl || null, email: form.email.trim() || null,
-            phone: form.phone.trim() || null, location: form.location.trim() || null, projectId: form.projectId,
+            phone: form.phone.trim() || null, location: form.location.trim() || null,
             source: form.source as LeadSource, stage: form.stage as LeadStage, assignedTo: form.assignedTo || null,
         };
         setBusy(true);
@@ -157,9 +154,6 @@ export function LeadFormDrawer({
             }
         >
             {formError ? <p className="ld-form-error" role="alert">{formError}</p> : null}
-            <Field label="Lead Name" required error={errors.name}>
-                <input value={form.name} onChange={(e) => set("name")(e.target.value)} placeholder="Enter Lead Name" maxLength={160} autoFocus />
-            </Field>
             <Field label="Profile Picture" error={errors.avatarUrl} group>
                 {form.avatarUrl ? (
                     <div className="ld-avatar-preview">
@@ -170,6 +164,9 @@ export function LeadFormDrawer({
                     <Dropzone onFiles={upload} busy={uploading} />
                 )}
             </Field>
+            <Field label="Lead Name" required error={errors.name}>
+                <input value={form.name} onChange={(e) => set("name")(e.target.value)} placeholder="Enter Lead Name" maxLength={160} autoFocus />
+            </Field>
             <Field label="Email" error={errors.email}>
                 <input type="email" value={form.email} onChange={(e) => set("email")(e.target.value)} placeholder="example@gmail.com" maxLength={254} />
             </Field>
@@ -178,9 +175,6 @@ export function LeadFormDrawer({
             </Field>
             <Field label="Location">
                 <input value={form.location} onChange={(e) => set("location")(e.target.value)} placeholder="Enter Location" maxLength={200} />
-            </Field>
-            <Field label="Linked Project" required error={errors.projectId}>
-                <SelectInput value={form.projectId} onChange={set("projectId")} placeholder="Choose or Link Project" options={projects} />
             </Field>
             <Field label="Lead Source" required error={errors.source}>
                 <SelectInput value={form.source} onChange={set("source")} placeholder="Choose Lead Source" options={LEAD_SOURCES} />
