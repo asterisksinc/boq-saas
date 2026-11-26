@@ -177,4 +177,23 @@ describe("Vendor Marketplace — pages and navigation", () => {
         expect(css).toMatch(/\.vm-drawer-body \{[^}]*min-height: 0;[^}]*overflow-y: auto/);
         expect(read("app", "vendors", "vendors.css")).toMatch(/\.vm-page,\s*\.vm-layer \{\s*--vm-ink/);
     });
+
+    it("draws the map with MapLibre GL on free OpenFreeMap tiles, keeping the attribution", () => {
+        const map = read("components", "vendors", "VendorMap.tsx");
+        expect(map).toContain('import("maplibre-gl")');
+        expect(map).toContain('"https://tiles.openfreemap.org/styles/positron"');
+        expect(map).toContain("attributionControl: { compact: true }");
+        expect(map).toContain("never draw an inaccurate pin");
+        expect(JSON.parse(read("package.json")).dependencies["maplibre-gl"]).toBeDefined();
+    });
+});
+
+describe("Vendor Marketplace — map radius ring", () => {
+    it("builds a closed geodesic circle whose points sit at the search radius", async () => {
+        const { circlePolygon } = await import("../lib/vendors/geo");
+        const hyd = getPlace("hyd")!;
+        const ring = circlePolygon(hyd, 25).geometry.coordinates[0];
+        expect(ring[0]).toEqual(ring[ring.length - 1]);
+        for (const [lng, lat] of ring.filter((_, i) => i % 12 === 0)) expect(distanceKm(hyd, { lat, lng })).toBeCloseTo(25, 0);
+    });
 });

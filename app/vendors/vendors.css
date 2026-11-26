@@ -455,36 +455,19 @@
     min-height: 0;
     overflow: hidden;
     border-radius: 12px;
-    background-color: #e8eef7;
-    background-image:
-        linear-gradient(to right, rgba(255, 255, 255, .9) 1.5px, transparent 1.5px),
-        linear-gradient(to bottom, rgba(255, 255, 255, .9) 1.5px, transparent 1.5px);
-    cursor: grab;
-    touch-action: none;
-    user-select: none;
+    background: #eef2f6;
+    isolation: isolate;
 }
-.vm-map.is-dragging { cursor: grabbing; }
-.vm-map-loading { position: absolute; z-index: 5; inset: 0; background: rgba(241, 245, 249, .55); animation: vm-pulse 1s ease-in-out infinite alternate; }
+/* MapLibre canvas (OpenFreeMap tiles) with mapcn-style React markers layered over it. */
+.vm-map-canvas { position: absolute; inset: 0; }
+.vm-map-canvas .maplibregl-canvas { outline: none; }
+.vm-map-overlay { position: absolute; z-index: 3; inset: 0; overflow: hidden; pointer-events: none; }
+.vm-map-overlay > * { pointer-events: auto; }
+.vm-map-overlay > .vm-map-origin { pointer-events: none; }
+.vm-map .maplibregl-ctrl-bottom-right { z-index: 8; }
+.vm-map .maplibregl-ctrl-attrib { font: 500 11px 'Urbanist', Inter, sans-serif; }
+.vm-map-loading { position: absolute; z-index: 4; pointer-events: none; inset: 0; background: rgba(241, 245, 249, .55); animation: vm-pulse 1s ease-in-out infinite alternate; }
 @keyframes vm-pulse { from { opacity: .3; } to { opacity: .8; } }
-.vm-map-label {
-    position: absolute;
-    transform: translate(-50%, -50%);
-    color: #94a3b8;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    white-space: nowrap;
-    pointer-events: none;
-}
-.vm-map-label.is-city { color: #64748b; font-size: 13px; }
-.vm-map-ring {
-    position: absolute;
-    border: 1.5px solid rgba(37, 99, 235, .55);
-    border-radius: 50%;
-    background: rgba(37, 99, 235, .06);
-    pointer-events: none;
-}
 .vm-map-origin {
     position: absolute;
     width: 10px;
@@ -612,7 +595,7 @@
 .vm-dot--certified { border: 2px solid var(--vm-blue); background: #fff; }
 .vm-dot--selected { background: var(--vm-blue); }
 .vm-dot--saved { background: var(--vm-amber); }
-.vm-map-sim { position: absolute; z-index: 7; right: 14px; bottom: 14px; padding: 6px 10px; border: 0; border-radius: 6px; background: rgba(255, 255, 255, .9); color: var(--vm-muted); font: 500 12px 'Urbanist', Inter, sans-serif; }
+.vm-map-sim { position: absolute; z-index: 7; left: 14px; top: 14px; padding: 6px 10px; border: 0; border-radius: 6px; background: rgba(255, 255, 255, .9); color: var(--vm-muted); font: 500 12px 'Urbanist', Inter, sans-serif; }
 .vm-map--down { display: grid; place-items: center; background: #f8fafc; cursor: default; }
 .vm-map-down { display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 340px; padding: 24px; text-align: center; color: var(--vm-muted); }
 .vm-map-down strong { color: var(--vm-ink); font-size: 17px; }

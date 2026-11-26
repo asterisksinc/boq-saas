@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { GeoJSONSource, Map as MapLibreMap } from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 import { Award, LocateFixed, MapPinOff, Minus, Plus, RotateCw, Search, X } from "lucide-react";
-import { PLACES, type Vendor } from "@/lib/vendors/data";
+import type { Vendor } from "@/lib/vendors/data";
+import { boundsOf, circlePolygon } from "@/lib/vendors/geo";
 import { Rating, TrustBadges, formatKm } from "./VendorUi";
 
 export interface MapPin {
@@ -30,251 +33,268 @@ export interface VendorMapProps {
     onNotify: (message: string) => void;
 }
 
-const KM_PER_LAT = 110.57;
-const ZOOMS = [0.6, 1, 1.6, 2.5, 4, 6, 9, 14, 20];
+/** OpenFreeMap: free OpenStreetMap vector tiles, no API key and no request limits. Its attribution must stay visible. */
+export const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
+const DEFAULT_CENTER: LatLng = { lat: 17.385, lng: 78.4867 };
 const CLUSTER_PX = 34;
-
-function project(p: LatLng, c: LatLng, scale: number) {
-    const kmPerLng = 111.32 * Math.cos((c.lat * Math.PI) / 180);
-    return { x: (p.lng - c.lng) * kmPerLng * scale, y: -(p.lat - c.lat) * KM_PER_LAT * scale };
-}
-
-function unproject(dx: number, dy: number, c: LatLng, scale: number): LatLng {
-    const kmPerLng = 111.32 * Math.cos((c.lat * Math.PI) / 180);
-    return { lat: c.lat - dy / scale / KM_PER_LAT, lng: c.lng + dx / scale / kmPerLng };
-}
-
-function zoomFor(radiusKm: number | null, size: number) {
-    if (!radiusKm) return 2;
-    const want = (size * 0.42) / radiusKm;
-    let best = 0;
-    ZOOMS.forEach((z, i) => { if (z <= want) best = i; });
-    return best;
-}
+const RADIUS_SOURCE = "vm-radius";
+const EMPTY_FC: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
 /**
- * Lightweight in-app map (no tile provider yet): projected vendor pins, clustering at low zoom, radius ring,
- * pan/zoom, "Search this area", current location and a failure fallback. Swap the background for a real tile
- * layer (Mapbox / Google) without changing the props.
+ * Vendor map on MapLibre GL + OpenFreeMap tiles, with mapcn-style React markers drawn over the canvas:
+ * custom pins (default / certified / selected / saved), screen-space clustering, a geodesic radius ring,
+ * fly-to from the list, "Search this area", current location and a failure fallback (PRD §06).
  */
 export default function VendorMap({
     center, radiusKm, pins, selectedId, hoveredId, focus, loading, outage,
     onSelect, onOpen, onSearchArea, onToggleOutage, onNotify,
 }: VendorMapProps) {
-    const box = useRef<HTMLDivElement>(null);
-    const [size, setSize] = useState({ w: 640, h: 480 });
-    const [view, setView] = useState<LatLng>(center ?? { lat: 17.385, lng: 78.4867 });
-    const [zoom, setZoom] = useState(2);
+    const container = useRef<HTMLDivElement>(null);
+    const mapRef = useRef<MapLibreMap | null>(null);
+    const [ready, setReady] = useState(false);
+    const [failed, setFailed] = useState(false);
+    const [attempt, setAttempt] = useState(0);
+    const [, setFrame] = useState(0); // bumps on every camera move so the overlay markers follow the map
     const [moved, setMoved] = useState(false);
-    const drag = useRef<{ x: number; y: number; start: LatLng; moved: boolean } | null>(null);
+    const [zoomBounds, setZoomBounds] = useState({ atMin: false, atMax: false });
+    const onSelectRef = useRef(onSelect);
+    onSelectRef.current = onSelect;
 
+    // Create the map once per attempt; "Retry map" after a failure builds a fresh one.
     useEffect(() => {
-        const el = box.current;
-        if (!el) return;
-        const ro = new ResizeObserver(([entry]) => setSize({ w: entry.contentRect.width, h: entry.contentRect.height }));
-        ro.observe(el);
-        return () => ro.disconnect();
-    }, []);
+        if (outage || !container.current) return;
+        let cancelled = false;
+        let map: MapLibreMap | null = null;
+        let loadTimer = 0;
+        setReady(false);
+        setFailed(false);
 
-    // Re-centre whenever a new search lands.
+        import("maplibre-gl").then(({ default: maplibregl }) => {
+            if (cancelled || !container.current) return;
+            const start = center ?? DEFAULT_CENTER;
+            try {
+                map = new maplibregl.Map({
+                    container: container.current,
+                    style: MAP_STYLE_URL,
+                    center: [start.lng, start.lat],
+                    zoom: 10,
+                    minZoom: 3,
+                    maxZoom: 18,
+                    attributionControl: { compact: true },
+                    dragRotate: false,
+                    pitchWithRotate: false,
+                    renderWorldCopies: false,
+                });
+            } catch (error) {
+                console.warn("[VendorMap] could not start the map", error); // e.g. WebGL unavailable
+                setFailed(true);
+                return;
+            }
+            map.touchZoomRotate.disableRotation();
+            mapRef.current = map;
+
+            loadTimer = window.setTimeout(() => { if (!map?.loaded()) setFailed(true); }, 15000);
+            const sync = () => {
+                if (!map) return;
+                setFrame((n) => n + 1);
+                setZoomBounds({ atMin: map.getZoom() <= map.getMinZoom() + 0.01, atMax: map.getZoom() >= map.getMaxZoom() - 0.01 });
+            };
+
+            map.on("load", () => {
+                window.clearTimeout(loadTimer);
+                if (!map) return;
+                map.addSource(RADIUS_SOURCE, { type: "geojson", data: EMPTY_FC });
+                map.addLayer({ id: "vm-radius-fill", type: "fill", source: RADIUS_SOURCE, paint: { "fill-color": "#2563eb", "fill-opacity": 0.06 } });
+                map.addLayer({ id: "vm-radius-line", type: "line", source: RADIUS_SOURCE, paint: { "line-color": "#2563eb", "line-width": 1.5, "line-opacity": 0.6 } });
+                setReady(true);
+                sync();
+            });
+            map.on("error", (e) => {
+                // A missing tile is recoverable; a style that never loads is an outage.
+                if (map && !map.loaded()) {
+                    console.warn("[VendorMap] map failed to load", e.error);
+                    window.clearTimeout(loadTimer);
+                    setFailed(true);
+                }
+            });
+            map.on("move", sync);
+            map.on("dragstart", () => setMoved(true));
+            map.on("zoomend", (e) => { if ((e as { originalEvent?: Event }).originalEvent) setMoved(true); });
+            map.on("click", () => onSelectRef.current(null)); // markers live in the overlay, so canvas clicks are "empty map"
+        });
+
+        return () => {
+            cancelled = true;
+            window.clearTimeout(loadTimer);
+            map?.remove();
+            mapRef.current = null;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [outage, attempt]);
+
+    // New search: draw the radius ring and frame it (or frame the pins for entire city / state).
     useEffect(() => {
-        if (!center) return;
-        setView(center);
-        setZoom(zoomFor(radiusKm, Math.min(size.w, size.h)));
+        const map = mapRef.current;
+        if (!map || !ready) return;
+        const ring = center && radiusKm ? circlePolygon(center, radiusKm) : null;
+        (map.getSource(RADIUS_SOURCE) as GeoJSONSource | undefined)?.setData(ring ? { type: "FeatureCollection", features: [ring] } : EMPTY_FC);
+        if (ring) {
+            map.fitBounds(boundsOf(ring.geometry.coordinates[0] as Array<[number, number]>), { padding: 48, duration: 600 });
+        } else if (center) {
+            const located = pins.filter((p) => p.vendor.lat != null && p.vendor.lng != null).map((p) => [p.vendor.lng!, p.vendor.lat!] as [number, number]);
+            if (located.length > 1) map.fitBounds(boundsOf(located), { padding: 72, maxZoom: 13, duration: 600 });
+            else map.flyTo({ center: [center.lng, center.lat], zoom: 11, duration: 600 });
+        }
         setMoved(false);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [center?.lat, center?.lng, radiusKm]);
+    }, [ready, center?.lat, center?.lng, radiusKm]);
 
-    // Card "show on map" / pin selection from the list.
+    // "Show on map" from a vendor card.
     useEffect(() => {
-        if (!focus) return;
+        const map = mapRef.current;
+        if (!map || !ready || !focus) return;
         const pin = pins.find((p) => p.vendor.id === focus.id);
         if (pin?.vendor.lat != null && pin.vendor.lng != null) {
-            setView({ lat: pin.vendor.lat, lng: pin.vendor.lng });
-            setZoom((z) => Math.max(z, 4));
-            setMoved(true);
+            map.flyTo({ center: [pin.vendor.lng, pin.vendor.lat], zoom: Math.max(map.getZoom(), 13), duration: 700 });
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [focus?.n]);
+    }, [ready, focus?.n]);
 
-    const scale = ZOOMS[zoom];
-    const cx = size.w / 2;
-    const cy = size.h / 2;
-
-    const placed = useMemo(() => pins
-        .filter((p) => p.vendor.lat !== null && p.vendor.lng !== null) // never draw an inaccurate pin
-        .map((p) => ({ ...p, ...project({ lat: p.vendor.lat!, lng: p.vendor.lng! }, view, scale) })), [pins, view, scale]);
-
-    const clusters = useMemo(() => {
-        const groups: Array<{ x: number; y: number; members: typeof placed }> = [];
-        for (const p of placed) {
-            if (p.vendor.id === selectedId) {
-                groups.push({ x: p.x, y: p.y, members: [p] });
-                continue;
-            }
-            const g = groups.find((c) => c.members[0].vendor.id !== selectedId && Math.hypot(c.x - p.x, c.y - p.y) < CLUSTER_PX);
-            if (g) {
-                g.members.push(p);
-                g.x = g.members.reduce((s, m) => s + m.x, 0) / g.members.length;
-                g.y = g.members.reduce((s, m) => s + m.y, 0) / g.members.length;
-            } else groups.push({ x: p.x, y: p.y, members: [p] });
-        }
-        return groups;
-    }, [placed, selectedId]);
-
-    // Cities always; localities only once zoomed in. Labels that would overlap an earlier one are skipped.
-    const labels = useMemo(() => {
-        const placedLabels: Array<{ id: string; text: string; city: boolean; x: number; y: number }> = [];
-        const candidates = PLACES
-            .filter((pl) => pl.kind === "city" || (pl.kind === "area" && scale >= 4))
-            .sort((a, b) => Number(b.kind === "city") - Number(a.kind === "city"));
-        for (const pl of candidates) {
-            const label = { id: pl.id, text: pl.kind === "city" ? pl.city : pl.label.split(",")[0], city: pl.kind === "city", ...project(pl, view, scale) };
-            if (Math.abs(label.x) > cx + 80 || Math.abs(label.y) > cy + 40) continue;
-            if (placedLabels.some((o) => Math.abs(o.x - label.x) < 110 && Math.abs(o.y - label.y) < 22)) continue;
-            placedLabels.push(label);
-        }
-        return placedLabels;
-    }, [view, scale, cx, cy]);
-
-    const ring = center && radiusKm ? { ...project(center, view, scale), r: radiusKm * scale } : null;
-    const selected = placed.find((p) => p.vendor.id === selectedId) ?? null;
-    const gridStep = Math.max(40, Math.min(160, scale * 5));
-    const origin = project({ lat: 0, lng: 0 }, view, scale);
-
-    const setZoomLevel = (next: number) => {
-        setZoom(Math.max(0, Math.min(ZOOMS.length - 1, next)));
-        setMoved(true);
-    };
-
-    const onPointerDown = (e: ReactPointerEvent) => {
-        if ((e.target as HTMLElement).closest("button, a")) return;
-        drag.current = { x: e.clientX, y: e.clientY, start: view, moved: false };
-        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    };
-    const onPointerMove = (e: ReactPointerEvent) => {
-        const d = drag.current;
-        if (!d) return;
-        const dx = e.clientX - d.x;
-        const dy = e.clientY - d.y;
-        if (!d.moved && Math.hypot(dx, dy) < 4) return;
-        d.moved = true;
-        setView(unproject(-dx, -dy, d.start, scale));
-    };
-    const onPointerUp = () => {
-        if (drag.current?.moved) setMoved(true);
-        else if (drag.current) onSelect(null);
-        drag.current = null;
-    };
-
-    const locate = () => {
+    const locate = useCallback(() => {
         if (!("geolocation" in navigator)) {
             onNotify("Current location isn't available in this browser. Enter a city instead.");
             return;
         }
         navigator.geolocation.getCurrentPosition(
             (pos) => {
-                setView({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                mapRef.current?.flyTo({ center: [pos.coords.longitude, pos.coords.latitude], zoom: 13, duration: 700 });
                 setMoved(true);
             },
             () => onNotify("Location permission was denied. Enter a city, area or pincode instead."),
             { timeout: 8000 },
         );
-    };
+    }, [onNotify]);
 
-    if (outage) {
+    if (outage || failed) {
         return (
             <div className="vm-map vm-map--down" role="region" aria-label="Map">
                 <div className="vm-map-down">
                     <MapPinOff size={28} aria-hidden="true" />
                     <strong>The map couldn&apos;t load</strong>
                     <p>You can keep searching and browsing vendors in the list. Locations will show again once the map is back.</p>
-                    <button type="button" className="vm-btn" onClick={onToggleOutage}><RotateCw size={16} /> Retry map</button>
+                    <button type="button" className="vm-btn" onClick={() => { if (outage) onToggleOutage(); else setAttempt((n) => n + 1); }}>
+                        <RotateCw size={16} /> Retry map
+                    </button>
                 </div>
             </div>
         );
     }
 
+    // Project markers to screen space on every render (the frame counter re-renders us as the camera moves).
+    const map = ready ? mapRef.current : null;
+    const placed = map
+        ? pins
+            .filter((p) => p.vendor.lat !== null && p.vendor.lng !== null) // never draw an inaccurate pin
+            .map((p) => ({ ...p, ...map.project([p.vendor.lng!, p.vendor.lat!]) }))
+        : [];
+    const clusters: Array<{ x: number; y: number; members: typeof placed }> = [];
+    for (const p of placed) {
+        const g = p.vendor.id === selectedId ? undefined
+            : clusters.find((c) => c.members[0].vendor.id !== selectedId && Math.hypot(c.x - p.x, c.y - p.y) < CLUSTER_PX);
+        if (g) {
+            g.members.push(p);
+            g.x = g.members.reduce((s, m) => s + m.x, 0) / g.members.length;
+            g.y = g.members.reduce((s, m) => s + m.y, 0) / g.members.length;
+        } else clusters.push({ x: p.x, y: p.y, members: [p] });
+    }
+    const origin = map && center ? map.project([center.lng, center.lat]) : null;
+    const selected = placed.find((p) => p.vendor.id === selectedId) ?? null;
+    const zoomBy = (delta: number) => {
+        const m = mapRef.current;
+        if (!m) return;
+        m.easeTo({ zoom: m.getZoom() + delta, duration: 250 });
+        setMoved(true);
+    };
+
     return (
-        <div
-            ref={box}
-            className={`vm-map${drag.current?.moved ? " is-dragging" : ""}`}
-            role="region"
-            aria-label="Vendor map"
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onWheel={(e) => { if (Math.abs(e.deltaY) > 20) setZoomLevel(zoom + (e.deltaY < 0 ? 1 : -1)); }}
-            style={{ backgroundSize: `${gridStep}px ${gridStep}px`, backgroundPosition: `${(cx + origin.x) % gridStep}px ${(cy + origin.y) % gridStep}px` }}
-        >
-            {loading ? <div className="vm-map-loading" aria-hidden="true" /> : null}
+        <div className="vm-map" role="region" aria-label="Vendor map">
+            <div ref={container} className="vm-map-canvas" />
+            {loading || !ready ? <div className="vm-map-loading" aria-hidden="true" /> : null}
 
-            {labels.map((l) => (
-                <span key={l.id} className={`vm-map-label${l.city ? " is-city" : ""}`} style={{ left: cx + l.x, top: cy + l.y }}>{l.text}</span>
-            ))}
+            <div className="vm-map-overlay">
+                {origin ? <span className="vm-map-origin" style={{ left: origin.x, top: origin.y }} aria-hidden="true" /> : null}
 
-            {ring ? <span className="vm-map-ring" style={{ left: cx + ring.x - ring.r, top: cy + ring.y - ring.r, width: ring.r * 2, height: ring.r * 2 }} aria-hidden="true" /> : null}
-            {center ? (() => { const c = project(center, view, scale); return <span className="vm-map-origin" style={{ left: cx + c.x, top: cy + c.y }} aria-hidden="true" />; })() : null}
-
-            {clusters.map((c) => {
-                if (c.members.length > 1) {
+                {clusters.map((c) => {
+                    if (c.members.length > 1) {
+                        return (
+                            <button
+                                key={c.members.map((m) => m.vendor.id).join("|")}
+                                type="button"
+                                className="vm-cluster"
+                                style={{ left: c.x, top: c.y }}
+                                aria-label={`${c.members.length} vendors here. Zoom in`}
+                                onClick={() => {
+                                    const m = mapRef.current;
+                                    if (!m) return;
+                                    m.easeTo({ center: m.unproject([c.x, c.y]), zoom: m.getZoom() + 2, duration: 400 });
+                                    setMoved(true);
+                                }}
+                            >
+                                {c.members.length}
+                            </button>
+                        );
+                    }
+                    const p = c.members[0];
+                    const state = p.vendor.id === selectedId ? "selected" : p.certified ? "certified" : "default";
                     return (
                         <button
-                            key={c.members.map((m) => m.vendor.id).join("|")}
+                            key={p.vendor.id}
                             type="button"
-                            className="vm-cluster"
-                            style={{ left: cx + c.x, top: cy + c.y }}
-                            aria-label={`${c.members.length} vendors here. Zoom in`}
-                            onClick={() => {
-                                setView(unproject(c.x, c.y, view, scale));
-                                setZoomLevel(zoom + 2);
-                            }}
+                            className={`vm-pin vm-pin--${state}${p.vendor.id === hoveredId ? " is-hovered" : ""}`}
+                            style={{ left: p.x, top: p.y }}
+                            aria-label={`${p.vendor.name}${p.certified ? ", RVYO Certified" : ""}`}
+                            aria-pressed={p.vendor.id === selectedId}
+                            onClick={() => onSelect(p.vendor.id)}
                         >
-                            {c.members.length}
+                            <span className="vm-pin-head">{p.certified ? <Award size={13} aria-hidden="true" /> : null}</span>
+                            {p.saved ? <span className="vm-pin-saved" aria-hidden="true" /> : null}
                         </button>
                     );
-                }
-                const p = c.members[0];
-                const state = p.vendor.id === selectedId ? "selected" : p.certified ? "certified" : "default";
-                return (
-                    <button
-                        key={p.vendor.id}
-                        type="button"
-                        className={`vm-pin vm-pin--${state}${p.vendor.id === hoveredId ? " is-hovered" : ""}`}
-                        style={{ left: cx + p.x, top: cy + p.y }}
-                        aria-label={`${p.vendor.name}${p.certified ? ", RVYO Certified" : ""}`}
-                        aria-pressed={p.vendor.id === selectedId}
-                        onClick={() => onSelect(p.vendor.id)}
-                    >
-                        <span className="vm-pin-head">{p.certified ? <Award size={13} aria-hidden="true" /> : null}</span>
-                        {p.saved ? <span className="vm-pin-saved" aria-hidden="true" /> : null}
-                    </button>
-                );
-            })}
+                })}
 
-            {selected ? (
-                <div className="vm-map-preview" style={{ left: cx + selected.x, top: cy + selected.y }} role="dialog" aria-label={`${selected.vendor.name} preview`}>
-                    <button type="button" className="vm-map-preview-close" aria-label="Close preview" onClick={() => onSelect(null)}><X size={14} /></button>
-                    <strong>{selected.vendor.name}</strong>
-                    <TrustBadges certified={selected.certified} verified={!!selected.vendor.verifiedOn} small />
-                    <span className="vm-map-preview-meta">
-                        <Rating vendor={selected.vendor} />
-                        {formatKm(selected.distanceKm) ? <span>{formatKm(selected.distanceKm)}</span> : null}
-                    </span>
-                    <button type="button" className="vm-btn vm-btn--primary vm-btn--block" onClick={() => onOpen(selected.vendor.id)}>View profile</button>
-                </div>
-            ) : null}
+                {selected ? (
+                    <div className="vm-map-preview" style={{ left: selected.x, top: selected.y }} role="dialog" aria-label={`${selected.vendor.name} preview`}>
+                        <button type="button" className="vm-map-preview-close" aria-label="Close preview" onClick={() => onSelect(null)}><X size={14} /></button>
+                        <strong>{selected.vendor.name}</strong>
+                        <TrustBadges certified={selected.certified} verified={!!selected.vendor.verifiedOn} small />
+                        <span className="vm-map-preview-meta">
+                            <Rating vendor={selected.vendor} />
+                            {formatKm(selected.distanceKm) ? <span>{formatKm(selected.distanceKm)}</span> : null}
+                        </span>
+                        <button type="button" className="vm-btn vm-btn--primary vm-btn--block" onClick={() => onOpen(selected.vendor.id)}>View profile</button>
+                    </div>
+                ) : null}
+            </div>
 
-            {moved ? (
-                <button type="button" className="vm-map-area" onClick={() => { setMoved(false); onSearchArea(view); }}>
+            {moved && ready ? (
+                <button
+                    type="button"
+                    className="vm-map-area"
+                    onClick={() => {
+                        const c = mapRef.current?.getCenter();
+                        if (!c) return;
+                        setMoved(false);
+                        onSearchArea({ lat: c.lat, lng: c.lng });
+                    }}
+                >
                     <Search size={15} /> Search this area
                 </button>
             ) : null}
 
             <div className="vm-map-controls">
-                <button type="button" aria-label="Zoom in" onClick={() => setZoomLevel(zoom + 1)} disabled={zoom === ZOOMS.length - 1}><Plus size={17} /></button>
-                <button type="button" aria-label="Zoom out" onClick={() => setZoomLevel(zoom - 1)} disabled={zoom === 0}><Minus size={17} /></button>
-                <button type="button" aria-label="Use my current location" className="vm-map-locate" onClick={locate}><LocateFixed size={17} /></button>
+                <button type="button" aria-label="Zoom in" onClick={() => zoomBy(1)} disabled={!ready || zoomBounds.atMax}><Plus size={17} /></button>
+                <button type="button" aria-label="Zoom out" onClick={() => zoomBy(-1)} disabled={!ready || zoomBounds.atMin}><Minus size={17} /></button>
+                <button type="button" aria-label="Use my current location" className="vm-map-locate" onClick={locate} disabled={!ready}><LocateFixed size={17} /></button>
             </div>
 
             <div className="vm-map-legend" aria-label="Map legend">
