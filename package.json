@@ -10,6 +10,7 @@
     "build": "next build",
     "start": "next start",
     "seed:demo-user": "node scripts/seed-demo-user.mjs",
+    "seed:admin-user": "node scripts/seed-admin-user.mjs",
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"

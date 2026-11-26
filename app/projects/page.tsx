@@ -45,6 +45,7 @@ export type Project = {
   currentStageId?: string | null;
   stageId?: string | null;
   assignedDesignerId?: string | null;
+  leadId?: string | null;
   leadDesigner?: string | null;
   designer?: string | null;
   companyName?: string | null;
@@ -106,6 +107,12 @@ type Form = {
   targetCompletionDate: string;
   leadDesigner?: string;
   assignedDesignerId?: string;
+  leadId?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
 };
 
 const blankForm: Form = {
@@ -122,6 +129,12 @@ const blankForm: Form = {
   targetCompletionDate: "",
   leadDesigner: "",
   assignedDesignerId: "",
+  leadId: "",
+  address: "",
+  city: "",
+  state: "",
+  postalCode: "",
+  country: "India",
 };
 
 let projectsPageCache: {
@@ -2008,6 +2021,7 @@ function EditProjectModal({
   onConfigureRooms: (p: Project) => void;
 }) {
   const [designers, setDesigners] = useState<any[]>([]);
+  const [leads, setLeads] = useState<any[]>([]);
   const [form, setForm] = useState<Form>({
     name: project.name || "",
     clientName: project.clientName || "",
@@ -2022,6 +2036,7 @@ function EditProjectModal({
     targetCompletionDate: project.targetCompletionDate ? project.targetCompletionDate.split("T")[0] : "",
     leadDesigner: project.leadDesigner || project.designer || "",
     assignedDesignerId: project.assignedDesignerId || "",
+    leadId: (project as any).leadId || "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -2032,6 +2047,13 @@ function EditProjectModal({
       .then((b) => {
         if (b.data?.items) setDesigners(b.data.items);
       })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/v1/leads?pageSize=100", { credentials: "include" })
+      .then((r) => r.json())
+      .then((b) => { if (b.data?.items) setLeads(b.data.items); })
       .catch(() => {});
   }, []);
 
@@ -2510,6 +2532,7 @@ function Create({
   const [method, setMethod] = useState("scratch");
   const [form, setForm] = useState<Form>(blankForm);
   const [designers, setDesigners] = useState<any[]>([]);
+  const [leads, setLeads] = useState<any[]>([]);
   const [project, setProject] = useState<Project | null>(initialProject || null);
   const [rooms, setRooms] = useState<ProjectRoom[]>([
     { name: "Master Bedroom", roomType: "Master Bedroom", unit: "ft" },
@@ -2524,6 +2547,13 @@ function Create({
       .then((b) => {
         if (b.data?.items) setDesigners(b.data.items);
       })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/v1/leads?pageSize=100", { credentials: "include" })
+      .then((r) => r.json())
+      .then((b) => { if (b.data?.items) setLeads(b.data.items); })
       .catch(() => {});
   }, []);
 
@@ -3160,6 +3190,12 @@ function Create({
       targetCompletionDate: form.targetCompletionDate || null,
       assignedDesignerId: form.assignedDesignerId || null,
       leadDesigner: form.leadDesigner?.trim() || null,
+      address: form.address?.trim() || null,
+      city: form.city?.trim() || null,
+      state: form.state?.trim() || null,
+      postalCode: form.postalCode?.trim() || null,
+      country: form.country?.trim() || null,
+      metadata: { leadId: form.leadId || null },
     };
 
     try {
@@ -3843,6 +3879,12 @@ function Create({
       targetCompletionDate: form.targetCompletionDate || null,
       assignedDesignerId: form.assignedDesignerId || null,
       leadDesigner: form.leadDesigner?.trim() || null,
+      address: form.address?.trim() || null,
+      city: form.city?.trim() || null,
+      state: form.state?.trim() || null,
+      postalCode: form.postalCode?.trim() || null,
+      country: form.country?.trim() || null,
+      metadata: { leadId: form.leadId || null },
     };
 
     try {
@@ -4458,6 +4500,13 @@ function Create({
                       placeholder="ex. +91 00000 00000"
                     />
                   </div>
+                  <div className="project-field-group">
+                    <label className="project-field-label" htmlFor="project-lead-select">Lead</label>
+                    <select id="project-lead-select" className="project-field-select" value={form.leadId || ""} onChange={(e) => change("leadId", e.target.value)}>
+                      <option value="">Select or add lead later</option>
+                      {leads.map((lead: any) => <option key={lead.id} value={lead.id}>{lead.name} {lead.leadCode ? `(${lead.leadCode})` : ""}</option>)}
+                    </select>
+                  </div>
                 </div>
 
                 <div className="project-fields-row">
@@ -4504,6 +4553,15 @@ function Create({
                       })}
                     </div>
                   </div>
+                </div>
+
+                <div className="project-fields-row">
+                  <div className="project-field-group"><label className="project-field-label" htmlFor="project-address-input">Address line 1</label><input id="project-address-input" className="project-field-input" value={form.address || ""} onChange={(e) => change("address", e.target.value)} placeholder="Building / street address" /></div>
+                  <div className="project-field-group"><label className="project-field-label" htmlFor="project-city-input">City / Town</label><input id="project-city-input" className="project-field-input" value={form.city || ""} onChange={(e) => change("city", e.target.value)} placeholder="City or town" /></div>
+                </div>
+                <div className="project-fields-row">
+                  <div className="project-field-group"><label className="project-field-label" htmlFor="project-state-input">State</label><input id="project-state-input" className="project-field-input" value={form.state || ""} onChange={(e) => change("state", e.target.value)} placeholder="State" /></div>
+                  <div className="project-field-group"><label className="project-field-label" htmlFor="project-pin-input">PIN code</label><input id="project-pin-input" className="project-field-input" value={form.postalCode || ""} onChange={(e) => change("postalCode", e.target.value)} placeholder="PIN code" /></div>
                 </div>
 
                 <div className="project-fields-row">

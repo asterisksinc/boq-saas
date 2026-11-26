@@ -191,6 +191,7 @@ const projectBaseSchema = z
     startDate: z.string().date().nullable().optional(),
     targetCompletionDate: z.string().date().nullable().optional(),
     assignedDesignerId: z.string().uuid().nullable().optional(),
+    leadId: z.string().uuid().nullable().optional(),
     currentStageId: z.string().uuid().nullable().optional(),
     projectCode: z.string().trim().max(80).nullable().optional(),
     progress: z.coerce.number().finite().min(0).max(100).nullable().optional(),

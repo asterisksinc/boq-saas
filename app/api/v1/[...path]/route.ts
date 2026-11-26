@@ -4138,6 +4138,7 @@ function projectDto(
     contractReference: (metadata.contractReference as string) || null,
     projectManager: (metadata.projectManager as string) || null,
     leadDesigner: designerName || (metadata.leadDesigner as string) || (row.assigned_designer_id as string) || null,
+    leadId: (metadata.leadId as string) || null,
     designer: designerName || (metadata.leadDesigner as string) || null,
     companyName: companyName || null,
     currentStageId: (row.current_stage_id as string) || (metadata.currentStageId as string) || tagStageValue || null,
@@ -4171,7 +4172,7 @@ function projectValues(input: Record<string, unknown>, existingMetadata: Record<
     "organization", "billingContact", "communicationPreference",
     "actualStartDate", "currentPhase", "priority",
     "currency", "taxConfiguration", "targetMargin", "paymentTerms", "contractReference",
-    "projectManager", "leadDesigner", "estimator", "procurementOwner", "financeOwner", "stage", "workflowStage",
+    "projectManager", "leadDesigner", "leadId", "estimator", "procurementOwner", "financeOwner", "stage", "workflowStage",
   ];
 
   const result: Record<string, unknown> = {};
@@ -16983,6 +16984,177 @@ async function integrationTransactions(request: NextRequest, supabase: SupabaseC
 
 
 // ======================================================
+// Admin Leads / relationship APIs. The UI keeps a local fallback for offline
+// development, but these handlers are the production source of truth.
+async function adminApi(request: NextRequest, supabase: SupabaseClient, id: string, resource: "overview" | "organizations" | "users" | "roles" | "plans") {
+  const scoped = await workspaceAccess(supabase, id, request.method !== "GET");
+  if ("response" in scoped) return scoped.response;
+  const wid = scoped.access.workspaceId;
+  const url = new URL(request.url);
+  const search = url.searchParams.get("search")?.trim().slice(0, 100);
+
+  if (resource === "overview") {
+    const [workspace, members, projects, leads, boards, subscription] = await Promise.all([
+      supabase.from("workspaces").select("id,name,status,currency,created_at,updated_at").eq("id", wid).single(),
+      supabase.from("workspace_memberships").select("id,user_id,role,status,joined_at", { count: "exact" }).eq("workspace_id", wid),
+      supabase.from("projects").select("id,status,created_at", { count: "exact" }).eq("workspace_id", wid),
+      supabase.from("leads").select("id,stage,created_at", { count: "exact" }).eq("workspace_id", wid).is("archived_at", null),
+      supabase.from("mood_boards").select("id,status,created_at", { count: "exact" }).eq("workspace_id", wid),
+      supabase.from("workspace_subscriptions").select("status,plan_code,seats_used,period_end,subscription_plans(code,name,monthly_price,currency)").eq("workspace_id", wid).maybeSingle(),
+    ]);
+    if (workspace.error) return fail("INTERNAL_ERROR", "Admin overview could not be loaded.", 500, id);
+    const memberRows = members.data || [];
+    const projectRows = projects.data || [];
+    const leadRows = leads.data || [];
+    return ok({ workspace: workspace.data, counts: { users: members.count || memberRows.length, projects: projects.count || projectRows.length, leads: leads.count || leadRows.length, moodBoards: boards.count || (boards.data || []).length }, stages: leadRows.reduce((acc: Record<string, number>, row: any) => { acc[row.stage] = (acc[row.stage] || 0) + 1; return acc; }, {}), projectStatuses: projectRows.reduce((acc: Record<string, number>, row: any) => { acc[row.status || "unknown"] = (acc[row.status || "unknown"] || 0) + 1; return acc; }, {}), subscription: subscription.data || null }, 200, id);
+  }
+
+  if (resource === "organizations") {
+    if (request.method === "PATCH") {
+      const input = await body(request) || {};
+      const values: Record<string, unknown> = {};
+      if (typeof input.name === "string" && input.name.trim()) values.name = input.name.trim();
+      if (["active", "suspended", "archived"].includes(input.status)) values.status = input.status;
+      if (!Object.keys(values).length) return fail("VALIDATION_ERROR", "A name or status is required.", 400, id);
+      const updated = await supabase.from("workspaces").update(values).eq("id", wid).select("id,name,status,currency,created_at,updated_at").single();
+      return updated.error ? fail("VALIDATION_ERROR", "Organization could not be updated.", 400, id) : ok(updated.data, 200, id);
+    }
+    const [workspace, members, projects, subscription] = await Promise.all([
+      supabase.from("workspaces").select("id,name,status,currency,created_at,updated_at").eq("id", wid).single(),
+      supabase.from("workspace_memberships").select("id,user_id,role,status", { count: "exact" }).eq("workspace_id", wid),
+      supabase.from("projects").select("id", { count: "exact", head: true }).eq("workspace_id", wid),
+      supabase.from("workspace_subscriptions").select("status,plan_code,seats_used,subscription_plans(code,name,monthly_price,currency)").eq("workspace_id", wid).maybeSingle(),
+    ]);
+    if (workspace.error) return fail("INTERNAL_ERROR", "Organizations could not be loaded.", 500, id);
+    return ok({ items: [{ ...workspace.data, users: members.count || 0, projects: projects.count || 0, plan: (subscription.data as any)?.subscription_plans?.name || (subscription.data as any)?.plan_code || "—", subscription: subscription.data || null }], total: 1 }, 200, id);
+  }
+
+  if (resource === "users") {
+    const memberships = await supabase.from("workspace_memberships").select("id,user_id,role,status,joined_at").eq("workspace_id", wid).order("joined_at", { ascending: false });
+    if (memberships.error) return fail("INTERNAL_ERROR", "Users could not be loaded.", 500, id);
+    const ids = (memberships.data || []).map((row: any) => row.user_id).filter(Boolean);
+    const profiles = ids.length ? await supabase.from("user_profiles").select("user_id,display_name,avatar_url,created_at").in("user_id", ids) : { data: [] as any[] };
+    const profileMap = new Map((profiles.data || []).map((row: any) => [String(row.user_id), row]));
+    let items = (memberships.data || []).map((row: any) => { const profile = profileMap.get(String(row.user_id)); return { id: row.id, userId: row.user_id, name: profile?.display_name || "Team member", avatarUrl: profile?.avatar_url || null, role: row.role, status: row.status, joinedAt: row.joined_at }; });
+    if (search) items = items.filter((row: any) => `${row.name} ${row.role} ${row.status}`.toLowerCase().includes(search.toLowerCase()));
+    return ok({ items, total: items.length }, 200, id);
+  }
+
+  if (resource === "roles") {
+    const result = await supabase.from("workspace_roles").select("id,name,description,is_system,system_fallback,created_at,updated_at").eq("workspace_id", wid).order("name");
+    if (result.error) return fail("INTERNAL_ERROR", "Roles could not be loaded.", 500, id);
+    const counts = await supabase.from("workspace_memberships").select("role").eq("workspace_id", wid);
+    const usage = (counts.data || []).reduce((acc: Record<string, number>, row: any) => { acc[row.role] = (acc[row.role] || 0) + 1; return acc; }, {});
+    return ok({ items: (result.data || []).map((row: any) => ({ ...row, users: usage[row.name] || 0 })), total: result.data?.length || 0 }, 200, id);
+  }
+
+  const result = await supabase.from("subscription_plans").select("code,name,description,monthly_price,currency,limits,features,sort_order,active").order("sort_order");
+  if (result.error) return fail("INTERNAL_ERROR", "Plans could not be loaded.", 500, id);
+  return ok({ items: result.data || [], total: result.data?.length || 0 }, 200, id);
+}
+
+const LEAD_STAGE_LABELS: Record<string, string> = { new: "New", contacted: "Contacted", interested: "Interested", qualified: "Qualified", unqualified: "Un-Qualified", lost: "Lost", won: "Won", churned: "Churned" };
+const LEAD_SOURCE_LABELS: Record<string, string> = { meta_ads: "Meta Ads", google_ads: "Google Ads", custom_website: "Custom Website", referral: "Referral", walk_in: "Walk-in", other: "Other" };
+
+function leadPage(request: Request) {
+  const url = new URL(request.url);
+  const page = Math.max(1, Number(url.searchParams.get("page") || 1));
+  const pageSize = Math.min(100, Math.max(1, Number(url.searchParams.get("pageSize") || 10)));
+  return { url, page, pageSize };
+}
+
+async function leadPeople(supabase: SupabaseClient, workspaceId: string, ids: string[]) {
+  const names = new Map<string, { id: string; name: string; role: string | null; avatarUrl: string | null }>();
+  if (!ids.length) return names;
+  const { data: members } = await supabase.from("workspace_memberships").select("user_id, role").eq("workspace_id", workspaceId).in("user_id", ids);
+  const userIds = (members || []).map((m: any) => m.user_id).filter(Boolean);
+  if (!userIds.length) return names;
+  const { data: profiles } = await supabase.from("user_profiles").select("user_id, display_name, avatar_url").in("user_id", userIds);
+  for (const p of profiles || []) names.set(String(p.user_id), { id: String(p.user_id), name: String(p.display_name || "Team member"), role: (members || []).find((m: any) => m.user_id === p.user_id)?.role || null, avatarUrl: p.avatar_url || null });
+  return names;
+}
+
+async function leadDto(supabase: SupabaseClient, workspaceId: string, row: any, projectMap?: Map<string, any>, people?: Map<string, any>) {
+  const project = row.project_id ? projectMap?.get(String(row.project_id)) || null : null;
+  const assignee = row.assigned_to ? people?.get(String(row.assigned_to)) || null : null;
+  return { id: row.id, leadCode: row.lead_code, name: row.name, avatarUrl: row.avatar_url || null, email: row.email || null, phone: row.phone || null, location: row.location || null, projectId: row.project_id || null, project: project ? { id: project.id, name: project.name, projectCode: project.project_code || null } : null, source: row.source, sourceLabel: LEAD_SOURCE_LABELS[row.source] || row.source, stage: row.stage, stageLabel: LEAD_STAGE_LABELS[row.stage] || row.stage, assignedTo: row.assigned_to || null, assignee, lastContactedAt: row.last_contacted_at || null, sortOrder: row.sort_order ?? 0, createdAt: row.created_at, updatedAt: row.updated_at };
+}
+
+async function listLeadsApi(request: NextRequest, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response;
+  const { url, page, pageSize } = leadPage(request); const from = (page - 1) * pageSize;
+  let query = supabase.from("leads").select("*", { count: "exact" }).eq("workspace_id", scoped.access.workspaceId).is("archived_at", null).order("updated_at", { ascending: false });
+  const search = url.searchParams.get("search")?.trim().slice(0, 120); const stage = url.searchParams.get("stage"); const source = url.searchParams.get("source"); const assignedTo = url.searchParams.get("assignedTo");
+  if (stage) query = query.eq("stage", stage); if (source) query = query.eq("source", source); if (assignedTo) query = query.eq("assigned_to", assignedTo);
+  if (search) { const safe = search.replace(/[%_,()]/g, " "); query = query.or(`name.ilike.%${safe}%,lead_code.ilike.%${safe}%,email.ilike.%${safe}%,phone.ilike.%${safe}%,location.ilike.%${safe}%`); }
+  const result = await query.range(from, from + pageSize - 1); if (result.error) return fail("INTERNAL_ERROR", "Leads could not be loaded.", 500, id);
+  const rows = result.data || []; const projectIds = rows.map((r: any) => r.project_id).filter(Boolean); const assigneeIds = rows.map((r: any) => r.assigned_to).filter(Boolean);
+  const projectPromise = projectIds.length ? supabase.from("projects").select("id,name,project_code").in("id", projectIds) : Promise.resolve({ data: [] as any[] });
+  const [projectResult, people] = await Promise.all([projectPromise, leadPeople(supabase, scoped.access.workspaceId, assigneeIds)]);
+  const projects = projectResult.data;
+  const projectMap = new Map((projects || []).map((p: any) => [String(p.id), p]));
+  const items = await Promise.all(rows.map((row: any) => leadDto(supabase, scoped.access.workspaceId, row, projectMap, people)));
+  const total = result.count || 0; if (url.searchParams.get("view") === "board") return ok({ items, total }, 200, id);
+  return ok({ items, page, pageSize, total, hasMore: from + items.length < total }, 200, id);
+}
+
+async function createLeadApi(request: Request, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response; const raw = await body(request) || {};
+  const valid = z.object({ name: z.string().trim().min(1).max(160), avatarUrl: z.string().nullable().optional(), email: z.string().email().nullable().optional(), phone: z.string().max(40).nullable().optional(), location: z.string().max(240).nullable().optional(), projectId: z.string().uuid().nullable().optional(), source: z.enum(["meta_ads","google_ads","custom_website","referral","walk_in","other"]), stage: z.enum(["new","contacted","interested","qualified","unqualified","lost","won","churned"]).default("new"), assignedTo: z.string().uuid().nullable().optional() }).safeParse(raw);
+  if (!valid.success) return fail("VALIDATION_ERROR", "Name, source and valid contact details are required.", 400, id);
+  const input = valid.data; const code = `Lead-${Date.now().toString().slice(-7)}`;
+  const result = await supabase.from("leads").insert({ workspace_id: scoped.access.workspaceId, created_by: scoped.access.userId, lead_code: code, name: input.name, avatar_url: input.avatarUrl ?? null, email: input.email ?? null, phone: input.phone ?? null, location: input.location ?? null, project_id: input.projectId ?? null, source: input.source, stage: input.stage, assigned_to: input.assignedTo ?? null }).select("*").single();
+  if (result.error) return fail(result.error.code === "23505" ? "CONFLICT" : "VALIDATION_ERROR", "Lead could not be created.", result.error.code === "23505" ? 409 : 400, id);
+  return ok(await leadDto(supabase, scoped.access.workspaceId, result.data), 201, id);
+}
+
+async function updateLeadApi(request: Request, supabase: SupabaseClient, id: string, leadId: string) {
+  const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response; const raw = await body(request) || {};
+  const allowed: Record<string, string> = { name: "name", avatarUrl: "avatar_url", email: "email", phone: "phone", location: "location", projectId: "project_id", source: "source", stage: "stage", assignedTo: "assigned_to", sortOrder: "sort_order" }; const values: Record<string, unknown> = {};
+  for (const [key, column] of Object.entries(allowed)) if (raw[key] !== undefined) values[column] = raw[key] === "" ? null : raw[key];
+  if (!Object.keys(values).length) return fail("VALIDATION_ERROR", "At least one field is required.", 400, id);
+  const result = await supabase.from("leads").update(values).eq("workspace_id", scoped.access.workspaceId).eq("id", leadId).is("archived_at", null).select("*").maybeSingle();
+  if (result.error) return fail("VALIDATION_ERROR", "Lead could not be updated.", 400, id); if (!result.data) return fail("NOT_FOUND", "Lead was not found.", 404, id);
+  return ok(await leadDto(supabase, scoped.access.workspaceId, result.data), 200, id);
+}
+
+async function deleteLeadApi(supabase: SupabaseClient, id: string, leadId: string) { const scoped = await workspaceAccess(supabase, id, true); if ("response" in scoped) return scoped.response; const result = await supabase.from("leads").update({ archived_at: new Date().toISOString() }).eq("workspace_id", scoped.access.workspaceId).eq("id", leadId).is("archived_at", null).select("id").maybeSingle(); return result.error ? fail("VALIDATION_ERROR", "Lead could not be archived.", 400, id) : result.data ? ok({ archived: true }, 200, id) : fail("NOT_FOUND", "Lead was not found.", 404, id); }
+
+async function leadSubresourceApi(request: Request, supabase: SupabaseClient, id: string, leadId: string, kind: "call-logs" | "notes", childId?: string) {
+  const scoped = await workspaceAccess(supabase, id, Boolean(request.method !== "GET")); if ("response" in scoped) return scoped.response; const { page, pageSize } = leadPage(request); const table = kind === "call-logs" ? "lead_call_logs" : "lead_notes";
+  const lead = await supabase.from("leads").select("id").eq("workspace_id", scoped.access.workspaceId).eq("id", leadId).is("archived_at", null).maybeSingle(); if (!lead.data) return fail("NOT_FOUND", "Lead was not found.", 404, id);
+  if (request.method === "GET") { const q = await supabase.from(table).select("*", { count: "exact" }).eq("workspace_id", scoped.access.workspaceId).eq("lead_id", leadId).order("created_at", { ascending: false }).range((page - 1) * pageSize, page * pageSize - 1); if (q.error) return fail("INTERNAL_ERROR", "Records could not be loaded.", 500, id); const rows = (q.data || []).map((r: any) => kind === "call-logs" ? ({ id: r.id, code: r.code, leadId: r.lead_id, title: r.title, callType: r.call_type, status: r.status, durationMinutes: r.duration_minutes, notes: r.notes, calledAt: r.called_at, createdBy: null, createdAt: r.created_at }) : ({ id: r.id, code: r.code, leadId: r.lead_id, title: r.title, body: r.body, noteType: r.note_type, visibility: r.visibility, boqId: null, boqCode: null, projectId: r.project_id, projectName: null, invoiceId: r.invoice_id, invoiceCode: null, attachments: r.attachments || [], createdBy: null, createdAt: r.created_at })); return ok({ items: rows, page, pageSize, total: q.count || 0, hasMore: (page - 1) * pageSize + rows.length < (q.count || 0) }, 200, id); }
+  if (request.method === "DELETE" && childId) { const d = await supabase.from(table).delete().eq("workspace_id", scoped.access.workspaceId).eq("lead_id", leadId).eq("id", childId).select("id").maybeSingle(); return d.error ? fail("VALIDATION_ERROR", "Record could not be deleted.", 400, id) : d.data ? ok({ deleted: true }, 200, id) : fail("NOT_FOUND", "Record was not found.", 404, id); }
+  const raw = await body(request) || {}; const isCall = kind === "call-logs"; const values: any = isCall ? { title: String(raw.title || "Untitled call").trim(), call_type: raw.callType || "outbound", status: raw.status || "connected", duration_minutes: raw.durationMinutes == null ? null : Number(raw.durationMinutes), notes: raw.notes || null, called_at: raw.calledAt || new Date().toISOString() } : { title: String(raw.title || "Untitled note").trim(), body: raw.body || null, note_type: raw.noteType || "general", visibility: raw.visibility || "team", project_id: raw.projectId || null, invoice_id: raw.invoiceId || null, attachments: Array.isArray(raw.attachments) ? raw.attachments : [] };
+  let q = childId ? supabase.from(table).update(values).eq("workspace_id", scoped.access.workspaceId).eq("lead_id", leadId).eq("id", childId) : supabase.from(table).insert({ ...values, workspace_id: scoped.access.workspaceId, lead_id: leadId, created_by: scoped.access.userId, code: `${isCall ? "CALL" : "NOTE"}-${Date.now().toString().slice(-6)}` });
+  const saved = await q.select("*").single(); if (saved.error) return fail("VALIDATION_ERROR", "Record could not be saved.", 400, id); if (isCall) await supabase.from("leads").update({ last_contacted_at: values.called_at }).eq("id", leadId).eq("workspace_id", scoped.access.workspaceId);
+  const row = saved.data as any;
+  const dto = isCall
+    ? { id: row.id, code: row.code, leadId: row.lead_id, title: row.title, callType: row.call_type, status: row.status, durationMinutes: row.duration_minutes, notes: row.notes, calledAt: row.called_at, createdBy: row.created_by, createdAt: row.created_at }
+    : { id: row.id, code: row.code, leadId: row.lead_id, title: row.title, body: row.body, noteType: row.note_type, visibility: row.visibility, boqId: null, boqCode: null, projectId: row.project_id, projectName: null, invoiceId: row.invoice_id, invoiceCode: null, attachments: row.attachments || [], createdBy: row.created_by, createdAt: row.created_at };
+  return ok(dto, childId ? 200 : 201, id);
+}
+
+async function leadDetailApi(supabase: SupabaseClient, id: string, leadId: string) { const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response; const row = await supabase.from("leads").select("*").eq("workspace_id", scoped.access.workspaceId).eq("id", leadId).is("archived_at", null).maybeSingle(); if (row.error) return fail("INTERNAL_ERROR", "Lead could not be loaded.", 500, id); if (!row.data) return fail("NOT_FOUND", "Lead was not found.", 404, id); const dto = await leadDto(supabase, scoped.access.workspaceId, row.data); const projectCount = row.data.project_id ? 1 : 0; return ok({ ...dto, stats: { projects: projectCount, boqValue: 0, invoicesPaid: 0, invoicesTotal: 0, outstandingAmount: 0, currency: scoped.access.currency }, projectIds: row.data.project_id ? [row.data.project_id] : [] }, 200, id); }
+
+function moodDto(row: any, project?: any, lead?: any, creator?: any) { return { id: row.id, name: row.name, description: row.description || undefined, projectId: row.project_id || "", projectName: project?.name || "Untitled Project", clientId: "", clientName: project?.client_name || "General Client", clientSubtitle: project?.project_type || "", boqReference: project?.project_code || undefined, leadId: row.lead_id || undefined, leadName: lead?.name || undefined, mode: row.mode, categories: row.categories || [], images: row.images || [], status: row.status, createdBy: creator?.display_name || "Team member", createdAt: row.created_at, updatedAt: row.updated_at, coverImage: row.cover_image || undefined }; }
+
+async function moodBoardApi(request: Request, supabase: SupabaseClient, id: string, boardId?: string, action?: "duplicate") {
+  const scoped = await workspaceAccess(supabase, id, Boolean(request.method !== "GET")); if ("response" in scoped) return scoped.response;
+  if (action === "duplicate" && boardId) { const source = await supabase.from("mood_boards").select("*").eq("workspace_id", scoped.access.workspaceId).eq("id", boardId).maybeSingle(); if (!source.data) return fail("NOT_FOUND", "Mood board was not found.", 404, id); const { id: _id, created_at: _createdAt, updated_at: _updatedAt, ...sourceValues } = source.data as any; const copy = { ...sourceValues, name: `${source.data.name} (Copy)`, status: "DRAFT", created_by: scoped.access.userId }; const inserted = await supabase.from("mood_boards").insert(copy).select("*").single(); return inserted.error ? fail("VALIDATION_ERROR", "Mood board could not be duplicated.", 400, id) : ok(moodDto(inserted.data), 201, id); }
+  if (request.method === "GET") { const q = new URL(request.url).searchParams; let query = supabase.from("mood_boards").select("*", { count: "exact" }).eq("workspace_id", scoped.access.workspaceId).order("updated_at", { ascending: false }); const search = q.get("search")?.trim(); if (search) query = query.ilike("name", `%${search.replace(/%/g, "")}%`); const res = boardId ? await query.eq("id", boardId).maybeSingle() : await query; if (res.error) return fail("INTERNAL_ERROR", "Mood boards could not be loaded.", 500, id); const rows = boardId ? (res.data ? [res.data] : []) : (res.data || []); const projectIds = rows.map((r: any) => r.project_id).filter(Boolean); const leadIds = rows.map((r: any) => r.lead_id).filter(Boolean); const [projects, leads] = await Promise.all([projectIds.length ? supabase.from("projects").select("id,name,project_code,client_name,project_type").in("id", projectIds) : Promise.resolve({ data: [] as any[] }), leadIds.length ? supabase.from("leads").select("id,name").in("id", leadIds) : Promise.resolve({ data: [] as any[] })]); const pm = new Map((projects.data || []).map((p: any) => [String(p.id), p])); const lm = new Map((leads.data || []).map((l: any) => [String(l.id), l])); const items = rows.map((r: any) => moodDto(r, pm.get(String(r.project_id)), lm.get(String(r.lead_id)))); if (boardId) return items[0] ? ok(items[0], 200, id) : fail("NOT_FOUND", "Mood board was not found.", 404, id); return ok({ items, total: items.length }, 200, id); }
+  if (request.method === "DELETE" && boardId) { const del = await supabase.from("mood_boards").delete().eq("workspace_id", scoped.access.workspaceId).eq("id", boardId).select("id").maybeSingle(); return del.error ? fail("VALIDATION_ERROR", "Mood board could not be deleted.", 400, id) : del.data ? ok({ deleted: true }, 200, id) : fail("NOT_FOUND", "Mood board was not found.", 404, id); }
+  const raw = await body(request) || {}; const values: any = { name: raw.name, description: raw.description || null, project_id: raw.projectId || null, lead_id: raw.leadId || null, mode: raw.mode || "blank", categories: Array.isArray(raw.categories) ? raw.categories : [], images: Array.isArray(raw.images) ? raw.images : [], status: raw.status || "DRAFT", cover_image: raw.coverImage || null };
+  const res = boardId ? await supabase.from("mood_boards").update(values).eq("workspace_id", scoped.access.workspaceId).eq("id", boardId).select("*").maybeSingle() : await supabase.from("mood_boards").insert({ ...values, workspace_id: scoped.access.workspaceId, created_by: scoped.access.userId }).select("*").single();
+  if (res.error || !res.data) return fail("VALIDATION_ERROR", "Mood board could not be saved.", 400, id);
+  const [project, lead] = await Promise.all([
+    res.data.project_id ? supabase.from("projects").select("id,name,project_code,client_name,project_type").eq("id", res.data.project_id).maybeSingle() : Promise.resolve({ data: null as any }),
+    res.data.lead_id ? supabase.from("leads").select("id,name").eq("id", res.data.lead_id).maybeSingle() : Promise.resolve({ data: null as any }),
+  ]);
+  return ok(moodDto(res.data, project.data, lead.data), boardId ? 200 : 201, id);
+}
+
+// ======================================================
 async function dispatch(request: NextRequest, path: string[]) {
   const id = requestId(request);
   const route = path.join("/");
@@ -17176,6 +17348,29 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (projectTemplateUseMatch && request.method === "POST") return useProjectTemplate(request, supabase, id, projectTemplateUseMatch[1]);
   const projectTemplateDuplicateMatch = route.match(/^project-templates\/([0-9a-f-]{36})\/duplicate$/i);
   if (projectTemplateDuplicateMatch && request.method === "POST") return duplicateProjectTemplate(supabase, id, projectTemplateDuplicateMatch[1]);
+  const adminResourceMatch = route.match(/^admin\/(overview|organizations|users|roles|plans)$/i);
+  if (adminResourceMatch && ["GET", "PATCH"].includes(request.method)) return adminApi(request, supabase, id, adminResourceMatch[1] as "overview" | "organizations" | "users" | "roles" | "plans");
+  if (request.method === "GET" && route === "leads") return listLeadsApi(request, supabase, id);
+  if (request.method === "POST" && route === "leads") return createLeadApi(request, supabase, id);
+  if (request.method === "GET" && route === "leads/export") {
+    const listed = await listLeadsApi(request, supabase, id);
+    if (!(listed instanceof Response) || !listed.ok) return listed;
+    const payload = await listed.json(); const rows = (payload.data?.items || []).map((l: any) => ({ Lead: l.leadCode, Name: l.name, Email: l.email || "", Phone: l.phone || "", Location: l.location || "", Source: l.sourceLabel, Stage: l.stageLabel, Project: l.project?.name || "" }));
+    const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, XLSX.utils.json_to_sheet(rows), "Leads"); const buffer = XLSX.write(book, { type: "buffer", bookType: "xlsx" });
+    return new Response(buffer, { status: 200, headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Content-Disposition": "attachment; filename=leads.xlsx", "Cache-Control": "private, no-store" } });
+  }
+  if (request.method === "POST" && route === "leads/import") {
+    const form = await request.formData(); const file = form.get("file"); if (!(file instanceof File)) return fail("VALIDATION_ERROR", "A spreadsheet file is required.", 400, id);
+    const bytes = Buffer.from(await file.arrayBuffer()); const workbook = XLSX.read(bytes, { type: "buffer" }); const sheet = workbook.Sheets[workbook.SheetNames[0]]; const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" }); let imported = 0; const errors: Array<{ row: number; message: string }> = [];
+    for (let i = 0; i < rows.length; i++) { const r = rows[i]; const result = await createLeadApi(new Request(request.url, { method: "POST", body: JSON.stringify({ name: r.Name || r.name, email: r.Email || r.email || null, phone: r.Phone || r.phone || null, location: r.Location || r.location || null, source: String(r.Source || "other").toLowerCase().replace(/\s+/g, "_"), stage: String(r.Stage || "new").toLowerCase().replace(/\s+/g, "_") }) }), supabase, id); if (result.ok) imported++; else errors.push({ row: i + 2, message: "Invalid lead row" }); }
+    return ok({ imported, skipped: errors.length, errors }, 200, id);
+  }
+  const leadMatch = route.match(/^leads\/([0-9a-f-]{36})$/i); if (leadMatch && request.method === "GET") return leadDetailApi(supabase, id, leadMatch[1]); if (leadMatch && request.method === "PATCH") return updateLeadApi(request, supabase, id, leadMatch[1]); if (leadMatch && request.method === "DELETE") return deleteLeadApi(supabase, id, leadMatch[1]);
+  const leadChildMatch = route.match(/^leads\/([0-9a-f-]{36})\/(call-logs|notes)(?:\/([0-9a-f-]{36}))?$/i); if (leadChildMatch && ["GET","POST","PATCH","DELETE"].includes(request.method)) return leadSubresourceApi(request, supabase, id, leadChildMatch[1], leadChildMatch[2] as "call-logs" | "notes", leadChildMatch[3]);
+  const leadRelatedMatch = route.match(/^leads\/([0-9a-f-]{36})\/(projects|boqs|proposals|invoices|tasks|approvals)$/i); if (leadRelatedMatch && request.method === "GET") { if (leadRelatedMatch[2] !== "projects") return ok({ items: [], page: 1, pageSize: 10, total: 0, hasMore: false }, 200, id); const scoped = await workspaceAccess(supabase, id); if ("response" in scoped) return scoped.response; const q = await supabase.from("projects").select("id,project_code,name,project_type,status,location,project_value,approved_budget,start_date,target_completion_date,cover_image,updated_at").eq("workspace_id", scoped.access.workspaceId).eq("id", (await supabase.from("leads").select("project_id").eq("id", leadRelatedMatch[1]).single()).data?.project_id || ""); return ok({ items: q.data || [], page: 1, pageSize: 10, total: q.data?.length || 0, hasMore: false }, 200, id); }
+  if (request.method === "GET" && route === "mood-boards") return moodBoardApi(request, supabase, id);
+  if (request.method === "POST" && route === "mood-boards") return moodBoardApi(request, supabase, id);
+  const moodBoardMatch = route.match(/^mood-boards\/([0-9a-f-]{36})(?:\/(duplicate))?$/i); if (moodBoardMatch && request.method === "GET") return moodBoardApi(request, supabase, id, moodBoardMatch[1]); if (moodBoardMatch && request.method === "POST" && moodBoardMatch[2] === "duplicate") return moodBoardApi(request, supabase, id, moodBoardMatch[1], "duplicate"); if (moodBoardMatch && request.method === "PATCH") return moodBoardApi(request, supabase, id, moodBoardMatch[1]); if (moodBoardMatch && request.method === "DELETE") return moodBoardApi(request, supabase, id, moodBoardMatch[1]);
   if (request.method === "GET" && route === "projects") return listProjects(request, supabase, id);
   if (request.method === "GET" && (route === "projects/designers" || route === "workspace/designers")) return listWorkspaceDesigners(request, supabase, id);
   if (request.method === "POST" && route === "projects") return createProject(request, supabase, id);

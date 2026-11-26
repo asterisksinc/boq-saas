@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ReactNode, useMemo, useState } from "react";
+import { ReactNode, useEffect, useMemo, useState } from "react";
 
 type BadgeTone = "green" | "blue" | "orange" | "red" | "gray" | "purple";
 type AdminTableColumn<T> = { key: string; label: string; width?: string; render: (row: T) => ReactNode };
@@ -41,6 +41,7 @@ const navItems = [
   { href: "/admin/organizations", label: "Organizations", icon: Building2 },
   { href: "/admin/users", label: "Users", icon: UserCircle },
   { href: "/admin/roles", label: "Roles", icon: ShieldCheck },
+  { href: "/admin/plans", label: "Plans", icon: Percent },
   { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/admin/templates", label: "Templates", icon: FileText },
   { href: "/admin/cms", label: "Content & CMS", icon: ImageIcon },
@@ -144,6 +145,19 @@ const modules = {
   ],
 };
 
+function useAdminResource<T>(resource: string, fallback: T) {
+  const [value, setValue] = useState<T>(fallback);
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/v1/admin/${resource}`, { credentials: "include", cache: "no-store" })
+      .then(response => response.ok ? response.json() : null)
+      .then(payload => { if (!cancelled && payload?.data) setValue(payload.data as T); })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [resource]);
+  return value;
+}
+
 export function AdminShell({ title, children, actionLabel = "New" }: { title: string; children: ReactNode; actionLabel?: string }) {
   return (
     <main className="admin-fig">
@@ -187,6 +201,8 @@ function AdminNavItem({ href, label, Icon }: { href: string; label: string; Icon
 }
 
 export function AdminOverviewPage() {
+  const data = useAdminResource<{ counts?: { users?: number; projects?: number; leads?: number; moodBoards?: number }; subscription?: { plan_code?: string; status?: string } }>("overview", {});
+  const counts = data.counts || {};
   return (
     <AdminShell title="Overview">
       <section className="admin-overview-grid">
@@ -203,18 +219,18 @@ export function AdminOverviewPage() {
         </Panel>
         <Panel className="admin-blue-panel">
           <SectionTitle title="Analytics Metric" />
-          <MetricRow icon={Building2} value="248" label="Organizations" />
-          <MetricRow icon={FileText} value="186" label="Active Subscriptions" />
-          <MetricRow icon={Gauge} value="$2.4M" label="Monthly Recurring Revenue" trend="+6.2%" />
-          <MetricRow icon={Users} value="1,284" label="Active Users" trend="+6.2%" />
+          <MetricRow icon={Building2} value="1" label="Organizations" />
+          <MetricRow icon={FileText} value={data.subscription?.status === "active" ? "1" : "0"} label="Active Subscriptions" />
+          <MetricRow icon={Gauge} value={data.subscription?.plan_code || "—"} label="Current Plan" />
+          <MetricRow icon={Users} value={String(counts.users ?? 0)} label="Active Users" trend="+6.2%" />
         </Panel>
         <Panel className="admin-product-health">
           <SectionTitle title="Product Health" />
           <div className="admin-mini-grid">
-            <Metric value="1,284" label="Active Users" trend="+14.1%" />
-            <Metric value="3,642" label="Projects Created" trend="+14.1%" />
-            <Metric value="8,914" label="BOQs Created" trend="+14.1%" />
-            <Metric value="2,186" label="Templates Used" trend="+14.1%" />
+            <Metric value={String(counts.users ?? 0)} label="Active Users" trend="+14.1%" />
+            <Metric value={String(counts.projects ?? 0)} label="Projects Created" trend="+14.1%" />
+            <Metric value={String(counts.leads ?? 0)} label="Leads" trend="+14.1%" />
+            <Metric value={String(counts.moodBoards ?? 0)} label="Mood Boards" trend="+14.1%" />
             <Metric value="5,274" label="Proposals Generated" trend="+14.1%" />
             <Metric value="3,891" label="Invoice Generated" trend="+14.1%" />
           </div>
@@ -239,6 +255,10 @@ export function AdminOverviewPage() {
 }
 
 export function OrganizationsPage() {
+  const data = useAdminResource<{ items: any[]; total: number }>("organizations", { items: orgRows, total: orgRows.length });
+  const rows = data.items.map((row: any) => ({
+    name: row.name, code: row.id ? `ORG-${String(row.id).slice(0, 8).toUpperCase()}` : row.code, owner: row.owner || "—", businessType: row.businessType || "Interior Design", plan: row.plan || "—", status: String(row.status || "active").toUpperCase(), users: row.users || 0, projects: row.projects || 0, boqs: row.boqs || 0, revenue: row.revenue || "—", created: row.created_at ? new Date(row.created_at).toLocaleDateString() : row.created || "—", lastActivity: row.updated_at ? new Date(row.updated_at).toLocaleDateString() : row.lastActivity || "—", health: row.status === "suspended" ? "Warning" : "Healthy",
+  }));
   const columns: AdminTableColumn<(typeof orgRows)[number]>[] = [
     { key: "organization", label: "Organization", width: "180px", render: row => <TwoLine title={row.name as string} detail={row.code as string} /> },
     { key: "owner", label: "Owner", width: "120px", render: row => row.owner },
@@ -253,10 +273,12 @@ export function OrganizationsPage() {
     { key: "activity", label: "Last Activity", width: "120px", render: row => row.lastActivity },
     { key: "health", label: "Health", width: "90px", render: row => <span className={row.health === "Warning" ? "admin-text-orange" : "admin-text-green"}>{row.health}</span> },
   ];
-  return <ListPage title="Organizations" heading="Organizations" detail="Manage every subscribed company or workspace on the platform." action="New Organization" stats={[["Total Organizations", "248"], ["Active", "184", "green"], ["Trial", "35", "blue"], ["Attention Required", "25", "orange"]]} search="Search projects or clients..." table={<AdminTable rows={orgRows} columns={columns} />} />;
+  return <ListPage title="Organizations" heading="Organizations" detail="Manage every subscribed company or workspace on the platform." action="New Organization" stats={[["Total Organizations", String(data.total)], ["Active", String(rows.filter(row => row.status === "ACTIVE").length), "green"], ["Trial", String(rows.filter(row => row.status === "TRIAL").length), "blue"], ["Attention Required", String(rows.filter(row => row.health === "Warning").length), "orange"]]} search="Search projects or clients..." table={<AdminTable rows={rows} columns={columns} />} />;
 }
 
 export function UsersPage() {
+  const data = useAdminResource<{ items: any[]; total: number }>("users", { items: userRows, total: userRows.length });
+  const rows = data.items.map((row: any) => ({ name: row.name, email: row.email || "—", organization: row.organization || "Current workspace", orgCode: row.orgCode || "", role: row.role || "Member", team: row.team || "—", status: String(row.status || "active").toUpperCase(), lastLogin: row.lastLogin || "—", auth: row.auth || "Email + Password", twoFa: row.twoFa || "—", created: row.joinedAt ? new Date(row.joinedAt).toLocaleDateString() : row.created || "—" }));
   const columns: AdminTableColumn<(typeof userRows)[number]>[] = [
     { key: "user", label: "User", render: row => <TwoLine title={row.name} detail={row.email} /> },
     { key: "organization", label: "Organization", width: "180px", render: row => <TwoLine title={row.organization} detail={row.orgCode} /> },
@@ -268,10 +290,12 @@ export function UsersPage() {
     { key: "twoFa", label: "2FA", width: "82px", render: row => <Badge tone={row.twoFa === "Enabled" ? "blue" : "gray"}>{row.twoFa}</Badge> },
     { key: "created", label: "Created", width: "96px", render: row => row.created },
   ];
-  return <ListPage title="All User" heading="Users & Access" detail="Manage platform users, roles, organization access, and account status" action="Invite User" stats={[["Total Users", "1,842"], ["Active Users", "1,674", "green"], ["Pending Invitations", "86", "orange"], ["Suspended Users", "42", "red"], ["2FA Enabled", "1,842"]]} search="Search organization or clients..." table={<AdminTable rows={userRows} columns={columns} />} />;
+  return <ListPage title="All User" heading="Users & Access" detail="Manage platform users, roles, organization access, and account status" action="Invite User" stats={[["Total Users", String(data.total)], ["Active Users", String(rows.filter(row => row.status === "ACTIVE").length), "green"], ["Pending Invitations", String(rows.filter(row => row.status === "INVITED").length), "orange"], ["Suspended Users", String(rows.filter(row => row.status === "SUSPENDED").length), "red"], ["2FA Enabled", "—"]]} search="Search organization or clients..." table={<AdminTable rows={rows} columns={columns} />} />;
 }
 
 export function RolesPage() {
+  const data = useAdminResource<{ items: any[]; total: number }>("roles", { items: roleRows, total: roleRows.length });
+  const rows = data.items.map((row: any) => ({ name: row.name, type: row.is_system ? "SYSTEM" : "CUSTOM", scope: row.scope || "Organization", description: row.description || "—", permissions: row.permissions || "—", users: row.users || 0, status: row.status || "Active", modified: row.updated_at ? new Date(row.updated_at).toLocaleDateString() : row.modified || "—" }));
   const columns: AdminTableColumn<(typeof roleRows)[number]>[] = [
     { key: "name", label: "Role Name", width: "160px", render: row => row.name },
     { key: "type", label: "Type", width: "96px", render: row => <Badge tone={row.type === "SYSTEM" ? "blue" : "purple"}>{row.type}</Badge> },
@@ -282,7 +306,20 @@ export function RolesPage() {
     { key: "status", label: "Status", width: "82px", render: row => <Badge tone="blue">{row.status}</Badge> },
     { key: "modified", label: "Last Modified", width: "170px", render: row => row.modified },
   ];
-  return <ListPage title="Roles" heading="Roles" detail="Manage platform roles and control the permissions available to users across the SaaS platform." action="Create Role" search="Search by role name, identifier, or description" table={<AdminTable rows={roleRows} columns={columns} />} />;
+  return <ListPage title="Roles" heading="Roles" detail="Manage platform roles and control the permissions available to users across the SaaS platform." action="Create Role" search="Search by role name, identifier, or description" table={<AdminTable rows={rows} columns={columns} />} />;
+}
+
+export function PlansPage() {
+  const data = useAdminResource<{ items: any[]; total: number }>("plans", { items: [], total: 0 });
+  const rows = data.items.map((row: any) => ({ name: row.name, code: row.code, price: row.monthly_price == null ? "—" : `${row.currency || "INR"} ${row.monthly_price}/mo`, status: row.active ? "Active" : "Paused", limits: Object.keys(row.limits || {}).length, features: Object.keys(row.features || {}).length }));
+  const columns: AdminTableColumn<(typeof rows)[number]>[] = [
+    { key: "name", label: "Plan", render: row => <TwoLine title={row.name} detail={row.code} /> },
+    { key: "price", label: "Monthly Price", width: "150px", render: row => row.price },
+    { key: "limits", label: "Limits", width: "100px", render: row => row.limits },
+    { key: "features", label: "Features", width: "100px", render: row => row.features },
+    { key: "status", label: "Status", width: "100px", render: row => <Badge tone={row.status === "Active" ? "green" : "orange"}>{row.status}</Badge> },
+  ];
+  return <ListPage title="Plans" heading="Plans" detail="Manage subscription plans, limits, and feature availability." action="New Plan" stats={[["Total Plans", String(data.total)], ["Active Plans", String(rows.filter(row => row.status === "Active").length), "green"]]} search="Search plans..." table={<AdminTable rows={rows} columns={columns} />} />;
 }
 
 export function AnalyticsPage() {
