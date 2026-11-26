@@ -48,7 +48,7 @@ export function FilterDrawer({ open, value, onApply, onClose, previewCount }: {
     const cats = allCats ? CATEGORIES : CATEGORIES.slice(0, 5);
 
     return (
-        <Layer>
+        <Layer lockScroll>
         <div className="vm-overlay vm-overlay--drawer" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
             <aside ref={panel} className="vm-drawer" role="dialog" aria-modal="true" aria-labelledby="vm-filter-title">
                 <header className="vm-drawer-head">

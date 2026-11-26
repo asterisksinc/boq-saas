@@ -169,9 +169,12 @@ describe("Vendor Marketplace — pages and navigation", () => {
         const ui = read("components", "vendors", "VendorUi.tsx");
         expect(ui).toContain("createPortal(<div className=\"vm-layer\">");
         const dialogs = read("components", "vendors", "VendorDialogs.tsx");
-        expect(dialogs).toMatch(/<Layer>\s*<div className="vm-overlay vm-overlay--drawer"/);
+        expect(dialogs).toMatch(/<Layer lockScroll>\s*<div className="vm-overlay vm-overlay--drawer"/);
         expect(dialogs).toContain("Show ${preview} vendor");
         expect(read("app", "vendors", "page.tsx")).toContain("previewCount={previewCount}");
+        const css = read("app", "vendors", "vendors.css");
+        expect(css).toMatch(/\.vm-drawer \{[^}]*max-height: 100dvh/);
+        expect(css).toMatch(/\.vm-drawer-body \{[^}]*min-height: 0;[^}]*overflow-y: auto/);
         expect(read("app", "vendors", "vendors.css")).toMatch(/\.vm-page,\s*\.vm-layer \{\s*--vm-ink/);
     });
 });

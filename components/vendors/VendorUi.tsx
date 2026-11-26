@@ -183,7 +183,13 @@ export function VendorCard({
  * Overlays render at the document root: `.fig-dashboard-main` is its own stacking context (z-index 1), so anything fixed
  * inside it would sit under the fixed side rail (z-index 2) no matter its own z-index. `.vm-layer` carries the module tokens.
  */
-export function Layer({ children }: { children: ReactNode }) {
+export function Layer({ children, lockScroll }: { children: ReactNode; lockScroll?: boolean }) {
+    useEffect(() => {
+        if (!lockScroll) return;
+        const { overflow } = document.body.style;
+        document.body.style.overflow = "hidden";
+        return () => { document.body.style.overflow = overflow; };
+    }, [lockScroll]);
     if (typeof document === "undefined") return null;
     return createPortal(<div className="vm-layer">{children}</div>, document.body);
 }
@@ -203,7 +209,7 @@ export function Modal({ open, onClose, labelledBy, wide, children }: { open: boo
     }, [open, onClose]);
     if (!open) return null;
     return (
-        <Layer>
+        <Layer lockScroll>
             <div className="vm-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
                 <div ref={panel} className={`vm-modal${wide ? " vm-modal--wide" : ""}`} role="dialog" aria-modal="true" aria-labelledby={labelledBy}>
                     <button type="button" className="vm-modal-close" aria-label="Close" onClick={onClose}><X size={18} /></button>

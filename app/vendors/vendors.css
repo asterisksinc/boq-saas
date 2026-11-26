@@ -628,15 +628,16 @@
     padding: 24px;
     background: rgba(15, 23, 42, .45);
 }
-.vm-overlay--drawer { place-items: stretch end; padding: 0; }
-.vm-drawer { display: flex; flex-direction: column; width: min(420px, 100vw); height: 100%; animation: vm-drawer-in .2s ease-out; background: #fff; box-shadow: -12px 0 32px rgba(15, 23, 42, .15); }
+.vm-overlay--drawer { display: flex; justify-content: flex-end; align-items: stretch; padding: 0; overflow: hidden; }
+.vm-drawer { display: flex; flex-direction: column; width: min(420px, 100vw); height: 100%; max-height: 100vh; max-height: 100dvh; min-height: 0; animation: vm-drawer-in .2s ease-out; background: #fff; box-shadow: -12px 0 32px rgba(15, 23, 42, .15); }
 @keyframes vm-drawer-in { from { transform: translateX(24px); opacity: 0; } }
 .vm-drawer-head { display: flex; align-items: flex-start; justify-content: space-between; padding: 20px 24px 16px; border-bottom: 1px solid var(--vm-line); }
 .vm-drawer-head h2 { margin: 0; font-size: 20px; font-weight: 600; }
 .vm-drawer-head p { margin: 2px 0 0; color: var(--vm-muted); font-size: 13px; }
-.vm-drawer-body { flex: 1; padding: 4px 24px 20px; overflow-y: auto; }
-.vm-drawer-body fieldset { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 16px 0; border: 0; border-bottom: 1px solid var(--vm-line); }
-.vm-drawer-body legend { display: block; width: 100%; margin-bottom: 8px; padding: 0; color: #94a3b8; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.vm-drawer-body { flex: 1 1 auto; min-height: 0; padding: 4px 24px 20px; overflow-y: auto; overscroll-behavior: contain; }
+.vm-drawer-head, .vm-drawer-foot { flex: none; }
+.vm-drawer-body fieldset { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 14px 0; border: 0; border-bottom: 1px solid var(--vm-line); }
+.vm-drawer-body legend { display: block; width: 100%; margin-bottom: 4px; padding: 0; color: #94a3b8; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
 .vm-drawer-body .vm-link { align-self: flex-start; margin-top: 6px; }
 .vm-drawer-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 24px; border-top: 1px solid var(--vm-line); }
 .vm-checkrow { display: flex; align-items: center; gap: 10px; min-height: 32px; color: var(--vm-ink); font-size: 15px; cursor: pointer; }
