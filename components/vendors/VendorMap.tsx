@@ -93,7 +93,10 @@ export default function VendorMap({
             map.touchZoomRotate.disableRotation();
             mapRef.current = map;
 
-            loadTimer = window.setTimeout(() => { if (!map?.loaded()) setFailed(true); }, 15000);
+            // Only a style that never arrives is an outage. map.loaded() stays false while any tile is
+            // still downloading, so on a slow connection it would wrongly report a failure.
+            let styleReady = false;
+            loadTimer = window.setTimeout(() => { if (!styleReady && !map?.isStyleLoaded()) setFailed(true); }, 25000);
             const sync = () => {
                 if (!map) return;
                 setFrame((n) => n + 1);
@@ -101,6 +104,7 @@ export default function VendorMap({
             };
 
             map.on("load", () => {
+                styleReady = true;
                 window.clearTimeout(loadTimer);
                 if (!map) return;
                 map.addSource(RADIUS_SOURCE, { type: "geojson", data: EMPTY_FC });
@@ -110,8 +114,9 @@ export default function VendorMap({
                 sync();
             });
             map.on("error", (e) => {
-                // A missing tile is recoverable; a style that never loads is an outage.
-                if (map && !map.loaded()) {
+                // A missing or slow tile, font or icon is recoverable; only a style that can't be fetched is an outage.
+                const tileError = "tile" in e || "sourceId" in e;
+                if (map && !styleReady && !tileError && !map.isStyleLoaded()) {
                     console.warn("[VendorMap] map failed to load", e.error);
                     window.clearTimeout(loadTimer);
                     setFailed(true);
