@@ -267,9 +267,17 @@ async function login(request: Request, supabase: SupabaseClient, id: string) {
     result = await supabase.auth.signInWithPassword(input.data);
   }
   const { data, error } = result;
-  if (error || !data.user) {
+  if (error) {
+    // Do not hide an Auth/DB outage as a bad password. GoTrue reports malformed
+    // directly-seeded auth.users rows as a 500 schema-query failure.
+    const authFailure = error.status === 400 || error.status === 401 || /invalid login credentials|email not confirmed|user not found/i.test(error.message ?? "");
+    if (!authFailure) {
+      console.error(JSON.stringify({ requestId: id, event: "supabase_login_failed", status: error.status, code: error.code, message: error.message }));
+      return fail("INTERNAL_ERROR", "Login service is temporarily unavailable. Please try again.", 500, id);
+    }
     return fail("UNAUTHENTICATED", "otp" in input.data ? "Invalid or expired OTP." : "Invalid email or password.", 401, id);
   }
+  if (!data.user) return fail("UNAUTHENTICATED", "Invalid email or password.", 401, id);
   if (!("otp" in input.data) && !isEmailOtpBypassed(input.data.email)) {
     try { await issueEmailOtp(input.data.email, data.user.id); }
     catch (otpError) { return emailOtpFailure(otpError, id); }
