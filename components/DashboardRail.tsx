@@ -35,6 +35,7 @@ export const navGroups: NavGroup[] = [
         title: "Design & Estimation",
         items: [
             { route: "/boqs", icon: "dashboard-boqs", label: "Bill of Quantities" },
+            { route: "/vendors", icon: "nav-vendors", label: "Vendor Marketplace" },
             { route: "/costs", icon: "nav-costing", label: "Costing" },
             { route: "/templates", icon: "dashboard-templates", label: "Templates" },
         ],
