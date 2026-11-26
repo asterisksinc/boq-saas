@@ -34,7 +34,7 @@ export interface VendorMapProps {
 }
 
 /** OpenFreeMap: free OpenStreetMap vector tiles, no API key and no request limits. Its attribution must stay visible. */
-export const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
+export const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 const DEFAULT_CENTER: LatLng = { lat: 17.385, lng: 78.4867 };
 const CLUSTER_PX = 34;
 const RADIUS_SOURCE = "vm-radius";
@@ -104,8 +104,8 @@ export default function VendorMap({
                 window.clearTimeout(loadTimer);
                 if (!map) return;
                 map.addSource(RADIUS_SOURCE, { type: "geojson", data: EMPTY_FC });
-                map.addLayer({ id: "vm-radius-fill", type: "fill", source: RADIUS_SOURCE, paint: { "fill-color": "#2563eb", "fill-opacity": 0.06 } });
-                map.addLayer({ id: "vm-radius-line", type: "line", source: RADIUS_SOURCE, paint: { "line-color": "#2563eb", "line-width": 1.5, "line-opacity": 0.6 } });
+                map.addLayer({ id: "vm-radius-fill", type: "fill", source: RADIUS_SOURCE, paint: { "fill-color": "#2563eb", "fill-opacity": 0.14 } });
+                map.addLayer({ id: "vm-radius-line", type: "line", source: RADIUS_SOURCE, paint: { "line-color": "#2563eb", "line-width": 2.5, "line-opacity": 0.95 } });
                 setReady(true);
                 sync();
             });
@@ -298,12 +298,11 @@ export default function VendorMap({
             </div>
 
             <div className="vm-map-legend" aria-label="Map legend">
-                <span><i className="vm-dot" /> Vendor</span>
+                <span><i className="vm-dot" /> Vendors</span>
                 <span><i className="vm-dot vm-dot--certified" /> Certified</span>
                 <span><i className="vm-dot vm-dot--selected" /> Selected</span>
                 <span><i className="vm-dot vm-dot--saved" /> Saved</span>
             </div>
-            <button type="button" className="vm-map-sim" onClick={onToggleOutage}>Simulate map outage</button>
         </div>
     );
 }

@@ -156,12 +156,12 @@ describe("Vendor Marketplace — pages and navigation", () => {
 
     it("ships the five marketplace destinations, split map/list and vendor profile", () => {
         const page = read("app", "vendors", "page.tsx");
-        for (const tab of ["Discover Vendors", "Saved Vendors", "Recently Viewed", "Contact Requests", "My Sourcing Lists"]) expect(page).toContain(`label: "${tab}"`);
-        for (const text of ["Find from BOQ", "VendorMap", "FilterDrawer", "Start your first sourcing search", "Related categories", "CompareModal", "New sourcing list"]) expect(page).toContain(text);
+        for (const tab of ["Discover Vendors", "Saved Vendors", "Recently Viewed", "Contact Requests", "My Sourcing List"]) expect(page).toContain(`label: "${tab}"`);
+        for (const text of ["Find from BOQ", "VendorMap", "FilterDrawer", "Start your first sourcing search", "Popular Categories", "Popular Locations", "Try an Example", "Related categories", "CompareModal", "New sourcing list"]) expect(page).toContain(text);
         const profile = read("app", "vendors", "[id]", "page.tsx");
-        for (const text of ["Acquire Contact Information", "Materials & Products", "Service Coverage", "Trust &amp; certification", "Report listing"]) expect(profile).toContain(text);
+        for (const text of ["Vendor Profile", "Evaluate the business before you connect.", "Acquire Contact Information", "Want to connect with this Vendor?", "Business Information", "Service Coverage", "Trust &amp; Certification", "Report listing"]) expect(profile).toContain(text);
         const dialogs = read("components", "vendors", "VendorDialogs.tsx");
-        for (const text of ["Secure contact access", "Verify & Reveal Contact", "Contact information unlocked", "Compare vendors", "Bill of Quantities"]) expect(dialogs).toContain(text);
+        for (const text of ["Secure Contact Access", "Enter Verification Code", "Verify & Reveal Contact", "OTP Verified", "Contact Information Unlocked", "Compare vendors", "Bill of Quantities"]) expect(dialogs).toContain(text);
         expect(read("components", "vendors", "VendorMap.tsx")).toContain("Search this area");
     });
 
@@ -181,7 +181,7 @@ describe("Vendor Marketplace — pages and navigation", () => {
     it("draws the map with MapLibre GL on free OpenFreeMap tiles, keeping the attribution", () => {
         const map = read("components", "vendors", "VendorMap.tsx");
         expect(map).toContain('import("maplibre-gl")');
-        expect(map).toContain('"https://tiles.openfreemap.org/styles/positron"');
+        expect(map).toContain('"https://tiles.openfreemap.org/styles/liberty"');
         expect(map).toContain("attributionControl: { compact: true }");
         expect(map).toContain("never draw an inaccurate pin");
         expect(JSON.parse(read("package.json")).dependencies["maplibre-gl"]).toBeDefined();

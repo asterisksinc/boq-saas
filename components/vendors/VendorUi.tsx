@@ -194,7 +194,11 @@ export function Layer({ children, lockScroll }: { children: ReactNode; lockScrol
     return createPortal(<div className="vm-layer">{children}</div>, document.body);
 }
 
-export function Modal({ open, onClose, labelledBy, wide, children }: { open: boolean; onClose: () => void; labelledBy: string; wide?: boolean; children: ReactNode }) {
+export function Modal({ open, onClose, labelledBy, wide, sheet, children }: {
+    open: boolean; onClose: () => void; labelledBy: string; wide?: boolean;
+    /** Figma "Secure Contact Access" look: grey panel, inner white card, blurred backdrop. */
+    sheet?: boolean; children: ReactNode;
+}) {
     const panel = useRef<HTMLDivElement>(null);
     useEffect(() => {
         if (!open) return;
@@ -210,9 +214,9 @@ export function Modal({ open, onClose, labelledBy, wide, children }: { open: boo
     if (!open) return null;
     return (
         <Layer lockScroll>
-            <div className="vm-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-                <div ref={panel} className={`vm-modal${wide ? " vm-modal--wide" : ""}`} role="dialog" aria-modal="true" aria-labelledby={labelledBy}>
-                    <button type="button" className="vm-modal-close" aria-label="Close" onClick={onClose}><X size={18} /></button>
+            <div className={`vm-overlay${sheet ? " vm-overlay--blur" : ""}`} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+                <div ref={panel} className={`vm-modal${wide ? " vm-modal--wide" : ""}${sheet ? " vm-modal--sheet" : ""}`} role="dialog" aria-modal="true" aria-labelledby={labelledBy}>
+                    <button type="button" className="vm-modal-close" aria-label="Close" onClick={onClose}><X size={sheet ? 20 : 18} strokeWidth={sheet ? 2.5 : 2} /></button>
                     {children}
                 </div>
             </div>

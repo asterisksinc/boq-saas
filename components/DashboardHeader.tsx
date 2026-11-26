@@ -2,7 +2,7 @@
 
 import { Bell, ChevronDown, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, type ReactNode } from "react";
 import {
     getDashboardNotifications,
     getSettingsOverview,
@@ -16,6 +16,12 @@ import NotificationsPopover from "./header/NotificationsPopover";
 
 interface DashboardHeaderProps {
     title?: string;
+    /** Optional line under the title (e.g. Vendor Marketplace). */
+    subtitle?: string;
+    /** Page-level actions rendered before the notifications bell. */
+    actions?: ReactNode;
+    /** Hide the global search box (pages with their own primary search). */
+    hideSearch?: boolean;
     onNew?: () => void;
     hideNew?: boolean;
     onSearch?: (query: string) => void;
@@ -28,6 +34,9 @@ type ActiveOverlay = "none" | "search" | "new" | "notifications";
 
 export default function DashboardHeader({
     title = "Overview",
+    subtitle,
+    actions,
+    hideSearch = false,
     onNew,
     hideNew = false,
     onSearch,
@@ -235,11 +244,19 @@ export default function DashboardHeader({
     };
 
     return (
-        <header ref={headerRef} className="fig-dashboard-header">
-            <h1>{title}</h1>
+        <header ref={headerRef} className={`fig-dashboard-header${subtitle ? " has-subtitle" : ""}`}>
+            {subtitle ? (
+                <div className="fig-dashboard-header-titles">
+                    <h1>{title}</h1>
+                    <p>{subtitle}</p>
+                </div>
+            ) : (
+                <h1>{title}</h1>
+            )}
 
             <div className="fig-dashboard-header-actions">
                 {/* 1. SEARCH TRIGGER & POPOVER */}
+                {!hideSearch && (
                 <div className="fig-dashboard-header-item fig-dashboard-search-container">
                     <label className="fig-dashboard-search" onClick={handleSearchClick}>
                         <img src="/assets/dashboard/dashboard-search.svg" alt="" />
@@ -261,6 +278,9 @@ export default function DashboardHeader({
                         onNavigate={(url) => router.push(url)}
                     />
                 </div>
+                )}
+
+                {actions}
 
                 {/* 2. + NEW TRIGGER & POPOVER */}
                 {!hideNew && (
