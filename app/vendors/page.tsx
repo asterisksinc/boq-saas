@@ -132,6 +132,10 @@ function VendorMarketplaceInner() {
     }, [submitted, quick, advanced, sort]);
 
     const result = useMemo(() => (submitted ? searchVendors({ ...submitted, quick, advanced, sort }) : null), [submitted, quick, advanced, sort]);
+    const closeFilters = useCallback(() => setFiltersOpen(false), []);
+    const previewCount = useMemo(() => (submitted
+        ? (f: AdvancedFilters) => { const r = searchVendors({ ...submitted, quick, advanced: f, sort }); return r.exact.length + r.related.length; }
+        : undefined), [submitted, quick, sort]);
     const hits = useMemo(() => (result ? [...result.exact, ...result.related] : []), [result]);
 
     const submit = (override?: Partial<Submitted>) => {
@@ -293,7 +297,7 @@ function VendorMarketplaceInner() {
                 )}
             </div>
 
-            <FilterDrawer open={filtersOpen} value={advanced} onClose={() => setFiltersOpen(false)} onApply={(f) => { setAdvanced(f); setFiltersOpen(false); }} />
+            <FilterDrawer open={filtersOpen} value={advanced} onClose={closeFilters} onApply={(f) => { setAdvanced(f); setFiltersOpen(false); }} previewCount={previewCount} />
             <BoqModal open={boqOpen} onClose={() => setBoqOpen(false)} onFind={findFromBoq} />
             <AddToListModal
                 vendor={listFor}

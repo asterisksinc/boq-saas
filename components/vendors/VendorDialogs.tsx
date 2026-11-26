@@ -9,23 +9,34 @@ import {
     type ChallengeView, type OtpMethod,
 } from "@/lib/vendors/store";
 import type { VendorContact } from "@/lib/vendors/contacts";
-import { CertifiedBadge, Modal, VendorLogo, useVendorStore } from "./VendorUi";
+import { CertifiedBadge, Layer, Modal, VendorLogo, useVendorStore } from "./VendorUi";
 
 /* Filter drawer (PRD §05, progressive disclosure) ------------------------------------------------ */
 
 const LANGUAGES = ["English", "Hindi", "Telugu", "Kannada", "Tamil", "Marathi", "Urdu"];
 
-export function FilterDrawer({ open, value, onApply, onClose }: { open: boolean; value: AdvancedFilters; onApply: (f: AdvancedFilters) => void; onClose: () => void }) {
+export function FilterDrawer({ open, value, onApply, onClose, previewCount }: {
+    open: boolean; value: AdvancedFilters; onApply: (f: AdvancedFilters) => void; onClose: () => void;
+    /** Live result count for the draft filters, when a search is active. */
+    previewCount?: (f: AdvancedFilters) => number;
+}) {
     const [draft, setDraft] = useState(value);
     const [allCats, setAllCats] = useState(false);
     const counts = useMemo(() => categoryCounts(), []);
     useEffect(() => { if (open) setDraft(value); }, [open, value]);
+    const panel = useRef<HTMLElement>(null);
     useEffect(() => {
         if (!open) return;
+        const previous = document.activeElement as HTMLElement | null;
         const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
         document.addEventListener("keydown", onKey);
-        return () => document.removeEventListener("keydown", onKey);
+        window.setTimeout(() => panel.current?.querySelector<HTMLElement>("button")?.focus(), 0);
+        return () => {
+            document.removeEventListener("keydown", onKey);
+            previous?.focus?.();
+        };
     }, [open, onClose]);
+    const preview = useMemo(() => (open && previewCount ? previewCount(draft) : null), [open, previewCount, draft]);
     if (!open) return null;
 
     const toggle = <K extends "verification" | "categories" | "businessTypes" | "languages">(key: K, item: AdvancedFilters[K][number]) =>
@@ -37,8 +48,9 @@ export function FilterDrawer({ open, value, onApply, onClose }: { open: boolean;
     const cats = allCats ? CATEGORIES : CATEGORIES.slice(0, 5);
 
     return (
+        <Layer>
         <div className="vm-overlay vm-overlay--drawer" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-            <aside className="vm-drawer" role="dialog" aria-modal="true" aria-labelledby="vm-filter-title">
+            <aside ref={panel} className="vm-drawer" role="dialog" aria-modal="true" aria-labelledby="vm-filter-title">
                 <header className="vm-drawer-head">
                     <div>
                         <h2 id="vm-filter-title">Filter vendors</h2>
@@ -111,10 +123,13 @@ export function FilterDrawer({ open, value, onApply, onClose }: { open: boolean;
                 </div>
                 <footer className="vm-drawer-foot">
                     <button type="button" className="vm-btn vm-btn--ghost" onClick={() => setDraft(EMPTY_ADVANCED)}>Clear all</button>
-                    <button type="button" className="vm-btn vm-btn--primary" onClick={() => onApply(draft)}>Apply filters</button>
+                    <button type="button" className="vm-btn vm-btn--primary" onClick={() => onApply(draft)}>
+                        {preview === null ? "Apply filters" : preview === 0 ? "No matches — apply anyway" : `Show ${preview} vendor${preview === 1 ? "" : "s"}`}
+                    </button>
                 </footer>
             </aside>
         </div>
+        </Layer>
     );
 }
 

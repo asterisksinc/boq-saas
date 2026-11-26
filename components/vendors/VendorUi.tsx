@@ -1,5 +1,7 @@
 "use client";
 
+import { createPortal } from "react-dom";
+
 import { useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
 import { Award, Bookmark, BookmarkCheck, ChevronRight, ListPlus, MapPin, ShieldCheck, Star, X } from "lucide-react";
 import { BUSINESS_TYPE_LABEL, type Vendor } from "@/lib/vendors/data";
@@ -177,6 +179,15 @@ export function VendorCard({
     );
 }
 
+/**
+ * Overlays render at the document root: `.fig-dashboard-main` is its own stacking context (z-index 1), so anything fixed
+ * inside it would sit under the fixed side rail (z-index 2) no matter its own z-index. `.vm-layer` carries the module tokens.
+ */
+export function Layer({ children }: { children: ReactNode }) {
+    if (typeof document === "undefined") return null;
+    return createPortal(<div className="vm-layer">{children}</div>, document.body);
+}
+
 export function Modal({ open, onClose, labelledBy, wide, children }: { open: boolean; onClose: () => void; labelledBy: string; wide?: boolean; children: ReactNode }) {
     const panel = useRef<HTMLDivElement>(null);
     useEffect(() => {
@@ -192,12 +203,14 @@ export function Modal({ open, onClose, labelledBy, wide, children }: { open: boo
     }, [open, onClose]);
     if (!open) return null;
     return (
-        <div className="vm-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-            <div ref={panel} className={`vm-modal${wide ? " vm-modal--wide" : ""}`} role="dialog" aria-modal="true" aria-labelledby={labelledBy}>
-                <button type="button" className="vm-modal-close" aria-label="Close" onClick={onClose}><X size={18} /></button>
-                {children}
+        <Layer>
+            <div className="vm-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+                <div ref={panel} className={`vm-modal${wide ? " vm-modal--wide" : ""}`} role="dialog" aria-modal="true" aria-labelledby={labelledBy}>
+                    <button type="button" className="vm-modal-close" aria-label="Close" onClick={onClose}><X size={18} /></button>
+                    {children}
+                </div>
             </div>
-        </div>
+        </Layer>
     );
 }
 
@@ -208,5 +221,5 @@ export function Toast({ message, onDone }: { message: string | null; onDone: () 
         return () => window.clearTimeout(timer);
     }, [message, onDone]);
     if (!message) return null;
-    return <div className="vm-toast" role="status">{message}</div>;
+    return <Layer><div className="vm-toast" role="status">{message}</div></Layer>;
 }

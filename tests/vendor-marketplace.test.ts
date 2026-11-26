@@ -164,4 +164,14 @@ describe("Vendor Marketplace — pages and navigation", () => {
         for (const text of ["Secure contact access", "Verify & Reveal Contact", "Contact information unlocked", "Compare vendors", "Bill of Quantities"]) expect(dialogs).toContain(text);
         expect(read("components", "vendors", "VendorMap.tsx")).toContain("Search this area");
     });
+
+    it("renders the filter drawer, modals and toast above the side rail with a live result count", () => {
+        const ui = read("components", "vendors", "VendorUi.tsx");
+        expect(ui).toContain("createPortal(<div className=\"vm-layer\">");
+        const dialogs = read("components", "vendors", "VendorDialogs.tsx");
+        expect(dialogs).toMatch(/<Layer>\s*<div className="vm-overlay vm-overlay--drawer"/);
+        expect(dialogs).toContain("Show ${preview} vendor");
+        expect(read("app", "vendors", "page.tsx")).toContain("previewCount={previewCount}");
+        expect(read("app", "vendors", "vendors.css")).toMatch(/\.vm-page,\s*\.vm-layer \{\s*--vm-ink/);
+    });
 });
