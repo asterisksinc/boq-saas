@@ -3,32 +3,29 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
-import {
-    BadgeCheck, Calculator, ChevronDown, Download, ExternalLink, FileText, Folder, Image as ImageIcon, ListChecks, Mail, MapPin,
-    MoreHorizontal, NotebookPen, Pencil, Phone, Plus, Receipt, Search, StickyNote, Trash2, User, X,
-} from "lucide-react";
+import { ArrowLeft, ChevronDown, ExternalLink, Folder, Mail, MapPin, Pencil, Phone, Plus, Search, User, X } from "lucide-react";
 import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
 import { CallLogDrawer, LeadFormDrawer, NoteDrawer } from "@/components/leads/LeadDrawers";
 import { Avatar, EmptyState, Pagination, Pill, RowMenu, Toast, humanize, stageTone, statusTone } from "@/components/leads/LeadUi";
 import {
-    CALL_STATUSES, NOTE_TYPES, deleteLead, deleteLeadCallLog, deleteLeadNote, formatCompactMoney, formatDate, formatMoney,
-    getLead, listLeadCallLogs, listLeadFormOptions, listLeadNotes, listLeadRelated, updateLead,
+    CALL_STATUSES, NOTE_TYPES, deleteLeadCallLog, deleteLeadNote, formatCompactMoney, formatDate, formatMoney,
+    getLead, listLeadCallLogs, listLeadFormOptions, listLeadNotes, listLeadRelated, relativeDays, updateLead,
     type LeadCallLog, type LeadPerson, type LeadDetail, type LeadNote, type LeadRelatedTab,
 } from "@/lib/api/leads";
 import { loadMoodBoards, type MoodBoard } from "@/lib/mood-boards";
 import "../leads.css";
 
 const TABS = [
-    { key: "projects", label: "Projects", icon: Folder, title: "Projects", text: "All projects linked with this lead.", action: "Create Project", href: "/projects?create=true" },
-    { key: "boqs", label: "BOQs", icon: Calculator, title: "BOQs", text: "Bills of quantities across this lead's projects.", action: "Create BOQ", href: "/boqs?create=true" },
-    { key: "proposals", label: "Proposals", icon: FileText, title: "Proposals", text: "Proposals shared with this lead.", action: "Create Proposal", href: "/proposals?create=true" },
-    { key: "invoices", label: "Invoices", icon: Receipt, title: "Invoices", text: "Invoices raised for this lead's projects.", action: "Create Invoice", href: "/invoices?create=true" },
-    { key: "moodboards", label: "Moodboards", icon: ImageIcon, title: "Moodboards", text: "Moodboards for this lead and its projects.", action: "Create Moodboard", href: "/mood-boards" },
-    { key: "tasks", label: "Tasks", icon: ListChecks, title: "Tasks", text: "Tasks on this lead's projects.", action: "Create Task", href: "/activities?tab=tasks&create=true" },
-    { key: "approvals", label: "Approvals", icon: BadgeCheck, title: "Approvals", text: "Approvals requested on this lead's projects.", action: "Request Approval", href: "/activities?tab=approvals&create=true" },
-    { key: "call-logs", label: "Call Logs", icon: Phone, title: "Call Logs", text: "Every call made with this lead.", action: "New Call Log", href: null },
-    { key: "notes", label: "Notes", icon: NotebookPen, title: "Notes", text: "Meeting notes, follow-ups and decisions.", action: "New Note", href: null },
+    { key: "projects", label: "Projects", action: "Create Project", href: "/projects?create=true" },
+    { key: "boqs", label: "BOQs", action: "Create BOQ", href: "/boqs?create=true" },
+    { key: "proposals", label: "Proposals", action: "Create Proposal", href: "/proposals?create=true" },
+    { key: "invoices", label: "Invoices", action: "Create Invoice", href: "/invoices?create=true" },
+    { key: "moodboards", label: "Moodboards", action: "Create Moodboard", href: "/mood-boards" },
+    { key: "tasks", label: "Tasks", action: "Create Task", href: "/activities?tab=tasks&create=true" },
+    { key: "approvals", label: "Approvals", action: "Request Approval", href: "/activities?tab=approvals&create=true" },
+    { key: "call-logs", label: "Call Logs", action: "New Call Log", href: null },
+    { key: "notes", label: "Notes", action: "New Note", href: null },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -54,14 +51,11 @@ export default function LeadDetailPage() {
     const [editOpen, setEditOpen] = useState(false);
     const [callLog, setCallLog] = useState<{ open: boolean; log: LeadCallLog | null }>({ open: false, log: null });
     const [note, setNote] = useState<{ open: boolean; note: LeadNote | null }>({ open: false, note: null });
-    const [entryOpen, setEntryOpen] = useState(false);
-    const [counts, setCounts] = useState<Partial<Record<TabKey, number>>>({});
     const [query, setQuery] = useState("");
     const [searchOpen, setSearchOpen] = useState(false);
     const [members, setMembers] = useState<LeadPerson[]>([]);
     const [assigning, setAssigning] = useState(false);
     const [toast, setToast] = useState<{ message: string; tone: "success" | "error" } | null>(null);
-    const entryRef = useRef<HTMLDivElement>(null);
 
     const notify = (message: string, tone: "success" | "error" = "success") => setToast({ message, tone });
 
@@ -113,17 +107,6 @@ export default function LeadDetailPage() {
 
     useEffect(() => { void loadTab(); }, [loadTab]);
 
-    // Record counts for the stat cards and tab labels.
-    const loadCounts = useCallback(async () => {
-        const keys = TABS.map((t) => t.key).filter((k) => k !== "moodboards");
-        const totals = await Promise.all(keys.map((key) => {
-            const req = key === "call-logs" ? listLeadCallLogs(id, 1, 1) : key === "notes" ? listLeadNotes(id, 1, 1) : listLeadRelated(id, key as LeadRelatedTab, 1, 1);
-            return req.then((r) => r.total).catch(() => 0);
-        }));
-        setCounts(Object.fromEntries(keys.map((k, i) => [k, totals[i]])));
-    }, [id]);
-
-    useEffect(() => { void loadCounts(); }, [loadCounts]);
 
     useEffect(() => {
         listLeadFormOptions()
@@ -144,15 +127,6 @@ export default function LeadDetailPage() {
             setAssigning(false);
         }
     };
-
-    useEffect(() => {
-        if (!entryOpen) return;
-        const close = (event: MouseEvent) => {
-            if (entryRef.current && !entryRef.current.contains(event.target as Node)) setEntryOpen(false);
-        };
-        document.addEventListener("mousedown", close);
-        return () => document.removeEventListener("mousedown", close);
-    }, [entryOpen]);
 
     const switchTab = (key: TabKey) => {
         setTab(key);
@@ -176,23 +150,12 @@ export default function LeadDetailPage() {
         XLSX.writeFile(book, `${lead.leadCode}.xlsx`);
     };
 
-    const removeLead = async () => {
-        if (!lead || !window.confirm(`Delete lead "${lead.name}"?`)) return;
-        try {
-            await deleteLead(lead.id);
-            router.push("/leads");
-        } catch (err) {
-            notify(err instanceof Error ? err.message : "Lead could not be deleted.", "error");
-        }
-    };
-
     const removeCallLog = async (log: LeadCallLog) => {
         if (!window.confirm(`Delete call log "${log.title}"?`)) return;
         try {
             await deleteLeadCallLog(id, log.id);
             notify("Call log deleted.");
             void loadTab();
-            void loadCounts();
         } catch (err) {
             notify(err instanceof Error ? err.message : "Call log could not be deleted.", "error");
         }
@@ -204,20 +167,17 @@ export default function LeadDetailPage() {
             await deleteLeadNote(id, item.id);
             notify("Note deleted.");
             void loadTab();
-            void loadCounts();
         } catch (err) {
             notify(err instanceof Error ? err.message : "Note could not be deleted.", "error");
         }
     };
 
     const currency = lead?.stats.currency ?? "INR";
-    const countOf = (key: TabKey) => (key === "moodboards" ? moodBoards.length : counts[key]);
+    const lastContacted = relativeDays(lead?.lastContactedAt ?? null);
     const tabMeta = TABS.find((t) => t.key === tab)!;
     const q = query.trim().toLowerCase();
     const visibleRows = q ? rows.filter((r) => JSON.stringify(r).toLowerCase().includes(q)) : rows;
     const visibleBoards = q ? moodBoards.filter((b) => `${b.name} ${b.projectName ?? ""}`.toLowerCase().includes(q)) : moodBoards;
-    const phoneDigits = lead?.phone?.replace(/\D/g, "") ?? "";
-    const whatsappNumber = phoneDigits.length === 10 ? `91${phoneDigits}` : phoneDigits;
 
     const runTabAction = () => {
         if (tab === "call-logs") setCallLog({ open: true, log: null });
@@ -238,87 +198,40 @@ export default function LeadDetailPage() {
 
     return (
         <Shell>
-            <nav className="ld-breadcrumb" aria-label="Breadcrumb">
-                <button type="button" onClick={() => router.push("/leads")}>Leads</button>
-                <span aria-hidden="true">/</span>
-                <button type="button" onClick={() => router.push("/leads")}>All Leads</button>
-                <span aria-hidden="true">/</span>
-                <span aria-current="page">{lead?.leadCode.toUpperCase() ?? "…"}</span>
-            </nav>
+            <button type="button" className="ld-back" onClick={() => router.push("/leads")}>
+                <ArrowLeft size={20} /> Back
+            </button>
 
-            <section className="ld-card ld-profile">
-                <div className="ld-profile-identity">
-                    <span className="ld-profile-avatar">
-                        {lead?.avatarUrl ? <img src={lead.avatarUrl} alt="" /> : initialsOf(lead?.name)}
+            <section className="ld-detail-head">
+                <div className="ld-detail-identity">
+                    <span className="ld-detail-logo">
+                        {lead?.avatarUrl ? <img src={lead.avatarUrl} alt="" /> : <SourceMark source={lead?.source} name={lead?.name} />}
                     </span>
-                    <div className="ld-profile-text">
-                        <h2>{lead?.name ?? "Loading…"}</h2>
-                        <p>{lead ? `${lead.leadCode.toUpperCase()} · Created ${formatDate(lead.createdAt)}` : ""}</p>
-                        {lead ? (
-                            <div className="ld-profile-tags">
-                                <Pill tone={stageTone(lead.stage)}>{lead.stage === "new" ? "New Lead" : lead.stageLabel}</Pill>
-                                <Pill tone="blue">{lead.sourceLabel}</Pill>
-                            </div>
-                        ) : null}
+                    <div>
+                        <h2>
+                            {lead?.name ?? "Loading…"}
+                            {lead ? <Pill tone={stageTone(lead.stage)}>{lead.stage === "new" ? "New Lead" : lead.stageLabel}</Pill> : null}
+                        </h2>
+                        <p>{lead ? `${lead.leadCode} · ${lead.sourceLabel}` : ""}</p>
                     </div>
                 </div>
-                <div className="ld-profile-actions">
-                    <a className={`ld-btn ld-btn--outline${lead?.phone ? "" : " is-disabled"}`} href={lead?.phone ? `tel:${lead.phone}` : undefined} aria-disabled={!lead?.phone}>
-                        <Phone size={18} className="ld-icon-blue" /> Call
-                    </a>
-                    <a className={`ld-btn ld-btn--outline${lead?.email ? "" : " is-disabled"}`} href={lead?.email ? `mailto:${lead.email}` : undefined} aria-disabled={!lead?.email}>
-                        <Mail size={18} /> Email
-                    </a>
-                    <a
-                        className={`ld-btn ld-btn--outline${whatsappNumber ? "" : " is-disabled"}`}
-                        href={whatsappNumber ? `https://wa.me/${whatsappNumber}` : undefined}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-disabled={!whatsappNumber}
-                    >
-                        <WhatsAppIcon /> WhatsApp
-                    </a>
-                    <button type="button" className="ld-btn ld-btn--outline" onClick={() => setEditOpen(true)} disabled={!lead}>
-                        <Pencil size={17} /> Edit Lead
-                    </button>
-                    <div className="ld-entry" ref={entryRef}>
-                        <button type="button" className="ld-btn ld-btn--outline ld-btn--icon" aria-label="More actions" aria-haspopup="menu" aria-expanded={entryOpen} onClick={() => setEntryOpen((v) => !v)} disabled={!lead}>
-                            <MoreHorizontal size={20} />
-                        </button>
-                        {entryOpen ? (
-                            <div className="ld-pop-menu" role="menu">
-                                <button type="button" role="menuitem" onClick={() => { setEntryOpen(false); setCallLog({ open: true, log: null }); }}>
-                                    <Phone size={20} /> New Call Log
-                                </button>
-                                <button type="button" role="menuitem" onClick={() => { setEntryOpen(false); setNote({ open: true, note: null }); }}>
-                                    <StickyNote size={20} /> New Note
-                                </button>
-                                <button type="button" role="menuitem" onClick={() => { setEntryOpen(false); exportLead(); }}>
-                                    <Download size={20} /> Export Lead
-                                </button>
-                                <button type="button" role="menuitem" className="is-danger" onClick={() => { setEntryOpen(false); void removeLead(); }}>
-                                    <Trash2 size={20} /> Delete Lead
-                                </button>
-                            </div>
-                        ) : null}
-                    </div>
+                <div className="ld-detail-actions">
+                    {lead ? (
+                        <span className={`ld-last-contacted${lastContacted ? "" : " is-never"}`}>
+                            {lastContacted ? `Last Contacted ${lastContacted}` : "Not contacted yet"}
+                        </span>
+                    ) : null}
+                    <button type="button" className="ld-btn" onClick={exportLead} disabled={!lead}>Export</button>
+                    <button type="button" className="ld-btn" onClick={() => setEditOpen(true)} disabled={!lead}>Edit Lead</button>
                 </div>
             </section>
 
             <section className="ld-stats" aria-label="Lead summary">
-                {TABS.map((t) => {
-                    const Icon = t.icon;
-                    const value = lead ? countOf(t.key) : undefined;
-                    return (
-                        <button key={t.key} type="button" className={`ld-stat${tab === t.key ? " is-current" : ""}`} onClick={() => switchTab(t.key)}>
-                            <Icon size={24} strokeWidth={1.6} className="ld-stat-icon" />
-                            <span className="ld-stat-text">
-                                <span>{t.label}</span>
-                                <strong>{value == null ? "—" : String(value).padStart(2, "0")}</strong>
-                            </span>
-                        </button>
-                    );
-                })}
+                <Stat label="Projects" value={lead ? String(lead.stats.projects) : "—"} />
+                <Stat label="BOQ Value" value={lead ? formatMoney(lead.stats.boqValue, currency) : "—"} />
+                <Stat label="Invoices" value={lead ? (lead.stats.invoicesTotal ? `${lead.stats.invoicesPaid} Paid of ${lead.stats.invoicesTotal}` : "0") : "—"} />
+                <Stat label="Moodboards" value={lead ? String(moodBoards.length) : "—"} />
+                <Stat label="Outstanding Amount" value={lead ? formatMoney(lead.stats.outstandingAmount, currency) : "—"} />
             </section>
 
             <div className="ld-detail-body">
@@ -481,8 +394,7 @@ export default function LeadDetailPage() {
                             setCallLog({ open: false, log: null });
                             notify(created ? "Call log added." : "Call log updated.");
                             void loadLead();
-                            void loadCounts();
-                            if (tab === "call-logs") void loadTab(); else switchTab("call-logs");
+                                            if (tab === "call-logs") void loadTab(); else switchTab("call-logs");
                         }}
                     />
                     <NoteDrawer
@@ -494,8 +406,7 @@ export default function LeadDetailPage() {
                             const created = !note.note;
                             setNote({ open: false, note: null });
                             notify(created ? "Note added." : "Note updated.");
-                            void loadCounts();
-                            if (tab === "notes") void loadTab(); else switchTab("notes");
+                                            if (tab === "notes") void loadTab(); else switchTab("notes");
                         }}
                     />
                 </>
@@ -533,13 +444,35 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
     );
 }
 
-function WhatsAppIcon() {
+function Stat({ label, value }: { label: string; value: string }) {
     return (
-        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-            <path fill="#25D366" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Z" />
-            <path fill="#fff" d="M17.3 14.4c-.3-.1-1.7-.8-1.9-.9-.3-.1-.5-.1-.7.1l-.9 1.1c-.2.2-.3.2-.6.1a7.6 7.6 0 0 1-3.8-3.3c-.3-.5.3-.5.8-1.6.1-.2 0-.4 0-.5l-.9-2.1c-.2-.6-.5-.5-.7-.5h-.6a1.1 1.1 0 0 0-.8.4 3.4 3.4 0 0 0-1 2.5 5.9 5.9 0 0 0 1.2 3.1 13.4 13.4 0 0 0 5.2 4.6c1.9.8 2.7.9 3.6.8a3.1 3.1 0 0 0 2-1.4 2.5 2.5 0 0 0 .2-1.4c-.1-.1-.3-.2-.6-.3Z" />
-        </svg>
+        <div className="ld-stat">
+            <span>{label}</span>
+            <strong>{value}</strong>
+        </div>
     );
+}
+
+/** Lead source brand mark for the header tile; falls back to the lead's initials. */
+function SourceMark({ source, name }: { source?: string; name?: string }) {
+    if (source === "meta_ads") {
+        return (
+            <svg width="30" height="30" viewBox="0 0 24 24" aria-label="Meta Ads" role="img">
+                <path fill="none" stroke="#0866ff" strokeWidth="2.4" strokeLinecap="round" d="M6.2 7c2.6 0 4.2 3.4 5.8 5.8 1.7 2.6 3 4.2 5.2 4.2 2.1 0 3.3-1.7 3.3-4.6C20.5 9.2 18.8 7 16.6 7c-2.2 0-3.4 1.9-4.6 3.9-1.4 2.4-3 6.1-5.6 6.1-2 0-3.1-1.8-3.1-4.6C3.3 9.4 4.4 7 6.2 7Z" />
+            </svg>
+        );
+    }
+    if (source === "google_ads") {
+        return (
+            <svg width="28" height="28" viewBox="0 0 24 24" aria-label="Google Ads" role="img">
+                <path fill="#4285F4" d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.8h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.3Z" />
+                <path fill="#34A853" d="M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 1-3.4 1-2.6 0-4.8-1.8-5.6-4.1H3.1v2.6A10 10 0 0 0 12 22Z" />
+                <path fill="#FBBC05" d="M6.4 14c-.2-.6-.3-1.3-.3-2s.1-1.4.3-2V7.4H3.1a10 10 0 0 0 0 9.2L6.4 14Z" />
+                <path fill="#EA4335" d="M12 5.9c1.5 0 2.8.5 3.8 1.5l2.9-2.9A10 10 0 0 0 3.1 7.4L6.4 10c.8-2.3 3-4.1 5.6-4.1Z" />
+            </svg>
+        );
+    }
+    return <span className="ld-detail-initials">{initialsOf(name)}</span>;
 }
 
 function RecordsTable({
@@ -553,29 +486,14 @@ function RecordsTable({
         switch (tab) {
             case "projects":
                 return [
-                    {
-                        label: "Project",
-                        render: (r) => (
-                            <span className="ld-project-cell">
-                                <span className="ld-project-thumb">{r.imageUrl ? <img src={r.imageUrl} alt="" /> : <Folder size={20} />}</span>
-                                <span className="ld-two-line">
-                                    <strong>{r.name}</strong>
-                                    <span className="ld-small">{[r.projectCode, r.areaSqft ? `${Number(r.areaSqft).toLocaleString("en-IN")} sqft` : null].filter(Boolean).join(" · ")}</span>
-                                </span>
-                            </span>
-                        ),
-                    },
+                    { label: "Project", render: (r) => <span className="ld-two-line"><strong>{r.name}</strong><span className="ld-small">{[r.projectCode, r.areaSqft ? `${Number(r.areaSqft).toLocaleString("en-IN")} sqft` : null].filter(Boolean).join(" · ")}</span></span> },
                     { label: "Type", render: (r) => <span className="ld-muted">{r.projectType ?? "—"}</span> },
                     { label: "Stage", render: (r) => (r.stage ? <Pill tone="gray">{humanize(r.stage)}</Pill> : <span className="ld-muted">—</span>) },
                     { label: "Status", render: (r) => <Pill tone={statusTone(r.status)}>{humanize(r.status).toUpperCase()}</Pill> },
-                    { label: "BOQ Value", render: (r) => <strong className="ld-strong">{formatCompactMoney(Number(r.boqValue ?? 0), currency)}</strong> },
-                    {
-                        label: "Owner",
-                        render: (r) => (r.designer ? (
-                            <span className="ld-person"><Avatar name={r.designer} size={32} /><span className="ld-person-name">{r.designer}</span></span>
-                        ) : <span className="ld-muted">—</span>),
-                    },
-                    { label: "Updated", render: (r) => <span className="ld-muted ld-nowrap">{formatDate(r.updatedAt ?? r.dueDate)}</span> },
+                    { label: "Designer", render: (r) => <span className="ld-muted">{r.designer ?? "—"}</span> },
+                    { label: "BOQs", render: (r) => <strong className="ld-strong">{formatCompactMoney(Number(r.boqValue ?? 0), currency)}</strong> },
+                    { label: "Margin", render: (r) => <span className="ld-muted">{r.margin != null ? `${Math.round(Number(r.margin))}%` : "—"}</span> },
+                    { label: "Due Date", render: (r) => <span className="ld-muted ld-nowrap">{formatDate(r.dueDate)}</span> },
                 ];
             case "boqs":
                 return [
@@ -626,7 +544,7 @@ function RecordsTable({
     }, [tab, currency]);
 
     const isCallLogs = tab === "call-logs";
-    const hasMenu = isCallLogs || tab === "projects";
+    const hasMenu = isCallLogs;
     const emptyLabel = TABS.find((t) => t.key === tab)?.label.toLowerCase() ?? "records";
 
     return (
@@ -649,7 +567,7 @@ function RecordsTable({
                                     <td className="ld-col-menu">
                                         <RowMenu
                                             label={`Actions for ${row.title ?? row.name}`}
-                                            actions={!isCallLogs ? [{ label: "Open Project", onSelect: () => onOpen(row) }] : [
+                                            actions={[
                                                 { label: "View Call Log", onSelect: () => onOpen(row) },
                                                 { label: "Delete Call Log", onSelect: () => onDeleteCallLog(row as LeadCallLog), danger: true },
                                             ]}
