@@ -8,7 +8,7 @@ import { generateInvoicePdf, type InvoicePdfData } from "@/lib/invoices/invoice-
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { EmailOtpError, issueEmailOtp, verifyEmailOtp } from "@/lib/auth/email-otp";
-import { isEmailOtpBypassed } from "@/lib/auth/otp-bypass";
+import { isOtpBypassedUser } from "@/lib/auth/otp-bypass";
 import { pagination } from "@/lib/domain/dashboard";
 import {
   DEFAULT_PROJECT_STAGES,
@@ -278,7 +278,7 @@ async function login(request: Request, supabase: SupabaseClient, id: string) {
     return fail("UNAUTHENTICATED", "otp" in input.data ? "Invalid or expired OTP." : "Invalid email or password.", 401, id);
   }
   if (!data.user) return fail("UNAUTHENTICATED", "Invalid email or password.", 401, id);
-  if (!("otp" in input.data) && !isEmailOtpBypassed(input.data.email)) {
+  if (!("otp" in input.data) && !isOtpBypassedUser(input.data.email, data.user.app_metadata)) {
     try { await issueEmailOtp(input.data.email, data.user.id); }
     catch (otpError) { return emailOtpFailure(otpError, id); }
     await supabase.auth.signOut({ scope: "local" });

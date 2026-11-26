@@ -6,6 +6,13 @@ import { createClient } from "@supabase/supabase-js";
 const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL || "admin@boq.com";
 const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD || "Admin@12345";
 const WORKSPACE_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const SEEDED_ADMIN_ID = "90000000-0000-4000-8000-000000000001";
+const SEEDED_USER_IDS = {
+  "admin@boq.com": SEEDED_ADMIN_ID,
+  "designer@boq.com": "90000000-0000-4000-8000-000000000002",
+  "sales@boq.com": "90000000-0000-4000-8000-000000000003",
+  "manager@boq.com": "90000000-0000-4000-8000-000000000004",
+};
 
 function loadEnv(file) {
   if (!fs.existsSync(file)) return {};
@@ -25,14 +32,26 @@ const assertOk = (label, result) => { if (result.error) throw new Error(`${label
 const upsert = (table, rows, onConflict = "id") => assertOk(`seed ${table}`, db.from(table).upsert(rows, { onConflict }));
 
 async function ensureUser(email, password, displayName, appRole = "member") {
-  const users = assertOk("list auth users", await db.auth.admin.listUsers({ perPage: 1000 }));
+  const listed = await db.auth.admin.listUsers({ perPage: 1000 });
+  if (listed.error && SEEDED_USER_IDS[email.toLowerCase()]) {
+    const repaired = await db.auth.admin.updateUserById(SEEDED_USER_IDS[email.toLowerCase()], {
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { display_name: displayName, company_name: "Arena Design Studio" },
+      app_metadata: { role: appRole, otp_bypass: email.toLowerCase() === ADMIN_EMAIL.toLowerCase() },
+    });
+    if (repaired.error || !repaired.data.user) throw new Error(`repair ${email}: ${repaired.error?.message || "no user returned"}`);
+    return repaired.data.user;
+  }
+  const users = assertOk("list auth users", listed);
   let user = users.users.find(item => item.email?.toLowerCase() === email.toLowerCase());
   if (!user) {
-    const created = await db.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { display_name: displayName, company_name: "Arena Design Studio" }, app_metadata: { role: appRole } });
+    const created = await db.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { display_name: displayName, company_name: "Arena Design Studio" }, app_metadata: { role: appRole, otp_bypass: email.toLowerCase() === ADMIN_EMAIL.toLowerCase() } });
     if (created.error || !created.data.user) throw new Error(`create ${email}: ${created.error?.message || "no user returned"}`);
     user = created.data.user;
   } else {
-    const updated = await db.auth.admin.updateUserById(user.id, { password, email_confirm: true, user_metadata: { display_name: displayName, company_name: "Arena Design Studio" }, app_metadata: { role: appRole } });
+    const updated = await db.auth.admin.updateUserById(user.id, { password, email_confirm: true, user_metadata: { display_name: displayName, company_name: "Arena Design Studio" }, app_metadata: { role: appRole, otp_bypass: email.toLowerCase() === ADMIN_EMAIL.toLowerCase() } });
     if (updated.error) throw new Error(`update ${email}: ${updated.error.message}`);
   }
   return user;
