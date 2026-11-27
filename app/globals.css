@@ -61781,3 +61781,61 @@ html[data-sidebar="expanded"] .fig-side-menu {
   .project-fields-row.project-lead-row { grid-template-columns: 1fr; }
   .project-add-lead-btn { margin-top: 0; }
 }
+
+/* ==========================================================================
+   Project detail (Open Project) — sizes and fonts from the Figma "Open Project" frames.
+   Earlier layers (.workspace-title button, .workspace-tabs, .tab-panel h4) shrank the header to 12px/36px
+   and dropped the tab bar background; this block restores the design values for every tab.
+   ========================================================================== */
+.workspace-ui .workspace-content > .po-header.workspace-title { margin: 0; min-height: 46px; }
+.workspace-ui .workspace-title .po-header-left { gap: 12px; }
+.workspace-ui .workspace-title .po-back-btn { width: 36px; height: 36px; padding: 0; background: transparent; }
+.workspace-ui .workspace-title .po-back-btn svg { width: 22px; height: 22px; }
+.workspace-ui .workspace-title h2.po-project-title { font-size: 18px; font-weight: 500; line-height: 1.2; letter-spacing: 0; color: #0f172a; }
+.workspace-ui .workspace-title .po-header-right { gap: 16px; }
+.workspace-ui .workspace-title .po-header-right > button {
+  min-height: 46px; height: 46px; padding: 0 16px; border: 0; border-radius: 6px;
+  font-family: 'Urbanist', Inter, sans-serif; font-size: 14px; font-weight: 500; line-height: 1.2; letter-spacing: 0;
+}
+.workspace-ui .workspace-title .po-header-right > .po-btn-secondary { background: #fff; color: #0f172a; }
+.workspace-ui .workspace-title .po-header-right > .po-btn-secondary:hover { background: #f8fafc; }
+.workspace-ui .workspace-title .po-header-right > .po-btn-primary { background: #2563eb; color: #fff; }
+.workspace-ui .workspace-title .po-header-right > .po-btn-primary:hover { background: #1d4ed8; }
+.workspace-ui .workspace-title .po-header-right > .po-btn-icon { width: 46px; padding: 0; justify-content: center; }
+.workspace-ui .workspace-title .po-header-right > .po-btn-icon svg { width: 20px; height: 20px; }
+
+.workspace-ui nav.po-tabs-container.workspace-tabs {
+  width: max-content; max-width: 100%; height: 46px; margin: 0; padding: 6px; gap: 0;
+  background: #fff; border: 0; border-radius: 6px;
+}
+.workspace-ui .workspace-tabs .po-tab-btn {
+  min-width: 136px; height: 34px; padding: 0 14px; border-radius: 4px;
+  font-family: 'Urbanist', Inter, sans-serif; font-size: 14px; font-weight: 500; line-height: 1.2; color: #64748b;
+}
+.workspace-ui .workspace-tabs .po-tab-btn:hover { background: #f8fafc; color: #0f172a; }
+.workspace-ui .workspace-tabs .po-tab-btn.is-active,
+.workspace-ui .workspace-tabs .po-tab-btn.active { background: #eff4ff !important; color: #2563eb !important; font-weight: 500 !important; }
+
+/* Activity Log (Open Project-19) */
+.workspace-ui .tab-panel.activity { padding: 0; }
+.workspace-ui .workspace-activity-container { gap: 16px; padding: 20px; border-radius: 8px; background: rgba(255, 255, 255, .6); }
+.workspace-ui .tab-panel.activity h4.workspace-activity-title { margin: 0; color: #475569; font-size: 14px; font-weight: 500; letter-spacing: .02em; text-transform: uppercase; }
+.workspace-ui .workspace-activity-filter-btn { font-size: 13px; font-weight: 500; padding: 7px 12px; }
+.workspace-ui .workspace-activity-card { gap: 0; padding: 4px 18px; border-radius: 12px; box-shadow: none; }
+.workspace-ui .workspace-activity-row { gap: 16px; min-height: 60px; padding: 12px 0; }
+.workspace-ui .workspace-activity-divider { height: 1px; margin: 0; border: 0; background: #e2e8f0; }
+.workspace-ui .workspace-activity-avatar { width: 32px; height: 32px; min-width: 32px; font-size: 12px; }
+.workspace-ui .workspace-activity-info { gap: 4px; }
+.workspace-ui .workspace-activity-line1 { gap: 5px; align-items: baseline; }
+.workspace-ui .workspace-activity-author { font-size: 14px; font-weight: 500; color: #0f172a; }
+.workspace-ui .workspace-activity-verb { font-size: 12px; font-weight: 400; color: #64748b; }
+.workspace-ui .workspace-activity-target { font-size: 14px; font-weight: 600; color: #0f172a; }
+.workspace-ui .workspace-activity-line2,
+.workspace-ui .workspace-activity-time,
+.workspace-ui .workspace-activity-category { font-size: 12px; font-weight: 400; color: #64748b; text-transform: uppercase; }
+.workspace-ui .workspace-activity-time { text-transform: none; }
+
+@media (max-width: 900px) {
+  .workspace-ui .workspace-tabs .po-tab-btn { min-width: 0; }
+  .workspace-ui .workspace-title .po-header-right > button { height: 40px; min-height: 40px; font-size: 13px; }
+}
