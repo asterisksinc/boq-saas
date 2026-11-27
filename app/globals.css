@@ -61787,6 +61787,8 @@ html[data-sidebar="expanded"] .fig-side-menu {
    Earlier layers (.workspace-title button, .workspace-tabs, .tab-panel h4) shrank the header to 12px/36px
    and dropped the tab bar background; this block restores the design values for every tab.
    ========================================================================== */
+/* Content lines up with the page header ("Projects" title and avatar); the legacy rule added 16px 26px. */
+.workspace-ui .fig-dashboard-main > .workspace-content { padding: 0 0 40px; gap: 16px; }
 .workspace-ui .workspace-content > .po-header.workspace-title { margin: 0; min-height: 46px; }
 .workspace-ui .workspace-title .po-header-left { gap: 12px; }
 .workspace-ui .workspace-title .po-back-btn { width: 36px; height: 36px; padding: 0; background: transparent; }
