@@ -66,6 +66,8 @@ export interface Expense {
     paymentMethod: PaymentMethod;
     reference: string | null;
     receipt: ExpenseReceipt | null;
+    /** Display name of the person who recorded it, when known. */
+    createdBy?: string | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -83,6 +85,7 @@ export interface ExpenseInput {
     paymentMethod: PaymentMethod;
     reference: string | null;
     receipt: ExpenseReceipt | null;
+    createdBy?: string | null;
 }
 
 export interface ExpenseFilters {
@@ -215,6 +218,7 @@ function build(input: ExpenseInput, base?: Expense): Expense {
         paymentMethod: input.paymentMethod,
         reference: input.reference?.trim() || null,
         receipt: input.receipt,
+        createdBy: base ? base.createdBy ?? null : input.createdBy ?? null,
         createdAt: base?.createdAt ?? now,
         updatedAt: now,
     };
@@ -260,6 +264,24 @@ export async function exportExpenses(filters: ExpenseFilters): Promise<Blob> {
     XLSX.utils.book_append_sheet(book, sheet, "Expenses");
     const data = XLSX.write(book, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
     return new Blob([data], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+}
+
+/** Sum of every expense linked to a project (base + tax). */
+export function projectExpenseTotal(projectId: string) {
+    return round2(read().filter((e) => e.projectId === projectId).reduce((t, e) => t + e.totalAmount, 0));
+}
+
+/**
+ * Project expense KPIs.
+ *  Amount received   = total the client has paid against the project's invoices
+ *  Total expenses    = sum of all expenses on the project
+ *  Project balance   = amount received - total expenses
+ *  Outstanding       = invoiced to the client but not yet paid
+ */
+export function projectExpenseKpis(input: { received: number; outstanding: number; expenses: number }) {
+    const received = round2(input.received || 0);
+    const expenses = round2(input.expenses || 0);
+    return { received, expenses, balance: round2(received - expenses), outstanding: round2(input.outstanding || 0) };
 }
 
 export function formatINR(n: number) {

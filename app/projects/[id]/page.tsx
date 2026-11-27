@@ -43,6 +43,9 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState, useCallba
 import { useParams } from "next/navigation";
 import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
+import { ProjectExpenses } from "@/components/expenses/ProjectExpenses";
+import "../../leads/leads.css";
+import "../../expenses/expenses.css";
 import { recordPayment } from "@/lib/api/invoices";
 import { getCostingAnalysis } from "@/lib/api/costing";
 import { resolveDesignerDisplay, formatIndianCurrency, calculateStageProgress } from "@/lib/domain/project-stages";
@@ -167,7 +170,7 @@ export type ClientInvitation = {
   updatedAt?: string;
 };
 
-const tabs = ["Overview", "Project Details", "BOQs", "Costing", "Project Workspace", "Documents", "Payments", "Activity Log"];
+const tabs = ["Overview", "Project Details", "BOQs", "Costing", "Expenses", "Project Workspace", "Documents", "Payments", "Activity Log"];
 
 const money = (x?: number) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(x || 0);
@@ -429,6 +432,15 @@ export default function ProjectPage() {
           {tab === "Project Details" && <Details p={p} onEdit={() => setEditOpen(true)} />}
           {tab === "BOQs" && <Boqs p={p} b={boqs} onReload={load} showToast={showToast} />}
           {tab === "Costing" && <Costing p={p} b={boqs} />}
+          {tab === "Expenses" && (
+            <ProjectExpenses
+              project={{ value: p.id, label: p.name, projectType: p.projectType ?? null }}
+              received={stats.paid}
+              outstanding={stats.due}
+              invoiced={invoices.reduce((sum, x) => sum + (x.totalAmount || 0), 0)}
+              notify={showToast}
+            />
+          )}
           {tab === "Project Workspace" && <Work p={p} b={boqs} showToast={showToast} />}
           {tab === "Documents" && (
             <Docs

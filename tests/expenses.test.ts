@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import {
-    __resetExpenses, computeAmounts, createExpense, deleteExpense, exportExpenses, listExpenses, updateExpense, validateExpense,
+    __resetExpenses, computeAmounts, createExpense, projectExpenseKpis, projectExpenseTotal, deleteExpense, exportExpenses, listExpenses, updateExpense, validateExpense,
     type ExpenseInput,
 } from "../lib/expenses/store";
 
@@ -64,5 +64,29 @@ describe("Expenses (Sales & Finance)", () => {
         for (const text of ["Every expense accounted for and every project in control.", "Search expense by amount, project", "New Expense", "Total Expenses"]) expect(page).toContain(text);
         const drawer = readFileSync("components/expenses/ExpenseDrawer.tsx", "utf8");
         for (const text of ["Expense Type", "Expense Date", "Base Amount (INR)", "Tax Applicable", "Link to Project", "Payment Method", "Reference Number (Optional)", "Receipt / Supporting Documents", "Edit Expense", "Add Expense"]) expect(drawer).toContain(text);
+    });
+
+    it("computes the project KPI cards from received, expenses and outstanding", () => {
+        createExpense(input({ baseAmount: 10000, taxApplicable: true, taxRate: 18 })); // 11,800
+        createExpense(input({ baseAmount: 5000, taxApplicable: false }));               // 5,000
+        createExpense(input({ projectId: "p2", baseAmount: 999, taxApplicable: false })); // other project
+        createExpense(input({ type: "office", projectId: null, baseAmount: 700, taxApplicable: false }));
+        expect(projectExpenseTotal("p1")).toBe(16800);
+        // Received 50,000 of 80,000 invoiced -> 30,000 outstanding.
+        expect(projectExpenseKpis({ received: 50000, outstanding: 30000, expenses: projectExpenseTotal("p1") }))
+            .toEqual({ received: 50000, expenses: 16800, balance: 33200, outstanding: 30000 });
+        // Spending more than received gives a negative balance.
+        expect(projectExpenseKpis({ received: 10000, outstanding: 0, expenses: 16800 }).balance).toBe(-6800);
+    });
+
+    it("adds an Expenses tab to the project detail with the KPI cards and the preview drawer", () => {
+        const page = readFileSync("app/projects/[id]/page.tsx", "utf8");
+        expect(page).toMatch(/"Costing", "Expenses", "Project Workspace"/);
+        expect(page).toContain("<ProjectExpenses");
+        const tab = readFileSync("components/expenses/ProjectExpenses.tsx", "utf8");
+        for (const k of ["Amount Received from Client", "Total Expenses", "Project Balance", "Outstanding Balance", " for this project"]) expect(tab).toContain(k);
+        const drawer = readFileSync("components/expenses/ExpenseDrawer.tsx", "utf8");
+        expect(drawer).toContain("Expenses Preview");
+        expect(drawer).toContain("Approval Timeline &amp; Audit History");
     });
 });
