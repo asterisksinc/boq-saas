@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import {
-    BadgeCheck, Calculator, ChevronDown, Download, ExternalLink, FileText, Folder, Image as ImageIcon, ListChecks, Mail, MapPin,
+    ArrowLeft, BadgeCheck, Calculator, ChevronDown, ExternalLink, FileText, Folder, Image as ImageIcon, ListChecks, Mail, MapPin,
     MoreHorizontal, NotebookPen, Pencil, Phone, Plus, Receipt, Search, StickyNote, Trash2, User, X,
 } from "lucide-react";
 import DashboardRail from "@/components/DashboardRail";
@@ -17,6 +17,7 @@ import {
     type LeadCallLog, type LeadPerson, type LeadDetail, type LeadNote, type LeadRelatedTab,
 } from "@/lib/api/leads";
 import { loadMoodBoards, type MoodBoard } from "@/lib/mood-boards";
+import { projectExpenseTotal } from "@/lib/expenses/store";
 import "../leads.css";
 
 const TABS = [
@@ -238,63 +239,51 @@ export default function LeadDetailPage() {
 
     return (
         <Shell>
-            <nav className="ld-breadcrumb" aria-label="Breadcrumb">
-                <button type="button" onClick={() => router.push("/leads")}>Leads</button>
-                <span aria-hidden="true">/</span>
-                <button type="button" onClick={() => router.push("/leads")}>All Leads</button>
-                <span aria-hidden="true">/</span>
-                <span aria-current="page">{lead?.leadCode.toUpperCase() ?? "…"}</span>
-            </nav>
+            <button type="button" className="ld-back" onClick={() => router.push("/leads")}>
+                <ArrowLeft size={20} aria-hidden="true" /> Back
+            </button>
 
-            <section className="ld-card ld-profile">
+            <section className="ld-profile">
                 <div className="ld-profile-identity">
                     <span className="ld-profile-avatar">
                         {lead?.avatarUrl ? <img src={lead.avatarUrl} alt="" /> : initialsOf(lead?.name)}
                     </span>
                     <div className="ld-profile-text">
-                        <h2>{lead?.name ?? "Loading…"}</h2>
-                        <p>{lead ? `${lead.leadCode.toUpperCase()} · Created ${formatDate(lead.createdAt)}` : ""}</p>
-                        {lead ? (
-                            <div className="ld-profile-tags">
-                                <Pill tone={stageTone(lead.stage)}>{lead.stage === "new" ? "New Lead" : lead.stageLabel}</Pill>
-                                <Pill tone="blue">{lead.sourceLabel}</Pill>
-                            </div>
-                        ) : null}
+                        <h2>
+                            <span>{lead?.name ?? "Loading…"}</span>
+                            {lead ? <Pill tone={stageTone(lead.stage)}>{lead.stage === "new" ? "New Lead" : lead.stageLabel}</Pill> : null}
+                        </h2>
+                        <p>{lead ? `${lead.leadCode} · ${lead.sourceLabel}` : ""}</p>
                     </div>
                 </div>
                 <div className="ld-profile-actions">
-                    <a className={`ld-btn ld-btn--outline${lead?.phone ? "" : " is-disabled"}`} href={lead?.phone ? `tel:${lead.phone}` : undefined} aria-disabled={!lead?.phone}>
-                        <Phone size={18} className="ld-icon-blue" /> Call
-                    </a>
-                    <a className={`ld-btn ld-btn--outline${lead?.email ? "" : " is-disabled"}`} href={lead?.email ? `mailto:${lead.email}` : undefined} aria-disabled={!lead?.email}>
-                        <Mail size={18} /> Email
-                    </a>
-                    <a
-                        className={`ld-btn ld-btn--outline${whatsappNumber ? "" : " is-disabled"}`}
-                        href={whatsappNumber ? `https://wa.me/${whatsappNumber}` : undefined}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-disabled={!whatsappNumber}
-                    >
-                        <WhatsAppIcon /> WhatsApp
-                    </a>
-                    <button type="button" className="ld-btn ld-btn--outline" onClick={() => setEditOpen(true)} disabled={!lead}>
-                        <Pencil size={17} /> Edit Lead
-                    </button>
+                    {lead ? (
+                        <span className={`ld-last-contact${lead.lastContactedAt ? "" : " is-never"}`}>
+                            {lead.lastContactedAt ? `Last Contacted ${timeAgo(lead.lastContactedAt)}` : "Not contacted yet"}
+                        </span>
+                    ) : null}
+                    <button type="button" className="ld-btn" onClick={exportLead} disabled={!lead}>Export</button>
+                    <button type="button" className="ld-btn" onClick={() => setEditOpen(true)} disabled={!lead}>Edit Lead</button>
                     <div className="ld-entry" ref={entryRef}>
-                        <button type="button" className="ld-btn ld-btn--outline ld-btn--icon" aria-label="More actions" aria-haspopup="menu" aria-expanded={entryOpen} onClick={() => setEntryOpen((v) => !v)} disabled={!lead}>
+                        <button type="button" className="ld-btn ld-btn--icon" aria-label="More actions" aria-haspopup="menu" aria-expanded={entryOpen} onClick={() => setEntryOpen((v) => !v)} disabled={!lead}>
                             <MoreHorizontal size={20} />
                         </button>
                         {entryOpen ? (
                             <div className="ld-pop-menu" role="menu">
+                                <a role="menuitem" className={lead?.phone ? "" : "is-disabled"} href={lead?.phone ? `tel:${lead.phone}` : undefined} aria-disabled={!lead?.phone} onClick={() => setEntryOpen(false)}>
+                                    <Phone size={20} /> Call
+                                </a>
+                                <a role="menuitem" className={lead?.email ? "" : "is-disabled"} href={lead?.email ? `mailto:${lead.email}` : undefined} aria-disabled={!lead?.email} onClick={() => setEntryOpen(false)}>
+                                    <Mail size={20} /> Email
+                                </a>
+                                <a role="menuitem" className={whatsappNumber ? "" : "is-disabled"} href={whatsappNumber ? `https://wa.me/${whatsappNumber}` : undefined} target="_blank" rel="noreferrer" aria-disabled={!whatsappNumber} onClick={() => setEntryOpen(false)}>
+                                    <WhatsAppIcon /> WhatsApp
+                                </a>
                                 <button type="button" role="menuitem" onClick={() => { setEntryOpen(false); setCallLog({ open: true, log: null }); }}>
                                     <Phone size={20} /> New Call Log
                                 </button>
                                 <button type="button" role="menuitem" onClick={() => { setEntryOpen(false); setNote({ open: true, note: null }); }}>
                                     <StickyNote size={20} /> New Note
-                                </button>
-                                <button type="button" role="menuitem" onClick={() => { setEntryOpen(false); exportLead(); }}>
-                                    <Download size={20} /> Export Lead
                                 </button>
                                 <button type="button" role="menuitem" className="is-danger" onClick={() => { setEntryOpen(false); void removeLead(); }}>
                                     <Trash2 size={20} /> Delete Lead
@@ -305,20 +294,19 @@ export default function LeadDetailPage() {
                 </div>
             </section>
 
-            <section className="ld-stats" aria-label="Lead summary">
-                {TABS.map((t) => {
-                    const Icon = t.icon;
-                    const value = lead ? countOf(t.key) : undefined;
-                    return (
-                        <button key={t.key} type="button" className={`ld-stat${tab === t.key ? " is-current" : ""}`} onClick={() => switchTab(t.key)}>
-                            <Icon size={24} strokeWidth={1.6} className="ld-stat-icon" />
-                            <span className="ld-stat-text">
-                                <span>{t.label}</span>
-                                <strong>{value == null ? "—" : String(value).padStart(2, "0")}</strong>
-                            </span>
-                        </button>
-                    );
-                })}
+            <section className="ld-kpis" aria-label="Lead summary">
+                {[
+                    { label: "Projects", value: lead ? String(lead.stats.projects) : "—" },
+                    { label: "BOQ Value", value: lead ? formatMoney(lead.stats.boqValue, currency) : "—" },
+                    { label: "Invoices", value: lead ? `${lead.stats.invoicesPaid} Paid of ${lead.stats.invoicesTotal}` : "—" },
+                    { label: "Expenses", value: lead ? formatMoney(lead.projectIds.reduce((sum, pid) => sum + projectExpenseTotal(pid), 0), currency) : "—" },
+                    { label: "Outstanding Amount", value: lead ? formatMoney(lead.stats.outstandingAmount, currency) : "—" },
+                ].map((k) => (
+                    <div key={k.label} className="ld-kpi">
+                        <span>{k.label}</span>
+                        <strong>{k.value}</strong>
+                    </div>
+                ))}
             </section>
 
             <div className="ld-detail-body">
@@ -507,7 +495,7 @@ export default function LeadDetailPage() {
 
 function Shell({ children }: { children: React.ReactNode }) {
     return (
-        <main className="fig-dashboard leads-page">
+        <main className="fig-dashboard leads-page lead-detail-page">
             <div className="fig-dashboard-glow" />
             <DashboardRail current="/leads" />
             <div className="fig-dashboard-main">
@@ -531,6 +519,16 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
             <dd>{value ?? <span className="ld-muted">—</span>}</dd>
         </div>
     );
+}
+
+function timeAgo(iso: string) {
+    const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+    if (mins < 60) return mins <= 1 ? "just now" : `${mins} minutes ago`;
+    const hours = Math.round(mins / 60);
+    if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+    const days = Math.round(hours / 24);
+    if (days < 30) return `${days} day${days === 1 ? "" : "s"} ago`;
+    return `on ${formatDate(iso)}`;
 }
 
 function WhatsAppIcon() {
