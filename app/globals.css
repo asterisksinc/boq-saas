@@ -61855,3 +61855,11 @@ html[data-sidebar="expanded"] .fig-side-menu {
 .tes-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 116px; height: 46px; padding: 0 16px; border: 0; border-radius: 6px; background: #2563eb; color: #fff; font: inherit; font-size: 14px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background .15s; }
 .tes-btn:hover { background: #1d4ed8; }
 .tes .ld-btn, .tes .vm-btn { height: 46px; }
+
+/* Empty tables: no row border under the empty state, and the empty state centred in the space left in the panel. */
+tr:has(> td > .tes) > td { height: auto !important; padding: 0 !important; border: 0 !important; background: transparent !important; vertical-align: middle !important; }
+tbody tr:has(> td > .tes), tbody tr:has(> td > .tes):hover { background: transparent !important; cursor: default; }
+.ld-tabs-card > .ld-table-scroll:has(.tes),
+.ld-table-card > .ld-table-scroll:has(.tes) { display: flex; flex: 1 1 auto; flex-direction: column; }
+.ld-table-scroll:has(.tes) > table { flex: 1 1 auto; height: 100%; }
+.tes { flex: 1 1 auto; }
