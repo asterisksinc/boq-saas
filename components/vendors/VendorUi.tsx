@@ -5,10 +5,25 @@ import { createPortal } from "react-dom";
 import { useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
 import { Award, Bookmark, BookmarkCheck, ChevronRight, ListPlus, MapPin, ShieldCheck, Star, X } from "lucide-react";
 import { BUSINESS_TYPE_LABEL, type Vendor } from "@/lib/vendors/data";
-import { getServerSnapshot, getSnapshot, subscribe } from "@/lib/vendors/store";
+import { getContactUsage, getServerSnapshot, getSnapshot, setContactPlan, subscribe } from "@/lib/vendors/store";
+import { contactPlanFromBilling, type ContactUsage } from "@/lib/vendors/credits";
 
 export function useVendorStore() {
     return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+}
+
+let planRequest: Promise<void> | null = null;
+
+/** Loads the workspace plan once per visit so contact credits follow free (5 total) or paid (monthly) rules. */
+export function useContactUsage(): ContactUsage {
+    const s = useVendorStore();
+    useEffect(() => {
+        planRequest ??= fetch("/api/v1/billing/overview", { credentials: "include" })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((b) => setContactPlan(contactPlanFromBilling(b?.data ?? null)))
+            .catch(() => { planRequest = null; });
+    }, []);
+    return getContactUsage(s);
 }
 
 export function CertifiedBadge({ small }: { small?: boolean }) {

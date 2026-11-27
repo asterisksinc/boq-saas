@@ -1160,3 +1160,14 @@
     .vm-ov-card .vm-portfolio { grid-template-columns: 1fr 1fr; }
     .vm-info dl > div { grid-template-columns: 140px minmax(0, 1fr); }
 }
+
+/* Contact credits: 5 free unlocks, then a monthly allowance on paid plans */
+.vm-credits { margin: -6px 0 0; color: var(--vm-slate); font-size: 12px; font-weight: 500; text-align: center; }
+.vm-credits.is-out { color: #b45309; }
+.vm-tag--amber { background: #fef3c7; color: #b45309; }
+.vm-quota { display: flex; flex-direction: column; gap: 8px; }
+.vm-quota p { margin: 0; font-size: 14px; }
+.vm-quota-meter { height: 8px; overflow: hidden; border-radius: 99px; background: #e2e8f0; }
+.vm-quota-meter span { display: block; height: 100%; border-radius: inherit; background: #f59e0b; }
+.vm-quota-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.vm-quota-actions .vm-btn { height: 48px; font-size: 15px; font-weight: 500; text-decoration: none; }

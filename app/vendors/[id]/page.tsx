@@ -6,11 +6,12 @@ import { ArrowLeft, ArrowRight, Award, BadgeCheck, Bookmark, BookmarkCheck, Book
 import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
 import { AddToListModal, ContactAccessModal, ContactDetails } from "@/components/vendors/VendorDialogs";
-import { Modal, Toast, VendorLogo, businessTypes, useVendorStore } from "@/components/vendors/VendorUi";
+import { Modal, Toast, VendorLogo, businessTypes, useContactUsage, useVendorStore } from "@/components/vendors/VendorUi";
 import { BUSINESS_TYPE_LABEL, CATEGORY_LABEL, getVendor, isCertified, isDiscoverable, type Vendor } from "@/lib/vendors/data";
 import { isOpenNow } from "@/lib/vendors/search";
 import { getUnlockedContact, isSaved, recordView, saveNote, toggleSaved } from "@/lib/vendors/store";
 import type { VendorContact } from "@/lib/vendors/contacts";
+import { usageLabel } from "@/lib/vendors/credits";
 import "../vendors.css";
 
 type ProfileTab = "overview" | "business" | "coverage";
@@ -24,6 +25,7 @@ function VendorProfileInner() {
     const router = useRouter();
     const params = useSearchParams();
     const store = useVendorStore();
+    const usage = useContactUsage();
     const vendor = getVendor(id);
     const [tab, setTab] = useState<ProfileTab>("overview");
     const [contactOpen, setContactOpen] = useState(false);
@@ -205,6 +207,7 @@ function VendorProfileInner() {
                             </ul>
                             <button type="button" className="vm-btn vm-btn--primary vm-btn--block" onClick={() => setContactOpen(true)}><Lock size={18} /> Acquire Contact Information</button>
                             <p className="vm-fine vm-center">Contact details are protected by OTP verification.</p>
+                            <p className={`vm-credits${usage.remaining ? "" : " is-out"}`} role="status">{usageLabel(usage)}</p>
                         </div>
                     )}
 
