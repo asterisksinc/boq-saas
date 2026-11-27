@@ -351,9 +351,9 @@ function LeadTable({
                             <tr>
                                 <td colSpan={9}>
                                     <EmptyState
-                                        title={filtered ? "No leads match your search" : "No leads yet"}
+                                        title="No Leads found"
                                         text={filtered ? "Try a different search or clear the filters." : "Add your first lead or import them from Excel."}
-                                        action={filtered ? undefined : <button type="button" className="ld-btn ld-btn--primary" onClick={onCreate}><Plus size={18} /> New Lead</button>}
+                                        action={filtered ? undefined : <button type="button" className="tes-btn" onClick={onCreate}><Plus size={20} strokeWidth={2.5} /> New Lead</button>}
                                     />
                                 </td>
                             </tr>

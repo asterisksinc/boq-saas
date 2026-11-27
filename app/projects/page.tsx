@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, ChevronDown, MoreHorizontal, Plus, X, ArrowLeft, Home, User, MapPin, Calendar, Briefcase, Search, Minus, Info, RefreshCcw, Edit2, Trash2, Copy, UploadCloud, Layers } from "lucide-react";
+import TableEmptyState from "@/components/shared/TableEmptyState";
 import { ChangeEvent, CSSProperties, FormEvent, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import DashboardRail from "@/components/DashboardRail";
@@ -1095,27 +1096,26 @@ export default function ProjectsPage() {
             ) : !projects.length ? (
               filter !== "all" || query.trim() ? (
                 <div className="projects-table-card">
-                  <div className="projects-state-box">
-                    <img src="/assets/projects/filter-icon.svg" alt="" style={{ width: 36, height: 36, opacity: 0.4 }} />
-                    <h3>No matching projects found</h3>
-                    <p>
-                      {query.trim() && filter !== "all"
-                        ? `No projects matching "${query}" with status "${label(filter)}".`
-                        : query.trim()
-                        ? `No projects matching "${query}".`
-                        : `No projects found with status "${label(filter)}".`}
-                    </p>
-                    <button
-                      type="button"
-                      className="projects-btn-primary"
-                      onClick={() => {
-                        setFilter("all");
-                        setQuery("");
-                      }}
-                    >
-                      Clear Filters
-                    </button>
-                  </div>
+                  <TableEmptyState
+                    title="No Projects found"
+                    text={query.trim() && filter !== "all"
+                      ? `Nothing matches "${query}" with status "${label(filter)}".`
+                      : query.trim()
+                      ? `Nothing matches "${query}".`
+                      : `No projects with status "${label(filter)}".`}
+                    action={
+                      <button
+                        type="button"
+                        className="projects-btn-primary"
+                        onClick={() => {
+                          setFilter("all");
+                          setQuery("");
+                        }}
+                      >
+                        Clear Filters
+                      </button>
+                    }
+                  />
                 </div>
               ) : (
                 <div className="projects-table-card">
@@ -1321,15 +1321,12 @@ export default function ProjectsPage() {
 
 function Empty({ onCreate }: { onCreate: () => void }) {
   return (
-    <div className="projects-state-box">
-      <img src="/assets/projects/menu-open.svg" alt="" style={{ width: 44, height: 44, opacity: 0.5 }} />
-      <h3>No projects yet</h3>
-      <p>Create your first project to start building BOQs.</p>
-      <button type="button" className="projects-btn-primary" onClick={onCreate}>
-        <Plus size={18} />
-        New Project
-      </button>
-    </div>
+    <TableEmptyState
+      title="No Projects found"
+      text="Create your first project to start building BOQs."
+      actionLabel="New Project"
+      onAction={onCreate}
+    />
   );
 }
 

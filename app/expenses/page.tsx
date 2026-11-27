@@ -194,9 +194,9 @@ function ExpensesPageInner() {
                                     <tr>
                                         <td colSpan={7}>
                                             <EmptyState
-                                                title={filtered ? "No expenses match your search" : "No expenses yet"}
+                                                title="No Expenses found"
                                                 text={filtered ? "Try a different search or clear the filters." : "Record your first expense and attach the receipt."}
-                                                action={filtered ? undefined : <button type="button" className="ld-btn ld-btn--primary" onClick={openNew}><Plus size={18} /> New Expense</button>}
+                                                action={filtered ? undefined : <button type="button" className="tes-btn" onClick={openNew}><Plus size={20} strokeWidth={2.5} /> New Expense</button>}
                                             />
                                         </td>
                                     </tr>

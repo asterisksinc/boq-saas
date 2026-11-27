@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
+import TableEmptyState from "@/components/shared/TableEmptyState";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
     AlertCircle, Armchair, ArrowLeft, Bookmark, Check, ChevronDown, ChevronRight, Crosshair, FileText, GitCompare, History, Lamp, Layers, LayoutGrid,
@@ -615,7 +616,7 @@ function SavedTab({ onOpen, onSave, onAddToList, onNotify }: { onOpen: (id: stri
     const pickedVendors = picked.map(getVendor).filter(Boolean) as Vendor[];
 
     if (!rows.length) {
-        return <EmptyBlock icon={<Bookmark size={22} />} title="No saved vendors yet" text="Save vendors while you search to compare them and add them to sourcing lists." />;
+        return <EmptyBlock icon={<Bookmark size={22} />} title="No Saved Vendors found" text="Save vendors while you search to compare them and add them to sourcing lists." />;
     }
 
     return (
@@ -670,7 +671,7 @@ function SavedTab({ onOpen, onSave, onAddToList, onNotify }: { onOpen: (id: stri
                     );
                 })}
             </div>
-            {!visible.length ? <EmptyBlock title="No saved vendors match these filters" text="Change the category or location filter." /> : null}
+            {!visible.length ? <EmptyBlock title="No Saved Vendors found" text="Change the category or location filter." /> : null}
             <CompareModal open={comparing} vendors={pickedVendors} certifiedOf={(v) => isCertified(v)} onClose={() => setComparing(false)} />
         </section>
     );
@@ -716,7 +717,7 @@ function RequestsTab({ onOpen, onNotify, onDiscover }: { onOpen: (id: string) =>
     const contact = viewing ? getUnlockedContact(viewing.id) : null;
 
     if (!store.disclosures.length) {
-        return <EmptyBlock icon={<Lock size={22} />} title="No contact requests yet" text="When you verify with an OTP to reveal a vendor's contact details, the request is recorded here." action={<button type="button" className="vm-btn vm-btn--primary" onClick={onDiscover}>Discover vendors</button>} />;
+        return <EmptyBlock icon={<Lock size={22} />} title="No Contact Requests found" text="When you verify with an OTP to reveal a vendor's contact details, the request is recorded here." action={<button type="button" className="vm-btn vm-btn--primary" onClick={onDiscover}>Discover vendors</button>} />;
     }
 
     return (
@@ -829,7 +830,7 @@ function ListsTab({ listId, onOpenList, onOpen, onNotify, onFindVendors }: {
                                 })}
                             </div>
                         )) : (
-                            <EmptyBlock title="No vendors in this list yet" text="Find vendors and use “Add to sourcing list” on any vendor card or profile." />
+                            <EmptyBlock title="No Vendors found" text="Find vendors and use “Add to sourcing list” on any vendor card or profile." />
                         )}
                         <p className="vm-fine">Shortlisting or unlocking contact details does not appoint a vendor to the project.</p>
                     </div>
@@ -895,7 +896,7 @@ function ListsTab({ listId, onOpenList, onOpen, onNotify, onFindVendors }: {
                     ))}
                 </div>
             ) : (
-                <EmptyBlock icon={<ListIcon size={22} />} title="No sourcing lists yet" text={`Create lists such as “${SAMPLE_PROJECTS[1].name} — Kitchen suppliers” to organise vendors by project and material.`}
+                <EmptyBlock icon={<ListIcon size={22} />} title="No Sourcing Lists found" text={`Create lists such as “${SAMPLE_PROJECTS[1].name} — Kitchen suppliers” to organise vendors by project and material.`}
                     action={<button type="button" className="vm-btn vm-btn--primary" onClick={() => setCreating(true)}><Plus size={16} /> New sourcing list</button>} />
             )}
             <NewListModal open={creating} onClose={() => setCreating(false)} onCreated={(id, name) => { setCreating(false); onNotify(`${name} created.`); onOpenList(id); }} />
@@ -903,14 +904,10 @@ function ListsTab({ listId, onOpenList, onOpen, onNotify, onFindVendors }: {
     );
 }
 
-function EmptyBlock({ icon, title, text, action }: { icon?: ReactNode; title: string; text: string; action?: ReactNode }) {
+function EmptyBlock({ title, text, action }: { icon?: ReactNode; title: string; text: string; action?: ReactNode }) {
     return (
-        <div className="vm-emptyblock">
-            {icon ? <span className="vm-emptyblock-icon">{icon}</span> : null}
-            <strong>{title}</strong>
-            <p>{text}</p>
-            {action}
-        </div>
+        // `icon` is kept for callers; the shared illustration replaces it (one empty state across the app).
+        <TableEmptyState compact title={title} text={text} action={action} />
     );
 }
 

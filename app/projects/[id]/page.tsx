@@ -44,6 +44,7 @@ import { useParams } from "next/navigation";
 import DashboardRail from "@/components/DashboardRail";
 import DashboardHeader from "@/components/DashboardHeader";
 import { ProjectExpenses } from "@/components/expenses/ProjectExpenses";
+import TableEmptyState from "@/components/shared/TableEmptyState";
 import "../../leads/leads.css";
 import "../../expenses/expenses.css";
 import { recordPayment } from "@/lib/api/invoices";
@@ -1622,15 +1623,12 @@ function Boqs({
 
             {/* Table Rows */}
             {b.length === 0 ? (
-              <div className="po-boq-empty blank">
-                <div className="po-boq-empty-icon">
-                  <FileSpreadsheet size={24} />
-                </div>
-                <p className="po-boq-empty-title">No BOQs created for this project yet</p>
-                <p className="po-boq-empty-desc">
-                  Start estimating by creating a blank BOQ, applying an interior design template, or importing a spreadsheet.
-                </p>
-                <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
+              <TableEmptyState
+                compact
+                title="No BOQs found"
+                text="Create a blank BOQ, apply a template, or import a spreadsheet to start estimating."
+                action={
+                <div style={{ display: "flex", gap: "12px" }}>
                   <button type="button" className="po-boq-btn-import" onClick={() => setImportModalOpen(true)}>
                     <FileSpreadsheet size={16} />
                     Import Excel
@@ -1640,7 +1638,8 @@ function Boqs({
                     New BOQ
                   </button>
                 </div>
-              </div>
+                }
+              />
             ) : (
               b.map((x) => (
                 <div
@@ -2798,9 +2797,7 @@ interface CategoryCostGroup {
               ))}
             </Table>
           ) : (
-            <div className="blank" style={{ padding: "32px", textAlign: "center", color: "#64748B", width: "100%" }}>
-              No costing items found for this project. Costing lines are generated as items are added to the Bill of Quantities.
-            </div>
+            <TableEmptyState compact title="No Costing Items found" text="Costing lines are generated as items are added to the project's BOQs." />
           )}
         </div>
       </div>
@@ -3747,12 +3744,7 @@ function Docs({
       {/* Root View Content: Folders List / Grid */}
       {!folder ? (
         !filteredFolders.length ? (
-          <div className="workspace-doc-empty">
-            <div className="workspace-doc-empty-icon">
-              <FolderIcon size={24} />
-            </div>
-            <div>No folders yet. Click New Folder to organise project files.</div>
-          </div>
+          <TableEmptyState compact title="No Folders found" text="Create a folder to organise this project's files." actionLabel="New Folder" onAction={add} />
         ) : !grid ? (
           <div className="workspace-doc-table-card">
             <div className="workspace-doc-table-head">
@@ -3893,12 +3885,7 @@ function Docs({
       ) : (
         /* Folder View Content: Approved Documents List / Grid */
         !filteredDocs.length ? (
-          <div className="workspace-doc-empty">
-            <div className="workspace-doc-empty-icon">
-              <FileText size={24} />
-            </div>
-            <div>No approved files in this folder yet.</div>
-          </div>
+          <TableEmptyState compact title="No Files found" text="Upload a file to add it to this folder." actionLabel="Upload File" onAction={upload} />
         ) : !grid ? (
           <div className="workspace-doc-table-card">
             <div className="workspace-doc-table-head doc-mode">

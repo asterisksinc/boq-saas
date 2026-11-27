@@ -1776,3 +1776,13 @@
     .ld-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .lead-detail-page .ld-profile-actions { flex-wrap: wrap; }
 }
+
+/* Line the KPI cards up with the panels below: the first card is as wide as Lead Information,
+   so the gap between cards 1 and 2 continues as the gap between the two panels. */
+.lead-detail-page .ld-kpis { grid-template-columns: 335px repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1100px) {
+    .lead-detail-page .ld-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+    .lead-detail-page .ld-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

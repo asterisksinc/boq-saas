@@ -57,7 +57,7 @@ describe("Documents Workspace Redesign — Figma Reference 1 (Root View) Parity"
 
   it("verifies root empty state message matches design specification", () => {
     const content = readFileSync(projectPagePath, "utf-8");
-    expect(content).toContain("No folders yet. Click New Folder to organise project files.");
+    expect(content).toContain('title="No Folders found"');
   });
 });
 
@@ -123,7 +123,7 @@ describe("Documents Workspace Redesign — Figma Reference 2 (Opened Folder View
 
   it("verifies folder empty state message matches Rule A: 'No approved files in this folder yet.'", () => {
     const content = readFileSync(projectPagePath, "utf-8");
-    expect(content).toContain("No approved files in this folder yet.");
+    expect(content).toContain('title="No Files found"');
   });
 });
 
