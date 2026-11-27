@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, type DragEvent } from "react";
-import { CalendarDays, CloudUpload, FileText, Trash2 } from "lucide-react";
+import { CalendarDays, CloudUpload, Download, Eye, FileText, Trash2 } from "lucide-react";
 import { Drawer, Field, SelectInput } from "@/components/leads/LeadUi";
+import { getSettingsOverview } from "@/lib/api/auth";
 import {
     EXPENSE_CATEGORIES, EXPENSE_TYPES, PAYMENT_METHODS, RECEIPT_MAX_BYTES, RECEIPT_TYPES, TAX_RATES,
-    computeAmounts, createExpense, formatINR, updateExpense, validateExpense,
+    computeAmounts, createExpense, formatINR, label, updateExpense, validateExpense,
     type Expense, type ExpenseCategory, type ExpenseInput, type ExpenseReceipt, type ExpenseType, type PaymentMethod,
 } from "@/lib/expenses/store";
 
@@ -43,6 +44,19 @@ const fromExpense = (e: Expense): FormState => ({
     category: e.category, projectId: e.projectId ?? "", paymentMethod: e.paymentMethod, reference: e.reference ?? "", receipt: e.receipt,
 });
 
+const fmtDay = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+const fmtStamp = (iso: string) => {
+    const d = new Date(iso);
+    return `${d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} · ${d.toLocaleTimeString("en-GB", { hour12: false })}`;
+};
+
+let creatorRequest: Promise<string | null> | null = null;
+/** Display name of the signed-in user, fetched once and used as "Created by". */
+const currentUserName = () =>
+    (creatorRequest ??= getSettingsOverview()
+        .then((o) => o?.profile?.displayName?.trim() || o?.profile?.email?.split("@")[0] || null)
+        .catch(() => null));
+
 const readFile = (file: File) => new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
@@ -55,10 +69,12 @@ const readFile = (file: File) => new Promise<string>((resolve, reject) => {
  * "Edit Expense"; editing turns the same form on and saves with "Save Changes".
  */
 export function ExpenseDrawer({
-    open, expense, projects, onClose, onSaved,
+    open, expense, projects, onClose, onSaved, fixedProject,
 }: {
     open: boolean; expense: Expense | null; projects: ProjectOption[];
     onClose: () => void; onSaved: (expense: Expense, created: boolean) => void;
+    /** Opened from a project's Expenses tab: new expenses are linked to this project. */
+    fixedProject?: ProjectOption | null;
 }) {
     const [form, setForm] = useState<FormState>(blank);
     const [editing, setEditing] = useState(true);
@@ -69,10 +85,12 @@ export function ExpenseDrawer({
 
     useEffect(() => {
         if (!open) return;
-        setForm(expense ? fromExpense(expense) : blank());
+        setForm(expense ? fromExpense(expense) : { ...blank(), projectId: fixedProject?.value ?? "" });
         setEditing(!expense);
         setErrors({});
         setFormError(null);
+        if (!expense) void currentUserName();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, expense]);
 
     const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
@@ -93,7 +111,8 @@ export function ExpenseDrawer({
 
     const base = Number(form.baseAmount);
     const amounts = computeAmounts(Number.isFinite(base) ? base : 0, form.taxApplicable, Number(form.taxRate) || null);
-    const project = projects.find((p) => p.value === form.projectId) ?? null;
+    const options = fixedProject && !projects.some((p) => p.value === fixedProject.value) ? [fixedProject, ...projects] : projects;
+    const project = options.find((p) => p.value === form.projectId) ?? null;
 
     const toInput = (): ExpenseInput => ({
         type: form.type as ExpenseType,
@@ -110,9 +129,9 @@ export function ExpenseDrawer({
         receipt: form.receipt,
     });
 
-    const submit = () => {
+    const submit = async () => {
         if (!editing) { setEditing(true); return; }
-        const input = toInput();
+        const input = { ...toInput(), createdBy: expense ? undefined : await currentUserName() };
         const next = validateExpense({ ...input, baseAmount: form.baseAmount.trim() === "" ? NaN : input.baseAmount });
         setErrors(next);
         if (Object.values(next).some(Boolean)) return;
@@ -131,16 +150,21 @@ export function ExpenseDrawer({
         if (!ro) void attach(e.dataTransfer.files[0]);
     };
 
+    if (expense && !editing) {
+        return <ExpensePreview expense={expense} open={open} onClose={onClose} onEdit={() => setEditing(true)} />;
+    }
+
     return (
         <Drawer
-            title={expense ? expense.code : "Add Expense"}
+            className="ex-drawer"
+            title={expense ? `Edit ${expense.code}` : "Add Expense"}
             open={open}
             onClose={onClose}
             footer={
                 <>
                     <button type="button" className="ld-btn" onClick={onClose}>Cancel</button>
-                    <button type="button" className={`ld-btn${editing ? " ld-btn--primary" : ""}`} onClick={submit}>
-                        {!expense ? "Add Expense" : editing ? "Save Changes" : "Edit Expense"}
+                    <button type="button" className="ld-btn ld-btn--primary" onClick={() => void submit()}>
+                        {expense ? "Save Changes" : "Add Expense"}
                     </button>
                 </>
             }
@@ -190,8 +214,8 @@ export function ExpenseDrawer({
                         value={form.projectId}
                         onChange={(v) => set("projectId", v)}
                         placeholder={projects.length ? "Project" : "No projects yet"}
-                        options={form.projectId && !project && expense?.projectName ? [...projects, { value: form.projectId, label: expense.projectName, projectType: null }] : projects}
-                        disabled={ro}
+                        options={form.projectId && !project && expense?.projectName ? [...options, { value: form.projectId, label: expense.projectName, projectType: null }] : options}
+                        disabled={ro || Boolean(fixedProject && !expense)}
                     />
                 </Field>
             ) : null}
@@ -199,7 +223,7 @@ export function ExpenseDrawer({
                 <SelectInput value={form.paymentMethod} onChange={(v) => set("paymentMethod", v as PaymentMethod)} options={PAYMENT_METHODS} disabled={ro} />
             </Field>
             <Field label="Reference Number (Optional)" error={errors.reference}>
-                <input value={form.reference} onChange={(e) => set("reference", e.target.value)} placeholder="UTR, invoice or bill number" maxLength={80} disabled={ro} />
+                <input value={form.reference} onChange={(e) => set("reference", e.target.value)} placeholder="Enter Reference Number" maxLength={80} disabled={ro} />
             </Field>
             <Field label="Receipt / Supporting Documents" error={errors.receipt} group>
                 {form.receipt ? (
@@ -228,6 +252,79 @@ export function ExpenseDrawer({
                     </div>
                 )}
             </Field>
+        </Drawer>
+    );
+}
+
+/** Figma "Expenses - View Expense": read-only preview with totals, details, attachment and audit history. */
+function ExpensePreview({ expense: e, open, onClose, onEdit }: { expense: Expense; open: boolean; onClose: () => void; onEdit: () => void }) {
+    const details: Array<[string, string]> = [
+        ["Project", e.projectName ?? "Office / Overhead"],
+        ["Expense Type", label(EXPENSE_TYPES, e.type)],
+        ["Category", label(EXPENSE_CATEGORIES, e.category)],
+        ["Payment Method", label(PAYMENT_METHODS, e.paymentMethod)],
+        ["GST", e.taxApplicable && e.taxRate ? `${e.taxRate}%` : "No Tax"],
+        ["Payment Reference", e.reference || "Not Specified"],
+    ];
+    const history = [
+        { at: e.createdAt, text: `Expense created${e.createdBy ? ` by ${e.createdBy}` : ""}` },
+        ...(e.updatedAt && e.updatedAt !== e.createdAt ? [{ at: e.updatedAt, text: "Expense updated" }] : []),
+    ].sort((a, b) => b.at.localeCompare(a.at));
+    const sizeKb = e.receipt ? Math.max(1, Math.round(e.receipt.size / 1024)) : 0;
+    return (
+        <Drawer
+            className="ex-drawer ex-drawer--preview"
+            title={`${e.code} — Expenses Preview`}
+            open={open}
+            onClose={onClose}
+            footer={
+                <>
+                    <button type="button" className="ld-btn" onClick={onClose}>Close</button>
+                    <button type="button" className="ld-btn ld-btn--primary" onClick={onEdit}>Edit Expense</button>
+                </>
+            }
+        >
+            <header className="ex-pv-head">
+                <div>
+                    <h3>{label(EXPENSE_CATEGORIES, e.category)}{e.projectName ? ` — ${e.projectName}` : ""}</h3>
+                    <p>{e.createdBy ? `Created by ${e.createdBy}` : `Recorded ${fmtDay(e.createdAt.slice(0, 10))}`}</p>
+                </div>
+                <span className="ex-pv-date">{fmtDay(e.date)}</span>
+            </header>
+            <section className="ex-pv-total">
+                <span>Total Expense</span>
+                <strong>{formatINR(e.totalAmount)}</strong>
+                <span>{e.taxAmount ? `Base ${formatINR(e.baseAmount)} + tax ${formatINR(e.taxAmount)}` : `Base ${formatINR(e.baseAmount)} · No tax`}</span>
+            </section>
+            <dl className="ex-pv-grid">
+                {details.map(([k, v]) => (
+                    <div key={k}><dt>{k}</dt><dd>{v}</dd></div>
+                ))}
+            </dl>
+            <section className="ex-pv-section">
+                <h4>Attachments</h4>
+                {e.receipt ? (
+                    <div className="ex-pv-file">
+                        <span className="ex-pv-file-icon"><FileText size={20} aria-hidden="true" /></span>
+                        <span className="ex-pv-file-text">
+                            <strong>{e.receipt.name}</strong>
+                            <small>Receipt · {sizeKb} KB</small>
+                        </span>
+                        <a href={e.receipt.url} download={e.receipt.name} aria-label={`Download ${e.receipt.name}`}><Download size={20} /></a>
+                        <a href={e.receipt.url} target="_blank" rel="noreferrer" aria-label={`Open ${e.receipt.name}`}><Eye size={20} /></a>
+                    </div>
+                ) : (
+                    <p className="ex-pv-empty">No receipt attached. Edit the expense to upload one.</p>
+                )}
+            </section>
+            <section className="ex-pv-section">
+                <h4>Approval Timeline &amp; Audit History</h4>
+                <ol className="ex-pv-timeline">
+                    {history.map((h) => (
+                        <li key={h.at + h.text}><strong>{fmtStamp(h.at)}</strong><span>{h.text}</span></li>
+                    ))}
+                </ol>
+            </section>
         </Drawer>
     );
 }

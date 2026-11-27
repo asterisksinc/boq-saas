@@ -144,9 +144,9 @@ export function Pagination({
 
 /** Right-hand slide-over panel used by Add Lead, Call Log and Note forms. */
 export function Drawer({
-    title, open, onClose, children, footer,
+    title, open, onClose, children, footer, className,
 }: {
-    title: string; open: boolean; onClose: () => void; children: ReactNode; footer: ReactNode;
+    title: string; open: boolean; onClose: () => void; children: ReactNode; footer?: ReactNode; className?: string;
 }) {
     useEffect(() => {
         if (!open) return;
@@ -162,13 +162,13 @@ export function Drawer({
     if (!open) return null;
     return (
         <div className="ld-drawer-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-            <aside className="ld-drawer" role="dialog" aria-modal="true" aria-label={title}>
+            <aside className={`ld-drawer${className ? ` ${className}` : ""}`} role="dialog" aria-modal="true" aria-label={title}>
                 <header className="ld-drawer-head">
                     <h2>{title}</h2>
                     <button type="button" aria-label="Close" onClick={onClose}><X size={20} /></button>
                 </header>
                 <div className="ld-drawer-body">{children}</div>
-                <footer className="ld-drawer-foot">{footer}</footer>
+                {footer ? <footer className="ld-drawer-foot">{footer}</footer> : null}
             </aside>
         </div>
     );
