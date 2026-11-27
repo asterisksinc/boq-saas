@@ -1726,3 +1726,53 @@
 .ld-assign .ld-assign-empty {
     margin-left: 4px;
 }
+
+/* Lead detail — Figma "Leads - Lead Detail" (1440 frame): Back link, header on the page background,
+   five KPI cards, and Lead Information + records panels that run to the bottom of the screen. */
+.lead-detail-page .fig-dashboard-main { gap: 0; min-height: calc(100vh - 32px); }
+.lead-detail-page .fig-dashboard-header { margin-bottom: 24px; }
+.ld-back {
+    display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; padding: 0; border: 0; background: none;
+    color: var(--ld-slate); font: inherit; font-size: 16px; font-weight: 500; cursor: pointer;
+}
+.ld-back:hover { color: var(--ld-ink); }
+.lead-detail-page .ld-profile { margin-top: 16px; padding: 0; border-radius: 0; background: none; }
+.lead-detail-page .ld-profile-avatar { width: 54px; height: 54px; border-radius: 6px; background: #fff; font-size: 20px; }
+.lead-detail-page .ld-profile-text { gap: 6px; }
+.lead-detail-page .ld-profile-text h2 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0; color: var(--ld-ink); font-size: 24px; font-weight: 500; line-height: 1.2; }
+.lead-detail-page .ld-profile-text h2 .ld-pill { font-size: 12px; }
+.lead-detail-page .ld-profile-text p { margin: 0; color: var(--ld-muted); font-size: 16px; }
+.lead-detail-page .ld-profile-actions { display: flex; align-items: center; gap: 16px; }
+.lead-detail-page .ld-profile-actions > .ld-btn { height: 46px; padding: 0 14px; border: 0; background: #fff; font-size: 14px; font-weight: 500; }
+.lead-detail-page .ld-profile-actions .ld-btn--icon { width: 46px; height: 46px; border: 0; background: #fff; }
+.ld-last-contact { display: inline-flex; align-items: center; gap: 8px; color: var(--ld-muted); font-size: 14px; white-space: nowrap; }
+.ld-last-contact::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #16a34a; }
+.ld-last-contact.is-never::before { background: #94a3b8; }
+.ld-pop-menu a {
+    display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px;
+    color: var(--ld-ink); font-size: 14px; text-decoration: none; white-space: nowrap;
+}
+.ld-pop-menu a:hover { background: #f1f5f9; }
+.ld-pop-menu a.is-disabled { color: #94a3b8; pointer-events: none; }
+
+.ld-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
+.ld-kpi { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: 20px; border-radius: 6px; background: var(--ld-panel); }
+.ld-kpi span { color: var(--ld-slate); font-size: 14px; font-weight: 500; }
+.ld-kpi strong { overflow: hidden; color: var(--ld-ink); font-size: 24px; font-weight: 500; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+
+.lead-detail-page .ld-detail-body { flex: 1 1 auto; grid-template-columns: 335px minmax(0, 1fr); gap: 8px; margin-top: 8px; min-height: 480px; }
+.lead-detail-page .ld-info,
+.lead-detail-page .ld-tabs-card { height: 100%; }
+.lead-detail-page .ld-info { padding: 0 20px 20px; }
+.lead-detail-page .ld-info-head { margin: 0 -20px 12px; padding: 24px 20px 16px; }
+.lead-detail-page .ld-info-head h3 { font-size: 18px; font-weight: 600; }
+.lead-detail-page .ld-tabs-card { padding: 20px; }
+
+@media (max-width: 1100px) {
+    .ld-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .lead-detail-page .ld-detail-body { grid-template-columns: 1fr; }
+}
+@media (max-width: 700px) {
+    .ld-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .lead-detail-page .ld-profile-actions { flex-wrap: wrap; }
+}
