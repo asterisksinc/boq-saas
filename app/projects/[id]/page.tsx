@@ -969,7 +969,7 @@ function Overview({
   return (
     <div className="po-content">
       {/* Row 1: Project Health & Next Actions */}
-      <div className="po-row-1 overview-top">
+      <div className="po-row-1">
         <aside className="po-panel po-health-panel">
           <h4 className="po-panel-title">Project Health</h4>
           <div className="po-health-stack">
@@ -987,11 +987,11 @@ function Overview({
           </div>
         </aside>
 
-        <div className="po-panel po-actions-panel next-actions">
+        <div className="po-panel po-actions-panel">
           <h4 className="po-panel-title">Next Actions for this Project</h4>
           <div className="po-actions-stack">
             {actions.map((act, i) => (
-              <div className="po-card po-action-card action-card" key={i}>
+              <div className="po-card po-action-card" key={i}>
                 <div className="po-action-left">
                   <div className="po-action-badge-row">
                     <span className={`po-priority-pill ${act.priority}`}>{act.priorityLabel}</span>
@@ -1341,16 +1341,14 @@ function Health({
 }) {
   const resolvedStatus = status || (ok === true ? "success" : ok === false ? "danger" : "warning");
   return (
-    <div className="po-card po-health-card health">
+    <div className="po-card po-health-card">
       <div className="po-health-header">
         <span className={`po-health-dot ${resolvedStatus}`} />
         <span className="po-health-label">{label}</span>
       </div>
       <div className="po-health-body">
-        <div style={{ display: "flex", alignItems: "baseline", gap: "8px", flexWrap: "wrap" }}>
-          <span className={`po-health-status ${resolvedStatus}`}>{value}</span>
-          {metric && <span className="po-health-metric">{metric}</span>}
-        </div>
+        <span className={`po-health-status ${resolvedStatus}`}>{value}</span>
+        {metric && <span className="po-health-metric">{metric}</span>}
         <span className="po-health-note">{note}</span>
       </div>
     </div>
