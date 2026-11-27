@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
-import { Folder, FileText, Receipt, CheckSquare, Bookmark, Box, Users } from "lucide-react";
+import { Folder, FileText, Receipt, CheckSquare, Bookmark, Box, Users, Wallet } from "lucide-react";
 
 interface NewMenuPopoverProps {
     isOpen: boolean;
@@ -15,7 +15,7 @@ export default function NewMenuPopover({ isOpen, onClose, onNew }: NewMenuPopove
 
     if (!isOpen) return null;
 
-    const handleAction = (type: "lead" | "project" | "boq" | "invoice" | "task" | "approval" | "item") => {
+    const handleAction = (type: "lead" | "project" | "boq" | "invoice" | "expense" | "task" | "approval" | "item") => {
         onClose();
 
         switch (type) {
@@ -45,6 +45,13 @@ export default function NewMenuPopover({ isOpen, onClose, onNew }: NewMenuPopove
                     onNew();
                 } else {
                     router.push("/invoices?create=true");
+                }
+                break;
+            case "expense":
+                if (pathname === "/expenses" && onNew) {
+                    onNew();
+                } else {
+                    router.push("/expenses?create=true");
                 }
                 break;
             case "task":
@@ -104,6 +111,16 @@ export default function NewMenuPopover({ isOpen, onClose, onNew }: NewMenuPopove
             >
                 <Receipt size={18} className="fig-new-menu-icon" />
                 <span className="fig-new-menu-label">Create Invoice</span>
+            </button>
+
+            <button
+                type="button"
+                role="menuitem"
+                className="fig-new-menu-item"
+                onClick={() => handleAction("expense")}
+            >
+                <Wallet size={18} className="fig-new-menu-icon" />
+                <span className="fig-new-menu-label">Add Expense</span>
             </button>
 
             <button
