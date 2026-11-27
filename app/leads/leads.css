@@ -1786,3 +1786,11 @@
 @media (max-width: 700px) {
     .lead-detail-page .ld-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Board shows all 8 stages (New → Churned). Columns are a little narrower and the horizontal scrollbar is always
+   visible (macOS hides overlay scrollbars), so Lost / Won / Churned are discoverable past the right edge. */
+.ld-board { grid-auto-columns: minmax(264px, 300px); scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+.ld-board::-webkit-scrollbar { height: 10px; }
+.ld-board::-webkit-scrollbar-track { background: transparent; }
+.ld-board::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: #cbd5e1; background-clip: padding-box; }
+.ld-board::-webkit-scrollbar-thumb:hover { background: #94a3b8; background-clip: padding-box; }
