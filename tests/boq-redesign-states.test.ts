@@ -88,12 +88,8 @@ describe("BOQ Redesign - Empty and Populated States Validation", () => {
 
         it("renders the Figma empty state vector illustration", () => {
             expect(pageContent).toContain("<BoqEmptyIllustration />");
-            // Check SVG elements from Figma CSS (164px circle, union pills, sparkles, 32px badge)
-            expect(illustrationContent).toContain('fill="#2563EB" fillOpacity="0.07"');
-            expect(illustrationContent).toContain('fill="#2563EB" fillOpacity="0.08"');
-            expect(illustrationContent).toContain('fill="#2563EB" fillOpacity="0.15"');
-            expect(illustrationContent).toContain('fill="#2563EB" fillOpacity="0.16"');
-            expect(illustrationContent).toContain('circle cx="16" cy="16" r="16" fill="#2563EB"');
+            // The exported Figma frame (Frame 2147225421) is used as the illustration.
+            expect(illustrationContent).toContain("/assets/empty-state/empty-illustration.png");
         });
 
         it("styles the empty state with a semi-transparent surface", () => {
