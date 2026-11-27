@@ -299,20 +299,17 @@ describe("User Dashboard → Projects Redesign (Figma Specifications)", () => {
       expect(cssSource).toContain("background: #2563EB"); // Continue button
     });
 
-    it("renders Progress Tracker Frame 2147225073 with PROJECT SETUP title and 5 numbered steps", () => {
+    it("renders Progress Tracker Frame 2147225073 with PROJECT SETUP title and 3 numbered steps", () => {
       expect(pageSource).toContain("project-setup-tracker");
       expect(pageSource).toContain("PROJECT SETUP");
       expect(pageSource).toContain("project-steps-panel");
       expect(pageSource).toContain('"01"');
       expect(pageSource).toContain('"Project Details"');
       expect(pageSource).toContain('"02"');
-      expect(pageSource).toContain('"Room Setup"');
+      expect(pageSource).toContain('"Room Setup & Dimensions"');
       expect(pageSource).toContain('"03"');
-      expect(pageSource).toContain('"Room Dimensions"');
-      expect(pageSource).toContain('"04"');
-      expect(pageSource).toContain('"Requirements"');
-      expect(pageSource).toContain('"05"');
-      expect(pageSource).toContain('"Material Assignment"');
+      expect(pageSource).toContain('"Continue to BOQ"');
+      expect(pageSource).not.toContain('"Material Assignment"');
 
       expect(cssSource).toContain(".project-setup-tracker");
       expect(cssSource).toContain(".project-setup-heading");
@@ -343,7 +340,9 @@ describe("User Dashboard → Projects Redesign (Figma Specifications)", () => {
       expect(pageSource).toContain("project-details-panel");
       expect(pageSource).toContain('id="create-details-form"');
       expect(pageSource).toContain("project-fields-row");
-      expect(pageSource).toContain("CLIENT INFORMATION");
+      expect(pageSource).toContain("PROJECT LOCATION");
+      expect(pageSource).toContain("Select Lead");
+      expect(pageSource).toContain("Add Lead");
       expect(pageSource).toContain("PROJECT TIMELINE");
 
       expect(cssSource).toContain(".project-details-card");
@@ -363,21 +362,15 @@ describe("User Dashboard → Projects Redesign (Figma Specifications)", () => {
       expect(cssSource).toContain("border-radius: 8px");
     });
 
-    it("renders Project Status 3-pill radio selector with Planning, In Progress, and On Hold", () => {
-      expect(pageSource).toContain("project-status-pills");
-      expect(pageSource).toContain("project-status-pill");
-      expect(pageSource).toContain("project-status-pill-circle");
-      expect(pageSource).toContain('"planning"');
-      expect(pageSource).toContain('"in_progress"');
-      expect(pageSource).toContain('"on_hold"');
-      expect(pageSource).toContain('role="radiogroup"');
-      expect(pageSource).toContain('role="radio"');
-
-      expect(cssSource).toContain(".project-status-pills");
-      expect(cssSource).toContain(".project-status-pill");
-      expect(cssSource).toContain(".project-status-pill.active");
-      expect(cssSource).toContain("background: rgba(37, 99, 235, 0.1)");
-      expect(cssSource).toContain("border: 1px solid #2563EB");
+    it("renders Project Location with map, current location and manual address fields", () => {
+      expect(pageSource).toContain("<ProjectLocationPicker");
+      for (const label of ["Address line 1", "Address line 2", "City", "Town", "State", "Pincode", "Country"]) {
+        expect(pageSource).toContain(`>${label}</label>`);
+      }
+      const picker = readFileSync("components/projects/ProjectLocationPicker.tsx", "utf8");
+      expect(picker).toContain("navigator.geolocation.getCurrentPosition");
+      expect(picker).toContain("Use current location");
+      expect(picker).toContain("tiles.openfreemap.org");
     });
 
     it("renders Project Cover Image card Frame 94 with 120x120 dashed drop area and Browse button", () => {

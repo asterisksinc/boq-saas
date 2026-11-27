@@ -47,12 +47,13 @@ describe("Step 3: Room Dimensions Redesign & Integration Tests", () => {
   });
 
   describe("2. Wizard Shell, Stepper & Summary Header", () => {
-    it("renders the 5-step progress stepper with Step 3 as active", () => {
+    it("renders the 3-step progress stepper with Room Setup & Dimensions active", () => {
       expect(page).toContain('screen === "roomConfig"');
       expect(page).toContain("<Steps");
-      expect(page).toContain("current={3}");
-      expect(page).toContain('if (step === 1) setScreen("details")');
-      expect(page).toContain('else if (step === 2) setScreen("rooms")');
+      const block = page.split('if (screen === "roomConfig")')[1].split('if (screen === "requirements")')[0];
+      expect(block).toContain("current={2}");
+      expect(block).toContain('if (step === 1) setScreen("details")');
+      expect(block).toContain("Continue to BOQ");
     });
 
     it("renders the Project Summary Card with dynamic client, location, type, timeline, and Edit Project action", () => {
@@ -138,7 +139,7 @@ describe("Step 3: Room Dimensions Redesign & Integration Tests", () => {
 
     it("includes Room Notes and Room References image upload dropzone", () => {
       expect(page).toContain("Room Notes");
-      expect(page).toContain("ROOM REFERENCES");
+      expect(page).toContain("ROOM PHOTOS");
       expect(page).toContain("UPLOAD IMAGE");
       expect(page).toContain("handleUploadRoomRef");
       expect(page).toContain("uploadingRoomRef");

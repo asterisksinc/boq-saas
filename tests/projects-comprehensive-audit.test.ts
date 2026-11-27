@@ -14,7 +14,7 @@ describe("Projects Comprehensive Audit & Implementation Tests", () => {
 
   describe("Phase 2 — Create Project: Room Dimensions, Requirements & Cover Image", () => {
     it("verifies Step 3 Room Dimensions includes Room References upload card", () => {
-      expect(wizardPage).toContain("ROOM REFERENCES");
+      expect(wizardPage).toContain("ROOM PHOTOS");
       expect(wizardPage).toContain("Upload room reference image");
       expect(wizardPage).toContain("handleUploadRoomRef");
       expect(wizardPage).toContain("referenceImageUrl");

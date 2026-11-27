@@ -98,7 +98,7 @@ describe("Create New Project UI Layout, Wizard Overlap & Width Alignment Fixes",
       const step3Block = pageSource.split('if (screen === "roomConfig")')[1]?.split('if (screen === "requirements")')[0];
       expect(step3Block).toBeDefined();
       expect(step3Block).toContain('className="project-scratch-container"');
-      expect(step3Block).toContain('current={3}');
+      expect(step3Block).toContain('current={2}'); // dimensions are part of Step 2: Room Setup & Dimensions
     });
 
     it("Step 4 (requirements) uses project-scratch-container", () => {

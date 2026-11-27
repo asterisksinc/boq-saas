@@ -61739,3 +61739,45 @@ html[data-sidebar="expanded"] .fig-side-menu {
         display: none;
     }
 }
+
+/* Project setup Step 1: lead picker and map location (PRD "Project Creation Flow") */
+.project-fields-row.project-fields-row--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.project-fields-row.project-lead-row { grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+.project-add-lead-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 48px; margin-top: 26px; padding: 0 16px;
+  border: 1px solid #2563eb; border-radius: 8px; background: #fff; color: #2563eb;
+  font: 500 14px 'Urbanist', -apple-system, sans-serif; white-space: nowrap; cursor: pointer;
+}
+.project-add-lead-btn:hover { background: #eff4ff; }
+.project-add-lead-layer { position: relative; z-index: 1000; }
+.project-location-picker { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.project-location-toolbar { display: flex; flex-wrap: wrap; gap: 10px; }
+.project-location-search {
+  display: flex; flex: 1 1 280px; align-items: center; gap: 8px; height: 44px; padding: 0 6px 0 12px;
+  border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #64748b;
+}
+.project-location-search input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent; color: #0f172a; font: 400 14px 'Inter', -apple-system, sans-serif; }
+.project-location-search button {
+  height: 32px; padding: 0 12px; border: 0; border-radius: 6px; background: #eff4ff; color: #2563eb;
+  font: 500 13px 'Inter', -apple-system, sans-serif; cursor: pointer;
+}
+.project-location-search button:disabled { opacity: .5; cursor: not-allowed; }
+.project-location-locate {
+  display: inline-flex; align-items: center; gap: 6px; height: 44px; padding: 0 14px;
+  border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #0f172a;
+  font: 500 14px 'Inter', -apple-system, sans-serif; cursor: pointer;
+}
+.project-location-locate:hover:not(:disabled) { border-color: #2563eb; color: #2563eb; }
+.project-location-locate:disabled { opacity: .6; cursor: not-allowed; }
+.project-location-map { position: relative; height: 240px; overflow: hidden; border: 1px solid #e2e8f0; border-radius: 10px; background: #eef2f7; }
+.project-location-canvas { position: absolute; inset: 0; }
+.project-location-fallback {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 8px;
+  color: #64748b; font: 400 14px 'Inter', -apple-system, sans-serif; background: #eef2f7;
+}
+@media (max-width: 760px) {
+  .project-fields-row.project-fields-row--3 { grid-template-columns: 1fr; }
+  .project-fields-row.project-lead-row { grid-template-columns: 1fr; }
+  .project-add-lead-btn { margin-top: 0; }
+}

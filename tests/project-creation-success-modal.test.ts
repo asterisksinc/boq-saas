@@ -137,21 +137,21 @@ describe("Project Creation Success Modal (Figma CSS Redesign)", () => {
 
     it("handles dynamic data fallbacks without hardcoded mocks", () => {
       expect(pageSource).toContain("clientNameDisplay");
-      expect(pageSource).toContain("projectTypeDisplay");
+      expect(pageSource).toContain("locationDisplay");
       expect(pageSource).toContain("designerDisplay");
-      expect(pageSource).toContain("budgetDisplay");
+      expect(pageSource).toContain("roomsDisplay");
       expect(pageSource).toContain("areaDisplay");
       expect(pageSource).toContain('resolveDesignerDisplay(');
-      expect(pageSource).toContain('formatIndianCurrency(');
+      expect(pageSource).toContain("totalRoomAreaSqft(rooms)");
     });
   });
 
   describe("8. Action Buttons Footer & Navigation", () => {
-    it("renders Back to Projects, Create BOQ Now, and Open Project Workspace buttons", () => {
+    it("renders Back to Projects, Create BOQ, and Open Project Workspace buttons", () => {
       expect(pageSource).toContain('className="success-btn-back"');
       expect(pageSource).toContain("Back to Projects");
       expect(pageSource).toContain('className="success-btn-boq"');
-      expect(pageSource).toContain("Create BOQ Now");
+      expect(pageSource).toMatch(/>\s*Create BOQ\s*</);
       expect(pageSource).toContain('className="success-btn-workspace"');
       expect(pageSource).toContain("Open Project Workspace");
     });
