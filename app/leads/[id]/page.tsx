@@ -17,6 +17,7 @@ import {
     type LeadCallLog, type LeadPerson, type LeadDetail, type LeadNote, type LeadRelatedTab,
 } from "@/lib/api/leads";
 import { loadMoodBoards, type MoodBoard } from "@/lib/mood-boards";
+import { projectExpenseTotal } from "@/lib/expenses/store";
 import "../leads.css";
 
 const TABS = [
@@ -298,7 +299,7 @@ export default function LeadDetailPage() {
                     { label: "Projects", value: lead ? String(lead.stats.projects) : "—" },
                     { label: "BOQ Value", value: lead ? formatMoney(lead.stats.boqValue, currency) : "—" },
                     { label: "Invoices", value: lead ? `${lead.stats.invoicesPaid} Paid of ${lead.stats.invoicesTotal}` : "—" },
-                    { label: "Moodboards", value: lead ? String(moodBoards.length) : "—" },
+                    { label: "Expenses", value: lead ? formatMoney(lead.projectIds.reduce((sum, pid) => sum + projectExpenseTotal(pid), 0), currency) : "—" },
                     { label: "Outstanding Amount", value: lead ? formatMoney(lead.stats.outstandingAmount, currency) : "—" },
                 ].map((k) => (
                     <div key={k.label} className="ld-kpi">

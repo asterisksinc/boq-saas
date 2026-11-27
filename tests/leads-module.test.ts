@@ -43,7 +43,7 @@ describe("Leads — pages and grouped sidebar", () => {
         // Figma lead detail: Back link, Last Contacted, Export + Edit Lead (contact actions in the menu), per-tab create action.
         for (const text of ["WhatsApp", "ld-back", "Last Contacted", "ld-square-btn--primary", "runTabAction", 'label="Assign to"']) expect(detail).toContain(text);
         // Five KPI cards, as in the design.
-        for (const k of ["Projects", "BOQ Value", "Invoices", "Moodboards", "Outstanding Amount"]) expect(detail).toContain(`label: "${k}", value:`);
+        for (const k of ["Projects", "BOQ Value", "Invoices", "Expenses", "Outstanding Amount"]) expect(detail).toContain(`label: "${k}", value:`);
         expect(detail).not.toContain("ld-breadcrumb");
         expect(detail).not.toContain('label="Lead Source"');
         for (const tab of ["Projects", "BOQs", "Proposals", "Invoices", "Moodboards", "Tasks", "Approvals", "Call Logs", "Notes"]) {
