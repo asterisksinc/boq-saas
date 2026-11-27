@@ -1125,3 +1125,38 @@
     .vm-split--map .vm-results { display: none; }
     .vm-page .vm-tabs { align-self: stretch; }
 }
+
+/* ---- Vendor profile tabs (Figma "Vendor Profile" Overview / Business Information / Service Coverage) ---- */
+.vm-page .vm-profile-main { align-self: start; gap: 16px; min-height: 0; padding: 16px; background: #f8fafc; }
+.vm-ov-card { display: flex; flex-direction: column; gap: 10px; padding: 16px 20px; border: 1px solid var(--vm-line); border-radius: 8px; background: #fff; }
+.vm-ov-card--divided { gap: 16px; }
+.vm-ov-card--divided .vm-ov-head { padding-bottom: 14px; border-bottom: 1px solid var(--vm-line); }
+.vm-ov-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.vm-ov-card h3, .vm-ov-block h3 { display: inline-flex; align-items: center; gap: 10px; margin: 0; color: var(--vm-ink); font-size: 16px; font-weight: 400; }
+.vm-ov-card h3 span, .vm-ov-block h3 span { display: inline-flex; color: var(--vm-ink); }
+.vm-ov-card .vm-body, .vm-ov-block .vm-body { margin: 0; color: var(--vm-slate); font-size: 14px; line-height: 1.45; }
+.vm-ov-head .vm-link { display: inline-flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 400; }
+.vm-ov-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; padding: 0 20px; }
+.vm-ov-block { display: flex; flex-direction: column; gap: 10px; padding: 18px 0; }
+.vm-ov-block:nth-child(odd) { padding-right: 28px; border-right: 1px solid var(--vm-line); }
+.vm-ov-block:nth-child(even) { padding-left: 28px; }
+.vm-ov-block:nth-child(-n+2) { border-bottom: 1px solid var(--vm-line); }
+.vm-chip--soft { height: 26px; padding: 0 10px; border: 0; border-radius: 4px; background: #eef0f3; color: var(--vm-slate); font-size: 13px; }
+.vm-ov-card .vm-portfolio { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.vm-ov-card .vm-portfolio-img { aspect-ratio: auto; height: 164px; border-radius: 8px; background: #eef0f3; color: #64748b; }
+.vm-ov-card .vm-portfolio figcaption { margin-top: 12px; }
+.vm-ov-card .vm-portfolio figcaption strong { font-size: 15px; font-weight: 400; }
+.vm-info { display: flex; flex-direction: column; padding: 8px 4px 4px; }
+.vm-info h3 { margin: 0; padding-bottom: 18px; border-bottom: 1px solid var(--vm-line); font-size: 16px; font-weight: 400; }
+.vm-info dl { display: flex; flex-direction: column; gap: 0; margin: 10px 0 0; }
+.vm-info dl > div { display: grid; grid-template-columns: 220px minmax(0, 1fr); align-items: center; min-height: 40px; font-size: 14px; }
+.vm-info dt { color: var(--vm-ink); }
+.vm-info dd { margin: 0; color: var(--vm-slate); }
+.vm-info dd .vm-link { display: inline-flex; align-items: center; gap: 6px; padding: 0; font-size: 14px; font-weight: 400; }
+@media (max-width: 900px) {
+    .vm-ov-grid { grid-template-columns: 1fr; }
+    .vm-ov-block:nth-child(n) { padding: 16px 0; border-right: 0; border-bottom: 1px solid var(--vm-line); }
+    .vm-ov-block:last-child { border-bottom: 0; }
+    .vm-ov-card .vm-portfolio { grid-template-columns: 1fr 1fr; }
+    .vm-info dl > div { grid-template-columns: 140px minmax(0, 1fr); }
+}

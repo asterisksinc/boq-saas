@@ -196,4 +196,15 @@ describe("Vendor Marketplace — map radius ring", () => {
         expect(ring[0]).toEqual(ring[ring.length - 1]);
         for (const [lng, lat] of ring.filter((_, i) => i % 12 === 0)) expect(distanceKm(hyd, { lat, lng })).toBeCloseTo(25, 0);
     });
+
+    it("vendor profile follows the Figma tabs: Overview, Business Information, Service Coverage", () => {
+        const page = readFileSync(join(process.cwd(), "app/vendors/[id]/page.tsx"), "utf8");
+        expect(page).toContain('type ProfileTab = "overview" | "business" | "coverage";');
+        expect(page).not.toContain("Reviews (");
+        for (const title of ["About the vendor", "Product categories", "Materials supplied", "Brands", "Catalogue", "Portfolio", "View all portfolio", "Business information", "Service Coverage"]) {
+            expect(page).toContain(title);
+        }
+        // The business address is contact data: it stays behind OTP on the coverage tab.
+        expect(page).toContain('["Business location", revealed ? revealed.address :');
+    });
 });
