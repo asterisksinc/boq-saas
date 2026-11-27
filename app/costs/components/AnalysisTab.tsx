@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import TableEmptyState from "@/components/shared/TableEmptyState";
 import { getCostingAnalysis, addVendorQuote, selectVendorQuote } from "@/lib/api/costing";
 import type { CostingAnalysisResponse } from "@/lib/types";
 import {
@@ -609,22 +610,13 @@ function VendorComparison({
 
                     {/* Rows */}
                     {displayQuotes.length === 0 ? (
-                        <div className="costing-vendor-empty-card">
-                            <Tag size={36} style={{ color: "#94A3B8" }} />
-                            <h4 className="costing-vendor-empty-title">
-                                {selectedItem ? `No quotes for ${selectedItem.name}` : "No vendor quotes found"}
-                            </h4>
-                            <p className="costing-vendor-empty-desc">
-                                Add vendor quotations to compare rates, lead times, and track committed costs.
-                            </p>
-                            <button
-                                type="button"
-                                className="costing-new-item-btn"
-                                onClick={() => onOpenAddModal(selectedItemId !== "all" ? selectedItemId : undefined)}
-                            >
-                                <Plus size={16} /> Add First Quote
-                            </button>
-                        </div>
+                        <TableEmptyState
+                            compact
+                            title={selectedItem ? `No Quotes found for ${selectedItem.name}` : "No Vendor Quotes found"}
+                            text="Add vendor quotations to compare rates, lead times, and track committed costs."
+                            actionLabel="Add First Quote"
+                            onAction={() => onOpenAddModal(selectedItemId !== "all" ? selectedItemId : undefined)}
+                        />
                     ) : (
                         displayQuotes.map((q, idx) => {
                             const isSelecting = selectingId === q.id;

@@ -225,11 +225,10 @@ describe("Costing Analysis - Vendor Comparison Redesign (Figma CSS Accurate)", (
     });
 
     it("supports empty state with 'Add First Quote' button when no quotes exist", () => {
-      expect(tabContent).toContain('costing-vendor-empty-card');
-      expect(tabContent).toContain('costing-vendor-empty-title');
-      expect(tabContent).toContain('costing-vendor-empty-desc');
+      // Uses the shared app-wide empty state (illustration + "No … found" + action).
+      expect(tabContent).toContain("<TableEmptyState");
+      expect(tabContent).toContain("No Vendor Quotes found");
       expect(tabContent).toContain("Add First Quote");
-      expect(cssContent).toContain(".costing-vendor-empty-card {");
     });
 
     it("integrates AddVendorQuoteModal with pre-selected item from active dropdown", () => {

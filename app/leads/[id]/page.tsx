@@ -18,6 +18,7 @@ import {
 } from "@/lib/api/leads";
 import { loadMoodBoards, type MoodBoard } from "@/lib/mood-boards";
 import { projectExpenseTotal } from "@/lib/expenses/store";
+import TableEmptyState from "@/components/shared/TableEmptyState";
 import "../leads.css";
 
 const TABS = [
@@ -435,6 +436,7 @@ export default function LeadDetailPage() {
                             }}
                             onDeleteCallLog={removeCallLog}
                             onCreateCallLog={() => setCallLog({ open: true, log: null })}
+                            onCreate={runTabAction}
                         />
                     )}
 
@@ -541,10 +543,12 @@ function WhatsAppIcon() {
 }
 
 function RecordsTable({
-    tab, rows, loading, currency, onOpen, onDeleteCallLog, onCreateCallLog,
+    tab, rows, loading, currency, onOpen, onDeleteCallLog, onCreateCallLog, onCreate,
 }: {
     tab: TabKey; rows: Row[]; loading: boolean; currency: string; onOpen: (row: Row) => void;
     onDeleteCallLog: (log: LeadCallLog) => void; onCreateCallLog: () => void;
+    /** The tab's own create action ("Create Project", "Create BOQ", …). */
+    onCreate?: () => void;
 }) {
     const columns = useMemo<Array<{ label: string; render: (row: Row) => React.ReactNode }>>(() => {
         const project = (row: Row) => row.projectName ?? "—";
@@ -659,10 +663,12 @@ function RecordsTable({
                     ) : (
                         <tr>
                             <td colSpan={columns.length + 1}>
-                                <EmptyState
-                                    title={`No ${emptyLabel} yet`}
+                                <TableEmptyState
+                                    compact
+                                    title={`No ${TABS.find((t) => t.key === tab)?.label ?? emptyLabel} found`}
                                     text={isCallLogs ? "Log calls with this lead to keep a history of every conversation." : "Records from this lead's linked projects will show up here."}
-                                    action={isCallLogs ? <button type="button" className="ld-btn ld-btn--primary" onClick={onCreateCallLog}><Plus size={18} /> New Call Log</button> : undefined}
+                                    actionLabel={TABS.find((t) => t.key === tab)?.action}
+                                    onAction={isCallLogs ? onCreateCallLog : onCreate}
                                 />
                             </td>
                         </tr>
@@ -681,11 +687,7 @@ function NotesGrid({
     if (loading && !notes.length) return <div className="ld-notes-grid">{[0, 1, 2].map((i) => <div key={i} className="ld-note-card is-skeleton" />)}</div>;
     if (!notes.length) {
         return (
-            <EmptyState
-                title="No notes yet"
-                text="Capture meeting notes, follow-ups and decisions for this lead."
-                action={<button type="button" className="ld-btn ld-btn--primary" onClick={onCreate}><Plus size={18} /> New Note</button>}
-            />
+            <TableEmptyState compact title="No Notes found" text="Capture meeting notes, follow-ups and decisions for this lead." actionLabel="New Note" onAction={onCreate} />
         );
     }
     return (
@@ -716,7 +718,7 @@ function NotesGrid({
 }
 
 function MoodBoardList({ boards, onOpen }: { boards: MoodBoard[]; onOpen: (id: string) => void }) {
-    if (!boards.length) return <EmptyState title="No moodboards yet" text="Moodboards for this lead or its projects will show up here." />;
+    if (!boards.length) return <TableEmptyState compact title="No Moodboards found" text="Moodboards for this lead or its projects will show up here." actionLabel="Create Moodboard" onAction={() => window.location.assign("/mood-boards")} />;
     return (
         <div className="ld-table-scroll">
             <table className="ld-table ld-table--compact">

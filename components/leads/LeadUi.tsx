@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import TableEmptyState from "@/components/shared/TableEmptyState";
 import { ChevronDown, ChevronLeft, ChevronRight, MoreHorizontal, X } from "lucide-react";
 import { initials } from "@/lib/api/leads";
 
@@ -211,14 +212,8 @@ export function SelectInput({
     );
 }
 
-export function EmptyState({ title, text, action }: { title: string; text?: string; action?: ReactNode }) {
-    return (
-        <div className="ld-empty">
-            <strong>{title}</strong>
-            {text ? <p>{text}</p> : null}
-            {action}
-        </div>
-    );
+export function EmptyState({ title, text, action, compact }: { title: string; text?: string; action?: ReactNode; compact?: boolean }) {
+    return <TableEmptyState title={title} text={text} action={action} compact={compact} />;
 }
 
 export function Toast({ message, tone = "success", onDone }: { message: string | null; tone?: "success" | "error"; onDone: () => void }) {

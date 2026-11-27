@@ -20,6 +20,7 @@ import {
     Trash2,
     X,
 } from "lucide-react";
+import TableEmptyState from "@/components/shared/TableEmptyState";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import DashboardRail from "@/components/DashboardRail";
@@ -468,23 +469,22 @@ export default function InvoicesPage() {
                                     onImport={() => setShowImportModal(true)}
                                 />
                             ) : page && page.total === 0 && search ? (
-                                <div className="invoices-empty-container">
-                                    <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#EFF6FF", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                        <Search size={22} color="#2563EB" />
-                                    </div>
-                                    <h3>No invoices match &ldquo;{search}&rdquo;</h3>
-                                    <p>Try searching by invoice number, project name, or client name.</p>
-                                    <button
-                                        type="button"
-                                        className="btn-invoices-import"
-                                        onClick={() => {
-                                            setSearch("");
-                                            void load(1, "", pageSize);
-                                        }}
-                                    >
-                                        Clear Search
-                                    </button>
-                                </div>
+                                <TableEmptyState
+                                    title="No Invoices found"
+                                    text={<>Nothing matches &ldquo;{search}&rdquo;. Try an invoice number, project or client name.</>}
+                                    action={
+                                        <button
+                                            type="button"
+                                            className="btn-invoices-import"
+                                            onClick={() => {
+                                                setSearch("");
+                                                void load(1, "", pageSize);
+                                            }}
+                                        >
+                                            Clear Search
+                                        </button>
+                                    }
+                                />
                             ) : (
                                 <>
                                     <div className="invoices-table-wrapper">
@@ -816,15 +816,11 @@ function InvoiceSummary({
 
 function InvoiceEmpty({ onCreate, onImport }: { onCreate: () => void; onImport?: () => void }) {
     return (
-        <div className="invoices-empty-container">
-            <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#EFF6FF", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <FileText size={32} color="#2563EB" />
-            </div>
-            <h3>No invoices yet</h3>
-            <p>
-                Create your first invoice from a BOQ or import existing invoices to start managing project financials.
-            </p>
-            <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
+        <TableEmptyState
+            title="No Invoices found"
+            text="Create your first invoice from a BOQ or import existing invoices to manage project financials."
+            action={
+            <div style={{ display: "flex", gap: 12 }}>
                 {onImport && (
                     <button type="button" className="btn-invoices-import" onClick={onImport}>
                         Import Invoices
@@ -832,10 +828,11 @@ function InvoiceEmpty({ onCreate, onImport }: { onCreate: () => void; onImport?:
                 )}
                 <button type="button" className="btn-invoices-new" onClick={onCreate}>
                     <Plus size={18} />
-                    <span>New Invoices</span>
+                    <span>New Invoice</span>
                 </button>
             </div>
-        </div>
+            }
+        />
     );
 }
 

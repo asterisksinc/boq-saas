@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import TableEmptyState from "@/components/shared/TableEmptyState";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus, ChevronDown, ChevronLeft, ChevronRight, ArrowRight, X, Calendar } from "lucide-react";
@@ -408,18 +409,13 @@ export default function ProposalsPage() {
                                         </tr>
                                     ) : proposals.length === 0 ? (
                                         <tr>
-                                            <td colSpan={10} className="proposals-table-empty">
-                                                <h3>No proposals found</h3>
-                                                <p>Get started by creating your first proposal or selecting a template.</p>
-                                                <button
-                                                    type="button"
-                                                    className="btn-new-proposal"
-                                                    style={{ margin: "0 auto", display: "inline-flex" }}
-                                                    onClick={() => setShowNewModal(true)}
-                                                >
-                                                    <Plus size={18} />
-                                                    <span>New Proposal</span>
-                                                </button>
+                                            <td colSpan={10}>
+                                                <TableEmptyState
+                                                    title="No Proposals found"
+                                                    text="Create your first proposal or start from a template."
+                                                    actionLabel="New Proposal"
+                                                    onAction={() => setShowNewModal(true)}
+                                                />
                                             </td>
                                         </tr>
                                     ) : (

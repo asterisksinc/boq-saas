@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, FormEvent, Suspense } from "react";
+import TableEmptyState from "@/components/shared/TableEmptyState";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Search,
@@ -1472,28 +1473,17 @@ function TemplatesContent() {
                   </div>
                 )
               ) : projectTemplates.length === 0 ? (
-                <div className="templates-empty-state">
-                  <LayoutGrid size={48} color="#CBD5E1" />
-                  <h3>No templates found</h3>
-                  <p>{query ? "Try adjusting your search or filters." : "Create your first template to get started."}</p>
-                  {query ? (
-                    <button
-                      className="template-new-btn"
-                      style={{ marginTop: 16 }}
-                      onClick={() => { setQuery(""); setPage(1); }}
-                    >
+                <TableEmptyState
+                  title="No Templates found"
+                  text={query ? "Try adjusting your search or filters." : "Create your first template to get started."}
+                  actionLabel={query ? undefined : "New Template"}
+                  onAction={query ? undefined : () => setIsNewModalOpen(true)}
+                  action={query ? (
+                    <button className="template-new-btn" onClick={() => { setQuery(""); setPage(1); }}>
                       Clear Search
                     </button>
-                  ) : (
-                    <button
-                      className="template-new-btn"
-                      style={{ marginTop: 16 }}
-                      onClick={() => setIsNewModalOpen(true)}
-                    >
-                      <Plus size={16} /> New Template
-                    </button>
-                  )}
-                </div>
+                  ) : undefined}
+                />
               ) : view === "grid" ? (
                 <>
                   {/* Grid View: Frame 2147225083 */}
@@ -1767,10 +1757,7 @@ function TemplatesContent() {
                 ))}
               </div>
             ) : (
-              <div className="templates-empty" style={{ padding: "48px 20px", textAlign: "center" }}>
-                <h3>No document templates found</h3>
-                <p>No document templates are available for this workspace.</p>
-              </div>
+              <TableEmptyState title="No Document Templates found" text="No document templates are available for this workspace yet." />
             )
           )}
 

@@ -155,9 +155,10 @@ export function ProjectExpenses({
                                 <tr>
                                     <td colSpan={7}>
                                         <EmptyState
-                                            title="No expenses on this project yet"
+                                            compact
+                                            title="No Expenses found"
                                             text="Record what this project costs, with receipts, to track its balance."
-                                            action={<button type="button" className="ld-btn ld-btn--primary" onClick={openNew}><Plus size={18} /> New Expense</button>}
+                                            action={<button type="button" className="tes-btn" onClick={openNew}><Plus size={20} strokeWidth={2.5} /> New Expense</button>}
                                         />
                                     </td>
                                 </tr>

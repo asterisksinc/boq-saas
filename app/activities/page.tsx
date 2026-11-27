@@ -35,6 +35,7 @@ import {
     AlertTriangle,
     Paperclip,
 } from "lucide-react";
+import BoqEmptyIllustration from "@/components/boqs/BoqEmptyIllustration";
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -4288,12 +4289,10 @@ export default function ActivitiesPage() {
                                 {loadingTasks && tasks.length === 0 ? (
                                     <LoadingSkeleton />
                                 ) : tasks.length === 0 ? (
-                                    <div className="activities-table-empty">
-                                        <div className="activities-table-empty-icon">
-                                            <CheckSquare size={32} />
-                                        </div>
-                                        <h4 className="activities-table-empty-title">No tasks found</h4>
-                                        <p className="activities-table-empty-desc">
+                                    <div className="tes">
+                                        <BoqEmptyIllustration />
+                                        <h4 className="tes-title">No Tasks found</h4>
+                                        <p className="tes-sub">
                                             Get started by adding tasks to track your team's deliverables across projects and stages.
                                         </p>
                                         <button
@@ -4355,12 +4354,10 @@ export default function ActivitiesPage() {
                                                     ) : (
                                                         <tr>
                                                             <td colSpan={10} style={{ padding: 0 }}>
-                                                                <div className="activities-table-empty">
-                                                                    <div className="activities-table-empty-icon">
-                                                                        <Search size={32} />
-                                                                    </div>
-                                                                    <h4 className="activities-table-empty-title">No matching tasks</h4>
-                                                                    <p className="activities-table-empty-desc">
+                                                                <div className="tes">
+                                                                    <BoqEmptyIllustration />
+                                                                    <h4 className="tes-title">No Tasks found</h4>
+                                                                    <p className="tes-sub">
                                                                         No tasks match your current search query or active filter selections.
                                                                     </p>
                                                                     <button
@@ -4615,12 +4612,10 @@ export default function ActivitiesPage() {
                                                     ) : (
                                                         <tr>
                                                             <td colSpan={9} style={{ padding: 0 }}>
-                                                                <div className="activities-table-empty">
-                                                                    <div className="activities-table-empty-icon">
-                                                                        <Search size={32} />
-                                                                    </div>
-                                                                    <h4 className="activities-table-empty-title">No matching approvals</h4>
-                                                                    <p className="activities-table-empty-desc">
+                                                                <div className="tes">
+                                                                    <BoqEmptyIllustration />
+                                                                    <h4 className="tes-title">No Approvals found</h4>
+                                                                    <p className="tes-sub">
                                                                         No approvals match your current search query or active filter selections.
                                                                     </p>
                                                                     {hasActiveApprovalFilters && (
