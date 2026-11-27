@@ -61863,3 +61863,39 @@ tbody tr:has(> td > .tes), tbody tr:has(> td > .tes):hover { background: transpa
 .ld-table-card > .ld-table-scroll:has(.tes) { display: flex; flex: 1 1 auto; flex-direction: column; }
 .ld-table-scroll:has(.tes) > table { flex: 1 1 auto; height: 100%; }
 .tes { flex: 1 1 auto; }
+
+/* ==========================================================================
+   Full-height pages: the main card (table, board) runs to the bottom of the screen on every list page,
+   with pagination pinned to the bottom of the card. Every wrapper below is already a flex column.
+   ========================================================================== */
+.fig-dashboard-main { min-height: calc(100vh - 32px); }
+
+/* Leads, Expenses (list + board) */
+.leads-page:not(.lead-detail-page) .fig-dashboard-main > .ld-table-card,
+.leads-page .fig-dashboard-main > .ld-board { flex: 1 1 auto; }
+.leads-page .fig-dashboard-main > .ld-board { min-height: 480px; align-items: stretch; }
+.ld-table-card > .ld-pagination { margin-top: auto; }
+
+/* Projects */
+.fig-dashboard-main > .projects-content { flex: 1 1 auto; }
+.projects-content > .projects-table-card,
+.projects-content > .projects-kanban-board { flex: 1 1 auto; }
+
+/* Proposals */
+.fig-dashboard-main > .proposals-main-container { flex: 1 1 auto; }
+.proposals-main-container > .proposals-table-container { flex: 1 1 auto; }
+.proposals-table-container > .proposals-pagination { margin-top: auto; }
+
+/* Invoices */
+.fig-dashboard-main > .invoices-main-container { flex: 1 1 auto; }
+.invoices-main-container > .invoices-table-card { flex: 1 1 auto; }
+.invoices-table-card > .invoices-pagination-bar { margin-top: auto; }
+
+/* BOQs */
+.fig-dashboard-main > .boq-page-shell-redesign { flex: 1 1 auto; }
+.boq-page-shell-redesign > .boq-content-surface-redesign { flex: 1 1 auto; }
+.boq-content-surface-redesign > .boq-pagination-controls-redesign { margin-top: auto; }
+
+/* Costing, Activities */
+.fig-dashboard-main > .costing-page-shell,
+.fig-dashboard-main > .activities-content { flex: 1 1 auto; }
