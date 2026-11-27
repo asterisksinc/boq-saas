@@ -45,6 +45,7 @@ export const navGroups: NavGroup[] = [
         items: [
             { route: "/proposals", icon: "dashboard-estimates", label: "Proposals" },
             { route: "/invoices", icon: "dashboard-purchase-orders", label: "Invoices" },
+            { route: "/expenses", icon: "nav-expenses", label: "Expenses" },
         ],
     },
     {

@@ -1,0 +1,44 @@
+/* Expenses — Figma "User Design" → Expenses, Expenses - New Expense, Expenses - View Expense. Builds on leads.css. */
+
+.expenses-page .ld-head { align-items: center; }
+.expenses-page .ld-head-actions { gap: 12px; }
+.ex-search { width: 380px; }
+
+.ex-table td { vertical-align: middle; }
+.ex-cat {
+    display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 4px;
+    background: #eef0f3; color: var(--ld-slate); font-size: 11px; font-weight: 500; letter-spacing: .03em; text-transform: uppercase; white-space: nowrap;
+}
+.ex-receipt-state { display: inline-flex; align-items: center; gap: 8px; color: var(--ld-slate); font-size: 14px; }
+.ex-receipt-state svg { color: var(--ld-muted); }
+.ex-receipt-state.is-missing, .ex-receipt-state.is-missing svg { color: #d97706; }
+
+/* Drawer form */
+.ex-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: end; }
+.ex-date { position: relative; display: block; }
+.ex-date input { padding-right: 44px; }
+.ex-date input::-webkit-calendar-picker-indicator { position: absolute; right: 12px; width: 22px; height: 22px; opacity: 0; cursor: pointer; }
+.ex-date svg { position: absolute; top: 50%; right: 14px; color: var(--ld-ink); pointer-events: none; transform: translateY(-50%); }
+.ex-check { display: inline-flex; align-items: center; gap: 10px; margin-top: -6px; color: var(--ld-ink); font-size: 14px; cursor: pointer; }
+.ex-check input { width: 16px; height: 16px; margin: 0; accent-color: var(--ld-blue); }
+.ex-tax-summary {
+    display: flex; flex-direction: column; justify-content: center; gap: 2px; height: 48px; padding: 0 14px;
+    border-radius: 8px; background: #f1f5f9; font-size: 13px;
+}
+.ex-tax-summary span { color: var(--ld-slate); }
+.ex-tax-summary strong { color: var(--ld-ink); font-weight: 600; }
+.ex-receipt {
+    display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 8px 8px 8px 14px;
+    border: 1px solid var(--ld-line); border-radius: 8px; background: #fff; font-size: 14px;
+}
+.ex-receipt svg { flex: none; color: var(--ld-blue); }
+.ex-receipt a { flex: 1; min-width: 0; overflow: hidden; color: var(--ld-ink); text-overflow: ellipsis; white-space: nowrap; }
+.ex-receipt span { color: var(--ld-muted); font-size: 12px; }
+.ex-receipt .ld-btn { width: 40px; height: 40px; padding: 0; }
+.ld-dropzone.is-disabled { cursor: default; opacity: .75; }
+.ld-field input:disabled, .ld-select-wrap select:disabled { background: #f8fafc; color: var(--ld-slate); cursor: default; opacity: 1; }
+
+@media (max-width: 900px) {
+    .ex-search { width: 100%; }
+    .ex-row { grid-template-columns: 1fr; }
+}
