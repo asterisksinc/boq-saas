@@ -9,7 +9,8 @@ import {
     type ChallengeView, type OtpMethod,
 } from "@/lib/vendors/store";
 import type { VendorContact } from "@/lib/vendors/contacts";
-import { CertifiedBadge, Layer, Modal, VendorLogo, useVendorStore } from "./VendorUi";
+import { CertifiedBadge, Layer, Modal, VendorLogo, useContactUsage, useVendorStore } from "./VendorUi";
+import { usageLabel } from "@/lib/vendors/credits";
 
 /* Filter drawer (PRD §05, progressive disclosure) ------------------------------------------------ */
 
@@ -148,7 +149,7 @@ export function FilterDrawer({ open, value, quick, onApply, onClose, previewCoun
 
 /* Secure contact disclosure (PRD §09: method → OTP → revealed) ---------------------------------- */
 
-type Step = { kind: "method" } | { kind: "otp"; challenge: ChallengeView } | { kind: "done"; contact: VendorContact };
+type Step = { kind: "method" } | { kind: "otp"; challenge: ChallengeView } | { kind: "done"; contact: VendorContact } | { kind: "quota" };
 
 export function ContactAccessModal({ vendor, certified, open, onClose, onUnlocked, onNotify }: {
     vendor: Vendor; certified: boolean; open: boolean; onClose: () => void; onUnlocked: (contact: VendorContact) => void; onNotify: (m: string) => void;
@@ -160,10 +161,11 @@ export function ContactAccessModal({ vendor, certified, open, onClose, onUnlocke
     const [busy, setBusy] = useState(false);
     const [now, setNow] = useState(Date.now());
     const inputs = useRef<Array<HTMLInputElement | null>>([]);
+    const usage = useContactUsage();
 
     useEffect(() => {
         if (open) {
-            setStep({ kind: "method" });
+            setStep(usage.remaining > 0 ? { kind: "method" } : { kind: "quota" });
             setDigits(Array(OTP_RULES.length).fill(""));
             setError(null);
         }
@@ -186,6 +188,7 @@ export function ContactAccessModal({ vendor, certified, open, onClose, onUnlocke
             setNow(Date.now());
             window.setTimeout(() => inputs.current[0]?.focus(), 0);
         } catch (err) {
+            if (err instanceof ContactAccessError && err.code === "quota") { setStep({ kind: "quota" }); return; }
             setError(err instanceof ContactAccessError ? err.message : "We couldn't send a code right now. Try again in a moment.");
         } finally {
             setBusy(false);
@@ -215,7 +218,9 @@ export function ContactAccessModal({ vendor, certified, open, onClose, onUnlocke
             setStep({ kind: "done", contact });
             onUnlocked(contact);
         } catch (err) {
-            if (err instanceof ContactAccessError) {
+            if (err instanceof ContactAccessError && err.code === "quota") {
+                setStep({ kind: "quota" });
+            } else if (err instanceof ContactAccessError) {
                 setError(err.message);
                 if (err.code === "invalid") {
                     setDigits(Array(OTP_RULES.length).fill(""));
@@ -273,7 +278,7 @@ export function ContactAccessModal({ vendor, certified, open, onClose, onUnlocke
                     </div>
                     {error ? <p className="vm-error" role="alert">{error}</p> : null}
                     <button type="button" className="vm-btn vm-btn--primary vm-btn--block" onClick={send} disabled={busy}>{busy ? "Sending…" : "Send OTP"}</button>
-                    <p className="vm-sheet-fine">Verify your RVYO account to reveal {vendor.name}&apos;s contact information.</p>
+                    <p className="vm-sheet-fine">Uses 1 contact credit once verified · {usageLabel(usage)}</p>
                 </div>
             ) : step.kind === "otp" ? (
                 <div className="vm-sheet">
@@ -319,6 +324,28 @@ export function ContactAccessModal({ vendor, certified, open, onClose, onUnlocke
                         Prototype: use code <strong>{PROTOTYPE_OTP}</strong>.
                         {!expired ? <> <button type="button" className="vm-sim-link" onClick={() => { expireContactOtp(step.challenge.id); setNow(Date.now() + 1); }}>Simulate expired code</button></> : null}
                     </p>
+                </div>
+            ) : step.kind === "quota" ? (
+                <div className="vm-sheet">
+                    <header className="vm-sheet-head">
+                        <span className="vm-tag vm-tag--amber">{usage.tier === "free" ? "Free contacts used" : "Monthly contacts used"}</span>
+                        <h2 id="vm-contact-title">Unlock more vendor contacts</h2>
+                        <p>
+                            {usage.tier === "free"
+                                ? `You've used all ${usage.limit} free contacts. Buy credits or upgrade your plan to see ${vendor.name}'s phone, email and address.`
+                                : `You've used all ${usage.limit} contacts included this month. They reset on ${usage.resetsAt?.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}. Buy credits or upgrade your plan to unlock ${vendor.name} now.`}
+                        </p>
+                    </header>
+                    <div className="vm-sheet-card vm-quota">
+                        <div className="vm-quota-meter" aria-hidden="true"><span style={{ width: "100%" }} /></div>
+                        <p><strong>{usage.used} of {usage.limit}</strong> {usage.tier === "free" ? "free contacts used" : "contacts used this month"}</p>
+                        <p className="vm-muted">Vendors you&apos;ve already unlocked stay unlocked, and browsing profiles is always free.</p>
+                    </div>
+                    <div className="vm-quota-actions">
+                        <a className="vm-btn vm-btn--block" href="/billing">Buy Credits</a>
+                        <a className="vm-btn vm-btn--primary vm-btn--block" href="/billing/manage-plan">Upgrade Plan</a>
+                    </div>
+                    <p className="vm-sheet-fine">Online payment for credits is coming soon. Billing shows your current plan.</p>
                 </div>
             ) : (
                 <div className="vm-sheet">

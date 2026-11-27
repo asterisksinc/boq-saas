@@ -14,8 +14,10 @@
  */
 import { lookupVendorContact, type VendorContact } from "./contacts";
 import { CURRENT_USER, getVendor } from "./data";
+import { FREE_CONTACT_PLAN, contactUsage, type ContactPlan, type ContactUsage } from "./credits";
 
-const STORAGE_KEY = "boq-saas:vendors:v1";
+// v2: contact credits. Starts every company with no unlocked vendors (v1 seeded one as already unlocked).
+const STORAGE_KEY = "boq-saas:vendors:v2";
 
 /** PRD §09 rules. */
 export const OTP_RULES = {
@@ -112,10 +114,9 @@ function seed(): State {
         ],
         recent: [{ vendorId: "deccan-timber", at: ago(D) }],
         disclosures: [
-            { id: "dc_1", vendorId: "deccan-timber", requestedBy: "Priya N.", method: "email", at: ago(D), status: "success" },
             { id: "dc_2", vendorId: "marblecraft-blr", requestedBy: "Arjun K.", method: "sms", at: ago(2 * D), status: "failed" },
         ],
-        unlocked: ["deccan-timber"],
+        unlocked: [],
         lists: [
             {
                 id: "sl_parkview", name: "Parkview Residence — Marble sourcing", projectId: "parkview", projectName: "Parkview Residence",
@@ -165,6 +166,40 @@ function commit(next: State) {
 
 function log(s: State, event: Omit<ActivityEvent, "id" | "at" | "by">): ActivityEvent[] {
     return [{ id: uid("ev"), at: new Date().toISOString(), by: CURRENT_USER.name, ...event }, ...s.activity].slice(0, 200);
+}
+
+/* Contact credits ------------------------------------------------------ */
+
+let contactPlan: ContactPlan = FREE_CONTACT_PLAN;
+
+/** Set from the workspace's billing plan (see useContactPlan). Re-renders subscribers. */
+export function setContactPlan(plan: ContactPlan) {
+    if (plan.tier === contactPlan.tier && plan.limit === contactPlan.limit && plan.period === contactPlan.period && plan.planName === contactPlan.planName) return;
+    contactPlan = plan;
+    if (state) state = { ...state };
+    listeners.forEach((fn) => fn());
+}
+
+export function getContactPlan() {
+    return contactPlan;
+}
+
+/** Credits used and left. Each vendor is charged once, on its first successful OTP check. */
+export function getContactUsage(s: State = load(), now = new Date()): ContactUsage {
+    return contactUsage(s.disclosures.filter((d) => d.status === "success"), contactPlan, now);
+}
+
+function assertCredit(vendorId: string) {
+    const s = load();
+    if (s.unlocked.includes(vendorId)) return;
+    const usage = getContactUsage(s);
+    if (usage.remaining > 0) return;
+    throw new ContactAccessError(
+        "quota",
+        usage.tier === "free"
+            ? `You've used all ${usage.limit} free contacts. Buy credits or upgrade your plan to unlock more vendors.`
+            : `You've used all ${usage.limit} contacts for this month. Buy credits or upgrade your plan to unlock more vendors.`,
+    );
 }
 
 export function subscribe(fn: () => void) {
@@ -280,7 +315,7 @@ export function deleteList(listId: string) {
 /* OTP-protected contact disclosure (PRD §09) --------------------------- */
 
 export class ContactAccessError extends Error {
-    constructor(public code: "rate_limited" | "expired" | "invalid" | "locked" | "used" | "cooldown" | "unavailable", message: string, public attemptsLeft?: number) {
+    constructor(public code: "rate_limited" | "expired" | "invalid" | "locked" | "used" | "cooldown" | "unavailable" | "quota", message: string, public attemptsLeft?: number) {
         super(message);
     }
 }
@@ -305,6 +340,7 @@ export function requestContactOtp(vendorId: string, method: OtpMethod, now = Dat
     if (!vendor || (vendor.status !== "verified" && vendor.status !== "certified")) {
         throw new ContactAccessError("unavailable", "This vendor is no longer available.");
     }
+    assertCredit(vendorId);
     const recent = [...challenges.values()].filter((c) => now - c.createdAt < H);
     if (recent.length >= OTP_RULES.maxChallengesPerHour) {
         throw new ContactAccessError("rate_limited", "Too many verification requests. Try again in an hour.");
@@ -355,6 +391,7 @@ export function verifyContactOtp(challengeId: string, code: string, now = Date.n
         }
         throw new ContactAccessError("invalid", `Incorrect code. ${c.attemptsLeft} attempt${c.attemptsLeft === 1 ? "" : "s"} left.`, c.attemptsLeft);
     }
+    assertCredit(c.vendorId);
     const contact = lookupVendorContact(c.vendorId);
     if (!contact) throw new ContactAccessError("unavailable", "This vendor has not published contact details.");
     c.used = true;
@@ -373,6 +410,7 @@ export function getUnlockedContact(vendorId: string): VendorContact | null {
 /** Test hook. */
 export function __resetVendorStore() {
     state = null;
+    contactPlan = FREE_CONTACT_PLAN;
     challenges.clear();
     try {
         window.localStorage.removeItem(STORAGE_KEY);

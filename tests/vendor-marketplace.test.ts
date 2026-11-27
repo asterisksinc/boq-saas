@@ -5,8 +5,10 @@ import { CATEGORIES, VENDORS, getPlace, isCertified } from "../lib/vendors/data"
 import { EMPTY_ADVANCED, distanceKm, matchVendor, searchVendors, type SearchInput } from "../lib/vendors/search";
 import {
     ContactAccessError, OTP_RULES, PROTOTYPE_OTP, __resetVendorStore, expireContactOtp, getSnapshot, getUnlockedContact,
-    requestContactOtp, resendContactOtp, toggleSaved, verifyContactOtp,
+    getContactUsage, requestContactOtp, resendContactOtp, setContactPlan, toggleSaved, verifyContactOtp,
 } from "../lib/vendors/store";
+import { FREE_CONTACT_UNLOCKS, contactPlanFromBilling, contactUsage, usageLabel } from "../lib/vendors/credits";
+import { lookupVendorContact } from "../lib/vendors/contacts";
 
 const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts), "utf8");
 const NOW = new Date("2026-11-26T12:00:00+05:30");
@@ -195,5 +197,60 @@ describe("Vendor Marketplace — map radius ring", () => {
         const ring = circlePolygon(hyd, 25).geometry.coordinates[0];
         expect(ring[0]).toEqual(ring[ring.length - 1]);
         for (const [lng, lat] of ring.filter((_, i) => i % 12 === 0)) expect(distanceKm(hyd, { lat, lng })).toBeCloseTo(25, 0);
+    });
+
+    it("vendor profile follows the Figma tabs: Overview, Business Information, Service Coverage", () => {
+        const page = readFileSync(join(process.cwd(), "app/vendors/[id]/page.tsx"), "utf8");
+        expect(page).toContain('type ProfileTab = "overview" | "business" | "coverage";');
+        expect(page).not.toContain("Reviews (");
+        for (const title of ["About the vendor", "Product categories", "Materials supplied", "Brands", "Catalogue", "Portfolio", "View all portfolio", "Business information", "Service Coverage"]) {
+            expect(page).toContain(title);
+        }
+        // The business address is contact data: it stays behind OTP on the coverage tab.
+        expect(page).toContain('["Business location", revealed ? revealed.address :');
+    });
+
+});
+
+describe("Vendor Marketplace — contact credits (5 free, then a monthly allowance on paid plans)", () => {
+    beforeEach(() => __resetVendorStore());
+    const unlockable = VENDORS.filter((v) => (v.status === "verified" || v.status === "certified") && lookupVendorContact(v.id)).map((v) => v.id);
+    const unlock = (id: string) => verifyContactOtp(requestContactOtp(id, "email").id, PROTOTYPE_OTP);
+
+    it("starts every company with no unlocked vendors and five free contacts", () => {
+        expect(getSnapshot().unlocked).toEqual([]);
+        expect(getUnlockedContact("deccan-timber")).toBeNull();
+        expect(getContactUsage()).toMatchObject({ used: 0, limit: 5, remaining: 5, tier: "free", period: "lifetime" });
+        expect(FREE_CONTACT_UNLOCKS).toBe(5);
+    });
+
+    it("charges one credit per vendor, never re-charges an unlocked vendor, and blocks the sixth", () => {
+        expect(unlockable.length).toBeGreaterThan(6);
+        unlockable.slice(0, 5).forEach(unlock);
+        expect(getContactUsage()).toMatchObject({ used: 5, remaining: 0 });
+        expect(getUnlockedContact(unlockable[0])).not.toBeNull();
+        expect(() => requestContactOtp(unlockable[5], "email")).toThrow(/used all 5 free contacts/);
+        try { requestContactOtp(unlockable[5], "email"); } catch (e) { expect((e as InstanceType<typeof ContactAccessError>).code).toBe("quota"); }
+        // Failed OTP attempts don't use credits.
+        expect(getSnapshot().disclosures.filter((d) => d.status === "success")).toHaveLength(5);
+    });
+
+    it("gives paid plans the monthly allowance admin sets on the plan, resetting each month", () => {
+        const billing = { subscription: { status: "active", subscriptionPlans: { name: "Professional", limits: { vendorContactsPerMonth: 30 } } } };
+        const plan = contactPlanFromBilling(billing);
+        expect(plan).toMatchObject({ tier: "paid", limit: 30, period: "month" });
+        // Payments aren't live yet: a plan without the limit, or a trial, stays on the free five.
+        expect(contactPlanFromBilling({ subscription: { status: "active", subscriptionPlans: { limits: { users: 20 } } } }).tier).toBe("free");
+        expect(contactPlanFromBilling({ subscription: { status: "trial", subscriptionPlans: { limits: { vendorContactsPerMonth: 30 } } } }).tier).toBe("free");
+        expect(contactPlanFromBilling(null).tier).toBe("free");
+
+        const now = new Date("2026-11-27T10:00:00+05:30");
+        const usage = contactUsage([{ vendorId: "a", at: "2026-10-30T10:00:00Z" }, { vendorId: "b", at: "2026-11-02T10:00:00Z" }, { vendorId: "b", at: "2026-11-03T10:00:00Z" }], plan, now);
+        expect(usage).toMatchObject({ used: 1, remaining: 29 });
+        expect(usage.resetsAt?.getMonth()).toBe(11);
+        expect(usageLabel(usage)).toBe("29 of 30 contacts left this month");
+
+        setContactPlan(plan);
+        expect(getContactUsage().limit).toBe(30);
     });
 });
