@@ -430,7 +430,7 @@ export default function ProjectPage() {
           </nav>
 
           {tab === "Overview" && <Overview p={p} b={boqs} s={stats} rows={invoices} onNavigateTab={setTab} />}
-          {tab === "Project Details" && <Details p={p} onEdit={() => setEditOpen(true)} />}
+          {tab === "Project Details" && <Details p={p} />}
           {tab === "BOQs" && <Boqs p={p} b={boqs} onReload={load} showToast={showToast} />}
           {tab === "Costing" && <Costing p={p} b={boqs} />}
           {tab === "Expenses" && (
@@ -1368,111 +1368,95 @@ function Health({
   );
 }
 
-function Card({ title, rows }: { title: string; rows: string[][] }) {
+type DetailRow = { label: string; value: React.ReactNode; wide?: boolean };
+
+/** Project Details panel (Figma "Open Project → Project Details"): uppercase title over a white card with a 3-column field grid. */
+function Card({ title, rows }: { title: string; rows: DetailRow[] }) {
   return (
-    <section className="info-card">
-      <h4>{title}</h4>
-      <div>
-        {rows.map(([k, v]) => (
-          <span key={k}>
-            <small>{k}</small>
-            <b>{v}</b>
-          </span>
+    <section className="pd-panel">
+      <h4 className="pd-panel-title">{title}</h4>
+      <div className="pd-card">
+        {rows.map((r) => (
+          <div key={r.label} className={`pd-field${r.wide ? " pd-field--wide" : ""}`}>
+            <span className="pd-label">{r.label}</span>
+            <span className="pd-value">{r.value}</span>
+          </div>
         ))}
       </div>
     </section>
   );
 }
 
-function Details({ p, onEdit }: { p: Project; onEdit: () => void }) {
+function Details({ p }: { p: Project }) {
+  const r = (label: string, value: React.ReactNode, wide = false): DetailRow => ({ label, value, wide });
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "12px" }}>
-        <button
-          onClick={onEdit}
-          style={{
-            border: "1px solid #dce4ef",
-            background: "#fff",
-            borderRadius: "6px",
-            padding: "8px 14px",
-            fontSize: "12px",
-            fontWeight: 600,
-            cursor: "pointer",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "6px",
-          }}
-        >
-          <Edit2 size={14} /> Edit Details
-        </button>
-      </div>
-      <div className="details-grid">
-        <Card
-          title="Project Identity"
-          rows={[
-            ["Project Name", p.name],
-            ["Project ID", p.projectCode || "—"],
-            ["Project Type", p.projectType],
-            ["Status", words(p.status)],
-            ["Area", p.areaSqft ? `${p.areaSqft.toLocaleString("en-IN")} sqft` : "—"],
-            ["Description", p.description || "—"],
-          ]}
-        />
-        <Card
-          title="Location"
-          rows={[
-            ["Property Name", p.propertyName || p.name],
-            ["Address", p.address || p.location || "—"],
-            ["City / State", `${p.city || ""}${p.city && p.state ? ", " : ""}${p.state || "—"}`],
-            ["Postal Code", p.postalCode || "—"],
-            ["Country", p.country || "India"],
-            ["Site Access Notes", p.siteAccessNotes || "No site access notes added"],
-          ]}
-        />
-        <Card
-          title="Client Information"
-          rows={[
-            ["Client Name", p.clientName],
-            ["Organization", p.organization || "—"],
-            ["Phone", p.clientContact || "—"],
-            ["Email", p.clientEmail || "—"],
-            ["Billing Contact", p.billingContact || p.clientName || "—"],
-            ["Communication Preference", p.communicationPreference || "Email"],
-          ]}
-        />
-        <Card
-          title="Timeline & Schedule"
-          rows={[
-            ["Planned Start Date", date(p.startDate)],
-            ["Actual Start Date", p.actualStartDate ? date(p.actualStartDate) : "—"],
-            ["Target Completion", date(p.targetCompletionDate)],
-            ["Current Phase", p.currentPhase || "Planning"],
-            ["Priority", p.priority || "Medium"],
-          ]}
-        />
-        <Card
-          title="Commercial Information"
-          rows={[
-            ["Project Value", money(p.projectValue)],
-            ["Approved Budget", money(p.approvedBudget)],
-            ["Currency", p.currency || "INR (₹)"],
-            ["Tax Configuration", p.taxConfiguration || "GST 18%"],
-            ["Target Margin", p.targetMargin ? `${p.targetMargin}%` : "—"],
-            ["Payment Terms", p.paymentTerms || "Net 30"],
-            ["Contract Reference", p.contractReference || "—"],
-          ]}
-        />
-        <Card
-          title="Ownership & Team"
-          rows={[
-            ["Project Manager", p.projectManager || "Unassigned"],
-            ["Lead Designer", resolveDesignerDisplay(p.leadDesigner, p.companyName)],
-            ["Estimator", p.estimator || "Unassigned"],
-            ["Procurement Owner", p.procurementOwner || "Unassigned"],
-            ["Finance Owner", p.financeOwner || "Unassigned"],
-          ]}
-        />
-      </div>
+    <div className="pd-grid">
+      <Card
+        title="Project Identity"
+        rows={[
+          r("Project Name", p.name),
+          r("Project ID", p.projectCode || "—"),
+          r("Project Type", p.projectType || "—"),
+          r("Status", <span className={`pd-status pd-status--${p.status}`}>{words(p.status)}</span>),
+          r("Area", p.areaSqft ? `${p.areaSqft.toLocaleString("en-IN")} sqft` : "—"),
+          r("Description", p.description || "—", true),
+        ]}
+      />
+      <Card
+        title="Location"
+        rows={[
+          r("Property Name", p.propertyName || p.name),
+          r("Address", p.address || p.location || "—"),
+          r("City", p.city || "—"),
+          r("State", p.state || "—"),
+          r("Country", p.country || "India"),
+          r("Postal Code", p.postalCode || "—"),
+          r("Site Access Notes", p.siteAccessNotes || "No site access notes added", true),
+        ]}
+      />
+      <Card
+        title="Client"
+        rows={[
+          r("Client Name", p.clientName || "—"),
+          r("Organization", p.organization || "—"),
+          r("Email", p.clientEmail || "—"),
+          r("Phone", p.clientContact || "—"),
+          r("Billing Contact", p.billingContact || p.clientName || "—"),
+          r("Communication Preference", p.communicationPreference || "Email"),
+        ]}
+      />
+      <Card
+        title="Timeline"
+        rows={[
+          r("Planned Start Date", date(p.startDate)),
+          r("Target Completion", date(p.targetCompletionDate)),
+          r("Actual Start Date", p.actualStartDate ? date(p.actualStartDate) : "—"),
+          r("Current Phase", p.currentPhase || "Planning"),
+          r("Priority", p.priority || "Medium"),
+        ]}
+      />
+      <Card
+        title="Commercial Information"
+        rows={[
+          r("Project Value", money(p.projectValue)),
+          r("Approved Budget", money(p.approvedBudget)),
+          r("Currency", p.currency || "INR (₹)"),
+          r("Tax Configuration", p.taxConfiguration || "GST 18%"),
+          r("Target Margin", p.targetMargin ? `${p.targetMargin}%` : "—"),
+          r("Payment Terms", p.paymentTerms || "Net 30"),
+          r("Contract Reference", p.contractReference || "—"),
+        ]}
+      />
+      <Card
+        title="Ownership & Team"
+        rows={[
+          r("Project Manager", p.projectManager || "Unassigned"),
+          r("Lead Designer", resolveDesignerDisplay(p.leadDesigner, p.companyName)),
+          r("Estimator", p.estimator || "Unassigned"),
+          r("Procurement Owner", p.procurementOwner || "Unassigned"),
+          r("Finance Owner", p.financeOwner || "Unassigned"),
+        ]}
+      />
     </div>
   );
 }
