@@ -83,6 +83,10 @@ describe("Projects Comprehensive Audit & Implementation Tests", () => {
       expect(projectPage).toContain('title="Ownership & Team"');
       expect(projectPage).toContain('className="pd-card"');
       expect(projectPage).not.toContain("Edit Details");
+      // Tag row shows user tags only; stage:* markers stay hidden and survive edits.
+      expect(projectPage).toContain('"Tag",');
+      expect(projectPage).toContain('!t.startsWith("stage:")');
+      expect(projectPage).toMatch(/t\.startsWith\("stage:"\)\),\n\s*\],/);
     });
 
     it("verifies EditProjectModal persists extended metadata fields", () => {

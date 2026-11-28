@@ -81,6 +81,7 @@ export type Project = {
   country?: string;
   postalCode?: string;
   siteAccessNotes?: string;
+  tags?: string[];
   organization?: string;
   billingContact?: string;
   communicationPreference?: string;
@@ -194,6 +195,8 @@ const formatCompactMoney = (value?: number, currency = "INR"): string => {
 const date = (x?: string) =>
   x ? new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(new Date(x)) : "—";
 const words = (x: string) => x.replace(/_/g, " ");
+/** User-facing project tags; `stage:*` entries are internal workflow markers. */
+const visibleTags = (tags?: string[] | null) => (Array.isArray(tags) ? tags.filter((t) => typeof t === "string" && t.trim() && !t.startsWith("stage:")) : []);
 const formatTime = (x?: string | null) => {
   if (!x) return "12:00 PM";
   try {
@@ -1397,6 +1400,18 @@ function Details({ p }: { p: Project }) {
           r("Project Name", p.name),
           r("Project ID", p.projectCode || "—"),
           r("Project Type", p.projectType || "—"),
+          r(
+            "Tag",
+            visibleTags(p.tags).length ? (
+              <span className="pd-tags">
+                {visibleTags(p.tags).map((t) => (
+                  <span key={t} className="pd-tag">{t}</span>
+                ))}
+              </span>
+            ) : (
+              "—"
+            ),
+          ),
           r("Status", <span className={`pd-status pd-status--${p.status}`}>{words(p.status)}</span>),
           r("Area", p.areaSqft ? `${p.areaSqft.toLocaleString("en-IN")} sqft` : "—"),
           r("Description", p.description || "—", true),
@@ -5904,6 +5919,7 @@ function EditProjectModal({
     location: project.location || "",
     description: project.description || "",
     areaSqft: project.areaSqft ? String(project.areaSqft) : "",
+    tags: visibleTags(project.tags).join(", "),
     projectValue: project.projectValue ? String(project.projectValue) : "",
     approvedBudget: project.approvedBudget ? String(project.approvedBudget) : "",
     startDate: project.startDate ? project.startDate.split("T")[0] : "",
@@ -5959,6 +5975,11 @@ function EditProjectModal({
       location: form.location.trim() || null,
       description: form.description.trim() || null,
       areaSqft: form.areaSqft ? Number(form.areaSqft) : null,
+      // Keep the hidden stage:* markers so editing tags never resets the workflow stage.
+      tags: [
+        ...Array.from(new Set(form.tags.split(",").map((t) => t.trim().slice(0, 40)).filter((t) => t && !t.startsWith("stage:")))).slice(0, 19),
+        ...(project.tags ?? []).filter((t) => typeof t === "string" && t.startsWith("stage:")),
+      ],
       projectValue: form.projectValue ? Number(form.projectValue) : null,
       approvedBudget: form.approvedBudget ? Number(form.approvedBudget) : null,
       startDate: form.startDate || null,
@@ -6110,6 +6131,10 @@ function EditProjectModal({
                 <label className="modal-label" style={{ marginTop: 0 }}>
                   Area (sqft)
                   <input type="number" value={form.areaSqft} onChange={(e) => update("areaSqft", e.target.value)} placeholder="e.g. 2400" />
+                </label>
+                <label className="modal-label" style={{ marginTop: 0 }}>
+                  Tags
+                  <input value={form.tags} onChange={(e) => update("tags", e.target.value)} placeholder="e.g. Luxury, Turnkey" maxLength={400} />
                 </label>
                 <label className="modal-label" style={{ marginTop: 0 }}>
                   Approved Budget (₹)

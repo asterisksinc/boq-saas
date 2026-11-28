@@ -61916,3 +61916,6 @@ tbody tr:has(> td > .tes), tbody tr:has(> td > .tes):hover { background: transpa
 .workspace-ui .pd-status--cancelled { background: #fee2e2; color: #dc2626; }
 @media (max-width: 1100px) { .workspace-ui .pd-grid { grid-template-columns: 1fr; } }
 @media (max-width: 640px) { .workspace-ui .pd-card { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.workspace-ui .pd-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.workspace-ui .pd-tag { display: inline-flex; align-items: center; padding: 2px 6px; border-radius: 4px; background: #f1f5f9; color: #64748b; font-size: 12px; font-weight: 400; line-height: 120%; }
+.workspace-ui .pd-status--in_progress { background: #dcfce7; color: #16a34a; }
