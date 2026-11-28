@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X } from "lucide-react";
+import { X, FolderPlus } from "lucide-react";
 
-interface AddCategoryModalProps {
+export interface AddCategoryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddCategory: (categoryName: string) => void;
+  onAddCategory: (categoryName: string, description?: string) => void;
   existingNames?: string[];
 }
 
@@ -17,11 +17,13 @@ export default function AddCategoryModal({
   existingNames = [],
 }: AddCategoryModalProps) {
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       setName("");
+      setDescription("");
       setError(null);
     }
   }, [isOpen]);
@@ -56,7 +58,7 @@ export default function AddCategoryModal({
       return;
     }
 
-    onAddCategory(trimmed);
+    onAddCategory(trimmed, description.trim() || undefined);
     onClose();
   };
 
@@ -72,9 +74,19 @@ export default function AddCategoryModal({
     >
       <div className="mb-category-dialog">
         <div className="mb-category-dialog-header">
-          <h3 id="add-cat-modal-title" className="mb-category-dialog-title">
-            Add New Category
-          </h3>
+          <div className="mb-cat-dialog-title-group">
+            <div className="mb-cat-icon-badge">
+              <FolderPlus size={18} className="text-blue-600" />
+            </div>
+            <div>
+              <h3 id="add-cat-modal-title" className="mb-category-dialog-title">
+                Add Category
+              </h3>
+              <p className="mb-cat-dialog-sub">
+                Create a category to group your design inspiration and materials.
+              </p>
+            </div>
+          </div>
           <button
             type="button"
             className="new-mb-close-btn"
@@ -87,23 +99,40 @@ export default function AddCategoryModal({
 
         <form onSubmit={handleSubmit}>
           <div className="mb-category-dialog-body">
-            <label htmlFor="cat-name-input" className="mb-editor-label">
-              <span>Category Name</span>
-              <span className="mb-required-star">*</span>
-            </label>
-            <input
-              id="cat-name-input"
-              type="text"
-              autoFocus
-              placeholder="e.g. Balcony Terrace, Study Room..."
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                if (error) setError(null);
-              }}
-              className={`mb-editor-input ${error ? "error" : ""}`}
-            />
-            {error && <p className="mb-editor-error-msg">{error}</p>}
+            <div className="mb-editor-field">
+              <label htmlFor="cat-name-input" className="mb-editor-label">
+                <span>Category Name</span>
+                <span className="mb-required-star">*</span>
+              </label>
+              <input
+                id="cat-name-input"
+                type="text"
+                autoFocus
+                placeholder="e.g. Master Bedroom, Color Palette, Lighting..."
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (error) setError(null);
+                }}
+                className={`mb-editor-input ${error ? "error" : ""}`}
+              />
+              {error && <p className="mb-editor-error-msg">{error}</p>}
+            </div>
+
+            <div className="mb-editor-field mt-3">
+              <label htmlFor="cat-desc-input" className="mb-editor-label">
+                <span>Category Description</span>
+                <span className="mb-optional-badge">(Optional)</span>
+              </label>
+              <textarea
+                id="cat-desc-input"
+                rows={2}
+                placeholder="Optional notes about this category's style or requirements..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="mb-editor-textarea"
+              />
+            </div>
           </div>
 
           <div className="mb-category-dialog-footer">
@@ -118,7 +147,7 @@ export default function AddCategoryModal({
               type="submit"
               className="new-mb-btn-continue"
             >
-              Add Category
+              Create Category
             </button>
           </div>
         </form>

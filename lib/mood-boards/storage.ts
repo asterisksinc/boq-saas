@@ -87,6 +87,7 @@ export function addMoodBoard(input: CreateMoodBoardInput): MoodBoard {
     leadId: input.leadId,
     leadName: input.leadName,
     mode: input.mode || "blank",
+    selectedTemplate: input.selectedTemplate || "grid-4x4",
     categories: input.categories || [],
     images: input.images || [],
     status: input.status || "DRAFT",
@@ -117,6 +118,7 @@ export function updateMoodBoard(id: string, input: UpdateMoodBoardInput): MoodBo
   const updatedBoard: MoodBoard = {
     ...current,
     ...input,
+    selectedTemplate: input.selectedTemplate || current.selectedTemplate || "grid-4x4",
     projectName: input.projectName || (matchedProject ? matchedProject.name : current.projectName),
     clientName: input.clientName || (matchedClient ? matchedClient.name : current.clientName),
     clientSubtitle:

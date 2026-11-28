@@ -4,15 +4,26 @@ export type MoodBoardStatus =
   | "COMPLETED"
   | "ARCHIVED";
 
+export type MoodBoardTemplateLayout =
+  | "grid-4x4"
+  | "collage"
+  | "modern"
+  | "minimal"
+  | "magazine"
+  | "split";
+
 export interface MoodBoardImage {
   id: string;
   name: string;
+  title?: string;
   previewUrl: string;
   fileType?: string;
   size?: number;
   isCover?: boolean;
   uploadedAt?: string;
   notes?: string;
+  originalFileName?: string;
+  position?: number;
 }
 
 export interface MoodBoardItem {
@@ -33,9 +44,11 @@ export interface MoodBoardItemGroup {
 export interface MoodBoardCategory {
   id: string;
   name: string;
+  description?: string;
   expanded?: boolean;
   imageCount?: number;
   images?: MoodBoardImage[];
+  position?: number;
   itemGroups?: MoodBoardItemGroup[];
 }
 
@@ -59,6 +72,7 @@ export interface MoodBoard {
   leadId?: string;
   leadName?: string;
   mode?: "blank" | "template";
+  selectedTemplate?: string;
   categories?: MoodBoardCategory[];
   images: MoodBoardImage[];
   status: MoodBoardStatus;
@@ -79,6 +93,7 @@ export interface CreateMoodBoardInput {
   leadId?: string;
   leadName?: string;
   mode?: "blank" | "template";
+  selectedTemplate?: string;
   categories?: MoodBoardCategory[];
   description?: string;
   status?: MoodBoardStatus;
@@ -98,6 +113,7 @@ export interface UpdateMoodBoardInput {
   leadId?: string;
   leadName?: string;
   mode?: "blank" | "template";
+  selectedTemplate?: string;
   categories?: MoodBoardCategory[];
   description?: string;
   status?: MoodBoardStatus;
