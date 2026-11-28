@@ -17,18 +17,44 @@ export type DefaultStage = {
   defaultProgress: number;
 };
 
+/**
+ * Standard project stages (Kanban columns), in order. The 11 working stages advance progress evenly up to
+ * Project Completed (100%). On Hold pauses a project, Lost and Cancelled close it; none of those count towards progress.
+ */
 export const DEFAULT_PROJECT_STAGES: DefaultStage[] = [
-  { key: "requirement_stated", name: "REQUIREMENT STATED", color: "#2563EB", sortOrder: 1, terminalType: null, defaultProgress: 14.29 },
-  { key: "estimate_boq_shared", name: "ESTIMATE / BOQ SHARED", color: "#7C3AED", sortOrder: 2, terminalType: null, defaultProgress: 28.57 },
-  { key: "negotiations", name: "NEGOTIATIONS", color: "#EA580C", sortOrder: 3, terminalType: null, defaultProgress: 42.86 },
-  { key: "design", name: "DESIGN", color: "#4F46E5", sortOrder: 4, terminalType: null, defaultProgress: 57.14 },
-  { key: "executions", name: "EXECUTIONS", color: "#0891B2", sortOrder: 5, terminalType: null, defaultProgress: 71.43 },
-  { key: "project_handover", name: "PROJECT HANDOVER", color: "#0D9488", sortOrder: 6, terminalType: null, defaultProgress: 85.71 },
-  { key: "won", name: "WON", color: "#16A34A", sortOrder: 7, terminalType: "completed", defaultProgress: 100 },
-  { key: "lost", name: "LOST", color: "#DC2626", sortOrder: 8, terminalType: "lost", defaultProgress: 0 },
+  { key: "enquiry", name: "Enquiry", color: "#2563EB", sortOrder: 1, terminalType: null, defaultProgress: 9.09 },
+  { key: "site_visit_briefing", name: "Site Visit & Briefing", color: "#0EA5E9", sortOrder: 2, terminalType: null, defaultProgress: 18.18 },
+  { key: "concept_estimate", name: "Concept & Estimate", color: "#7C3AED", sortOrder: 3, terminalType: null, defaultProgress: 27.27 },
+  { key: "boq_proposal", name: "BOQ & Proposal", color: "#9333EA", sortOrder: 4, terminalType: null, defaultProgress: 36.36 },
+  { key: "client_review", name: "Client Review", color: "#EA580C", sortOrder: 5, terminalType: null, defaultProgress: 45.45 },
+  { key: "agreement_advance", name: "Agreement & Advance", color: "#D97706", sortOrder: 6, terminalType: null, defaultProgress: 54.55 },
+  { key: "design_finalisation", name: "Design Finalisation", color: "#4F46E5", sortOrder: 7, terminalType: null, defaultProgress: 63.64 },
+  { key: "procurement_production", name: "Procurement & Production", color: "#0891B2", sortOrder: 8, terminalType: null, defaultProgress: 72.73 },
+  { key: "site_execution", name: "Site Execution", color: "#0D9488", sortOrder: 9, terminalType: null, defaultProgress: 81.82 },
+  { key: "quality_handover", name: "Quality & Handover", color: "#059669", sortOrder: 10, terminalType: null, defaultProgress: 90.91 },
+  { key: "project_completed", name: "Project Completed", color: "#16A34A", sortOrder: 11, terminalType: "completed", defaultProgress: 100 },
+  { key: "on_hold", name: "On Hold", color: "#64748B", sortOrder: 12, terminalType: null, defaultProgress: 0 },
+  { key: "lost", name: "Lost", color: "#DC2626", sortOrder: 13, terminalType: "lost", defaultProgress: 0 },
+  { key: "cancelled", name: "Cancelled", color: "#991B1B", sortOrder: 14, terminalType: "lost", defaultProgress: 0 },
 ];
 
+/** Stages that sit outside the progress sequence. */
+export const NON_PROGRESS_STAGE_NAMES = ["ON HOLD", "LOST", "CANCELLED"];
+
 export const STAGE_COLOR_MAP: Record<string, { bg: string; text: string; hex: string }> = {
+  "ENQUIRY": { bg: "rgba(37, 99, 235, 0.12)", text: "#2563EB", hex: "#2563EB" },
+  "SITE VISIT & BRIEFING": { bg: "rgba(14, 165, 233, 0.12)", text: "#0EA5E9", hex: "#0EA5E9" },
+  "CONCEPT & ESTIMATE": { bg: "rgba(124, 58, 237, 0.12)", text: "#7C3AED", hex: "#7C3AED" },
+  "BOQ & PROPOSAL": { bg: "rgba(147, 51, 234, 0.12)", text: "#9333EA", hex: "#9333EA" },
+  "CLIENT REVIEW": { bg: "rgba(234, 88, 12, 0.12)", text: "#EA580C", hex: "#EA580C" },
+  "AGREEMENT & ADVANCE": { bg: "rgba(217, 119, 6, 0.12)", text: "#D97706", hex: "#D97706" },
+  "DESIGN FINALISATION": { bg: "rgba(79, 70, 229, 0.12)", text: "#4F46E5", hex: "#4F46E5" },
+  "PROCUREMENT & PRODUCTION": { bg: "rgba(8, 145, 178, 0.12)", text: "#0891B2", hex: "#0891B2" },
+  "SITE EXECUTION": { bg: "rgba(13, 148, 136, 0.12)", text: "#0D9488", hex: "#0D9488" },
+  "QUALITY & HANDOVER": { bg: "rgba(5, 150, 105, 0.12)", text: "#059669", hex: "#059669" },
+  "PROJECT COMPLETED": { bg: "rgba(22, 163, 74, 0.12)", text: "#16A34A", hex: "#16A34A" },
+  "ON HOLD": { bg: "rgba(100, 116, 139, 0.12)", text: "#64748B", hex: "#64748B" },
+  "CANCELLED": { bg: "rgba(153, 27, 27, 0.12)", text: "#991B1B", hex: "#991B1B" },
   "REQUIREMENT STATED": { bg: "rgba(37, 99, 235, 0.12)", text: "#2563EB", hex: "#2563EB" },
   "ESTIMATE / BOQ SHARED": { bg: "rgba(124, 58, 237, 0.12)", text: "#7C3AED", hex: "#7C3AED" },
   "NEGOTIATIONS": { bg: "rgba(234, 88, 12, 0.12)", text: "#EA580C", hex: "#EA580C" },
@@ -42,7 +68,6 @@ export const STAGE_COLOR_MAP: Record<string, { bg: string; text: string; hex: st
   "DESIGN CONCEPTS": { bg: "rgba(79, 70, 229, 0.12)", text: "#4F46E5", hex: "#4F46E5" },
   "BOQ APPROVAL": { bg: "rgba(124, 58, 237, 0.12)", text: "#7C3AED", hex: "#7C3AED" },
   "PROCUREMENT": { bg: "rgba(8, 145, 178, 0.12)", text: "#0891B2", hex: "#0891B2" },
-  "SITE EXECUTION": { bg: "rgba(8, 145, 178, 0.12)", text: "#0891B2", hex: "#0891B2" },
 };
 
 /**
@@ -135,7 +160,7 @@ export function calculateStageProgress(
   if (upper === "WON" || upper === "COMPLETED" || upper.includes("WON") || upper.includes("COMPLETED")) {
     return 100;
   }
-  if (upper === "LOST" || upper.includes("LOST")) {
+  if (upper === "LOST" || upper.includes("LOST") || upper.includes("CANCEL") || upper === "ON HOLD" || upper === "ON_HOLD") {
     return 0;
   }
 
@@ -171,7 +196,7 @@ export function calculateStageProgress(
         .filter((s) => {
           const t = (s.terminalType || (s as any).terminal_type || "").toLowerCase();
           const n = s.name.toUpperCase();
-          return t !== "lost" && n !== "LOST";
+          return t !== "lost" && !NON_PROGRESS_STAGE_NAMES.includes(n);
         })
         .sort((a, b) => {
           const ordA = a.sortOrder ?? (a as any).sort_order ?? 0;

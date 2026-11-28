@@ -61935,3 +61935,46 @@ tbody tr:has(> td > .tes), tbody tr:has(> td > .tes):hover { background: transpa
   .workspace-ui .pd-card { padding: 12px 16px; gap: 10px 16px; }
   .workspace-ui .pd-field { gap: 4px; }
 }
+
+/* Project detail KPI cards use the Proposals KPI format: translucent tiles, 14px label, 24px regular value, 12px caption. */
+.workspace-ui .po-workspace-summary-panel,
+.workspace-ui .po-costing-summary-panel { padding: 0; background: transparent; border: 0; border-radius: 0; gap: 8px; }
+.workspace-ui .po-workspace-kpi-grid,
+.workspace-ui .po-costing-kpi-grid,
+.workspace-ui .metric-row,
+.workspace-ui .pe-kpis { gap: 8px; margin-bottom: 0; }
+.workspace-ui .po-workspace-kpi-card,
+.workspace-ui .po-costing-kpi-card,
+.workspace-ui .po-costing-kpi-card.has-caption,
+.workspace-ui .metric-row > section,
+.workspace-ui .pe-kpi {
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 8px;
+  min-height: 116px; padding: 20px; box-sizing: border-box; min-width: 0;
+  background: rgba(255, 255, 255, 0.6); border: 0; border-radius: 6px; box-shadow: none; backdrop-filter: blur(12px);
+  transform: none; transition: background 0.15s ease;
+}
+.workspace-ui .po-workspace-kpi-card:hover,
+.workspace-ui .po-costing-kpi-card:hover,
+.workspace-ui .metric-row > section:hover,
+.workspace-ui .pe-kpi:hover { background: rgba(255, 255, 255, 0.85); box-shadow: none; transform: none; }
+.workspace-ui .po-workspace-kpi-label,
+.workspace-ui .po-costing-kpi-label,
+.workspace-ui .metric-row > section > small,
+.workspace-ui .pe-kpi-label { font-family: 'Urbanist', sans-serif; font-size: 14px; font-weight: 500; line-height: 120%; color: #64748b; }
+.workspace-ui .po-workspace-kpi-value,
+.workspace-ui .po-costing-kpi-value,
+.workspace-ui .metric-row > section > b,
+.workspace-ui .pe-kpi-value { margin: 0; font-family: 'Urbanist', sans-serif; font-size: 24px; font-weight: 400; line-height: 120%; color: #0f172a; }
+.workspace-ui .po-workspace-kpi-caption,
+.workspace-ui .po-costing-kpi-caption,
+.workspace-ui .pe-kpi-sub { margin: 0; font-family: 'Urbanist', sans-serif; font-size: 12px; font-weight: 500; line-height: 120%; color: #64748b; }
+.workspace-ui .pe-kpi-value.is-green, .workspace-ui .pe-kpi-value.is-blue, .workspace-ui .pe-kpi-value.is-amber { color: #0f172a; }
+.workspace-ui .pe-kpi-value.is-red, .workspace-ui .po-workspace-kpi-value.danger { color: #dc2626; }
+
+/* Expenses tab: the table card runs to the bottom of the screen like the list pages. */
+.workspace-ui .fig-dashboard-main:has(.pe-tab) > .workspace-content { flex: 1 1 auto; display: flex; flex-direction: column; }
+.workspace-ui .fig-dashboard-main:has(.pe-tab) { display: flex; flex-direction: column; }
+.workspace-ui .pe-tab { flex: 1 1 auto; }
+.workspace-ui .pe-tab > .ld-table-card { flex: 1 1 auto; display: flex; flex-direction: column; }
+.workspace-ui .pe-tab > .ld-table-card > .ld-table-scroll { flex: 1 1 auto; }
+.workspace-ui .pe-tab .ld-pagination { margin-top: auto; }

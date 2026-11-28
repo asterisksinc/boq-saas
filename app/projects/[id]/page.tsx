@@ -3116,6 +3116,7 @@ function Work({ p, b, showToast }: { p: Project; b: Boq[]; showToast?: (msg: str
             <span className="po-workspace-kpi-value" title={currentPhase}>
               {currentPhase}
             </span>
+            <span className="po-workspace-kpi-caption">Current stage</span>
           </div>
 
           {/* Overall Progress */}
@@ -3124,6 +3125,7 @@ function Work({ p, b, showToast }: { p: Project; b: Boq[]; showToast?: (msg: str
             <span className="po-workspace-kpi-value">
               {p.progress || 0}%
             </span>
+            <span className="po-workspace-kpi-caption">Based on project stage</span>
           </div>
 
           {/* Next Stage */}
@@ -3132,6 +3134,7 @@ function Work({ p, b, showToast }: { p: Project; b: Boq[]; showToast?: (msg: str
             <span className="po-workspace-kpi-value" title={nextPhase}>
               {nextPhase}
             </span>
+            <span className="po-workspace-kpi-caption">Up next</span>
           </div>
 
           {/* Overdue Tasks */}
@@ -3140,6 +3143,7 @@ function Work({ p, b, showToast }: { p: Project; b: Boq[]; showToast?: (msg: str
             <span className={`po-workspace-kpi-value ${overdueTasks.length > 0 ? "danger" : ""}`}>
               {overdueTasks.length}
             </span>
+            <span className="po-workspace-kpi-caption">Past their due date</span>
           </div>
 
           {/* Open Issues */}
@@ -3148,6 +3152,7 @@ function Work({ p, b, showToast }: { p: Project; b: Boq[]; showToast?: (msg: str
             <span className={`po-workspace-kpi-value ${blockedTasks.length > 0 ? "danger" : ""}`}>
               {blockedTasks.length}
             </span>
+            <span className="po-workspace-kpi-caption">Blocked tasks</span>
           </div>
         </div>
       </div>
