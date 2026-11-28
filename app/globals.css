@@ -61920,12 +61920,18 @@ tbody tr:has(> td > .tes), tbody tr:has(> td > .tes):hover { background: transpa
 .workspace-ui .pd-tag { display: inline-flex; align-items: center; padding: 2px 6px; border-radius: 4px; background: #f1f5f9; color: #64748b; font-size: 12px; font-weight: 400; line-height: 120%; }
 .workspace-ui .pd-status--in_progress { background: #dcfce7; color: #16a34a; }
 
-/* Project Details fills exactly one screen (Figma): header + tabs + 3 rows of panels, no page scroll.
-   Below 1100px the panels stack and the page scrolls as usual. */
+/* Project Details fills one screen (Figma): header + tabs + 3 rows of panels. Rows stretch to fill the height but
+   never shrink below their content, so nothing is clipped and cards never scroll inside. */
 @media (min-width: 1101px) {
-  .workspace-ui .fig-dashboard-main:has(.pd-grid) { display: flex; flex-direction: column; height: calc(100vh - 32px); min-height: 0; box-sizing: border-box; }
-  .workspace-ui .fig-dashboard-main:has(.pd-grid) > .workspace-content { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding-bottom: 0; }
-  .workspace-ui .pd-grid { flex: 1 1 auto; min-height: 0; grid-template-rows: repeat(3, minmax(0, 1fr)); }
-  .workspace-ui .pd-panel { min-height: 0; overflow: hidden; }
-  .workspace-ui .pd-card { min-height: 0; overflow: auto; scrollbar-width: thin; }
+  .workspace-ui .fig-dashboard-main:has(.pd-grid) { display: flex; flex-direction: column; min-height: calc(100vh - 32px); box-sizing: border-box; }
+  .workspace-ui .fig-dashboard-main:has(.pd-grid) > .workspace-content { flex: 1 1 auto; display: flex; flex-direction: column; padding-bottom: 0; }
+  .workspace-ui .pd-grid { flex: 1 1 auto; grid-template-rows: repeat(3, minmax(min-content, 1fr)); }
+}
+/* Laptop-height screens: tighter spacing so all six panels fit without scrolling. */
+@media (min-width: 1101px) and (max-height: 920px) {
+  .workspace-ui .fig-dashboard-main:has(.pd-grid) > .workspace-content { gap: 12px; }
+  .workspace-ui .pd-grid { gap: 12px; }
+  .workspace-ui .pd-panel { padding: 14px 16px; gap: 10px; }
+  .workspace-ui .pd-card { padding: 12px 16px; gap: 10px 16px; }
+  .workspace-ui .pd-field { gap: 4px; }
 }
