@@ -314,5 +314,25 @@ describe("Mood Board Management — Architecture, Navigation & Figma Design Veri
         expect(existsSync(join(compDir, comp))).toBe(true);
       }
     });
+
+    it("uses viewport-positioned portals for mood board more menus", () => {
+      const actionsMenuContent = readFileSync(
+        join(root, "components", "mood-boards", "MoodBoardActionsMenu.tsx"),
+        "utf-8"
+      );
+      const detailContent = readFileSync(
+        join(root, "components", "mood-boards", "MoodBoardDetail.tsx"),
+        "utf-8"
+      );
+      const cssContent = readFileSync(cssPath, "utf-8");
+
+      expect(actionsMenuContent).toContain("createPortal");
+      expect(actionsMenuContent).toContain("document.body");
+      expect(detailContent).toContain("createPortal");
+      expect(detailContent).toContain("mb-dropdown-menu-fixed");
+      expect(cssContent).toContain(".mb-dropdown-menu-fixed");
+      expect(cssContent).toContain("position: fixed");
+      expect(cssContent).toContain("z-index: 12000");
+    });
   });
 });

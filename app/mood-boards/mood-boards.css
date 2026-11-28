@@ -585,9 +585,25 @@
   gap: 2px;
 }
 
+.mb-dropdown-menu-fixed {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: auto;
+  width: 190px;
+  min-width: 190px;
+  max-width: calc(100vw - 16px);
+  z-index: 12000;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
 .mb-dropdown-item {
   display: flex;
+  box-sizing: border-box;
   align-items: center;
+  flex: 0 0 auto;
+  min-height: 34px;
   gap: 8px;
   padding: 8px 12px;
   border-radius: 4px;
@@ -601,6 +617,7 @@
   cursor: pointer;
   transition: all 0.15s ease;
   width: 100%;
+  white-space: nowrap;
 }
 
 .mb-dropdown-item:hover {
@@ -1484,7 +1501,7 @@
   background: rgba(0, 0, 0, 0.2);
   backdrop-filter: blur(7px);
   -webkit-backdrop-filter: blur(7px);
-  z-index: 1000;
+  z-index: 10050;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1496,7 +1513,7 @@
   max-height: calc(100vh - 32px);
   overflow-y: auto;
   position: relative;
-  z-index: 1001;
+  z-index: 10051;
   box-sizing: border-box;
 }
 
@@ -2863,7 +2880,7 @@
 .mb-editor-columns-grid {
   box-sizing: border-box;
   display: grid;
-  grid-template-columns: minmax(0, 0.677fr) minmax(0, 1fr);
+  grid-template-columns: minmax(320px, 0.8fr) minmax(0, 1.2fr);
   gap: 16px;
   align-items: start;
   width: 100%;
@@ -3733,7 +3750,7 @@
   padding: 20px;
   gap: 20px;
   width: 100%;
-  max-width: 781px;
+  max-width: none;
   background: rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -5003,6 +5020,61 @@
   border-radius: 6px;
   outline: none;
   background: #FFFFFF;
+  min-width: 150px;
+}
+
+.mb-cat-inline-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.mb-cat-inline-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mb-cat-inline-rename-input.error {
+  border-color: #DC2626;
+}
+
+.mb-cat-inline-save,
+.mb-cat-inline-cancel {
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-family: 'Urbanist', Inter, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mb-cat-inline-save {
+  border: 1px solid #2563EB;
+  background: #2563EB;
+  color: #FFFFFF;
+}
+
+.mb-cat-inline-cancel {
+  border: 1px solid #CBD5E1;
+  background: #FFFFFF;
+  color: #334155;
+}
+
+.mb-cat-inline-error {
+  margin: 0;
+  color: #DC2626;
+  font-size: 12px;
+  line-height: 16px;
 }
 
 .mb-cat-head-right {
@@ -6874,6 +6946,661 @@
   }
   .mood-boards-page .mb-workflow-stepper {
     width: 300px;
+  }
+}
+
+/* Responsive workflow header — keep the stepper and actions inside the dashboard viewport. */
+@media (max-width: 1180px) {
+  .mood-boards-page .mb-action-bar-frame {
+    grid-template-columns: minmax(220px, 1fr) minmax(0, 420px) !important;
+  }
+
+  .mood-boards-page .mb-action-bar-top-right {
+    width: 100%;
+    max-width: 420px;
+  }
+
+  .mood-boards-page .mb-workflow-stepper {
+    width: 100%;
+    max-width: 420px;
+    min-width: 0;
+  }
+
+  .mood-boards-page .mb-steps-list {
+    gap: 2px;
+  }
+
+  .mood-boards-page .mb-step-btn {
+    padding: 6px 4px;
+  }
+
+  .mood-boards-page .mb-step-connector {
+    width: 16px;
+    margin: 0 2px;
+  }
+}
+
+@media (max-width: 760px) {
+  .mood-boards-page .mb-action-bar-frame {
+    grid-template-columns: 1fr !important;
+    gap: 10px;
+  }
+
+  .mood-boards-page .mb-action-bar-top-right {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 36px auto;
+    width: 100%;
+    max-width: none;
+  }
+
+  .mood-boards-page .mb-workflow-stepper {
+    height: 36px;
+    max-width: none;
+  }
+
+  .mood-boards-page .mb-step-btn {
+    gap: 4px;
+  }
+
+  .mood-boards-page .mb-step-label {
+    font-size: 11px;
+  }
+
+  .mood-boards-page .mb-step-connector {
+    flex: 1;
+    width: auto;
+    min-width: 8px;
+  }
+
+  .mood-boards-page .mb-action-bar-right {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    flex-wrap: wrap;
+  }
+
+  .mood-boards-page .mb-action-btn-draft,
+  .mood-boards-page .mb-action-btn-create {
+    flex: 1 1 150px;
+  }
+
+  .moodboard-content-grid,
+  .mb-editor-columns-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mb-cat-inline-edit-row {
+    flex-wrap: wrap;
+  }
+
+  .mb-cat-inline-rename-input {
+    flex: 1 1 160px;
+  }
+}
+
+/* Definitive responsive geometry: the workflow header owns its available width. */
+.mood-boards-page .mb-action-bar-frame {
+  grid-template-columns: minmax(280px, 1fr) minmax(430px, 520px) !important;
+  align-items: start;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.mood-boards-page .mb-action-bar-top-right {
+  width: 100%;
+  max-width: 520px;
+  grid-template-columns: minmax(0, 520px);
+  justify-self: end;
+  overflow: visible;
+}
+
+.mood-boards-page .mb-workflow-stepper {
+  width: 100%;
+  max-width: 390px;
+  min-width: 0;
+  justify-self: end;
+}
+
+.mood-boards-page .mb-steps-list {
+  min-width: 0;
+}
+
+.mood-boards-page .mb-step-item {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.mood-boards-page .mb-step-btn {
+  max-width: 100%;
+}
+
+.mood-boards-page .mb-step-connector {
+  flex: 1 1 20px;
+  min-width: 8px;
+  max-width: 24px;
+}
+
+.mood-boards-page .moodboard-content-grid,
+.mood-boards-page .mb-editor-columns-grid {
+  grid-template-columns: minmax(320px, 40%) minmax(0, 60%);
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+.mood-boards-page .moodboard-left-panel,
+.mood-boards-page .mb-left-config-column,
+.mood-boards-page .moodboard-right-panel,
+.mood-boards-page .mb-right-preview-column,
+.mood-boards-page .moodboard-preview-panel,
+.mood-boards-page .mb-preview-panel {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+.new-mb-overlay .mb-category-dialog {
+  width: min(440px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.new-mb-overlay .mb-category-dialog form {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.new-mb-overlay .mb-category-dialog-body {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.new-mb-overlay .mb-category-dialog-footer {
+  flex: 0 0 auto;
+}
+
+.new-mb-overlay .mb-title-modal-img {
+  max-height: 180px;
+  width: 100%;
+  object-fit: contain;
+}
+
+@media (max-width: 1180px) {
+  .mood-boards-page .mb-action-bar-frame {
+    grid-template-columns: minmax(220px, 1fr) minmax(360px, 420px) !important;
+  }
+  .mood-boards-page .mb-workflow-stepper {
+    max-width: 360px;
+  }
+  .mood-boards-page .mb-step-label {
+    font-size: 12px;
+  }
+  .mood-boards-page .moodboard-content-grid,
+  .mood-boards-page .mb-editor-columns-grid {
+    grid-template-columns: minmax(300px, 42%) minmax(0, 58%);
+  }
+}
+
+@media (max-width: 1024px) {
+  .mood-boards-page .mb-action-bar-frame {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 380px) !important;
+  }
+  .mood-boards-page .moodboard-content-grid,
+  .mood-boards-page .mb-editor-columns-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .mood-boards-page .mb-action-bar-frame {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .mood-boards-page .mb-action-bar-top-right {
+    max-width: none;
+  }
+  .mood-boards-page .mb-workflow-stepper {
+    max-width: none;
+  }
+  .mood-boards-page .mb-step-label {
+    font-size: 11px;
+  }
+  .new-mb-overlay {
+    padding: 12px;
+  }
+  .new-mb-overlay .mb-category-dialog {
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+  }
+}
+
+/* New Moodboard editor refresh: crisp cards, clearer hierarchy, and a compact workflow header. */
+.mood-boards-page {
+  --mb-editor-ink: #0F172A;
+  --mb-editor-muted: #64748B;
+  --mb-editor-line: #E2E8F0;
+  --mb-editor-blue: #2563EB;
+  background: #F1F5F9;
+}
+
+.mood-boards-page .moodboard-create-container,
+.mood-boards-page .mb-create-editor-view {
+  gap: 18px;
+  padding-bottom: 36px;
+}
+
+.mood-boards-page .mb-action-bar-frame {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(460px, 560px) !important;
+  align-items: center;
+  gap: clamp(18px, 2vw, 32px);
+  min-height: 92px;
+  padding: 14px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.045);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.mood-boards-page .mb-action-bar-left {
+  display: flex !important;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.mood-boards-page .mb-page-navigation-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 20px;
+  padding: 0;
+}
+
+.mood-boards-page .mb-back-nav-btn {
+  color: #64748B;
+  font-size: 12px;
+  font-weight: 500;
+  transition: color 140ms ease;
+}
+
+.mood-boards-page .mb-back-nav-btn:hover {
+  color: #2563EB;
+}
+
+.mood-boards-page .mb-breadcrumb-chevron {
+  color: #94A3B8;
+}
+
+.mood-boards-page .mb-current-crumb {
+  color: #64748B;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.mood-boards-page .mb-page-navigation-row .mb-page-section-title {
+  grid-column: auto;
+  grid-row: auto;
+  margin: 0;
+  color: #64748B;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.mood-boards-page .mb-header-title-wrap {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.mood-boards-page .mb-action-bar-title {
+  padding: 0;
+  color: #0F172A;
+  font-size: clamp(21px, 1.65vw, 25px);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+}
+
+.mood-boards-page .mb-action-bar-sub {
+  margin: 4px 0 0;
+  color: #64748B;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.mood-boards-page .mb-action-bar-top-right {
+  display: grid;
+  grid-template-rows: auto auto;
+  justify-items: end;
+  align-content: center;
+  row-gap: 10px;
+  width: 100%;
+  max-width: 560px;
+  min-width: 0;
+}
+
+.mood-boards-page .mb-workflow-stepper {
+  width: min(100%, 390px);
+  max-width: 390px;
+  min-width: 0;
+  height: auto;
+}
+
+.mood-boards-page .mb-action-bar-right {
+  display: flex;
+  justify-self: end;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 9px;
+  width: auto;
+  min-width: 0;
+  height: auto;
+}
+
+.mood-boards-page .mb-action-btn-draft,
+.mood-boards-page .mb-action-btn-create {
+  min-height: 40px;
+  height: 40px;
+  padding-inline: 15px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.mood-boards-page .mb-action-btn-draft {
+  border-color: #CBD5E1;
+  background: #FFFFFF;
+  color: #334155;
+}
+
+.mood-boards-page .mb-action-btn-draft:hover:not(:disabled) {
+  border-color: #94A3B8;
+  background: #F8FAFC;
+}
+
+.mood-boards-page .mb-action-btn-create {
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.16);
+}
+
+.mood-boards-page .mb-editor-columns-grid {
+  gap: 18px;
+  align-items: start;
+}
+
+.mood-boards-page .mb-section-card {
+  padding: 18px;
+  gap: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 6px 22px rgba(15, 23, 42, 0.035);
+}
+
+.mood-boards-page .mb-section-heading,
+.mood-boards-page .mb-categories-section-title {
+  color: #0F172A;
+  font-family: 'Urbanist', Inter, sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-transform: none;
+}
+
+.mood-boards-page .basic-details-card {
+  padding: 18px;
+  gap: 16px;
+  border: 1px solid #EEF2F7;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.035);
+}
+
+.mood-boards-page .mb-editor-label {
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mood-boards-page .mb-editor-input,
+.mood-boards-page .mb-editor-select,
+.mood-boards-page .mb-editor-textarea {
+  border-color: #DCE4EE;
+  border-radius: 9px;
+  background-color: #FFFFFF;
+  font-family: 'Urbanist', Inter, sans-serif;
+  font-size: 13px;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.mood-boards-page .mb-editor-input,
+.mood-boards-page .mb-editor-select {
+  height: 42px;
+}
+
+.mood-boards-page .mb-editor-input:focus,
+.mood-boards-page .mb-editor-select:focus,
+.mood-boards-page .mb-editor-textarea:focus {
+  border-color: #60A5FA;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.mood-boards-page .mb-editor-textarea {
+  min-height: 78px;
+  padding: 11px 13px;
+}
+
+.mood-boards-page .mb-categories-section-title {
+  font-size: 17px;
+}
+
+.mood-boards-page .mb-categories-sub-hint {
+  margin-top: -8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.mood-boards-page .mb-categories-total-badge {
+  background: #EFF6FF;
+  color: #1D4ED8;
+}
+
+.mood-boards-page .mb-btn-add-category {
+  height: 36px;
+  padding-inline: 12px;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mood-boards-page .mb-category-accordion-card {
+  border-color: #E6ECF3;
+  border-radius: 11px;
+  background: #FFFFFF;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.025);
+}
+
+.mood-boards-page .mb-category-accordion-card.is-selected-category {
+  border-color: #BFDBFE;
+}
+
+.mood-boards-page .mb-category-accordion-card.is-expanded .mb-category-accordion-header {
+  background: #F8FAFC;
+}
+
+.mood-boards-page .mb-category-accordion-body {
+  padding: 12px;
+}
+
+.mood-boards-page .mb-image-card {
+  border-color: #E6ECF3;
+  border-radius: 9px;
+  box-shadow: none;
+}
+
+.mood-boards-page .mb-image-thumb-wrapper {
+  aspect-ratio: 1.18 / 1;
+}
+
+.mood-boards-page .mb-image-card-footer {
+  min-height: 34px;
+  font-size: 11px;
+}
+
+.mood-boards-page .mb-choose-template-section {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 14px 16px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 6px 22px rgba(15, 23, 42, 0.035);
+}
+
+.mood-boards-page .mb-template-bar-title {
+  font-size: 15px;
+}
+
+.mood-boards-page .mb-template-card-option {
+  flex-basis: 96px;
+  min-width: 96px;
+  height: 88px;
+  padding: 7px 6px;
+  border-radius: 9px;
+}
+
+.mood-boards-page .mb-tpl-diagram-frame {
+  height: 52px;
+}
+
+.mood-boards-page .mb-preview-inner-card,
+.mood-boards-page .mb-preview-canvas-card {
+  padding: 18px;
+  gap: 14px;
+  border-color: #E7EDF4;
+  border-radius: 14px;
+  box-shadow: 0 7px 22px rgba(15, 23, 42, 0.045);
+}
+
+.mood-boards-page .mb-preview-canvas-header {
+  min-height: 40px;
+  padding-bottom: 12px;
+  border-bottom-color: #E9EEF5;
+}
+
+.mood-boards-page .mb-active-cat-name {
+  font-size: 18px;
+}
+
+.mood-boards-page .mb-preview-sub-breadcrumb {
+  font-size: 12px;
+}
+
+.mood-boards-page .mb-canvas-viewport {
+  min-height: 460px;
+  padding: 14px;
+  border-color: #E8EDF4;
+  border-radius: 11px;
+  background: #F8FAFC;
+}
+
+.mood-boards-page .mb-preview-category-pagination {
+  gap: 12px;
+}
+
+.mood-boards-page .mb-btn-fullscreen {
+  border-radius: 8px;
+}
+
+@media (max-width: 1024px) {
+  .mood-boards-page .mb-action-bar-frame {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 12px;
+  }
+
+  .mood-boards-page .mb-action-bar-top-right {
+    max-width: none;
+    justify-items: stretch;
+  }
+
+  .mood-boards-page .mb-workflow-stepper {
+    justify-self: start;
+  }
+
+  .mood-boards-page .mb-action-bar-right {
+    justify-self: start;
+  }
+
+  .mood-boards-page .mb-canvas-viewport {
+    min-height: 380px;
+  }
+}
+
+@media (max-width: 600px) {
+  .mood-boards-page .mb-action-bar-frame {
+    padding: 13px;
+    border-radius: 12px;
+  }
+
+  .mood-boards-page .mb-action-bar-sub {
+    font-size: 12px;
+  }
+
+  .mood-boards-page .mb-action-bar-right {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .mood-boards-page .mb-action-btn-draft,
+  .mood-boards-page .mb-action-btn-create {
+    flex: 1 1 145px;
+    justify-content: center;
+    padding-inline: 10px;
+    font-size: 12px;
+  }
+
+  .mood-boards-page .mb-section-card,
+  .mood-boards-page .mb-preview-inner-card,
+  .mood-boards-page .mb-preview-canvas-card {
+    padding: 13px;
+  }
+
+  .mood-boards-page .basic-details-card {
+    padding: 13px;
+  }
+
+  .mood-boards-page .mb-category-images-grid {
+    gap: 8px;
+  }
+
+  .mood-boards-page .mb-canvas-viewport {
+    min-height: 300px;
+    padding: 9px;
+  }
+
+  .mood-boards-page .mb-preview-canvas-header {
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .mood-boards-page .mb-active-cat-name {
+    font-size: 15px;
+  }
+
+  .mood-boards-page .mb-preview-sub-breadcrumb {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: 50%;
+    text-align: right;
+    font-size: 10px;
   }
 }
 

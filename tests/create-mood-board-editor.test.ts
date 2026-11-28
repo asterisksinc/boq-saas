@@ -168,6 +168,14 @@ describe("Redesigned Moodboard Creation Workflow — Category-Based Image Collec
       expect(categoriesContent).toContain("handleDeleteCategoryPrompt");
     });
 
+    it("provides validated Save and Cancel controls for category title editing", () => {
+      expect(categoriesContent).toContain("handleSaveRename");
+      expect(categoriesContent).toContain("handleCancelRename");
+      expect(categoriesContent).toContain("Category title is required");
+      expect(categoriesContent).toContain("Save category title");
+      expect(categoriesContent).toContain("Cancel category title edit");
+    });
+
     it("displays category accordions with image count badge and expand/collapse", () => {
       expect(categoriesContent).toContain("mb-category-accordion-card");
       expect(categoriesContent).toContain("mb-category-accordion-header");
@@ -212,6 +220,10 @@ describe("Redesigned Moodboard Creation Workflow — Category-Based Image Collec
       expect(editTitleContent).toContain("Edit Image Title");
       expect(editTitleContent).toContain("Save Title");
       expect(editTitleContent).toContain("onSaveTitle");
+      expect(editTitleContent).toContain("createPortal");
+      expect(editTitleContent).toContain("document.body");
+      expect(editTitleContent).toContain("Image title is required");
+      expect(editTitleContent).toContain("Saving...");
     });
 
     it("verifies 3-column grid CSS definition in mood-boards.css", () => {

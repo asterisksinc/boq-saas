@@ -1232,14 +1232,12 @@ export default function ActivitiesPage() {
             if (editStage) {
                 await updateActivityStage(editStage.id, {
                     name: trimmedName,
-                    color: stageForm.color || null,
-                    terminalType: stageForm.terminalType || null
+                    color: stageForm.color || null
                 });
             } else {
                 await createActivityStage({
                     name: trimmedName,
-                    color: stageForm.color || null,
-                    terminalType: stageForm.terminalType || null
+                    color: stageForm.color || null
                 });
             }
             setCreateStage(false);
@@ -2783,33 +2781,18 @@ export default function ActivitiesPage() {
                                 )}
                             </div>
 
-                            <details style={{ width: "100%", fontSize: "13px", color: "#64748B", cursor: "pointer" }}>
-                                <summary style={{ userSelect: "none", outline: "none", fontWeight: 500 }}>Advanced options</summary>
-                                <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "12px" }}>
-                                    <div className="activities-modal-field">
-                                        <label className="activities-modal-label">Stage Color</label>
-                                        <input
-                                            type="color"
-                                            value={stageForm.color}
-                                            onChange={e => setStageForm(f => ({ ...f, color: e.target.value }))}
-                                            style={{ width: "48px", height: "32px", border: "1px solid #E2E8F0", borderRadius: "6px", cursor: "pointer", padding: "2px" }}
-                                        />
-                                    </div>
-                                    <div className="activities-modal-field">
-                                        <label className="activities-modal-label">Terminal Type</label>
-                                        <select
-                                            className="activities-modal-input"
-                                            style={{ height: "40px", padding: "0 12px" }}
-                                            value={stageForm.terminalType}
-                                            onChange={e => setStageForm(f => ({ ...f, terminalType: e.target.value as "completed" | "lost" | "" }))}
-                                        >
-                                            <option value="">None (Standard Stage)</option>
-                                            <option value="completed">Completed (Workflow terminal)</option>
-                                            <option value="lost">Lost (Workflow terminal)</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </details>
+                            <div className="activities-modal-field">
+                                <label className="activities-modal-label" htmlFor="stage-color-input">Stage Color</label>
+                                <input
+                                    id="stage-color-input"
+                                    type="color"
+                                    value={stageForm.color}
+                                    onChange={e => setStageForm(f => ({ ...f, color: e.target.value }))}
+                                    disabled={isSubmittingStage}
+                                    aria-label="Stage color"
+                                    style={{ width: "48px", height: "36px", border: "1px solid #E2E8F0", borderRadius: "6px", cursor: "pointer", padding: "2px", background: "#fff" }}
+                                />
+                            </div>
                         </div>
 
                         <div className="activities-modal-actions-row">

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { MoreHorizontal, Eye, Edit3, Copy, Archive, Trash2, Download } from "lucide-react";
 import { MoodBoard } from "@/lib/mood-boards/types";
 
@@ -25,6 +26,21 @@ export default function MoodBoardActionsMenu({
 }: MoodBoardActionsMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
+
+  const calculateMenuPosition = () => {
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const menuWidth = 190;
+    const menuHeight = onDownload ? 238 : 206;
+    const left = Math.max(8, Math.min(window.innerWidth - menuWidth - 8, rect.right - menuWidth));
+    const below = rect.bottom + 6;
+    const top = below + menuHeight <= window.innerHeight - 8
+      ? below
+      : Math.max(8, rect.top - menuHeight - 6);
+    setMenuPosition({ top, left });
+  };
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -40,32 +56,43 @@ export default function MoodBoardActionsMenu({
     if (isOpen) {
       document.addEventListener("mousedown", handleClickOutside);
       document.addEventListener("keydown", handleKeyDown);
+      window.addEventListener("resize", calculateMenuPosition);
+      window.addEventListener("scroll", calculateMenuPosition, true);
     }
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", calculateMenuPosition);
+      window.removeEventListener("scroll", calculateMenuPosition, true);
     };
   }, [isOpen]);
+
+  const openMenu = () => {
+    if (!isOpen) calculateMenuPosition();
+    setIsOpen((prev) => !prev);
+  };
 
   return (
     <div className="mb-actions-wrap" ref={menuRef}>
       <button
         type="button"
         className="mb-actions-btn"
+        ref={buttonRef}
         aria-label={`Actions for ${moodBoard.name}`}
         aria-expanded={isOpen}
         onClick={(e) => {
           e.stopPropagation();
-          setIsOpen((prev) => !prev);
+          openMenu();
         }}
       >
         <MoreHorizontal size={18} />
       </button>
 
-      {isOpen && (
+      {isOpen && typeof document !== "undefined" && createPortal(
         <div
-          className="mb-dropdown-menu"
+          className="mb-dropdown-menu mb-dropdown-menu-fixed"
           role="menu"
+          style={menuPosition}
           onClick={(e) => e.stopPropagation()}
         >
           <button
@@ -147,7 +174,8 @@ export default function MoodBoardActionsMenu({
             <Trash2 size={15} />
             <span>Delete</span>
           </button>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

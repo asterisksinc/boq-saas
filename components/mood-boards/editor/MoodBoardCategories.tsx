@@ -58,6 +58,7 @@ export default function MoodBoardCategories({
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
   const [editCatName, setEditCatName] = useState("");
+  const [editCatError, setEditCatError] = useState("");
   const [draggedCatIndex, setDraggedCatIndex] = useState<number | null>(null);
 
   // Image title editing modal
@@ -92,12 +93,22 @@ export default function MoodBoardCategories({
     e.stopPropagation();
     setEditingCatId(cat.id);
     setEditCatName(cat.name);
+    setEditCatError("");
   };
 
   const handleSaveRename = (catId: string) => {
-    if (editCatName.trim()) {
-      onRenameCategory(catId, editCatName.trim());
+    const trimmedName = editCatName.trim();
+    if (!trimmedName) {
+      setEditCatError("Category title is required");
+      return;
     }
+    onRenameCategory(catId, trimmedName);
+    setEditCatError("");
+    setEditingCatId(null);
+  };
+
+  const handleCancelRename = () => {
+    setEditCatError("");
     setEditingCatId(null);
   };
 
@@ -266,19 +277,55 @@ export default function MoodBoardCategories({
                   </div>
 
                   {editingCatId === category.id ? (
-                    <input
-                      type="text"
-                      autoFocus
-                      value={editCatName}
-                      onChange={(e) => setEditCatName(e.target.value)}
-                      onBlur={() => handleSaveRename(category.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleSaveRename(category.id);
-                        if (e.key === "Escape") setEditingCatId(null);
-                      }}
+                    <div
+                      className="mb-cat-inline-edit"
                       onClick={(e) => e.stopPropagation()}
-                      className="mb-cat-inline-rename-input"
-                    />
+                    >
+                      <div className="mb-cat-inline-edit-row">
+                        <input
+                          type="text"
+                          autoFocus
+                          value={editCatName}
+                          aria-label={`Edit category title for ${category.name}`}
+                          aria-invalid={!!editCatError}
+                          onChange={(e) => {
+                            setEditCatName(e.target.value);
+                            if (editCatError) setEditCatError("");
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleSaveRename(category.id);
+                            }
+                            if (e.key === "Escape") handleCancelRename();
+                          }}
+                          className={`mb-cat-inline-rename-input ${editCatError ? "error" : ""}`}
+                        />
+                        <button
+                          type="button"
+                          className="mb-cat-inline-save"
+                          onClick={() => handleSaveRename(category.id)}
+                          aria-label="Save category title"
+                          title="Save Changes"
+                        >
+                          <Check size={14} />
+                          <span>Save</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="mb-cat-inline-cancel"
+                          onClick={handleCancelRename}
+                          aria-label="Cancel category title edit"
+                          title="Cancel"
+                        >
+                          <X size={14} />
+                          <span>Cancel</span>
+                        </button>
+                      </div>
+                      {editCatError && (
+                        <p className="mb-cat-inline-error">{editCatError}</p>
+                      )}
+                    </div>
                   ) : (
                     <div className="mb-cat-name-group">
                       <span className="mb-cat-title-text">{category.name}</span>
@@ -560,9 +607,7 @@ export default function MoodBoardCategories({
       {/* Edit Image Title Modal */}
       <EditImageTitleModal
         isOpen={titleModalState.isOpen}
-        onClose={() =>
-          setTitleModalState((prev) => ({ ...prev, isOpen: false }))
-        }
+        onClose={() => setTitleModalState((prev) => ({ ...prev, isOpen: false }))}
         currentTitle={titleModalState.currentTitle}
         imageThumbnail={titleModalState.thumbnail}
         onSaveTitle={(newTitle) => {

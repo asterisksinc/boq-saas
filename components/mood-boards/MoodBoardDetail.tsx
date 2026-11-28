@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -45,6 +46,9 @@ export default function MoodBoardDetail({ id, rail }: MoodBoardDetailProps) {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const [previewImage, setPreviewImage] = useState<MoodBoardImage | null>(null);
 
   // Toast state
@@ -73,6 +77,47 @@ export default function MoodBoardDetail({ id, rail }: MoodBoardDetailProps) {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const calculateMenuPosition = useCallback(() => {
+    const rect = menuButtonRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const menuWidth = 190;
+    const menuHeight = 154;
+    const left = Math.max(8, Math.min(window.innerWidth - menuWidth - 8, rect.right - menuWidth));
+    const below = rect.bottom + 6;
+    const top = below + menuHeight <= window.innerHeight - 8
+      ? below
+      : Math.max(8, rect.top - menuHeight - 6);
+    setMenuPosition({ top, left });
+  }, []);
+
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(target) &&
+        menuButtonRef.current &&
+        !menuButtonRef.current.contains(target)
+      ) {
+        setIsMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("resize", calculateMenuPosition);
+    window.addEventListener("scroll", calculateMenuPosition, true);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", calculateMenuPosition);
+      window.removeEventListener("scroll", calculateMenuPosition, true);
+    };
+  }, [isMenuOpen, calculateMenuPosition]);
 
   // Handle Edit Submit
   const handleEditSubmit = async (boardId: string, input: UpdateMoodBoardInput) => {
@@ -318,17 +363,26 @@ export default function MoodBoardDetail({ id, rail }: MoodBoardDetailProps) {
                 <div className="mb-actions-wrap">
                   <button
                     type="button"
+                    ref={menuButtonRef}
                     className="mb-btn mb-btn-secondary"
                     style={{ width: 46, padding: 0 }}
-                    onClick={() => setIsMenuOpen((prev) => !prev)}
+                    onClick={() => {
+                      if (!isMenuOpen) calculateMenuPosition();
+                      setIsMenuOpen((prev) => !prev);
+                    }}
                     aria-label="More options"
                     aria-expanded={isMenuOpen}
                   >
                     <MoreHorizontal size={18} />
                   </button>
 
-                  {isMenuOpen && (
-                    <div className="mb-dropdown-menu">
+                  {isMenuOpen && typeof document !== "undefined" && createPortal(
+                    <div
+                      ref={menuRef}
+                      className="mb-dropdown-menu mb-dropdown-menu-fixed"
+                      role="menu"
+                      style={menuPosition}
+                    >
                       <button
                         type="button"
                         className="mb-dropdown-item"
@@ -364,7 +418,8 @@ export default function MoodBoardDetail({ id, rail }: MoodBoardDetailProps) {
                         <Trash2 size={15} />
                         <span>Delete</span>
                       </button>
-                    </div>
+                    </div>,
+                    document.body
                   )}
                 </div>
               </div>

@@ -40,7 +40,6 @@ export default function MoodBoardActionBar({
     <header className="moodboard-header mb-action-bar-frame" role="toolbar" aria-label="Moodboard editor toolbar">
       {/* Top Left: Back Navigation, Title & Subtitle */}
       <div className="mb-action-bar-left">
-        <h2 className="mb-page-section-title">Moodboards</h2>
         <div className="mb-page-navigation-row">
           <button
             type="button"
@@ -50,8 +49,10 @@ export default function MoodBoardActionBar({
             title="Back to Moodboards"
           >
             <ArrowLeft size={14} />
-            <span>Back</span>
+            <span>Back to Moodboards</span>
           </button>
+          <ChevronRight size={13} className="mb-breadcrumb-chevron" aria-hidden="true" />
+          <span className="mb-current-crumb mb-page-section-title" aria-current="page">New Moodboard</span>
         </div>
         <div className="mb-header-title-wrap">
           <h1 className="mb-action-bar-title">{title}</h1>
