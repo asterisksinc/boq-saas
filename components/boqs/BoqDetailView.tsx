@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
     ArrowLeft,
     ChevronRight,
@@ -96,6 +97,14 @@ export default function BoqDetailView({ activeBoq, onBack }: BoqDetailViewProps)
     const [newRoomName, setNewRoomName] = useState("");
     const [selectedRoomForItems, setSelectedRoomForItems] = useState<any | null>(null);
     const [openRowMenuId, setOpenRowMenuId] = useState<string | null>(null);
+    const [rowMenuPosition, setRowMenuPosition] = useState({
+        top: 0,
+        left: 0,
+        maxHeight: 0,
+        placement: "bottom" as "top" | "bottom",
+    });
+    const rowMenuTriggerRef = useRef<HTMLButtonElement>(null);
+    const rowMenuRef = useRef<HTMLDivElement>(null);
     const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
     const [editRoomName, setEditRoomName] = useState("");
 
@@ -141,14 +150,83 @@ export default function BoqDetailView({ activeBoq, onBack }: BoqDetailViewProps)
         }
     }, []);
 
-    // Close action dropdown menu on outside click
+    // Dynamically position the room action menu within the viewport.
     useEffect(() => {
-        const handleOutsideClick = () => {
-            setOpenRowMenuId(null);
+        if (!openRowMenuId) return;
+
+        const updatePosition = () => {
+            const trigger = rowMenuTriggerRef.current;
+            if (!trigger) return;
+
+            const rect = trigger.getBoundingClientRect();
+            const menu = rowMenuRef.current;
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            const viewportMargin = 12;
+            const menuGap = 6;
+            const menuWidth = menu ? Math.round(menu.getBoundingClientRect().width) : 166;
+            const naturalMenuHeight = menu ? Math.ceil(menu.scrollHeight) : 232;
+
+            let left = rect.right - menuWidth;
+            left = Math.max(viewportMargin, Math.min(left, viewportWidth - menuWidth - viewportMargin));
+
+            const availableBelow = viewportHeight - rect.bottom - menuGap - viewportMargin;
+            const availableAbove = rect.top - menuGap - viewportMargin;
+            let top = rect.bottom + menuGap;
+            let placement: "top" | "bottom" = "bottom";
+            let maxHeight = naturalMenuHeight;
+
+            if (availableBelow >= naturalMenuHeight) {
+                top = rect.bottom + menuGap;
+                maxHeight = naturalMenuHeight;
+            } else if (availableAbove >= naturalMenuHeight) {
+                top = rect.top - naturalMenuHeight - menuGap;
+                placement = "top";
+            } else if (availableAbove >= availableBelow) {
+                maxHeight = Math.max(80, Math.floor(availableAbove));
+                top = rect.top - maxHeight - menuGap;
+                placement = "top";
+            } else {
+                maxHeight = Math.max(80, Math.floor(availableBelow));
+                top = rect.bottom + menuGap;
+            }
+
+            top = Math.max(viewportMargin, Math.min(top, viewportHeight - maxHeight - viewportMargin));
+            setRowMenuPosition({ top, left, maxHeight, placement });
         };
-        window.addEventListener("click", handleOutsideClick);
-        return () => window.removeEventListener("click", handleOutsideClick);
-    }, []);
+
+        updatePosition();
+
+        const handleOutsideClick = (event: MouseEvent) => {
+            const target = event.target as Node;
+            if (
+                !rowMenuRef.current?.contains(target) &&
+                !rowMenuTriggerRef.current?.contains(target)
+            ) {
+                setOpenRowMenuId(null);
+            }
+        };
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === "Escape") setOpenRowMenuId(null);
+        };
+
+        document.addEventListener("mousedown", handleOutsideClick);
+        document.addEventListener("keydown", handleKeyDown);
+        window.addEventListener("resize", updatePosition);
+        window.addEventListener("scroll", updatePosition, true);
+        const resizeObserver = typeof ResizeObserver !== "undefined" && rowMenuRef.current
+            ? new ResizeObserver(updatePosition)
+            : null;
+        resizeObserver?.observe(rowMenuRef.current as Element);
+
+        return () => {
+            document.removeEventListener("mousedown", handleOutsideClick);
+            document.removeEventListener("keydown", handleKeyDown);
+            window.removeEventListener("resize", updatePosition);
+            window.removeEventListener("scroll", updatePosition, true);
+            resizeObserver?.disconnect();
+        };
+    }, [openRowMenuId]);
 
     const loadDetail = async () => {
         setLoading(true);
@@ -1025,25 +1103,35 @@ export default function BoqDetailView({ activeBoq, onBack }: BoqDetailViewProps)
                                                     onClick={(e) => e.stopPropagation()}
                                                 >
                                                     <button
+                                                        ref={openRowMenuId === room.id ? rowMenuTriggerRef : undefined}
                                                         type="button"
                                                         className="boq-room-row-action-btn"
                                                         aria-label="Room actions"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
+                                                            rowMenuTriggerRef.current = e.currentTarget;
                                                             setOpenRowMenuId(openRowMenuId === room.id ? null : room.id);
                                                         }}
                                                     >
                                                         <MoreHorizontal size={18} />
                                                     </button>
-
-                                                    {openRowMenuId === room.id && (
+                                                    {openRowMenuId === room.id &&
+                                                        typeof document !== "undefined" &&
+                                                        createPortal(
                                                         <div
+                                                            ref={rowMenuRef}
+                                                            role="menu"
                                                             className="boq-action-dropdown-menu"
                                                             style={{
-                                                                position: "absolute",
-                                                                top: "40px",
-                                                                right: "0px",
-                                                                zIndex: 40,
+                                                                position: "fixed",
+                                                                top: `${rowMenuPosition.top}px`,
+                                                                left: `${rowMenuPosition.left}px`,
+                                                                right: "auto",
+                                                                zIndex: 99999,
+                                                                maxHeight: rowMenuPosition.maxHeight > 0
+                                                                    ? `${rowMenuPosition.maxHeight}px`
+                                                                    : undefined,
+                                                                overflowY: "auto",
                                                             }}
                                                             onClick={(e) => e.stopPropagation()}
                                                         >
@@ -1104,8 +1192,9 @@ export default function BoqDetailView({ activeBoq, onBack }: BoqDetailViewProps)
                                                                 <Trash2 size={15} />
                                                                 <span>Delete Room</span>
                                                             </button>
-                                                        </div>
-                                                    )}
+                                                        </div>,
+                                                        document.body
+                                                        )}
                                                 </div>
                                             </div>
                                         );

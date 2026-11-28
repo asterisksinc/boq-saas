@@ -7292,6 +7292,19 @@ async function nextBoqIdentity(supabase: SupabaseClient, workspaceId: string, of
   return { boqNumber: `BOQ-${sequence}`, version };
 }
 
+async function previewBoqIdentity(request: Request, supabase: SupabaseClient, id: string) {
+  const scoped = await workspaceAccess(supabase, id, true);
+  if ("response" in scoped) return scoped.response;
+  const projectId = new URL(request.url).searchParams.get("projectId") || undefined;
+  if (projectId) {
+    const project = await supabase.from("projects").select("id")
+      .eq("workspace_id", scoped.access.workspaceId).eq("id", projectId).is("archived_at", null).maybeSingle();
+    if (!project.data) return fail("NOT_FOUND", "Project was not found.", 404, id);
+  }
+  const identity = await nextBoqIdentity(supabase, scoped.access.workspaceId, 1, projectId);
+  return ok(identity, 200, id);
+}
+
 async function cleanupCreatedBoq(supabase: SupabaseClient, workspaceId: string, boqId: string, requestId: string) {
   const { error } = await supabase.from("boqs").delete().eq("workspace_id", workspaceId).eq("id", boqId);
   if (error) {
@@ -17429,6 +17442,7 @@ async function dispatch(request: NextRequest, path: string[]) {
   if (request.method === "POST" && route === "boq-imports") return createBoqImport(request, supabase, id);
   if (request.method === "GET" && route === "boqs") return listBoqs(request, supabase, id);
   if (request.method === "POST" && route === "boqs") return createBoq(request, supabase, id);
+  if (request.method === "GET" && route === "boqs/identity") return previewBoqIdentity(request, supabase, id);
   if (request.method === "POST" && route === "boq-templates/upload-image") return uploadTemplateImage(request, supabase, id);
   if (["GET","POST"].includes(request.method) && route === "boq-templates") return boqTemplates(request, supabase, id);
   const boqTemplateRestoreMatch = route.match(/^boq-templates\/([0-9a-f-]{36})\/restore$/i);

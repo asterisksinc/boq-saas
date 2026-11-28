@@ -114,3 +114,19 @@ export function filterMoodBoards(
     return true;
   });
 }
+
+export function formatFilenameToTitle(filename: string): string {
+  if (!filename) return "Untitled Image";
+  // Remove file extension
+  const withoutExt = filename.replace(/\.[^/.]+$/, "");
+  // Replace hyphens, underscores, dots with spaces
+  const cleaned = withoutExt.replace(/[-_.]+/g, " ").trim();
+  // Capitalize words
+  return (
+    cleaned
+      .split(" ")
+      .filter(Boolean)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ") || "Untitled Image"
+  );
+}

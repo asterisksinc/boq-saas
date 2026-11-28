@@ -1,10 +1,10 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import {
   MOCK_PROJECTS,
+  MOCK_CLIENTS,
   MOCK_LEADS,
-  createInitialCategories,
 } from "../lib/mood-boards/mock-data";
 import {
   saveDraftMoodBoard,
@@ -14,70 +14,109 @@ import {
   addMoodBoard,
 } from "../lib/mood-boards/storage";
 import { moodBoardRepository } from "../lib/mood-boards/repository";
+import { LAYOUT_TEMPLATES } from "../lib/mood-boards/templates-data";
 
-describe("Create Mood Board Editor — Architecture & Figma Spec Verification", () => {
+describe("Redesigned Moodboard Creation Workflow — Category-Based Image Collection Verification", () => {
   const root = process.cwd();
   const editorCompPath = join(root, "components", "mood-boards", "editor", "CreateMoodBoardEditor.tsx");
   const actionBarPath = join(root, "components", "mood-boards", "editor", "MoodBoardActionBar.tsx");
   const basicDetailsPath = join(root, "components", "mood-boards", "editor", "MoodBoardBasicDetails.tsx");
   const categoriesPath = join(root, "components", "mood-boards", "editor", "MoodBoardCategories.tsx");
-  const itemsPath = join(root, "components", "mood-boards", "editor", "MoodBoardItems.tsx");
   const previewPath = join(root, "components", "mood-boards", "editor", "MoodBoardPreview.tsx");
+  const templateSelectorPath = join(root, "components", "mood-boards", "editor", "MoodBoardTemplateSelector.tsx");
+  const fullscreenModalPath = join(root, "components", "mood-boards", "editor", "MoodBoardFullscreenModal.tsx");
+  const reviewStepPath = join(root, "components", "mood-boards", "editor", "MoodBoardReviewStep.tsx");
+  const completeStepPath = join(root, "components", "mood-boards", "editor", "MoodBoardCompleteStep.tsx");
   const unsavedPath = join(root, "components", "mood-boards", "editor", "UnsavedChangesDialog.tsx");
   const addCategoryModalPath = join(root, "components", "mood-boards", "editor", "AddCategoryModal.tsx");
+  const editTitleModalPath = join(root, "components", "mood-boards", "editor", "EditImageTitleModal.tsx");
   const newPagePath = join(root, "app", "mood-boards", "new", "page.tsx");
   const dashboardNewPagePath = join(root, "app", "dashboard", "mood-boards", "new", "page.tsx");
   const cssPath = join(root, "app", "mood-boards", "mood-boards.css");
 
   describe("1. Component File Structure Verification", () => {
-    it("verifies all modular editor components exist", () => {
+    it("verifies all modular editor components exist for the redesigned workflow", () => {
       expect(existsSync(editorCompPath)).toBe(true);
       expect(existsSync(actionBarPath)).toBe(true);
       expect(existsSync(basicDetailsPath)).toBe(true);
       expect(existsSync(categoriesPath)).toBe(true);
-      expect(existsSync(itemsPath)).toBe(true);
       expect(existsSync(previewPath)).toBe(true);
+      expect(existsSync(templateSelectorPath)).toBe(true);
+      expect(existsSync(fullscreenModalPath)).toBe(true);
+      expect(existsSync(reviewStepPath)).toBe(true);
+      expect(existsSync(completeStepPath)).toBe(true);
       expect(existsSync(unsavedPath)).toBe(true);
       expect(existsSync(addCategoryModalPath)).toBe(true);
+      expect(existsSync(editTitleModalPath)).toBe(true);
       expect(existsSync(newPagePath)).toBe(true);
       expect(existsSync(dashboardNewPagePath)).toBe(true);
+      expect(existsSync(cssPath)).toBe(true);
     });
   });
 
-  describe("2. Top Action Bar Verification (Section 4 & Frame 2147225068)", () => {
+  describe("2. Header & 3-Step Workflow Progress Indicator (Section 3)", () => {
     const actionBarContent = readFileSync(actionBarPath, "utf-8");
     const cssContent = readFileSync(cssPath, "utf-8");
 
-    it("verifies title 'Create Mood Board' and back button exist", () => {
-      expect(actionBarContent).toContain("Create Mood Board");
+    it("verifies title, breadcrumb, and back button exist", () => {
+      expect(actionBarContent).toContain("Create Moodboard");
       expect(actionBarContent).toContain("ArrowLeft");
       expect(actionBarContent).toContain("onBack");
+      expect(actionBarContent).toContain("mb-page-section-title");
+      expect(actionBarContent).toContain("mb-page-navigation-row");
     });
 
-    it("verifies Cancel, Save as Draft, and Create Mood Board buttons exist", () => {
+    it("verifies three-step workflow indicator: Add Content -> Review -> Complete", () => {
+      expect(actionBarContent).toContain("Add Content");
+      expect(actionBarContent).toContain("Review");
+      expect(actionBarContent).toContain("Complete");
+      expect(actionBarContent).toContain("mb-workflow-stepper");
+      expect(actionBarContent).toContain("mb-step-indicator");
+    });
+
+    it("verifies Cancel, Save as Draft, Continue to Review, and Create Mood Board actions exist", () => {
       expect(actionBarContent).toContain("Cancel");
       expect(actionBarContent).toContain("Save as Draft");
+      expect(actionBarContent).toContain("Continue to Review");
       expect(actionBarContent).toContain("Create Mood Board");
     });
 
-    it("verifies Action Bar CSS matches Figma spec", () => {
+    it("verifies Action Bar and Stepper CSS tokens match design system", () => {
       expect(cssContent).toContain(".mb-action-bar-frame");
-      expect(cssContent).toContain(".mb-action-btn-cancel");
+      expect(cssContent).toContain(".mb-workflow-stepper");
+      expect(cssContent).toContain(".mb-step-indicator");
       expect(cssContent).toContain(".mb-action-btn-draft");
       expect(cssContent).toContain(".mb-action-btn-create");
-      expect(cssContent).toContain("min-width: 152px");
       expect(cssContent).toContain("background: #2563EB");
+    });
+
+    it("fits the editor to the dashboard tab and keeps the header flush and aligned", () => {
+      expect(cssContent).toMatch(/\.mood-boards-page \.moodboard-create-container[\s\S]*?width:\s*100%;/);
+      expect(cssContent).toMatch(/\.mood-boards-page \.moodboard-create-container[\s\S]*?margin:\s*0;/);
+      expect(cssContent).toContain(".mood-boards-page .mb-action-bar-left");
+      expect(cssContent).toContain(".mood-boards-page .mb-action-bar-back-btn");
+      expect(cssContent).toContain("margin-top: 0;");
+      expect(cssContent).toContain("height: 34px;");
+      expect(cssContent).toContain("grid-template-columns: repeat(4, minmax(0, 1fr));");
+      expect(cssContent).toContain("max-height: calc(100vh - 32px);");
+      expect(cssContent).toContain(".mood-boards-page .mb-action-bar-right");
+      expect(cssContent).toContain(".mood-boards-page .mb-page-section-title");
+      expect(cssContent).toContain("grid-template-columns: 68px minmax(0, 1fr);");
+      expect(cssContent).toContain(".mood-boards-page .mb-action-bar-top-right");
+      expect(cssContent).toContain("grid-template-columns: minmax(320px, 1fr) minmax(520px, auto)");
+      expect(cssContent).toContain("grid-template-rows: 28px 46px;");
+      expect(cssContent).toContain("grid-template-columns: minmax(0, 0.677fr) minmax(0, 1fr);");
+      expect(cssContent).toContain("flex: 0 0 104px;");
     });
   });
 
-  describe("3. Basic Details Section Verification (Section 5 & Frame 2147225071)", () => {
+  describe("3. Basic Details Section Verification (Section 4)", () => {
     const detailsContent = readFileSync(basicDetailsPath, "utf-8");
-    const cssContent = readFileSync(cssPath, "utf-8");
 
-    it("contains Mood Board Name * with red asterisk and Enter Mood Board Name placeholder", () => {
-      expect(detailsContent).toContain("Mood Board Name");
+    it("contains Moodboard Name * with red asterisk and placeholder", () => {
+      expect(detailsContent).toContain("Moodboard Name");
       expect(detailsContent).toContain("mb-required-star");
-      expect(detailsContent).toContain("Enter Mood Board Name");
+      expect(detailsContent).toContain("Enter moodboard name");
     });
 
     it("contains Project * dropdown populated with MOCK_PROJECTS", () => {
@@ -86,171 +125,291 @@ describe("Create Mood Board Editor — Architecture & Figma Spec Verification", 
       expect(MOCK_PROJECTS.length).toBeGreaterThan(0);
     });
 
-    it("contains Lead * dropdown populated with MOCK_LEADS", () => {
-      expect(detailsContent).toContain("Select Lead");
-      expect(detailsContent).toContain("MOCK_LEADS");
-      expect(MOCK_LEADS.length).toBeGreaterThan(0);
+    it("contains Client * dropdown populated with project clients and MOCK_CLIENTS", () => {
+      expect(detailsContent).toContain("Select Client");
+      expect(detailsContent).toContain("MOCK_CLIENTS");
+      expect(MOCK_CLIENTS.length).toBeGreaterThan(0);
     });
 
-    it("contains Description field", () => {
-      expect(detailsContent).toContain("Description");
-      expect(detailsContent).toContain("Enter description");
+    it("contains Description textarea with concept guidance placeholder", () => {
+      expect(detailsContent).toContain("textarea");
+      expect(detailsContent).toContain("Describe the concept, theme, or design direction.");
     });
 
-    it("verifies CSS matches Figma translucent outer card and inner white card", () => {
-      expect(cssContent).toContain(".mb-section-card");
-      expect(cssContent).toContain("background: rgba(255, 255, 255, 0.6)");
-      expect(cssContent).toContain("border-radius: 6px");
-      expect(cssContent).toContain(".mb-inner-white-card");
-      expect(cssContent).toContain("box-shadow: 0px 0px 6px rgba(0, 0, 0, 0.06)");
-      expect(cssContent).toContain("border-radius: 14px");
+    it("uses a clean two-column layout for Project and Client, and full width for Name and Description", () => {
+      expect(detailsContent).toContain("mb-two-col-row");
     });
   });
 
-  describe("4. Categories Section Verification (Section 6 & Frame 2147225617)", () => {
+  describe("4. Categories Management & Accordion Verification (Section 5)", () => {
     const categoriesContent = readFileSync(categoriesPath, "utf-8");
-    const initialCats = createInitialCategories();
+    const addCatContent = readFileSync(addCategoryModalPath, "utf-8");
+    const cssContent = readFileSync(cssPath, "utf-8");
 
-    it("initializes with 5 core mock categories (Entrance, Living Room, Dining, Kitchen, Master Bedroom)", () => {
-      const names = initialCats.map((c) => c.name);
-      expect(names).toContain("Entrance");
-      expect(names).toContain("Living Room");
-      expect(names).toContain("Dining");
-      expect(names).toContain("Kitchen");
-      expect(names).toContain("Master Bedroom");
+    it("contains Categories title, count badge, and Add Category button", () => {
+      expect(categoriesContent).toContain("Categories");
+      expect(categoriesContent).toContain("mb-categories-total-badge");
+      expect(categoriesContent).toContain("Add Category");
+      expect(categoriesContent).toContain("onAddCategory");
     });
 
-    it("verifies initial image count values match Figma reference (8, 16, 10, 24, 18)", () => {
-      const entrance = initialCats.find((c) => c.name === "Entrance");
-      const living = initialCats.find((c) => c.name === "Living Room");
-      const dining = initialCats.find((c) => c.name === "Dining");
-      const kitchen = initialCats.find((c) => c.name === "Kitchen");
-      const master = initialCats.find((c) => c.name === "Master Bedroom");
-
-      expect(entrance?.imageCount).toBe(8);
-      expect(living?.imageCount).toBe(16);
-      expect(dining?.imageCount).toBe(10);
-      expect(kitchen?.imageCount).toBe(24);
-      expect(master?.imageCount).toBe(18);
+    it("contains AddCategoryModal with required Category Name and optional Description", () => {
+      expect(addCatContent).toContain("Category Name");
+      expect(addCatContent).toContain("mb-required-star");
+      expect(addCatContent).toContain("Category Description");
+      expect(addCatContent).toContain("Create Category");
     });
 
-    it("verifies Add More Category button and reordering/rename handlers exist", () => {
-      expect(categoriesContent).toContain("Add More Category");
+    it("supports category operations: rename, delete with confirmation, and drag-and-drop reordering", () => {
       expect(categoriesContent).toContain("onRenameCategory");
       expect(categoriesContent).toContain("onDeleteCategory");
       expect(categoriesContent).toContain("onReorderCategories");
+      expect(categoriesContent).toContain("GripVertical");
+      expect(categoriesContent).toContain("handleDeleteCategoryPrompt");
     });
 
-    it("verifies Master Bedroom contains sub-groups (Furniture, Painting, Electrical)", () => {
-      const master = initialCats.find((c) => c.name === "Master Bedroom");
-      const groupNames = master?.itemGroups?.map((g) => g.name);
-      expect(groupNames).toContain("Furniture");
-      expect(groupNames).toContain("Painting");
-      expect(groupNames).toContain("Electrical");
+    it("displays category accordions with image count badge and expand/collapse", () => {
+      expect(categoriesContent).toContain("mb-category-accordion-card");
+      expect(categoriesContent).toContain("mb-category-accordion-header");
+      expect(categoriesContent).toContain("mb-cat-image-count-tag");
+      expect(categoriesContent).toContain("onToggleExpand");
+    });
+
+    it("verifies categories CSS styling in mood-boards.css", () => {
+      expect(cssContent).toContain(".mb-categories-management");
+      expect(cssContent).toContain(".mb-category-accordion-card");
+      expect(cssContent).toContain(".mb-btn-add-category");
     });
   });
 
-  describe("5. Items Section Verification (Section 7 & Frame 2147225126)", () => {
-    const itemsContent = readFileSync(itemsPath, "utf-8");
+  describe("5. Image Upload Inside Categories & 3-Column Image Cards (Section 6)", () => {
+    const categoriesContent = readFileSync(categoriesPath, "utf-8");
+    const editTitleContent = readFileSync(editTitleModalPath, "utf-8");
     const cssContent = readFileSync(cssPath, "utf-8");
 
-    it("contains table headers: DESCRIPTION, QTY, RATE, AMOUNT", () => {
-      expect(itemsContent).toContain("DESCRIPTION");
-      expect(itemsContent).toContain("QTY");
-      expect(itemsContent).toContain("RATE");
-      expect(itemsContent).toContain("AMOUNT");
+    it("provides empty category dropzone with upload icon and browse button", () => {
+      expect(categoriesContent).toContain("Upload images to this category");
+      expect(categoriesContent).toContain("Drag and drop or browse files");
+      expect(categoriesContent).toContain("Add Images");
+      expect(categoriesContent).toContain("UploadCloud");
     });
 
-    it("contains Add Item button", () => {
-      expect(itemsContent).toContain("Add Item");
-      expect(itemsContent).toContain("onAddItem");
+    it("renders uploaded images in a three-column grid with image thumbnail and title", () => {
+      expect(categoriesContent).toContain("mb-category-images-grid");
+      expect(categoriesContent).toContain("mb-image-card");
+      expect(categoriesContent).toContain("mb-image-thumb");
+      expect(categoriesContent).toContain("mb-image-title-text");
     });
 
-    it("calculates amount automatically on quantity or rate change", () => {
-      expect(itemsContent).toContain("item.amount");
-      expect(itemsContent).toContain("onUpdateItem");
+    it("provides remove button in the top-right corner and title edit option", () => {
+      expect(categoriesContent).toContain("mb-img-remove-btn");
+      expect(categoriesContent).toContain("onRemoveImageFromCategory");
+      expect(categoriesContent).toContain("onUpdateImageTitle");
+      expect(categoriesContent).toContain("EditImageTitleModal");
     });
 
-    it("verifies CSS table header #E4ECFB and Urbanist typography", () => {
-      expect(cssContent).toContain(".mb-items-table-header");
-      expect(cssContent).toContain("background: #E4ECFB");
+    it("contains EditImageTitleModal for editing individual image titles", () => {
+      expect(editTitleContent).toContain("Edit Image Title");
+      expect(editTitleContent).toContain("Save Title");
+      expect(editTitleContent).toContain("onSaveTitle");
+    });
+
+    it("verifies 3-column grid CSS definition in mood-boards.css", () => {
+      expect(cssContent).toContain(".mb-category-images-grid");
+      expect(cssContent).toContain("grid-template-columns: repeat(3, 1fr)");
+      expect(cssContent).toContain(".mb-image-card");
+      expect(cssContent).toContain(".mb-img-remove-btn");
     });
   });
 
-  describe("6. Right Panel: Mood Board Preview & Financial Summary (Section 8 & Frame 2147225071)", () => {
+  describe("6. Choose Template & Live Moodboard Preview (Section 7 & 8)", () => {
     const previewContent = readFileSync(previewPath, "utf-8");
+    const selectorContent = readFileSync(templateSelectorPath, "utf-8");
+    const fullscreenContent = readFileSync(fullscreenModalPath, "utf-8");
     const cssContent = readFileSync(cssPath, "utf-8");
 
-    it("contains MOODBOARD PREVIEW heading and Change Template button", () => {
-      expect(previewContent).toContain("MOODBOARD PREVIEW");
-      expect(previewContent).toContain("Change Template");
-      expect(previewContent).toContain("onChangeTemplate");
+    it("defines the 6 required layout templates: Grid 4x4, Collage, Modern, Minimal, Magazine, Split", () => {
+      expect(LAYOUT_TEMPLATES.length).toBe(6);
+      const ids = LAYOUT_TEMPLATES.map((t) => t.id);
+      expect(ids).toContain("grid-4x4");
+      expect(ids).toContain("collage");
+      expect(ids).toContain("modern");
+      expect(ids).toContain("minimal");
+      expect(ids).toContain("magazine");
+      expect(ids).toContain("split");
     });
 
-    it("displays Subtotal, GST (18%), and Total Amount", () => {
-      expect(previewContent).toContain("Subtotal");
-      expect(previewContent).toContain("GST (18%)");
-      expect(previewContent).toContain("Total Amount");
+    it("renders Choose Template bar with layout mini-diagrams and selected checkmark", () => {
+      expect(selectorContent).toContain("Choose Template");
+      expect(selectorContent).toContain("renderLayoutDiagram");
+      expect(selectorContent).toContain("mb-tpl-selected-badge");
+      expect(selectorContent).toContain("onSelectTemplate");
     });
 
-    it("supports image uploads, dropzone, and sample swatch generation", () => {
-      expect(previewContent).toContain("UploadCloud");
-      expect(previewContent).toContain("Add Sample Swatch");
-      expect(previewContent).toContain("onAddImagesToCategory");
-      expect(previewContent).toContain("onSetCoverImage");
+    it("renders live preview canvas with active category, project, moodboard title, and distinct layouts", () => {
+      expect(previewContent).toContain("mb-preview-canvas-card");
+      expect(previewContent).toContain("mb-active-cat-name");
+      expect(previewContent).toContain("mb-preview-proj-name");
+      expect(previewContent).toContain("mb-preview-board-name");
+      expect(previewContent).toContain("layout-grid-4x4");
+      expect(previewContent).toContain("layout-collage");
+      expect(previewContent).toContain("layout-modern");
+      expect(previewContent).toContain("layout-minimal");
+      expect(previewContent).toContain("layout-magazine");
+      expect(previewContent).toContain("layout-split");
     });
 
-    it("verifies CSS styling for preview panel and summary card", () => {
-      expect(cssContent).toContain(".mb-preview-panel");
-      expect(cssContent).toContain(".mb-financial-summary-card");
-      expect(cssContent).toContain(".mb-summary-total-val");
+    it("provides category navigation controls below the preview canvas", () => {
+      expect(previewContent).toContain("mb-preview-category-pagination");
+      expect(previewContent).toContain("mb-page-nav-btn prev");
+      expect(previewContent).toContain("mb-page-nav-btn next");
+      expect(previewContent).toContain("mb-pagination-counter-group");
+    });
+
+    it("provides Fullscreen button and Fullscreen overlay modal with category switcher", () => {
+      expect(previewContent).toContain("mb-btn-fullscreen");
+      expect(previewContent).toContain("MoodBoardFullscreenModal");
+      expect(fullscreenContent).toContain("mb-fullscreen-overlay");
+      expect(fullscreenContent).toContain("Fullscreen Preview");
+      expect(fullscreenContent).toContain("mb-fullscreen-close-btn");
+    });
+
+    it("verifies template layouts and preview canvas CSS styling", () => {
+      expect(cssContent).toContain(".mb-choose-template-section");
+      expect(cssContent).toContain(".mb-preview-canvas-card");
+      expect(cssContent).toContain(".layout-grid-4x4");
+      expect(cssContent).toContain(".layout-collage");
+      expect(cssContent).toContain(".layout-modern");
+      expect(cssContent).toContain(".layout-minimal");
+      expect(cssContent).toContain(".layout-magazine");
+      expect(cssContent).toContain(".layout-split");
+      expect(cssContent).toContain(".mb-fullscreen-overlay");
     });
   });
 
-  describe("7. Draft Storage & Persistence (Section 12)", () => {
-    it("can save, load, and clear working drafts in localStorage", () => {
+  describe("7. Removal of Item-Based and Costing Functionality (Section 1)", () => {
+    const editorContent = readFileSync(editorCompPath, "utf-8");
+    const previewContent = readFileSync(previewPath, "utf-8");
+    const categoriesContent = readFileSync(categoriesPath, "utf-8");
+
+    it("ensures NO financial calculations or BOQ pricing exist in the moodboard creation workflow", () => {
+      // CreateMoodBoardEditor must not calculate or display Subtotal, GST, or Total Amount
+      expect(editorContent).not.toContain("subtotal =");
+      expect(editorContent).not.toContain("gst =");
+      expect(editorContent).not.toContain("totalAmount =");
+
+      // Preview canvas must not display Subtotal, GST, or Total Amount
+      expect(previewContent).not.toContain("Subtotal");
+      expect(previewContent).not.toContain("GST (18%)");
+      expect(previewContent).not.toContain("Total Amount");
+
+      // No "+ Add Sample Swatch" in preview
+      expect(previewContent).not.toContain("Add Sample Swatch");
+
+      // No item table rendering in CreateMoodBoardEditor active UI
+      expect(editorContent).not.toContain("<MoodBoardItems");
+    });
+  });
+
+  describe("8. Review and Complete Workflow Verification (Section 12)", () => {
+    const reviewContent = readFileSync(reviewStepPath, "utf-8");
+    const completeContent = readFileSync(completeStepPath, "utf-8");
+
+    it("verifies Step 2: Review displays complete moodboard, category tabs, and validation status", () => {
+      expect(reviewContent).toContain("Step 2: Review");
+      expect(reviewContent).toContain("mb-review-category-tabs-row");
+      expect(reviewContent).toContain("mb-review-canvas-wrapper");
+      expect(reviewContent).toContain("Back to Add Content");
+      expect(reviewContent).toContain("Create Moodboard");
+    });
+
+    it("verifies Step 3: Complete displays success confirmation, summary, and action links", () => {
+      expect(completeContent).toContain("Step 3: Complete");
+      expect(completeContent).toContain("Moodboard Created Successfully!");
+      expect(completeContent).toContain("View Moodboard");
+      expect(completeContent).toContain("Back to Moodboards");
+      expect(completeContent).toContain("Create Another Moodboard");
+    });
+  });
+
+  describe("9. Draft Storage & Persistence (Section 10)", () => {
+    it("can save, load, and clear working category-based drafts in localStorage", () => {
       const mockDraft = {
-        name: "Test Penthouse Suite",
+        name: "Artisan Modern Penthouse",
         projectId: "proj-1",
-        leadId: "lead-1",
-        description: "Draft concept description",
+        clientId: "client-1",
+        description: "Category based visual inspiration draft",
+        selectedTemplate: "collage",
+        categories: [
+          {
+            id: "cat-1",
+            name: "Bedroom Suite",
+            images: [
+              {
+                id: "img-1",
+                name: "Bed Headboard",
+                title: "Bed Headboard",
+                previewUrl: "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=",
+              },
+            ],
+          },
+        ],
+        step: 1,
       };
 
       saveDraftMoodBoard(mockDraft);
       const loaded = loadDraftMoodBoard();
       expect(loaded).toBeDefined();
-      expect(loaded?.name).toBe("Test Penthouse Suite");
+      expect(loaded?.name).toBe("Artisan Modern Penthouse");
+      expect(loaded?.selectedTemplate).toBe("collage");
+      expect(loaded?.categories?.length).toBe(1);
+      expect(loaded?.categories[0].images[0].title).toBe("Bed Headboard");
 
       clearDraftMoodBoard();
       const afterClear = loadDraftMoodBoard();
       expect(afterClear).toBeNull();
     });
 
-    it("repository create persists leadId, leadName, categories, and mode", async () => {
-      const initialCats = createInitialCategories();
+    it("repository create persists category collection, selected template, and metadata", async () => {
       const created = await moodBoardRepository.create({
-        name: "Bespoke Villa Master Suite",
+        name: "Coastal Contemporary Villa",
         projectId: "proj-2",
-        leadId: "lead-2",
-        leadName: "Alex Morgan",
-        description: "Full bespoke villa interior spec",
+        projectName: "Skyline Penthouse",
+        clientId: "client-2",
+        clientName: "Sharma Developers",
+        description: "Full visual moodboard concept",
         mode: "blank",
-        categories: initialCats,
+        selectedTemplate: "modern",
+        categories: [
+          {
+            id: "cat-living",
+            name: "Living Room",
+            images: [
+              {
+                id: "img-liv-1",
+                name: "Modular Bouclé Sofa",
+                title: "Modular Bouclé Sofa",
+                previewUrl: "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=",
+              },
+            ],
+          },
+        ],
       });
 
       expect(created.id).toBeDefined();
-      expect(created.name).toBe("Bespoke Villa Master Suite");
-      expect(created.leadName).toBe("Alex Morgan");
-      expect(created.categories?.length).toBe(5);
+      expect(created.name).toBe("Coastal Contemporary Villa");
+      expect(created.selectedTemplate).toBe("modern");
+      expect(created.categories?.length).toBe(1);
+      expect(created.categories![0].images![0].title).toBe("Modular Bouclé Sofa");
 
       const fetched = await moodBoardRepository.getById(created.id);
       expect(fetched).toBeDefined();
-      expect(fetched?.name).toBe("Bespoke Villa Master Suite");
-      expect(fetched?.leadName).toBe("Alex Morgan");
+      expect(fetched?.name).toBe("Coastal Contemporary Villa");
+      expect(fetched?.selectedTemplate).toBe("modern");
     });
   });
 
-  describe("8. Unsaved Changes & Dialog (Section 4 & 13)", () => {
+  describe("10. Unsaved Changes & Dialog (Section 4 & 13)", () => {
     const unsavedContent = readFileSync(unsavedPath, "utf-8");
 
     it("contains Unsaved Changes dialog with Leave Without Saving and Keep Editing", () => {

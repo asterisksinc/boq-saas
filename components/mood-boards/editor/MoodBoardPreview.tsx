@@ -1,336 +1,380 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
-  UploadCloud,
-  X,
-  Star,
-  Image as ImageIcon,
-  Layers,
+  Maximize2,
+  ChevronLeft,
+  ChevronRight,
   Sparkles,
-  DollarSign,
-  Folder,
+  LayoutTemplate,
+  Layers,
+  Image as ImageIcon,
 } from "lucide-react";
 import {
   MoodBoardCategory,
   MoodBoardImage,
-  MoodBoardItem,
+  MoodBoardTemplateLayout,
 } from "@/lib/mood-boards/types";
-import { createSampleImageSvg } from "@/lib/mood-boards/mock-data";
-import { generateId } from "@/lib/mood-boards/helpers";
+import MoodBoardTemplateSelector from "./MoodBoardTemplateSelector";
+import MoodBoardFullscreenModal from "./MoodBoardFullscreenModal";
 
-interface MoodBoardPreviewProps {
+export interface MoodBoardPreviewProps {
   name: string;
   projectName: string;
-  leadName: string;
-  description: string;
+  leadName?: string;
+  clientName?: string;
+  description?: string;
   categories: MoodBoardCategory[];
   activeCategory: MoodBoardCategory;
+  selectedTemplate: MoodBoardTemplateLayout;
+  onSelectTemplate: (template: MoodBoardTemplateLayout) => void;
+  onSelectCategory: (categoryId: string) => void;
   coverImage?: string;
-  onSetCoverImage: (url: string) => void;
-  onAddImagesToCategory: (categoryId: string, images: MoodBoardImage[]) => void;
-  onRemoveImageFromCategory: (categoryId: string, imageId: string) => void;
-  onChangeTemplate: () => void;
+  onSetCoverImage?: (url: string) => void;
+  onChangeTemplate?: () => void;
 }
 
 export default function MoodBoardPreview({
   name,
   projectName,
   leadName,
+  clientName,
   description,
   categories,
   activeCategory,
-  coverImage,
-  onSetCoverImage,
-  onAddImagesToCategory,
-  onRemoveImageFromCategory,
+  selectedTemplate = "grid-4x4",
+  onSelectTemplate,
+  onSelectCategory,
   onChangeTemplate,
 }: MoodBoardPreviewProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
+  const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
 
-  // Calculate Subtotal, GST, and Total from all categories & items
-  const subtotal = categories.reduce((totalCat, cat) => {
-    const catSum = (cat.itemGroups || []).reduce((totalGrp, grp) => {
-      const grpSum = (grp.items || []).reduce(
-        (sum, item) => sum + (item.amount || 0),
-        0
+  const currentIndex = categories.findIndex((c) => c.id === activeCategory.id);
+  const totalCategories = categories.length;
+  const prevCategory = currentIndex > 0 ? categories[currentIndex - 1] : null;
+  const nextCategory =
+    currentIndex < totalCategories - 1 ? categories[currentIndex + 1] : null;
+
+  const currentImages = activeCategory.images || [];
+
+  // Helper to render the layout variations
+  const renderTemplateCanvas = (cat: MoodBoardCategory, isFullscreen = false) => {
+    const images = cat.images || [];
+
+    if (images.length === 0) {
+      return (
+        <div className="mb-canvas-empty-state">
+          <div className="mb-canvas-empty-icon-wrap">
+            <ImageIcon size={38} className="text-slate-400" />
+          </div>
+          <h4 className="mb-canvas-empty-title">
+            No images in {cat.name} yet
+          </h4>
+          <p className="mb-canvas-empty-sub">
+            Upload images in the left panel to see this {selectedTemplate.toUpperCase()} layout come to life.
+          </p>
+        </div>
       );
-      return totalGrp + grpSum;
-    }, 0);
-    return totalCat + catSum;
-  }, 0);
-
-  const gst = subtotal * 0.18;
-  const totalAmount = subtotal + gst;
-
-  // Format currency in Indian Rupees
-  const formatCurrency = (val: number) => {
-    if (val >= 100000) {
-      return `₹${(val / 100000).toFixed(2)}L`;
     }
-    return `₹${val.toLocaleString("en-IN")}`;
-  };
 
-  // Handle local image file upload
-  const handleFiles = (files: FileList | null) => {
-    if (!files || files.length === 0) return;
+    switch (selectedTemplate) {
+      case "grid-4x4":
+        return (
+          <div className={`preview-image-grid mb-layout-canvas layout-grid-4x4 ${isFullscreen ? "is-fullscreen" : ""}`}>
+            {images.map((img, idx) => (
+              <div key={img.id || idx} className="mb-canvas-card card-grid-4x4">
+                <div className="mb-canvas-img-box">
+                  <img
+                    src={img.previewUrl}
+                    alt={img.title || img.name}
+                    className="mb-canvas-img"
+                    loading="lazy"
+                  />
+                </div>
+                <div className="mb-canvas-card-footer">
+                  <span className="mb-canvas-img-title">{img.title || img.name}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        );
 
-    const newImages: MoodBoardImage[] = [];
-    Array.from(files).forEach((file) => {
-      if (!file.type.startsWith("image/")) return;
-      const objectUrl = URL.createObjectURL(file);
-      newImages.push({
-        id: `img-${generateId()}`,
-        name: file.name,
-        previewUrl: objectUrl,
-        fileType: file.type,
-        size: file.size,
-        uploadedAt: new Date().toISOString(),
-      });
-    });
+      case "collage":
+        return (
+          <div className={`mb-layout-canvas layout-collage ${isFullscreen ? "is-fullscreen" : ""}`}>
+            {images.map((img, idx) => {
+              // Asymmetric sizing
+              const isHero = idx === 0;
+              const isTall = idx === 1;
+              const isWide = idx === 3;
+              let cardClass = "card-collage-standard";
+              if (isHero) cardClass = "card-collage-hero";
+              else if (isTall) cardClass = "card-collage-tall";
+              else if (isWide) cardClass = "card-collage-wide";
 
-    if (newImages.length > 0) {
-      onAddImagesToCategory(activeCategory.id, newImages);
-      if (!coverImage) {
-        onSetCoverImage(newImages[0].previewUrl);
-      }
+              return (
+                <div key={img.id || idx} className={`mb-canvas-card ${cardClass}`}>
+                  <div className="mb-canvas-img-box">
+                    <img
+                      src={img.previewUrl}
+                      alt={img.title || img.name}
+                      className="mb-canvas-img"
+                      loading="lazy"
+                    />
+                  </div>
+                  <div className="mb-canvas-card-footer">
+                    <span className="mb-canvas-img-title">{img.title || img.name}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+
+      case "modern":
+        return (
+          <div className={`mb-layout-canvas layout-modern ${isFullscreen ? "is-fullscreen" : ""}`}>
+            {images.map((img, idx) => (
+              <div
+                key={img.id || idx}
+                className={`mb-canvas-card card-modern ${
+                  idx % 3 === 0 ? "span-two" : ""
+                }`}
+              >
+                <div className="mb-canvas-img-box">
+                  <img
+                    src={img.previewUrl}
+                    alt={img.title || img.name}
+                    className="mb-canvas-img"
+                    loading="lazy"
+                  />
+                </div>
+                <div className="mb-canvas-card-footer modern-footer">
+                  <span className="mb-canvas-img-index">0{idx + 1}</span>
+                  <span className="mb-canvas-img-title">{img.title || img.name}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+
+      case "minimal":
+        return (
+          <div className={`mb-layout-canvas layout-minimal ${isFullscreen ? "is-fullscreen" : ""}`}>
+            {images.map((img, idx) => (
+              <div key={img.id || idx} className="mb-canvas-card card-minimal">
+                <div className="mb-canvas-img-box minimal-box">
+                  <img
+                    src={img.previewUrl}
+                    alt={img.title || img.name}
+                    className="mb-canvas-img"
+                    loading="lazy"
+                  />
+                </div>
+                <div className="mb-canvas-card-footer minimal-footer">
+                  <span className="mb-canvas-img-title">{img.title || img.name}</span>
+                  <span className="mb-canvas-minimal-dot">•</span>
+                  <span className="mb-canvas-minimal-cat">{cat.name}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+
+      case "magazine":
+        return (
+          <div className={`mb-layout-canvas layout-magazine ${isFullscreen ? "is-fullscreen" : ""}`}>
+            {/* Left Primary Hero Section */}
+            {images.length > 0 && (
+              <div className="mb-mag-hero-column">
+                <div className="mb-canvas-card card-mag-hero">
+                  <div className="mb-canvas-img-box mag-hero-box">
+                    <img
+                      src={images[0].previewUrl}
+                      alt={images[0].title || images[0].name}
+                      className="mb-canvas-img"
+                      loading="lazy"
+                    />
+                    <div className="mb-mag-hero-badge">Featured Concept</div>
+                  </div>
+                  <div className="mb-canvas-card-footer mag-hero-footer">
+                    <h5 className="mb-mag-title">{images[0].title || images[0].name}</h5>
+                    <p className="mb-mag-sub">{cat.name} Signature Study</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Right Supporting Images Grid */}
+            {images.length > 1 && (
+              <div className="mb-mag-support-column">
+                {images.slice(1).map((img, idx) => (
+                  <div key={img.id || idx} className="mb-canvas-card card-mag-support">
+                    <div className="mb-canvas-img-box mag-support-box">
+                      <img
+                        src={img.previewUrl}
+                        alt={img.title || img.name}
+                        className="mb-canvas-img"
+                        loading="lazy"
+                      />
+                    </div>
+                    <div className="mb-canvas-card-footer">
+                      <span className="mb-canvas-img-title">{img.title || img.name}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+
+      case "split":
+        return (
+          <div className={`mb-layout-canvas layout-split ${isFullscreen ? "is-fullscreen" : ""}`}>
+            <div className="mb-split-col mb-split-col-left">
+              {images
+                .filter((_, i) => i % 2 === 0)
+                .map((img, idx) => (
+                  <div key={img.id || idx} className="mb-canvas-card card-split">
+                    <div className="mb-canvas-img-box">
+                      <img
+                        src={img.previewUrl}
+                        alt={img.title || img.name}
+                        className="mb-canvas-img"
+                        loading="lazy"
+                      />
+                    </div>
+                    <div className="mb-canvas-card-footer">
+                      <span className="mb-canvas-img-title">{img.title || img.name}</span>
+                    </div>
+                  </div>
+                ))}
+            </div>
+
+            <div className="mb-split-divider-line" />
+
+            <div className="mb-split-col mb-split-col-right">
+              {images
+                .filter((_, i) => i % 2 === 1)
+                .map((img, idx) => (
+                  <div key={img.id || idx} className="mb-canvas-card card-split">
+                    <div className="mb-canvas-img-box">
+                      <img
+                        src={img.previewUrl}
+                        alt={img.title || img.name}
+                        className="mb-canvas-img"
+                        loading="lazy"
+                      />
+                    </div>
+                    <div className="mb-canvas-card-footer">
+                      <span className="mb-canvas-img-title">{img.title || img.name}</span>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
     }
   };
-
-  // Generate a sample swatch for the active category
-  const handleAddSampleSwatch = () => {
-    const palettes: [string, string, string][] = [
-      ["#1e293b", "#334155", "#475569"],
-      ["#78350f", "#b45309", "#f59e0b"],
-      ["#1e3a8a", "#2563eb", "#60a5fa"],
-      ["#064e3b", "#047857", "#10b981"],
-    ];
-    const chosenPalette =
-      palettes[Math.floor(Math.random() * palettes.length)];
-    const sampleUrl = createSampleImageSvg(
-      `${activeCategory.name} - Concept Spec`,
-      chosenPalette,
-      projectName || "Interior Specification"
-    );
-
-    const sampleImage: MoodBoardImage = {
-      id: `img-sample-${generateId()}`,
-      name: `${activeCategory.name}-Spec.svg`,
-      previewUrl: sampleUrl,
-      fileType: "image/svg+xml",
-      size: 145000,
-      uploadedAt: new Date().toISOString(),
-    };
-
-    onAddImagesToCategory(activeCategory.id, [sampleImage]);
-    if (!coverImage) {
-      onSetCoverImage(sampleUrl);
-    }
-  };
-
-  const categoryImages = activeCategory.images || [];
 
   return (
-    <section className="mb-preview-panel" aria-labelledby="mb-preview-title">
-      {/* Header Row: MOODBOARD PREVIEW + Change Template button (Frame 2147225453) */}
-      <div className="mb-preview-header-bar">
-        <h2 id="mb-preview-title" className="mb-preview-heading-title">
-          MOODBOARD PREVIEW
-        </h2>
+    <section className="moodboard-preview-panel mb-preview-panel" aria-labelledby="mb-template-heading">
+      {/* Choose Template Section */}
+      <MoodBoardTemplateSelector
+        selectedTemplate={selectedTemplate}
+        onSelectTemplate={onSelectTemplate}
+      />
 
-        <button
-          type="button"
-          className="mb-btn-change-template"
-          onClick={onChangeTemplate}
-        >
-          Change Template
-        </button>
-      </div>
-
-      {/* Main Inner White Card (Frame 2147225027) */}
-      <div className="mb-preview-inner-card">
-        {/* Mood Board Live Meta Header */}
-        <div className="mb-preview-meta-block">
-          <div className="mb-preview-meta-top">
-            <h3 className="mb-preview-board-name">
-              {name.trim() || "Untitled Mood Board"}
-            </h3>
-            <span className="mb-preview-status-pill">DRAFT</span>
+      {/* Main Preview White Canvas Container */}
+      <div className="moodboard-preview-canvas mb-preview-inner-card mb-preview-canvas-card">
+        {/* Preview Title Row: Category title left (— Category Name), Project | Moodboard name right */}
+        <div className="preview-title-row mb-preview-canvas-header">
+          <div className="mb-preview-header-meta">
+            <div className="mb-preview-category-tag-row">
+              <span className="mb-active-cat-dash">—</span>
+              <span className="mb-active-cat-name">{activeCategory.name}</span>
+            </div>
           </div>
 
-          <div className="mb-preview-meta-row">
-            <span className="mb-preview-meta-item">
-              <strong>Project:</strong> {projectName || "None selected"}
-            </span>
-            <span className="mb-preview-meta-dot">•</span>
-            <span className="mb-preview-meta-item">
-              <strong>Lead:</strong> {leadName || "None assigned"}
-            </span>
-            <span className="mb-preview-meta-dot">•</span>
-            <span className="mb-preview-meta-item">
-              <strong>Active Category:</strong> {activeCategory.name}
-            </span>
+          <div className="mb-preview-header-actions-group">
+            <div className="mb-preview-sub-breadcrumb">
+              <span className="mb-preview-proj-name">{projectName || "Select Project"}</span>
+              <span className="mb-preview-sep">|</span>
+              <span className="mb-preview-board-name">
+                {name.trim() || "Untitled Moodboard"}
+              </span>
+            </div>
           </div>
-
-          {description && (
-            <p className="mb-preview-desc-text">{description}</p>
-          )}
         </div>
 
-        {/* Visual Asset Uploader & Swatches Section */}
-        <div className="mb-preview-assets-section">
-          <div className="mb-preview-assets-header">
-            <div className="mb-preview-assets-title-wrap">
-              <Folder size={18} className="mb-preview-folder-icon" />
-              <h4 className="mb-preview-category-assets-title">
-                {activeCategory.name} Visuals & Swatches
-              </h4>
-              <span className="mb-category-badge">
-                {categoryImages.length}
+        {/* Live Canvas Viewport */}
+        <div className="mb-canvas-viewport">
+          {renderTemplateCanvas(activeCategory, false)}
+        </div>
+
+        {/* Category Preview Navigation Bar with Fullscreen on the right */}
+        <nav
+          className="mb-preview-category-pagination"
+          aria-label="Category Preview Navigation"
+        >
+          <div className="mb-preview-nav-controls">
+            <button
+              type="button"
+              className="mb-page-nav-btn prev"
+              disabled={currentIndex <= 0}
+              onClick={() => prevCategory && onSelectCategory(prevCategory.id)}
+              title={prevCategory ? `Previous: ${prevCategory.name}` : "No previous category"}
+            >
+              <ChevronLeft size={16} />
+              <span className="mb-nav-btn-label">{prevCategory ? prevCategory.name : "Previous"}</span>
+            </button>
+
+            <div className="mb-pagination-counter-group">
+              <span className="mb-pagination-current-label">{activeCategory.name}</span>
+              <span className="mb-pagination-fraction">
+                {currentIndex + 1} / {totalCategories}
               </span>
             </div>
 
             <button
               type="button"
-              className="mb-text-action-btn"
-              onClick={handleAddSampleSwatch}
+              className="mb-page-nav-btn next"
+              disabled={currentIndex >= totalCategories - 1}
+              onClick={() => nextCategory && onSelectCategory(nextCategory.id)}
+              title={nextCategory ? `Next: ${nextCategory.name}` : "No next category"}
             >
-              <Sparkles size={14} />
-              <span>+ Add Sample Swatch</span>
+              <span className="mb-nav-btn-label">{nextCategory ? nextCategory.name : "Next"}</span>
+              <ChevronRight size={16} />
             </button>
           </div>
 
-          {/* Upload Dropzone */}
-          <div
-            className={`mb-preview-dropzone ${isDragging ? "dragging" : ""}`}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setIsDragging(true);
-            }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setIsDragging(false);
-              handleFiles(e.dataTransfer.files);
-            }}
-            onClick={() => fileInputRef.current?.click()}
+          <button
+            type="button"
+            className="mb-btn-fullscreen"
+            onClick={() => setIsFullscreenOpen(true)}
+            title="View in full-screen overlay"
           >
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept="image/*"
-              style={{ display: "none" }}
-              onChange={(e) => handleFiles(e.target.files)}
-            />
-            <UploadCloud size={28} className="mb-dropzone-icon" />
-            <p className="mb-dropzone-title">
-              Click to upload or drag images into {activeCategory.name}
-            </p>
-            <p className="mb-dropzone-sub">
-              JPG, PNG, WEBP, SVG preview supported
-            </p>
-          </div>
-
-          {/* Images Grid */}
-          {categoryImages.length > 0 ? (
-            <div className="mb-preview-images-grid">
-              {categoryImages.map((img) => {
-                const isCover = coverImage === img.previewUrl;
-                return (
-                  <div
-                    key={img.id}
-                    className={`mb-preview-img-card ${
-                      isCover ? "is-cover" : ""
-                    }`}
-                  >
-                    <div className="mb-preview-img-wrapper">
-                      <img
-                        src={img.previewUrl}
-                        alt={img.name}
-                        className="mb-preview-img-thumb"
-                      />
-                      {isCover && (
-                        <div className="mb-preview-cover-badge">
-                          <Star size={10} fill="#FFFFFF" />
-                          <span>Cover</span>
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        className="mb-editor-img-delete"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRemoveImageFromCategory(
-                            activeCategory.id,
-                            img.id
-                          );
-                        }}
-                        aria-label={`Remove ${img.name}`}
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-
-                    <div className="mb-preview-img-footer">
-                      <span className="mb-preview-img-name" title={img.name}>
-                        {img.name}
-                      </span>
-                      {!isCover && (
-                        <button
-                          type="button"
-                          className="mb-btn-set-cover"
-                          onClick={() => onSetCoverImage(img.previewUrl)}
-                        >
-                          Set Cover
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="mb-preview-empty-gallery">
-              <ImageIcon size={36} className="mb-empty-gallery-icon" />
-              <p className="mb-empty-gallery-title">
-                No visual assets added to {activeCategory.name} yet
-              </p>
-              <p className="mb-empty-gallery-sub">
-                Upload room photos, material finishes, 3D renders, or click &quot;+ Add Sample Swatch&quot; above.
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Financial & Items Summary Box (Frame 2147225179 & Frame 2147225224) */}
-        <div className="mb-financial-summary-card">
-          <div className="mb-summary-row">
-            <span className="mb-summary-label">Subtotal</span>
-            <span className="mb-summary-val">
-              {subtotal > 0 ? formatCurrency(subtotal) : "--"}
-            </span>
-          </div>
-
-          <div className="mb-summary-row">
-            <span className="mb-summary-label">GST (18%)</span>
-            <span className="mb-summary-val">
-              {subtotal > 0 ? formatCurrency(gst) : "₹0.00"}
-            </span>
-          </div>
-
-          {/* Divider (Rectangle 30) */}
-          <div className="mb-summary-divider" />
-
-          <div className="mb-summary-row total">
-            <span className="mb-summary-total-label">Total Amount</span>
-            <span className="mb-summary-total-val">
-              {totalAmount > 0 ? formatCurrency(totalAmount) : "₹0.00"}
-            </span>
-          </div>
-        </div>
+            <Maximize2 size={15} />
+            <span>Fullscreen</span>
+          </button>
+        </nav>
       </div>
+
+      {/* Fullscreen Modal Overlay */}
+      <MoodBoardFullscreenModal
+        isOpen={isFullscreenOpen}
+        onClose={() => setIsFullscreenOpen(false)}
+        categories={categories}
+        activeCategoryId={activeCategory.id}
+        onSelectCategory={onSelectCategory}
+        selectedTemplate={selectedTemplate}
+        moodboardName={name}
+        projectName={projectName}
+        renderTemplateCanvas={renderTemplateCanvas}
+      />
     </section>
   );
 }

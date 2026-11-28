@@ -165,7 +165,9 @@ export default function BoqRoomCategoryView({
 
     // Action menu dropdown anchors
     const [openCategoryMenu, setOpenCategoryMenu] = useState(false);
+    const [categoryMenuPosition, setCategoryMenuPosition] = useState({ top: 0, left: 0 });
     const [activeItemMenuId, setActiveItemMenuId] = useState<string | null>(null);
+    const [itemMenuPosition, setItemMenuPosition] = useState({ top: 0, left: 0 });
     const categoryMenuRef = useRef<HTMLDivElement>(null);
 
     // Loading & feedback state
@@ -810,7 +812,14 @@ export default function BoqRoomCategoryView({
                                             type="button"
                                             className="boq-room-square-btn"
                                             aria-label="More category options"
-                                            onClick={() => setOpenCategoryMenu(!openCategoryMenu)}
+                                            onClick={(e) => {
+                                                const rect = e.currentTarget.getBoundingClientRect();
+                                                setCategoryMenuPosition({
+                                                    top: rect.bottom + 6,
+                                                    left: Math.max(8, rect.right - 160),
+                                                });
+                                                setOpenCategoryMenu(!openCategoryMenu);
+                                            }}
                                         >
                                             <MoreVertical size={18} color="#1C1B1F" />
                                         </button>
@@ -818,10 +827,10 @@ export default function BoqRoomCategoryView({
                                         {openCategoryMenu && (
                                             <div
                                                 style={{
-                                                    position: "absolute",
-                                                    right: 0,
-                                                    top: "100%",
-                                                    marginTop: "6px",
+                                                    position: "fixed",
+                                                    right: "auto",
+                                                    top: `${categoryMenuPosition.top}px`,
+                                                    left: `${categoryMenuPosition.left}px`,
                                                     width: "160px",
                                                     background: "#FFFFFF",
                                                     border: "1px solid #E2E8F0",
@@ -1071,6 +1080,11 @@ export default function BoqRoomCategoryView({
                                                                                             aria-label="Item actions"
                                                                                             onClick={(e) => {
                                                                                                 e.stopPropagation();
+                                                                                                const rect = e.currentTarget.getBoundingClientRect();
+                                                                                                setItemMenuPosition({
+                                                                                                    top: rect.bottom + 4,
+                                                                                                    left: Math.max(8, rect.right - 140),
+                                                                                                });
                                                                                                 setActiveItemMenuId(isMenuOpen ? null : item.id);
                                                                                             }}
                                                                                         >
@@ -1080,9 +1094,10 @@ export default function BoqRoomCategoryView({
                                                                                         {isMenuOpen && (
                                                                                             <div
                                                                                                 style={{
-                                                                                                    position: "absolute",
-                                                                                                    right: "12px",
-                                                                                                    top: "calc(100% - 6px)",
+                                                                                                    position: "fixed",
+                                                                                                    right: "auto",
+                                                                                                    top: `${itemMenuPosition.top}px`,
+                                                                                                    left: `${itemMenuPosition.left}px`,
                                                                                                     width: "140px",
                                                                                                     background: "#FFFFFF",
                                                                                                     border: "1px solid #E2E8F0",
@@ -1231,6 +1246,11 @@ export default function BoqRoomCategoryView({
                                                                                 className="boq-item-action-trigger"
                                                                                 onClick={(e) => {
                                                                                     e.stopPropagation();
+                                                                                    const rect = e.currentTarget.getBoundingClientRect();
+                                                                                    setItemMenuPosition({
+                                                                                        top: rect.bottom + 4,
+                                                                                        left: Math.max(8, rect.right - 140),
+                                                                                    });
                                                                                     setActiveItemMenuId(isMenuOpen ? null : item.id);
                                                                                 }}
                                                                             >
@@ -1239,9 +1259,10 @@ export default function BoqRoomCategoryView({
                                                                             {isMenuOpen && (
                                                                                 <div
                                                                                     style={{
-                                                                                        position: "absolute",
-                                                                                        right: "12px",
-                                                                                        top: "calc(100% - 6px)",
+                                                                                        position: "fixed",
+                                                                                        right: "auto",
+                                                                                        top: `${itemMenuPosition.top}px`,
+                                                                                        left: `${itemMenuPosition.left}px`,
                                                                                         width: "140px",
                                                                                         background: "#FFFFFF",
                                                                                         border: "1px solid #E2E8F0",
