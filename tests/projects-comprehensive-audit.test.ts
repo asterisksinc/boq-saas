@@ -74,14 +74,19 @@ describe("Projects Comprehensive Audit & Implementation Tests", () => {
       expect(projectPage).toContain("Next Actions for this Project");
     });
 
-    it("verifies Project Details renders the 6 two-column cards matching reference design", () => {
+    it("verifies Project Details renders the 6 three-column cards matching reference design", () => {
       expect(projectPage).toContain('title="Project Identity"');
       expect(projectPage).toContain('title="Location"');
-      expect(projectPage).toContain('title="Client Information"');
-      expect(projectPage).toContain('title="Timeline & Schedule"');
+      expect(projectPage).toContain('title="Client"');
+      expect(projectPage).toContain('title="Timeline"');
       expect(projectPage).toContain('title="Commercial Information"');
       expect(projectPage).toContain('title="Ownership & Team"');
-      expect(projectPage).toContain("Edit Details");
+      expect(projectPage).toContain('className="pd-card"');
+      expect(projectPage).not.toContain("Edit Details");
+      // Tag row shows user tags only; stage:* markers stay hidden and survive edits.
+      expect(projectPage).toContain('"Tag",');
+      expect(projectPage).toContain('!t.startsWith("stage:")');
+      expect(projectPage).toMatch(/t\.startsWith\("stage:"\)\),\n\s*\],/);
     });
 
     it("verifies EditProjectModal persists extended metadata fields", () => {

@@ -61899,3 +61899,82 @@ tbody tr:has(> td > .tes), tbody tr:has(> td > .tes):hover { background: transpa
 /* Costing, Activities */
 .fig-dashboard-main > .costing-page-shell,
 .fig-dashboard-main > .activities-content { flex: 1 1 auto; }
+
+/* Project detail → Project Details tab (Figma "Open Project"): 2 panels per row, 3-column field grid inside each. */
+.workspace-ui .pd-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+.workspace-ui .pd-panel { display: flex; flex-direction: column; gap: 20px; padding: 20px; background: rgba(255, 255, 255, 0.6); border: 1px solid rgba(226, 232, 240, 0.7); border-radius: 6px; box-sizing: border-box; min-width: 0; }
+.workspace-ui .pd-panel-title { margin: 0; font-family: 'Urbanist', Inter, sans-serif; font-size: 14px; font-weight: 500; line-height: 120%; letter-spacing: 0.02em; text-transform: uppercase; color: #64748b; }
+.workspace-ui .pd-card { flex: 1 1 auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px 16px; align-content: start; padding: 20px 16px; background: #fff; border-radius: 14px; box-shadow: 0 0 6px rgba(0, 0, 0, 0.06); box-sizing: border-box; }
+.workspace-ui .pd-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.workspace-ui .pd-field--wide { grid-column: 1 / -1; }
+.workspace-ui .pd-label { font-family: 'Urbanist', Inter, sans-serif; font-size: 12px; font-weight: 400; line-height: 120%; color: #64748b; }
+.workspace-ui .pd-value { font-family: 'Urbanist', Inter, sans-serif; font-size: 14px; font-weight: 400; line-height: 120%; color: #0f172a; overflow-wrap: anywhere; }
+.workspace-ui .pd-status { display: inline-flex; align-items: center; width: max-content; padding: 2px 6px; border-radius: 4px; font-size: 12px; font-weight: 500; line-height: 120%; letter-spacing: 0.02em; text-transform: uppercase; background: #f1f5f9; color: #475569; }
+.workspace-ui .pd-status--active, .workspace-ui .pd-status--completed { background: #dcfce7; color: #16a34a; }
+.workspace-ui .pd-status--planning { background: #dbeafe; color: #2563eb; }
+.workspace-ui .pd-status--on_hold { background: #fef3c7; color: #b45309; }
+.workspace-ui .pd-status--cancelled { background: #fee2e2; color: #dc2626; }
+@media (max-width: 1100px) { .workspace-ui .pd-grid { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .workspace-ui .pd-card { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.workspace-ui .pd-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.workspace-ui .pd-tag { display: inline-flex; align-items: center; padding: 2px 6px; border-radius: 4px; background: #f1f5f9; color: #64748b; font-size: 12px; font-weight: 400; line-height: 120%; }
+.workspace-ui .pd-status--in_progress { background: #dcfce7; color: #16a34a; }
+
+/* Project Details fills one screen (Figma): header + tabs + 3 rows of panels. Rows stretch to fill the height but
+   never shrink below their content, so nothing is clipped and cards never scroll inside. */
+@media (min-width: 1101px) {
+  .workspace-ui .fig-dashboard-main:has(.pd-grid) { display: flex; flex-direction: column; min-height: calc(100vh - 32px); box-sizing: border-box; }
+  .workspace-ui .fig-dashboard-main:has(.pd-grid) > .workspace-content { flex: 1 1 auto; display: flex; flex-direction: column; padding-bottom: 0; }
+  .workspace-ui .pd-grid { flex: 1 1 auto; grid-template-rows: repeat(3, minmax(min-content, 1fr)); }
+}
+/* Laptop-height screens: tighter spacing so all six panels fit without scrolling. */
+@media (min-width: 1101px) and (max-height: 920px) {
+  .workspace-ui .fig-dashboard-main:has(.pd-grid) > .workspace-content { gap: 12px; }
+  .workspace-ui .pd-grid { gap: 12px; }
+  .workspace-ui .pd-panel { padding: 14px 16px; gap: 10px; }
+  .workspace-ui .pd-card { padding: 12px 16px; gap: 10px 16px; }
+  .workspace-ui .pd-field { gap: 4px; }
+}
+
+/* Project detail KPI cards use the Proposals KPI format: translucent tiles, 14px label, 24px regular value, 12px caption. */
+.workspace-ui .po-workspace-summary-panel,
+.workspace-ui .po-costing-summary-panel { padding: 0; background: transparent; border: 0; border-radius: 0; gap: 8px; }
+.workspace-ui .po-workspace-kpi-grid,
+.workspace-ui .po-costing-kpi-grid,
+.workspace-ui .metric-row,
+.workspace-ui .pe-kpis { gap: 8px; margin-bottom: 0; }
+.workspace-ui .po-workspace-kpi-card,
+.workspace-ui .po-costing-kpi-card,
+.workspace-ui .po-costing-kpi-card.has-caption,
+.workspace-ui .metric-row > section,
+.workspace-ui .pe-kpi {
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 8px;
+  min-height: 116px; padding: 20px; box-sizing: border-box; min-width: 0;
+  background: rgba(255, 255, 255, 0.6); border: 0; border-radius: 6px; box-shadow: none; backdrop-filter: blur(12px);
+  transform: none; transition: background 0.15s ease;
+}
+.workspace-ui .po-workspace-kpi-card:hover,
+.workspace-ui .po-costing-kpi-card:hover,
+.workspace-ui .metric-row > section:hover,
+.workspace-ui .pe-kpi:hover { background: rgba(255, 255, 255, 0.85); box-shadow: none; transform: none; }
+.workspace-ui .po-workspace-kpi-label,
+.workspace-ui .po-costing-kpi-label,
+.workspace-ui .metric-row > section > small,
+.workspace-ui .pe-kpi-label { font-family: 'Urbanist', sans-serif; font-size: 14px; font-weight: 500; line-height: 120%; color: #64748b; }
+.workspace-ui .po-workspace-kpi-value,
+.workspace-ui .po-costing-kpi-value,
+.workspace-ui .metric-row > section > b,
+.workspace-ui .pe-kpi-value { margin: 0; font-family: 'Urbanist', sans-serif; font-size: 24px; font-weight: 400; line-height: 120%; color: #0f172a; }
+.workspace-ui .po-workspace-kpi-caption,
+.workspace-ui .po-costing-kpi-caption,
+.workspace-ui .pe-kpi-sub { margin: 0; font-family: 'Urbanist', sans-serif; font-size: 12px; font-weight: 500; line-height: 120%; color: #64748b; }
+.workspace-ui .pe-kpi-value.is-green, .workspace-ui .pe-kpi-value.is-blue, .workspace-ui .pe-kpi-value.is-amber { color: #0f172a; }
+.workspace-ui .pe-kpi-value.is-red, .workspace-ui .po-workspace-kpi-value.danger { color: #dc2626; }
+
+/* Expenses tab: the table card runs to the bottom of the screen like the list pages. */
+.workspace-ui .fig-dashboard-main:has(.pe-tab) > .workspace-content { flex: 1 1 auto; display: flex; flex-direction: column; }
+.workspace-ui .fig-dashboard-main:has(.pe-tab) { display: flex; flex-direction: column; }
+.workspace-ui .pe-tab { flex: 1 1 auto; }
+.workspace-ui .pe-tab > .ld-table-card { flex: 1 1 auto; display: flex; flex-direction: column; }
+.workspace-ui .pe-tab > .ld-table-card > .ld-table-scroll { flex: 1 1 auto; }
+.workspace-ui .pe-tab .ld-pagination { margin-top: auto; }
